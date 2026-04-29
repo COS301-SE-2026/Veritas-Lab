@@ -116,7 +116,7 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
       <a href="https://github.com/Keegan-l-star" style="text-decoration: none; margin-right: 10px; display: inline-block;">
         <img src="https://skillicons.dev/icons?i=github" alt="GitHub" />
       </a>
-      <a href="" style="text-decoration: none; display: inline-block;">
+      <a href="https://www.linkedin.com/in/keegan-lewis-1bbb78373/" style="text-decoration: none; display: inline-block;">
         <img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" />
       </a>
     </td>
