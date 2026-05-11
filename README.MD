@@ -34,7 +34,7 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 | Machine Learning & Computer Vision | Pytorch, OpenCV, Hugging Face | <img src="https://skillicons.dev/icons?i=pytorch,opencv"/> |
 | Caching | Redis | <img src="https://skillicons.dev/icons?i=redis"/> |
 | Queue | Celery | |
-| Authentication | Keycloak |  |
+| Authentication | Json Web Token |  |
 | Deployment | AWS,Docker,GitHubActions | <img src="https://skillicons.dev/icons?i=aws,docker,githubactions"/> |
 | Testing and Version Control | PyTest, Jest, Playwright, Github | <img src="https://skillicons.dev/icons?i=jest,github,git"/> |
 
