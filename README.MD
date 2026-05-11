@@ -32,7 +32,8 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 | Database | PostgreSQL | <img src="https://skillicons.dev/icons?i=postgresql"/> |
 | Storage | AWS S3 | <img src="https://skillicons.dev/icons?i=aws"/> |
 | Machine Learning & Computer Vision | Pytorch, OpenCV, Hugging Face | <img src="https://skillicons.dev/icons?i=pytorch,opencv"/> |
-| Queue | Redis | <img src="https://skillicons.dev/icons?i=redis"/> |
+| Caching | Redis | <img src="https://skillicons.dev/icons?i=redis"/> |
+| Queue | Celery | |
 | Authentication | Keycloak |  |
 | Deployment | AWS,Docker,GitHubActions | <img src="https://skillicons.dev/icons?i=aws,docker,githubactions"/> |
 | Testing and Version Control | PyTest, Jest, Playwright, Github | <img src="https://skillicons.dev/icons?i=jest,github,git"/> |
