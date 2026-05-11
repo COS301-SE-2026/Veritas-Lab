@@ -22,6 +22,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Frontend File Structure
 
+```
 frontend/
 ├── public/ # Next.js application
 ├── src/ # API/server code, if separate
@@ -41,6 +42,9 @@ frontend/
 │   └── types/ # Custom interfaces/types to used
 ├── .gitignore
 ├── eslint.config.mjs
+├── next.config.ts
+├── package.json
+├── postcss.config.mjs
 ├── README.md
-├── tsconfig.json
-└── docs/
+└── tsconfig.json
+```
