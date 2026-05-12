@@ -10,6 +10,9 @@ Backend/
     ├── search/     #OpenSearch interaction
     ├── tasks/      #celery for ML jobs
     ├── tests/      #pyTest suite
+    ├── storage/    #AWS S3 storage
+    ├── services/   #business logic
+    ├── auth/       #authorization logic here
     ├── DockerFile
     ├── README.MD
     └── .dockerignore
