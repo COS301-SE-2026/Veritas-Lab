@@ -37,7 +37,7 @@ Installed with explanation of why and how to use:
 
 ## Database
 - sqlalchemy[asyncio] - from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine (AsyncSession opens database connections, create_async_engine sets up the PostgreSQL connection)
-    [asyncio] - unlocks async mode in SQLAlchemy without it SQLAlchemy runs synchronously and bloks our FastAPI routes
+    [asyncio] - unlocks async mode in SQLAlchemy without it SQLAlchemy runs synchronously and bloks our fastapi routes
 - asyncpg             - SQLAlchemy uses it automatically when our connection string starts with postgresql+asyncpg://
 - alembic             - keeps the real PostgreSQL tables in sync with our ORM models as they change
 
@@ -62,7 +62,7 @@ Installed with explanation of why and how to use:
 
 ## Testing
 - pytest              - import pytest (base testing framework every test file uses @pytest.mark.asyncio and @pytest.fixture decorators)
-- pytest-asyncio      - import pytest_asyncio (allows test functions to be async so they can test our async FastAPI routes and services without blocking)
+- pytest-asyncio      - import pytest_asyncio (allows test functions to be async so they can test our async fastapi routes and services without blocking)
 - pytest-cov          - run as pytest --cov=app in terminal (generates a coverage report)
 - httpx               - from httpx import AsyncClient (creates a test client in tests/conftest.py that sends fake HTTP requests without needing a running server)
 - fakeredis           - import fakeredis (creates an in memory fake Redis so our tests never need a real Redis connection running)
@@ -70,6 +70,13 @@ Installed with explanation of why and how to use:
     [s3] - only installs the S3 mocking component. moto covers all AWS services so we specify only what we need to keep it lightweight
 
     note: the above will likely need to be updated when real tests are done
+
+## Storage
+-boto3                - import boto3 (AWS SDK that handles S3 upload and object management we use it in storage/storage_service.py)
+-aioboto3             - import aioboto3 (async wrapper around boto3 necessary because the fastapi routes and Celery tasks are async so S3 calls cannot block)
+
+## Search
+- opensearch-py       - from opensearch_py import OpenSearch (covers index management, document ingest and all query types used in search/queries.py)
 
 # Currently not installed but will do so once we require them:
 
@@ -85,10 +92,3 @@ Installed with explanation of why and how to use:
 - numpy
 - scikit-learn
 - scipy
-
-## Storage
-- boto3
-- aioboto3
-
-## Search
-- opensearch-py
