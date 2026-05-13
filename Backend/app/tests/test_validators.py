@@ -1,5 +1,4 @@
-from app.api.main import validateEmail
-from app.api.main import validatePassword
+from app.api.main import validateEmail,validatePassword
 
 def testValidEmail():
     assert validateEmail("u12345678@tuks.co.za") is True
@@ -20,7 +19,7 @@ def testPasswordLength():
     assert validatePassword("Strong1@") is False
 
 def testPasswordNumber():
-    assert validatePassword("@QWertyuipsjdnasndoajd&&sa1235678991") is False
+    assert validatePassword("@QWertyuipsjdnasndoajd&&saweqwdsadsadffd") is False
 
 def testPasswordUpperCase():
     assert validatePassword("qwertyuiopasddf123455!@#$sasd") is False
@@ -31,6 +30,6 @@ def testPasswordLowerCase():
 def testPasswordMissing():
     assert validatePassword("") is False
 
-def testInvalidPassword():
+def testValidPassword():
     assert validatePassword("ThisIsAStrongPassword123@@") is True
 
