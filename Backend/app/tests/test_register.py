@@ -16,12 +16,8 @@ def testSuccessfulRegistration(monkeypatch):
             "role": role
         }
 
-    def mock_createToken(user):
-        return "mockedJWTToken"
-
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
     monkeypatch.setattr(auth, "insertUser", mock_insertUser)
-    monkeypatch.setattr(auth, "createToken", mock_createToken)
 
     response = client.post(
         "/api/register",
@@ -35,5 +31,5 @@ def testSuccessfulRegistration(monkeypatch):
     assert response.status_code == 201
     assert response.json() == {
         "status": "success",
-        "token": "mockedJWTToken"
+        "message": "Account created successfully"
     }
