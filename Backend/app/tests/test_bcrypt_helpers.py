@@ -1,7 +1,7 @@
 from app.auth.auth import hashPassword,verifyPassword
 
 def testHashPasswordReturnsString():
-    hashedPassword =hashPassword("StrongP@ssword123")
+    hashedPassword =hashPassword("StrongP@ssword1234567")
     assert isinstance(hashedPassword, str)
 
 def testHashPasswordDoesNotReturnPlainPassword():

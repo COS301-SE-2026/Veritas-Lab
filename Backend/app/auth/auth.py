@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import re as regex
 import bcrypt
+import asyncpg # This is the library for communicating with Postgres
 
 router = APIRouter(
     prefix="/api",
@@ -34,12 +35,93 @@ def validatePassword(password: str) -> bool:
     pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$"
     return regex.match(pattern, password) is not None
 
+# utf-8 encode the input string because bcrypt uses this, generate a salt, use the encoded string and salt to make the hash
+# the hash is also utf-8 encoded so it needs to be decoded before it is returned
+def hashPassword(input: str) -> str:
+    convertedString = input.encode("utf-8")
+    salt =bcrypt.gensalt()
+    hashed = bcrypt.hashpw(convertedString, salt)
+    return hashed.decode("utf-8")
 
-class loginRequest(BaseModel):
+# utf-8 encodes both strings and uses bcrypt.checkpw to see if they are the same
+def verifyPassword(password: str, hashedPassword: str) ->bool:
+    convertedPassword = password.encode("utf-8")
+    convertedHash = hashedPassword.encode("utf-8")
+    return bcrypt.checkpw(convertedPassword,convertedHash)
+
+class LoginRequest(BaseModel):
     email: str
     password: str
 
+# Once the envs are setup this will need to be updated
+async def searchUsersViaEmail(email:str):
+    connection = await asyncpg.connect(
+        user="postgres_username_here",
+        password="some password here",
+        database="database name here",
+        host="localhost",
+        port=8001
+    )
 
+    row = await connection.fetchrow(
+         """
+        SELECT "UserId", "UserEmail", "UserName", "UserRole", "UserPassword"
+        FROM "Users"
+        WHERE "UserEmail" = $1
+        """,
+        email
+    )
+
+    await connection.close
+
+    if row is None:
+        return None
+    
+    return {
+        "id": str(row["UserId"]),
+        "email": row["UserEmail"],
+        "username": row["UserName"],
+        "role": row["UserRole"],
+        "password": row["UserPassword"]
+    }
+
+@router.post("/login")
+async def login(request: LoginRequest):
+    if not validateEmail(request.email):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+        )
+
+    if not validatePassword(request.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+        )
+
+    user = await searchUsersViaEmail(request.email.strip())
+
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail= "A User with this email does not exist. Please register"
+        )
+    
+    if not verifyPassword(request.password, user["password"]):
+        raise HTTPException(
+            status_code=401,
+            detail= "Invalid email or password"
+        )
+
+    token = createToken(user)
+
+    return {
+        "status" : "success",
+        "token" : token
+    }
+
+        
+    
 
 
 
