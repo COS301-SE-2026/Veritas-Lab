@@ -1,28 +1,18 @@
 from fastapi import FastAPI
 import re
+from pydantic import BaseModel # For JSON
 
-# Validates an email. 
-# Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
-# an "@", one or more valid post-@ pre. characters (0-9, a-z, A-z,.,-), a ".",
-# and finally two or more valid post. characters (A-Z and a-z).
-def validateEmail(email: str) -> bool:
-    if not isinstance(email,str):
-        return False
+app = FastAPI(
+    title="Veritas Lab API",
+    description="This is the backend REST API for Veritas Lab"
+)
 
-    email = email.strip()
+@app.get("/")
+def root():
+    return {
+        "status":"success",
+        "message":"The API is running..."
+    }
 
-    if len(email) == 0:
-        return False
-    
-    pattern = r"^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
-    return re.match(pattern, email) is not None
 
-# Validates a password. 
-# Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
-# Regex : At least 1 lower case, At least 1 upper case, At least 1 number number, At least 1 special char, must be 12 chars long
-def validatePassword(password: str) -> bool:
-    if not isinstance(password,str):
-        return False
-    
-    pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$"
-    return re.match(pattern, password) is not None
+
