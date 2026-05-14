@@ -118,8 +118,7 @@ def createToken(user: dict) ->str:
     expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
-        "sub": user["email"],
-        "userId": user["id"],
+        "sub": user["id"],
         "username": user["username"],
         "role": user["role"],
         "exp": expiryTime
