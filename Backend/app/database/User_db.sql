@@ -1,0 +1,19 @@
+
+
+Create SCHEMA IF NOT EXISTS "Users_DB";
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+
+CREATE TYPE User_Role_Enum AS ENUM ('ADMIN','INVESTIGATOR','USER');
+
+CREATE TABLE IF NOT EXISTS users(
+    UserId UUID PRIMARY KEY DEFAULT uuid_generate_v4,
+    UserEmail VARCHAR(255) UNIQUE NOT NULL,
+    UserName VARCHAR(100) NOT NULL,
+    UserRole User_Role_Enum NOT NULL,
+    UserPassword VARCHAR(255) NOT NULL,
+    UserJWTIssued TIMESTAMPTZ,
+)
+
+
+
