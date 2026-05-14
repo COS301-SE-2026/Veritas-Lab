@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re as regex
 import bcrypt
@@ -55,9 +56,11 @@ def verifyPassword(password: str, hashedPassword: str) ->bool:
     convertedHash = hashedPassword.encode("utf-8")
     return bcrypt.checkpw(convertedPassword,convertedHash)
 
+# Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
+# So we allow None and validate missing fields in the endpoint.
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str | None=None 
+    password: str | None=None
 
 async def updateUserJWTIssued(email: str):
     connection = await asyncpg.connect(
@@ -129,29 +132,41 @@ def createToken(user: dict) ->str:
 @router.post("/login")
 async def login(request: LoginRequest):
     if not validateEmail(request.email):
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail="Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+            content={
+                "status": "error",
+                "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+            }
         )
 
     if not validatePassword(request.password):
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail="Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+            content={
+                "status": "error",
+                "message": "Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+            }
         )
 
     user = await searchUsersViaEmail(request.email.strip())
 
     if user is None:
-        raise HTTPException(
+        return JSONResponse(
             status_code=404,
-            detail= "A User with this email does not exist. Please register"
+            content={
+                "status": "error",
+                "message": "A User with this email does not exist. Please register"
+            }
         )
     
     if not verifyPassword(request.password, user["password"]):
-        raise HTTPException(
+        return JSONResponse(
             status_code=401,
-            detail= "Invalid email or password"
+            content={
+                "status": "error",
+                "message": "Invalid email or password"
+            }
         )
 
     token = createToken(user)
