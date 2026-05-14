@@ -2,7 +2,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import re as regex
 import bcrypt
+from jose import jwt
+from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
+
+SECRET_KEY = "change when the env is ready"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 5
 
 router = APIRouter(
     prefix="/api",
@@ -53,6 +59,26 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+async def updateUserJWTIssued(email: str):
+    connection = await asyncpg.connect(
+        user="postgres",
+        password="",
+        database="",
+        host="localhost",
+        port=8001
+    )
+
+    await connection.execute(
+        """
+        UPDATE "Users_DB"."Users"
+        SET "UserJWTIssued" = NOW()
+        WHERE "UserEmail" = $1
+        """,
+        email
+    )
+
+    await connection.close()
+
 # Once the envs are setup this will need to be updated
 async def searchUsersViaEmail(email:str):
     connection = await asyncpg.connect(
@@ -85,6 +111,21 @@ async def searchUsersViaEmail(email:str):
         "password": row["UserPassword"]
     }
 
+def createToken(user: dict) ->str:
+    expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    payload = {
+        "sub": user["email"],
+        "userId": user["id"],
+        "username": user["username"],
+        "role": user["role"],
+        "exp": expiryTime
+    }
+
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
+    return token
+
+# POST /api/login
 @router.post("/login")
 async def login(request: LoginRequest):
     if not validateEmail(request.email):
@@ -114,6 +155,8 @@ async def login(request: LoginRequest):
         )
 
     token = createToken(user)
+
+    await updateUserJWTIssued(user["email"])
 
     return {
         "status" : "success",
