@@ -30,7 +30,7 @@ def testSuccessfulLogin(monkeypatch):
     assert response.status_code == 200
 
     hashedToken = hashString("mockedJWTToken")
-    
+
     assert response.json() =={
         "status":"success",
         "token": hashedToken

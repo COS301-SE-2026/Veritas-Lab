@@ -35,10 +35,11 @@ def validatePassword(password: str) -> bool:
     return regex.match(pattern, password) is not None
 
 
-
-
 class loginRequest(BaseModel):
     email: str
     password: str
+
+
+
 
 
