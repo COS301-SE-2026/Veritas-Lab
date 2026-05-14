@@ -1,4 +1,4 @@
-from app.api.main import validateEmail,validatePassword
+from app.auth.auth import validateEmail,validatePassword
 
 def testValidEmail():
     assert validateEmail("u12345678@tuks.co.za") is True
