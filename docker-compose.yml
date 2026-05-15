@@ -26,15 +26,20 @@ services:
             - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/veridian
             - REDIS_URL=redis://redis:6379/0
             - OPENSEARCH_URL=http://opensearch:9200
-            - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            - AWS_REGION=${AWS_REGION}
             - S3_BUCKET_NAME=${S3_BUCKET_NAME}
             - JWT_SECRET=${JWT_SECRET}
+            # BOTO3 / MINIO CONFIGURATION
+            - STORAGE_PROVIDER=minio
+            - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}       # Map MinIO user to AWS key
+            - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD} # Map MinIO pass to AWS secret
+            - AWS_S3_ENDPOINT_URL=http://minio:9000       # Critical: Points boto3 to the container
+            - S3_BUCKET_NAME=${MINIO_BUCKET_NAME}
+            - AWS_DEFAULT_REGION=${AWS_REGION}               # Boto3 requires a region structure even for MinIO
         depends_on:
             - postgres
             - redis
             - opensearch
+            - minio
         networks:
             - app-network
 
@@ -49,11 +54,14 @@ services:
             - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/veridian
             - REDIS_URL=redis://redis:6379/0
             - OPENSEARCH_URL=http://opensearch:9200
-            - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            - AWS_REGION=${AWS_REGION}
-            - S3_BUCKET_NAME=${S3_BUCKET_NAME}
             - JWT_SECRET=${JWT_SECRET}
+            # BOTO3 / MINIO CONFIGURATION
+            - STORAGE_PROVIDER=minio
+            - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}       # Map MinIO user to AWS key
+            - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD} # Map MinIO pass to AWS secret
+            - AWS_S3_ENDPOINT_URL=${STORAGE_URL}      # Critical: Points boto3 to the container
+            - S3_BUCKET_NAME=${MINIO_BUCKET_NAME}
+            - AWS_DEFAULT_REGION=${AWS_REGION}               # Boto3 requires a region structure even for MinIO
         depends_on:
             - backend
             - redis
@@ -95,11 +103,25 @@ services:
             - opensearch_data:/usr/share/opensearch/data
         networks:
             - app-network
+    minio:
+        image: minio/minio:latest
+        ports:
+            - "${MINIO_API_PORT}:${MINIO_API_PORT}"     # Dynamic API Port
+            - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}" # Dynamic Web Dashboard Port
+        volumes:
+            - minio_data:/data
+        environment:
+            - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+            - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+        command: server /data --address ":${MINIO_API_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
+        networks:
+            - app-network
 
 volumes:
     postgres_data:
     redis_data:
     opensearch_data:
+    minio_data:
 
 networks:
     app-network:
