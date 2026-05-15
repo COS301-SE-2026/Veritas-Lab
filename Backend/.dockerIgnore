@@ -1,0 +1,23 @@
+#python virtual environment must not  go into docker.
+venv
+.venv/
+#python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+#environment files 
+.env
+.env.*
+#testing files dont need to be in the image
+tests/
+#git files
+.git/
+.gitignore
+#dev files
+.vscode/
+.idea/
+*.md
+#model weights pulled at runtime.
+model_weights/
