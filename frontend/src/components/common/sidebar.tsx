@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import {
-    ChevronLeft, Menu, Home, Construction, Settings,
+    ChevronLeft, Menu, Home, Construction,
 } from 'lucide-react';
+import Button from '@/components/ui/button';
+
 
 const navItems = [
   { label: 'Home',      href: '/',           icon: Home },
@@ -31,12 +33,12 @@ export default function Sidebar() {
                 Veritas Lab
             </div>
             )}
-            <button
+            <Button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-2 rounded-md hover:bg-[#231F20] transition-colors ml-auto"
+            variant="sidebar"
             >
             {collapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
-            </button>
+            </Button>
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1">
         {navItems.map(({ label, href, icon: Icon }) => {
