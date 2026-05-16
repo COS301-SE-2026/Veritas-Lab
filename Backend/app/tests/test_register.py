@@ -33,3 +33,83 @@ def testSuccessfulRegistration(monkeypatch):
         "status": "success",
         "message": "Account created successfully"
     }
+
+def testInvalidEmailReturns400():
+    response = client.post(
+        "/api/register",
+        json={
+            "email": "invalid-email-no-domain",
+            "password": "StrongP@ssword1234",
+            "username": "Test Analyst"
+        }
+    )
+
+    assert response.status_code == 400
+
+def testMissingEmailReturns400():
+    response = client.post(
+        "/api/register",
+        json={
+            "email": None,
+            "password": "StrongP@ssword1234",
+            "username": "Test Analyst"
+        }
+    )
+
+    assert response.status_code == 400
+
+#testing invalid password
+def testInvalidPasswordReturns400():
+    response = client.post(
+        "/api/register",
+        json={
+            "email": "analyst@veritas.lab",
+            "password": "weak",
+            "username": "Test Analyst"
+        }
+    )
+
+    assert response.status_code == 400
+
+def testMissingPasswordReturns400():
+    response = client.post(
+        "/api/register",
+        json={
+            "email": "analyst@veritas.lab",
+            "password": None,
+            "username": "Test Analyst"
+        }
+    )
+
+    assert response.status_code == 400
+
+    #test missing username
+def testMissingUsernameReturns400():
+    response = client.post(
+        "/api/register",
+        json={
+            "email": "analyst@veritas.lab",
+            "password": "StrongP@ssword1234",
+            "username": None
+        }
+    )
+
+    assert response.status_code == 400
+
+#testing duplicate email. SO email is already in use or registered
+def testDuplicateEmailReturns409(monkeypatch):
+    async def mock_searchUsersViaEmail(email):
+        return {"id": "existing-id", "email": email, "username": "Existing User", "role": "analyst"}
+
+    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
+
+    response = client.post(
+        "/api/register",
+        json={
+            "email": "analyst@veritas.lab",
+            "password": "Makelana@2026_Capstone",
+            "username": "Test Dupe_Email"
+        }
+    )
+
+    assert response.status_code == 409
