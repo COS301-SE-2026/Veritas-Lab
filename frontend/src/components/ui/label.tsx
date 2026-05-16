@@ -2,10 +2,13 @@
 type labelProps = {
     text: string;
     htmlFor: string;
+    className?: string;
 };
 
-export default function Label({ text, htmlFor }: labelProps) {
+export default function Label({ text, htmlFor, className }: labelProps) {
     return (
-        <label htmlFor={htmlFor}>{text}</label>
+        <label htmlFor={htmlFor} className={className}>
+            {text}
+        </label>
     );
 }

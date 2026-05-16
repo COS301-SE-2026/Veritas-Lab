@@ -1,16 +1,21 @@
 type InputProps = {
     placeholder?: string;
-    value: string;
-    onChange: (value: string) => void;
+    value?: string;
+    onChange?: (value: string) => void;
+    id?: string;
+    type?: string;
+    className?: string;
 };
 
-export default function Input({ placeholder, value, onChange }: InputProps) {
+export default function Input({ placeholder, value, onChange, id, type, className }: InputProps) {
     return (
         <input
-            type="text"
+            id={id}
+            type={type || "text"}
             placeholder={placeholder}
+            className={className}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         />
     );
 }
