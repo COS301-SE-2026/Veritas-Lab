@@ -209,8 +209,58 @@ async def login(request: LoginRequest):
         "token" : token
     }
 
-        
-    
+# POST /api/register
+@router.post("/register", status_code=201)
+async def register(request: RegisterRequest):
+    if not validateEmail(request.email):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+            }
+        )
+
+    if not validatePassword(request.password):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+            }
+        )
+
+    if not request.username or not request.username.strip():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing username"
+            }
+        )
+
+    existingUser = await searchUsersViaEmail(request.email.strip())
+
+    if existingUser is not None:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "error",
+                "message": "An account with this email already exists"
+            }
+        )
+
+    hashedPassword = hashPassword(request.password)
+    await insertUser(request.email.strip(), request.username.strip(), "analyst", hashedPassword)
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "status": "success",
+            "message": "Account created successfully"
+        }
+    )
+
 
 
 
