@@ -59,8 +59,13 @@ def verifyPassword(password: str, hashedPassword: str) ->bool:
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
 class LoginRequest(BaseModel):
-    email: str | None=None 
+    email: str | None=None
     password: str | None=None
+
+class RegisterRequest(BaseModel):
+    email: str | None = None
+    password: str | None = None
+    username: str | None = None
 
 async def updateUserJWTIssued(email: str):
     connection = await asyncpg.connect(
