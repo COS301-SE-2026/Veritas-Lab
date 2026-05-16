@@ -114,6 +114,33 @@ async def searchUsersViaEmail(email:str):
         "password": row["UserPassword"]
     }
 
+async def insertUser(email: str, username: str, role: str, hashedPassword: str):
+    connection = await asyncpg.connect(
+        user="postgres_username_here",
+        password="some password here",
+        database="database name here",
+        host="localhost",
+        port=8001
+    )
+
+    row = await connection.fetchrow(
+        """
+        INSERT INTO "Users" ("UserEmail", "UserName", "UserRole", "UserPassword")
+        VALUES ($1, $2, $3, $4)
+        RETURNING "UserId", "UserEmail", "UserName", "UserRole"
+        """,
+        email, username, role, hashedPassword
+    )
+
+    await connection.close()
+
+    return {
+        "id": str(row["UserId"]),
+        "email": row["UserEmail"],
+        "username": row["UserName"],
+        "role": row["UserRole"]
+    }
+
 def createToken(user: dict) ->str:
     expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
