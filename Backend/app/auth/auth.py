@@ -251,7 +251,7 @@ async def register(request: RegisterRequest):
         )
 
     hashedPassword = hashPassword(request.password)
-    await insertUser(request.email.strip(), request.username.strip(), "analyst", hashedPassword)
+    await insertUser(request.email.strip(), request.username.strip(), "analyst", hashedPassword) # default role is analyst for now, this will need to be updated when we have admin registration
 
     return JSONResponse(
         status_code=201,
