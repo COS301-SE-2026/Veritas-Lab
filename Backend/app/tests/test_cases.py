@@ -1,5 +1,6 @@
 import pytest
 from app.core.cases import Case
+from unittest.mock import patch, AsyncMock
 
 def test_CaseCreationWithValidData():
     """Test successful case creation with valid inputs"""
@@ -70,3 +71,28 @@ def test_CaseNameAt256Characters():
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
         Case(CaseCreator="alice_dev", CaseName=case_name_256)
+
+@patch("asyncpg.connect")
+async def test_SaveCaseWithMock(mock_connect):
+    case = Case(CaseCreator="alice_dev", CaseName="Test Case")
+
+    fake_db_uuid = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    # Mocking the database Connection therefore no actual database hit
+    mock_connection = AsyncMock()
+    mock_connect.return_value = mock_connection
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connection.fetchval = AsyncMock(return_value=fake_db_uuid)
+
+    uuid = await case.save()
+
+    assert uuid == fake_db_uuid
+    assert isinstance(uuid, str)
+
+    # Ensuring functions were called
+    mock_connect.assert_called_once()
+    mock_connection.fetchval.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+
