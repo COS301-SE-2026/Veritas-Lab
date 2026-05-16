@@ -12,7 +12,7 @@ Create TABLE MediaType(
 CREATE TABLE Cases (
     CaseId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     CaseReviews JSONB,
-    CaseName varchar(255) NOT NULL DEFAULT "", -- The default can be blank but this could be an intrusion 
+    CaseName varchar(255) NOT NULL,
     CaseCreator varchar(100) NOT NULL, -- A case has to have a creator 
     CaseCreationDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
