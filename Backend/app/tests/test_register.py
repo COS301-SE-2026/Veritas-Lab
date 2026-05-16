@@ -6,7 +6,7 @@ client = TestClient(app)
 
 def testSuccessfulRegistration(monkeypatch):
     async def mock_searchUsersViaEmail(email):
-        return None  # No existing user — email is free to register
+        return None  # No existing user so email is free to register
 
     async def mock_insertUser(email, username, role, hashedPassword):
         return {
