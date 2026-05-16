@@ -7,15 +7,16 @@ const mockOnClick = jest.fn();
 beforeEach(() => {
   mockOnClick.mockClear();
 });
-
+// This is the ideal test suite for all the components. For now this will be the only comprehensive.
 describe('Button', () => {
+  // Rendering tests
   describe('Rendering', () => {
     it('renders the text prop', () => {
       render(<Button text="Click here" onClick={mockOnClick} />);
       expect(screen.getByRole('button')).toHaveTextContent('Click here');
     });
   });
-
+// Default props tests
   describe('Default props', () => {
     it('is enabled by default', () => {
       render(<Button text="Click here" onClick={mockOnClick} />);
@@ -27,7 +28,7 @@ describe('Button', () => {
       expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
     });
   });
-
+// Prop tests
   describe('Props', () => {
     it('disables the button when disabled={true}', () => {
       render(<Button text="Click here" onClick={mockOnClick} disabled />);
@@ -41,7 +42,7 @@ describe('Button', () => {
         expect(screen.getByRole('button')).toHaveAttribute('type', type);
       }
     );
-
+// Variant and size tests - just checking that they don't throw errors for now
     it.each(['primary', 'secondary', 'outline'] as const)(
       'renders without error for variant="%s"',
       (variant) => {
@@ -50,7 +51,7 @@ describe('Button', () => {
         ).not.toThrow();
       }
     );
-
+// Size tests
     it.each(['small', 'medium', 'large'] as const)(
       'renders without error for size="%s"',
       (size) => {
@@ -60,20 +61,20 @@ describe('Button', () => {
       }
     );
   });
-
+// Interaction tests
   describe('Interactions', () => {
     it('calls onClick when clicked', () => {
       render(<Button text="Click here" onClick={mockOnClick} />);
       fireEvent.click(screen.getByRole('button'));
       expect(mockOnClick).toHaveBeenCalledTimes(1);
     });
-
+// Disabled button should not call onClick
     it('does not call onClick when clicked while disabled', () => {
       render(<Button text="Click here" onClick={mockOnClick} disabled />);
       fireEvent.click(screen.getByRole('button'));
       expect(mockOnClick).not.toHaveBeenCalled();
     });
-
+// Multiple clicks should call onClick the correct number of times
     it('calls onClick only once per click', () => {
       render(<Button text="Click here" onClick={mockOnClick} />);
       fireEvent.click(screen.getByRole('button'));
