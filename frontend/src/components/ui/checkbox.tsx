@@ -8,3 +8,29 @@ type CheckBoxProps = {
 	disabled?: boolean;
 	className?: string;
 };
+
+export default function CheckBox(
+{
+	label,
+	onChange,
+	checked,
+	defaultChecked,
+	disabled = false,
+	className
+}: CheckBoxProps)
+{
+	const isControlled = typeof checked === 'boolean';
+
+	return (
+		<label className={className}>
+			<input
+				type="checkbox"
+				onChange={onChange}
+				disabled={disabled}
+				checked={isControlled ? checked : undefined}
+				defaultChecked={!isControlled ? defaultChecked : undefined}
+			/>
+			{label}
+		</label>
+	);
+}
