@@ -7,7 +7,7 @@ type labelProps = {
 
 export default function Label({ text, htmlFor, className }: labelProps) {
     return (
-        <label htmlFor={htmlFor} className={className}>
+        <label htmlFor={htmlFor} className={`text-[16px] ${className || ''}`}>
             {text}
         </label>
     );

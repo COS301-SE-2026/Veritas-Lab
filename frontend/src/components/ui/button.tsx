@@ -29,7 +29,7 @@ export default function Button({
     const variantClasses = {
         primary: '',
         secondary: '',
-        outline: '',
+        outline: 'py-2 px-4 border-[#3DBF79] border-1 text-[#3DBF79] hover:bg-[#231F20] rounded-full hover:text-white transition-colors',
         sidebar: 'p-2 rounded-md hover:bg-[#231F20] transition-colors ml-auto',
         submit: 'bg-[#3DBF79] text-white font-medium py-2 px-4 rounded-full hover:bg-[#2E9E66] transition-colors',
     };
