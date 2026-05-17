@@ -7,7 +7,7 @@ type DropdownOption = {
 
 type DropdownProps = {
 	options: DropdownOption[];
-	onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+	onChange?: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 	defaultValue?: string;
 	disabled?: boolean;
 	className?: string;
