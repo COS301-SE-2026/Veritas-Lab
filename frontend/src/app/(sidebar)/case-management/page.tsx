@@ -1,7 +1,15 @@
+'use client';
+import { useState } from 'react';
 import Button from '@/components/ui/button';
 import CaseManagementBar from '@/components/common/caseManagementBar';
 import CaseCard from '@/components/common/caseCard';
+import CaseManagementModal from '@/components/common/caseManagementModal';
 export default function CaseManagement() {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const openModal = () => setIsModalOpen(true);
+    const closeModal = () => setIsModalOpen(false);
+
     return (
         <>
         <div className="mt-8 ml-8 mr-8">
@@ -12,7 +20,7 @@ export default function CaseManagement() {
                 </div>
                 <div  className="justify-end flex items-center ">
                     <div>
-                        <Button variant="submit" >
+                        <Button variant="submit" onClick={openModal}>
                             <div className="text-[16px] font-bold">New Case</div>
                         </Button>
                     </div>
@@ -27,6 +35,7 @@ export default function CaseManagement() {
                 </div>
             </div>
         </div>
+        <CaseManagementModal isOpen={isModalOpen} onClose={closeModal} />
         </>
     );
 }
