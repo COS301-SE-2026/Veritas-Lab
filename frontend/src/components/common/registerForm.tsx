@@ -9,6 +9,7 @@ export default function RegisterForm() {
             <>
             <div className="flex flex-col justify-center ">
                 <div className="text-[36px] font-bold text-[#231F20] justify-left items-left">Create your account</div>
+                {/* Registration form currently with fields for full name, email, password, and confirm password */}
                 <form className="flex flex-col gap-4 w-full text-[#231F20]">
                     <Label text="Full Name" htmlFor="name" className="font-medium mt-2" />
                     <Input id="name" type="text" placeholder="Enter your full name" className="border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-[#3DBF79]" />
