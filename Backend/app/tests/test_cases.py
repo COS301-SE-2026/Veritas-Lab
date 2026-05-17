@@ -25,16 +25,16 @@ def test_NameIsTooLong():
     """ The name is too long """
     with pytest.raises(ValueError, match="Name is too long"):
         Case(
-            CaseName="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_THAT_is_right",
-            CaseCreator="New_dev"
+            CaseName="Test Case",
+            CaseCreator="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_THAT_is_right"
         )
 
 def test_NameIs100():
     """The name is 100 characters that still too long"""
     with pytest.raises(ValueError, match="Name is too long"):
         Case(
-            CaseName="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_0",
-            CaseCreator="New_dev"
+            CaseName="Test Case",
+            CaseCreator="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_0"
         )
 
 
