@@ -20,4 +20,27 @@ class Case:
         self.CaseCreationDate = datetime.now(timezone.utc)
 
     async def save(self):
-        pass
+        connection = await asyncpg.connect(
+            user="postgres",
+            password="",
+            database="",
+            host="localhost",
+            port=8001
+        )
+
+        case_id = await connection.fetchval(
+            """
+            INSERT INTO "Cases_DB"."Cases" ("CaseId", "CaseCreator", "CaseName", "CaseReviews", "CaseCreationDate")
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING "CaseId"
+            """,
+            self.CaseId,
+            self.CaseCreator,
+            self.CaseName,
+            self.CaseReviews,
+            self.CaseCreationDate
+        )
+
+        await connection.close()
+
+        return str(case_id)
