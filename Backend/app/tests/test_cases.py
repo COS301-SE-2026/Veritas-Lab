@@ -72,6 +72,7 @@ def test_CaseNameAt256Characters():
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
         Case(CaseCreator="alice_dev", CaseName=case_name_256)
 
+@pytest.mark.asyncio
 @patch("asyncpg.connect")
 async def test_SaveCaseWithMock(mock_connect):
     case = Case(CaseCreator="alice_dev", CaseName="Test Case")
