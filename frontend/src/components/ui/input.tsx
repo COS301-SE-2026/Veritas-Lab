@@ -5,9 +5,10 @@ type InputProps = {
     id?: string;
     type?: string;
     className?: string;
+    required?: boolean;
 };
 
-export default function Input({ placeholder, value, onChange, id, type, className }: InputProps) {
+export default function Input({ placeholder, value, onChange, id, type, className, required }: InputProps) {
     return (
         <input
             id={id}
@@ -16,6 +17,7 @@ export default function Input({ placeholder, value, onChange, id, type, classNam
             className={className}
             value={value}
             onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+            required={required}
         />
     );
 }
