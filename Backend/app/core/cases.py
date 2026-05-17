@@ -13,7 +13,7 @@ class Case:
         if len(CaseCreator) > 100:
             raise ValueError("Name is too long. Must be 100 characters or less")
 
-        self.CaseId = str(uuid4())
+        self.CaseId = uuid4()
         self.CaseCreator = CaseCreator
         self.CaseName = CaseName
         self.CaseReviews = CaseReviews
