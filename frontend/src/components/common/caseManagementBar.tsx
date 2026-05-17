@@ -4,7 +4,7 @@ import Dropdown from '../ui/dropdown';
 export default function CaseManagementBar() {
     return (
         <>
-        <div className='grid grid-cols-3 gap-4 rounded-full bg-[#3DBF79] border-2 p-4 mt-4'>
+        <div className='grid grid-cols-3 gap-4 rounded-full bg-[#3DBF79] font-semibold border-2 p-4 mt-4'>
             <div>
                 <Input placeholder="Search cases..." />
             </div>
