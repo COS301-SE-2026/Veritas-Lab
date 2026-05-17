@@ -8,6 +8,7 @@ type ButtonProps = {
     type?: 'button' | 'submit' | 'reset';
     variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit';
     size?: 'small' | 'medium' | 'large';
+    className?: string;
 };
 
 export default function Button({ 
@@ -17,7 +18,8 @@ export default function Button({
     disabled = false,
     type = 'button',
     variant = 'primary',
-    size = 'medium'
+    size = 'medium',
+    className = '',
  }: ButtonProps) {
 
     const sizeClasses = {
@@ -35,7 +37,7 @@ export default function Button({
     };
 
     return (
-        <button onClick={onClick} disabled={disabled} type={type} className={`${sizeClasses[size]} ${variantClasses[variant]}`}>
+        <button onClick={onClick} disabled={disabled} type={type} className={`${sizeClasses[size]} ${variantClasses[variant]} ${className}`}>
             {children || text}
         </button>
     );

@@ -3,8 +3,9 @@ import React from 'react';
 import Label from '../ui/label';
 import Input from '../ui/input';
 import Button from '../ui/button';
+import { useRouter } from 'next/navigation';
 export default function RegisterForm() {
-
+    const router = useRouter();
         return (
             <>
             <div className="flex flex-col justify-center ">
@@ -19,7 +20,8 @@ export default function RegisterForm() {
                     <Input id="password" type="password" placeholder="Enter your password" className="border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-[#3DBF79]" required />
                     <Label text="Confirm Password" htmlFor="confirmPassword" className="font-medium mt-2" />
                     <Input id="confirmPassword" type="password" placeholder="Confirm your password" className="border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-[#3DBF79]" required />
-                    <Button text="Create Account" onClick={() => {}} type="submit" variant="submit" />
+                    <Button text="Create Account" onClick={() => {}} type="submit" variant="submit" className="mt-4" />
+                    <Button text="Sign In" onClick={() => router.push('/login')} variant="outline" />
                 </form>
             </div>
             </>
