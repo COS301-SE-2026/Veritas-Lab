@@ -1,5 +1,5 @@
 from uuid import uuid4
-from datetime import datetime, timezone, 
+from datetime import datetime, timezone
 import asyncpg
 
 class Case:
@@ -19,5 +19,5 @@ class Case:
         self.CaseReviews = CaseReviews
         self.CaseCreationDate = datetime.now(timezone.utc)
 
-        async def save(self):
+    async def save(self):
         pass
