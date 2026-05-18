@@ -59,8 +59,13 @@ def verifyPassword(password: str, hashedPassword: str) ->bool:
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
 class LoginRequest(BaseModel):
-    email: str | None=None 
+    email: str | None=None
     password: str | None=None
+
+class RegisterRequest(BaseModel):
+    email: str | None = None
+    password: str | None = None
+    username: str | None = None
 
 async def updateUserJWTIssued(email: str):
     connection = await asyncpg.connect(
@@ -112,6 +117,33 @@ async def searchUsersViaEmail(email:str):
         "username": row["UserName"],
         "role": row["UserRole"],
         "password": row["UserPassword"]
+    }
+
+async def insertUser(email: str, username: str, role: str, hashedPassword: str):
+    connection = await asyncpg.connect(
+        user="postgres_username_here",
+        password="some password here",
+        database="database name here",
+        host="localhost",
+        port=8001
+    )
+
+    row = await connection.fetchrow(
+        """
+        INSERT INTO "Users" ("UserEmail", "UserName", "UserRole", "UserPassword")
+        VALUES ($1, $2, $3, $4)
+        RETURNING "UserId", "UserEmail", "UserName", "UserRole"
+        """,
+        email, username, role, hashedPassword
+    )
+
+    await connection.close()
+
+    return {
+        "id": str(row["UserId"]),
+        "email": row["UserEmail"],
+        "username": row["UserName"],
+        "role": row["UserRole"]
     }
 
 def createToken(user: dict) ->str:
@@ -177,8 +209,58 @@ async def login(request: LoginRequest):
         "token" : token
     }
 
-        
-    
+# POST /api/register
+@router.post("/register", status_code=201)
+async def register(request: RegisterRequest):
+    if not validateEmail(request.email):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+            }
+        )
+
+    if not validatePassword(request.password):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+            }
+        )
+
+    if not request.username or not request.username.strip():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing username"
+            }
+        )
+
+    existingUser = await searchUsersViaEmail(request.email.strip())
+
+    if existingUser is not None:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "error",
+                "message": "An account with this email already exists"
+            }
+        )
+
+    hashedPassword = hashPassword(request.password)
+    await insertUser(request.email.strip(), request.username.strip(), "user", hashedPassword)
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "status": "success",
+            "message": "Account created successfully"
+        }
+    )
+
 
 
 
