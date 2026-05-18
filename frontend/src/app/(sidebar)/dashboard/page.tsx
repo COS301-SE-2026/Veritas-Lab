@@ -4,6 +4,7 @@ import Button from '@/components/ui/button';
 import CaseManagementBar from '@/components/common/caseManagementBar';
 import CaseCard from '@/components/common/caseCard';
 import CaseManagementModal from '@/components/common/caseManagementModal';
+import DashboardCards from '@/components/common/dashboardCards';
 export default function CaseManagement() {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -15,7 +16,7 @@ export default function CaseManagement() {
         <div className="mt-8 ml-8 mr-8">
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <div className="text-[32px] font-bold text-[#231F20]">Case Management</div>
+                    <div className="text-[32px] font-bold text-[#231F20]">Dashboard</div>
                     <div className="text-[16px] font-bold text-[#231F20]">Manage and Track Cases</div>
                 </div>
                 <div  className="justify-end flex items-center ">
@@ -25,6 +26,9 @@ export default function CaseManagement() {
                         </Button>
                     </div>
                 </div>
+            </div>
+            <div>
+                <DashboardCards />
             </div>
             <div className="mt-10">
                 <CaseManagementBar />

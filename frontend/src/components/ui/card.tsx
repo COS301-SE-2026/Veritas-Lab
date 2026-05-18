@@ -2,14 +2,18 @@ type CardProps = {
     header: string | React.ReactNode;
     content: string | React.ReactNode;
     footer: string | React.ReactNode;
+    className?: string;
+    headerClassName?: string;
+    contentClassName?: string;
+    footerClassName?: string;
 };
 
-export default function Card({ header, content, footer }: CardProps) {
+export default function Card({ header, content, footer, className, headerClassName, contentClassName, footerClassName }: CardProps) {
     return (
-        <div>
-            <div className="card-header">{header}</div>
-            <div className="card-content">{content}</div>
-            <div className="card-footer">{footer}</div>
+        <div className={className}>
+            <div className={headerClassName || "card-header"}>{header}</div>
+            <div className={contentClassName || "card-content"}>{content}</div>
+            <div className={footerClassName || "card-footer"}>{footer}</div>
          </div>
     );
 }
