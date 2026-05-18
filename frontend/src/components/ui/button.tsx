@@ -3,7 +3,7 @@ import React from 'react';
 type ButtonProps = {
     children?: React.ReactNode;
     text?: string;
-    onClick: () => void;
+    onClick?: () => void;
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
     variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit';

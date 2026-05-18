@@ -3,23 +3,26 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useSidebar } from '@/context/SidebarContext';
 // Uses Lucide for some nice icons. Pretty cool.
 import {
-    ChevronLeft, Menu, Home, Construction,
+    ChevronLeft, Menu, Home, Construction, Briefcase,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 
 // List of navigation items with their labels, paths, and icons
 const navItems = [
   { label: 'Home',      href: '/',           icon: Home },
-  { label: 'Page', href: '/login',  icon: Construction },
+  { label: 'Case Management', href: '/case-management',  icon: Briefcase },
+  { label: 'Login', href: '/login',  icon: Construction },
+  { label: 'Register', href: '/register',  icon: Construction },
 ];
 
 export default function Sidebar() {
     // Get the current pathname to determine which nav item is active
     const pathname = usePathname();
     // State to manage whether the sidebar is collapsed or expanded
-    const [collapsed, setCollapsed] = useState(false);
+    const { collapsed, toggle } = useSidebar();
 
     return (
       // Sidebar container with dynamic width based on collapsed state
@@ -39,7 +42,7 @@ export default function Sidebar() {
             )}
             {/* Toggle button to collapse or expand the sidebar */}
             <Button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={toggle}
             variant="sidebar"
             >
             {collapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
