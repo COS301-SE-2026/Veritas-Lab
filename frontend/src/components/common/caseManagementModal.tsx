@@ -16,10 +16,10 @@ export default function CaseManagementModal({ isOpen, onClose }: CaseManagementM
                 <Label text="Case Description" htmlFor="caseDescription" className="mb-2 text-[16px] text-[#231F20]" />
                 <Input id="caseDescription" type="text" placeholder="Enter case description" className="border border-gray-300 rounded-lg py-10 px-4 focus:outline-none focus:ring-2 focus:ring-[#3DBF79] mb-4 w-full text-[16px] text-[#231F20]" required />
                 <div className="flex justify-end">
-                    <Button variant="outline" onClick={onClose} className="mr-2">
+                    <Button variant="sadSack" onClick={onClose} className="mr-2">
                         <div className="text-[16px] font-bold">Cancel</div>
                     </Button>  
-                    <Button variant="submit" onClick={onClose}>
+                    <Button variant="submit" type="submit" onClick={onClose}>
                         <div className="text-[16px] font-bold">Create Case</div>
                     </Button>
                 </div>

@@ -17,15 +17,15 @@ export default function SliderBar({ filters, defaultFilter, onChange, className 
     };
 
     return (
-        <div className={`flex items-center gap-2 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-full w-fit ${className ?? ''}`}>
+        <div className={`flex items-center shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-full w-full p-1 ${className ?? ''}`}>
             {filters.map((filter) => (
                 <button
                     key={filter}
                     onClick={() => handleClick(filter)}
-                    className={`px-5 py-3 rounded-full text-sm font-semibold transition-colors duration-200
+                    className={`flex-1 py-3 rounded-full text-sm font-semibold transition-colors duration-200
                         ${active === filter
                             ? 'text-white bg-[var(--color-primary)]'
-                            : 'text-text hover:bg-gray-100'
+                            : 'text-[var(--color-text)] hover:bg-gray-100'
                         }`}
                 >
                     {filter}

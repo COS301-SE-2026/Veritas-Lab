@@ -10,7 +10,7 @@ export default function CaseManagementBar() {
                 <Input placeholder="Search cases..." className='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] pl-5 w-full py-2.5 rounded-full'/>
             </div>
             <div>
-                <SliderBar filters={['All', 'Open', 'Closed']}  />
+                <SliderBar filters={['All', 'Open', 'Closed']}  className='w-full'/>
             </div>
             <div>
                 <Dropdown options={[

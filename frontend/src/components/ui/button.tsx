@@ -6,7 +6,7 @@ type ButtonProps = {
     onClick?: () => void;
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit';
+    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack';
     size?: 'small' | 'medium' | 'large';
     className?: string;
 };
@@ -31,9 +31,10 @@ export default function Button({
     const variantClasses = {
         primary: '',
         secondary: '',
-        outline: 'py-2 px-4 border-[#3DBF79] border-1 text-[#3DBF79] hover:bg-[#231F20] rounded-full hover:text-white transition-colors',
+        outline: 'py-2 px-4 border-[var(--color-primary)] border-1 text-[var(--color-primary)] hover:bg-[#231F20] rounded-full hover:text-white transition-colors',
         sidebar: 'p-2 rounded-md hover:bg-[#231F20] transition-colors ml-auto',
-        submit: 'bg-[#3DBF79] text-white font-medium py-2 px-4 rounded-full hover:bg-[#2E9E66] transition-colors',
+        submit: 'bg-[var(--color-primary)] text-white font-medium py-2 px-4 rounded-full hover:bg-[#2E9E66] transition-colors font-semibold',
+        sadSack: 'py-2 px-4 text-[var(--color-text)] hover:text-[var(--color-primary)] rounded-full',
     };
 
     return (
