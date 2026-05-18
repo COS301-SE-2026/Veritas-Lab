@@ -2,7 +2,6 @@
 import { useMemo, useState } from 'react';
 
 type RegisterFormState = {
-    fullName: string;
     username: string;
     email: string;
     password: string;
@@ -16,7 +15,6 @@ type StatusState = {
 };
 
 const initialFormState: RegisterFormState = {
-    fullName: '',
     username: '',
     email: '',
     password: '',
@@ -53,11 +51,6 @@ export default function useRegisterForm()
     };
 
     const validateForm = () => {
-        if(!formState.fullName.trim())
-        {
-            return 'Please enter your full name.';
-        }
-
         if(!formState.username.trim())
         {
             return 'Please enter a username.';
@@ -101,7 +94,6 @@ export default function useRegisterForm()
                 },
                 body: JSON.stringify({
                     email: formState.email.trim(),
-                    fullName: formState.fullName.trim(),
                     password: formState.password,
                     username: formState.username.trim(),
                 }),
