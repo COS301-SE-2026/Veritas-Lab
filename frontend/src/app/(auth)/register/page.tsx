@@ -1,11 +1,10 @@
+'use client';
 import React from 'react';
 import RegisterForm from '@/components/common/registerForm';
 import Image from 'next/image';
 //import Logo from '../../../public/VL_Logo.svg';
-
 export default function Register() {
     return (
-        // The page imports the Logo and RegisterForm components.
         <div className="grid grid-cols-2 min-h-screen ">
             <div className="flex flex-col justify-center px-30 bg-white">
                 <div className="mb-10">
