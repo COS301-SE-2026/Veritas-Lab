@@ -1,10 +1,10 @@
-version: '3.9'
+#version: '3.9' <- obsolete
 #VERY LIKELY NEEDS TO BE REVISED FOR OUR ENV AND IF ANY PACKAGE CHANGES OCCUR, SAME IS TRUE FOR BOTH FRONTEND AND BACKEND FILES.
 services:
     #frontend
     frontend:
         build:
-            context: ./Frontend
+            context: ./frontend
             dockerfile: Dockerfile
         ports:
             - "3000:3000"
@@ -23,18 +23,16 @@ services:
         ports:
             - "8000:8000"
         environment:
-            - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/veridian
+            - DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@postgres:${DB_PORT}/${DB_NAME}
             - REDIS_URL=redis://redis:6379/0
             - OPENSEARCH_URL=http://opensearch:9200
-            - S3_BUCKET_NAME=${S3_BUCKET_NAME}
             - JWT_SECRET=${JWT_SECRET}
             # BOTO3 / MINIO CONFIGURATION
             - STORAGE_PROVIDER=minio
-            - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}       # Map MinIO user to AWS key
-            - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD} # Map MinIO pass to AWS secret
-            - AWS_S3_ENDPOINT_URL=http://minio:9000       # Critical: Points boto3 to the container
-            - S3_BUCKET_NAME=${MINIO_BUCKET_NAME}
-            - AWS_DEFAULT_REGION=${AWS_REGION}               # Boto3 requires a region structure even for MinIO
+            - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}      
+            - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+            - AWS_S3_ENDPOINT_URL=http://minio:9000     
+            - AWS_DEFAULT_REGION=${AWS_REGION}        
         depends_on:
             - postgres
             - redis
@@ -43,42 +41,45 @@ services:
         networks:
             - app-network
 
-    #Celery Worker
-    #same image as backend
-    celery-worker:
-        build:
-            context: ./Backend
-            dockerfile: Dockerfile
-        command: celery -A app.tasks.celery_app worker --loglevel=info
-        environment:
-            - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/veridian
-            - REDIS_URL=redis://redis:6379/0
-            - OPENSEARCH_URL=http://opensearch:9200
-            - JWT_SECRET=${JWT_SECRET}
-            # BOTO3 / MINIO CONFIGURATION
-            - STORAGE_PROVIDER=minio
-            - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}       # Map MinIO user to AWS key
-            - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD} # Map MinIO pass to AWS secret
-            - AWS_S3_ENDPOINT_URL=${STORAGE_URL}      # Critical: Points boto3 to the container
-            - S3_BUCKET_NAME=${MINIO_BUCKET_NAME}
-            - AWS_DEFAULT_REGION=${AWS_REGION}               # Boto3 requires a region structure even for MinIO
-        depends_on:
-            - backend
-            - redis
-            - postgres
-        networks:
-            - app-network
+    # #Celery Worker (This is missing a that tells it what is a celery task in : Backend/app/tasks/celery_app.py)
+    # #same image as backend 
+    # celery-worker:
+    #     build:
+    #         context: ./Backend
+    #         dockerfile: Dockerfile
+    #     command: celery -A app.tasks.celery_app worker --loglevel=info
+    #     environment:
+    #         - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/veridian
+    #         - REDIS_URL=redis://redis:6379/0
+    #         - OPENSEARCH_URL=http://opensearch:9200
+    #         - JWT_SECRET=${JWT_SECRET}
+    #         # BOTO3 / MINIO CONFIGURATION
+    #         - STORAGE_PROVIDER=minio
+    #         - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}       
+    #         - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+    #         - AWS_S3_ENDPOINT_URL=${STORAGE_URL} 
+    #         - AWS_DEFAULT_REGION=${AWS_REGION} 
+    #     depends_on:
+    #         - backend
+    #         - redis
+    #         - postgres
+    #     networks:
+    #         - app-network
 
     postgres:
         image: postgres:16-alpine
         environment:
-            - POSTGRES_USER=postgres
-            - POSTGRES_PASSWORD=postgres
-            - POSTGRES_DB=veridian
+            - POSTGRES_USER=${DB_USER}
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+            - POSTGRES_DB=${DB_NAME}
         ports:
             - "5432:5432"
         volumes:
             - postgres_data:/var/lib/postgresql/data
+            - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/schema-users.sql
+            - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/schema-cases.sql
+            - ./Backend/app/database/seedingUsers.sql:/docker-entrypoint-initdb.d/seed-users.sql
+            - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/seed-cases.sql
         networks:
             - app-network
 
@@ -106,14 +107,33 @@ services:
     minio:
         image: minio/minio:latest
         ports:
-            - "${MINIO_API_PORT}:${MINIO_API_PORT}"     # Dynamic API Port
-            - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}" # Dynamic Web Dashboard Port
+            - "${MINIO_API_PORT}:${MINIO_API_PORT}" 
+            - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}" 
         volumes:
             - minio_data:/data
         environment:
             - MINIO_ROOT_USER=${MINIO_ROOT_USER}
             - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
         command: server /data --address ":${MINIO_API_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    minio-init:
+        image: minio/mc:latest
+        entrypoint: >
+            /bin/sh -c "
+            /usr/bin/mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+            /usr/bin/mc mb minio/images --ignore-existing &&
+            /usr/bin/mc mb minio/pdf --ignore-existing
+            "
+        depends_on:
+            minio:
+                condition: service_healthy
         networks:
             - app-network
 
