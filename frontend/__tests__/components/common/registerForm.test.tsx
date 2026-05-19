@@ -21,7 +21,6 @@ describe('RegisterForm', () => {
 	});
 
 	const fillValidForm = () => {
-		fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Jane Doe' } });
 		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'jane.doe' } });
 		fireEvent.change(screen.getByLabelText('Work Email'), { target: { value: 'jane@veritaslab.com' } });
 		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'ValidPassword!1' } });
@@ -31,7 +30,6 @@ describe('RegisterForm', () => {
 	it('renders heading and fields', () => {
 		render(<RegisterForm />);
 		expect(screen.getByText('Create your account')).toBeInTheDocument();
-		expect(screen.getByLabelText('Full Name')).toBeInTheDocument();
 		expect(screen.getByLabelText('Username')).toBeInTheDocument();
 		expect(screen.getByLabelText('Work Email')).toBeInTheDocument();
 		expect(screen.getByLabelText('Password')).toBeInTheDocument();
@@ -53,7 +51,6 @@ describe('RegisterForm', () => {
 	//validation of form input testing
 	it('shows validation error for invalid email', async () => {
 		render(<RegisterForm />);
-		fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Jane Doe' } });
 		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'jane.doe' } });
 		fireEvent.change(screen.getByLabelText('Work Email'), { target: { value: 'invalid-email' } });
 		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'ValidPassword!1' } });
@@ -66,7 +63,6 @@ describe('RegisterForm', () => {
 
 	it('shows validation error for weak password', async () => {
 		render(<RegisterForm />);
-		fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Jane Doe' } });
 		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'jane.doe' } });
 		fireEvent.change(screen.getByLabelText('Work Email'), { target: { value: 'jane@veritaslab.com' } });
 		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'weak' } });
@@ -81,7 +77,6 @@ describe('RegisterForm', () => {
 
 	it('shows validation error when passwords do not match', async () => {
 		render(<RegisterForm />);
-		fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Jane Doe' } });
 		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'jane.doe' } });
 		fireEvent.change(screen.getByLabelText('Work Email'), { target: { value: 'jane@veritaslab.com' } });
 		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'ValidPassword!1' } });

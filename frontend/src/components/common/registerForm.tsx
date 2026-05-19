@@ -15,15 +15,6 @@ export default function RegisterForm() {
         <div className="flex flex-col justify-center ">
             <div className="text-[36px] font-bold text-[#231F20] justify-left items-left">Create your account</div>
             <form className="flex flex-col gap-4 w-full text-[#231F20]" onSubmit={handleSubmit}>
-                <Label text="Full Name" htmlFor="fullName" className="font-medium mt-2" />
-                <Input id="fullName"
-                    type="text"
-                    placeholder="Enter your full name"
-                    className="border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-[#3DBF79]"
-                    value={formState.fullName}
-                    onChange={(value) => updateField('fullName', value)}
-                    required
-                />
                 <Label text="Username" htmlFor="username" className="font-medium mt-2" />
                 <Input id="username"
                     type="text"
