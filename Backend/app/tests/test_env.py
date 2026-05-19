@@ -11,14 +11,14 @@ def test_get_required(monkeypatch):
     assert result == "postgresql://test"
 
 def test_get_required_missing(monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("JWT_SECRET", raising=False)
 
     env = ENVLoader()
 
-    with pytest.raises(RuntimeError) as error:
-        env.getRequiredEnv("DATABASE_URL")
+    with pytest.raises(RuntimeError) as exc_info:
+        env.getRequiredEnv("JWT_SECRET")
 
-    assert "Missing required environment variable: DATABASE_URL" in str(error.value)
+    assert "Missing required environment variable: JWT_SECRET" in str(exc_info.value)
 
 def test_get_required_env_empty(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "")
@@ -50,11 +50,10 @@ def test_get_optional_set(monkeypatch):
 
 def test_get_optional_env_missing(monkeypatch):
     monkeypatch.delenv("HASH", raising=False)
-
     env = ENVLoader()
-    result = env.getOptionalEnv("HASH", "HS256")
+    value = env.getOptionalEnv("HASH", "HS256")
 
-    assert result == "HS256"
+    assert value == "HS256"
 
 def test_get_optional_env_empty(monkeypatch):
     monkeypatch.setenv("HASH", "")
@@ -78,10 +77,10 @@ def test_get_required_int_missing(monkeypatch):
 
     env = ENVLoader()
 
-    with pytest.raises(RuntimeError) as error:
+    with pytest.raises(RuntimeError) as exc_info:
         env.getRequiredIntEnv("TOKEN_EXPIRE")
 
-    assert "Missing required environment variable: TOKEN_EXPIRE" in str(error.value)
+    assert "Missing required environment variable: TOKEN_EXPIRE" in str(exc_info.value)
 
 def test_get_required_int_not_int(monkeypatch):
     monkeypatch.setenv("TOKEN_EXPIRE", "abc")
