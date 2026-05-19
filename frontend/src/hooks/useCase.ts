@@ -1,4 +1,4 @@
-const APIURL = process.env.APIURL;
+const APIURL = process.env.APIURL ?? "http://localhost:3000/sad/sack/api";
 
 export default function useCase() {
     const fetchCases = async (caseID: string) => {

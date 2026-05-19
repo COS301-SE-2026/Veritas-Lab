@@ -4,24 +4,42 @@ import Modal from "../ui/modal";
 import Button from "../ui/button";
 import Label from "../ui/label";
 import { UploadCloud } from 'lucide-react';
-
+import useCase from '@/hooks/useCase';
 type MediaUploadModalProps = {
     isOpen: boolean;
     onClose: () => void;
 };
 
 export default function MediaUploadModal({ isOpen, onClose }: MediaUploadModalProps) {
+    const { addEvidence } = useCase();
     const [file, setFile] = useState<File | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selected = e.target.files?.[0];
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selected = event.target.files?.[0];
         if (selected) setFile(selected);
+    };
+
+    const handleClose = () => {
+        setFile(null);
+        onClose();
+    };
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!file) {
+            return;
+        }
+
+        await addEvidence(file);
+        setFile(null);
+        onClose();
     };
 
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
-            <form>
+            <form onSubmit={handleSubmit}>
                 <Label htmlFor="file" text="Upload Media" className="text-[var(--color-text)] text-[18px] font-semibold" />
 
                 <div
@@ -43,10 +61,10 @@ export default function MediaUploadModal({ isOpen, onClose }: MediaUploadModalPr
                 <input ref={inputRef} type="file" id="file" className="hidden" onChange={handleChange} required />
 
                 <div className="flex justify-end mt-6 gap-2">
-                    <Button variant="sadSack" onClick={onClose}>
+                    <Button variant="sadSack" onClick={handleClose}>
                         <div className="text-[16px] font-bold">Cancel</div>
                     </Button>
-                    <Button variant="submit" type="submit" onClick={onClose}>
+                    <Button variant="submit" type="submit">
                         <div className="text-[16px] font-bold">Upload Media</div>
                     </Button>
                 </div>
