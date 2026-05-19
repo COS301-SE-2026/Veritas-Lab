@@ -6,10 +6,18 @@ import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
+from app.core.env import ENVLoader
 
-SECRET_KEY = "change when the env is ready"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 5
+env = ENVLoader()
+
+DB_USER= env.getRequiredEnv("DB_USER")
+DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
+DB_HOST= env.getRequiredEnv("DB_HOST")
+DB_PORT= env.getRequiredIntEnv("DB_PORT")
+DB_NAME= env.getRequiredEnv("DB_NAME")
+SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
+ALGORITHM = env.getRequiredEnv("HASH")
+ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 
 router = APIRouter(
     prefix="/api",
@@ -62,18 +70,16 @@ class LoginRequest(BaseModel):
     email: str | None=None
     password: str | None=None
 
-class RegisterRequest(BaseModel):
-    email: str | None = None
-    password: str | None = None
+class RegisterRequest(LoginRequest):
     username: str | None = None
 
 async def updateUserJWTIssued(email: str):
     connection = await asyncpg.connect(
-        user="postgres",
-        password="",
-        database="",
-        host="localhost",
-        port=8001
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
     )
 
     await connection.execute(
@@ -90,11 +96,11 @@ async def updateUserJWTIssued(email: str):
 # Once the envs are setup this will need to be updated
 async def searchUsersViaEmail(email:str):
     connection = await asyncpg.connect(
-        user="postgres_username_here",
-        password="some password here",
-        database="database name here",
-        host="localhost",
-        port=8001
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
     )
 
     row = await connection.fetchrow(
@@ -121,11 +127,11 @@ async def searchUsersViaEmail(email:str):
 
 async def insertUser(email: str, username: str, role: str, hashedPassword: str):
     connection = await asyncpg.connect(
-        user="postgres_username_here",
-        password="some password here",
-        database="database name here",
-        host="localhost",
-        port=8001
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
     )
 
     row = await connection.fetchrow(
