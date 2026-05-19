@@ -12,8 +12,7 @@ import Button from '@/components/ui/button';
 
 // List of navigation items with their labels, paths, and icons
 const navItems = [
-  { label: 'Home',      href: '/',           icon: Home },
-  { label: 'Case Management', href: '/case-management',  icon: Briefcase },
+  { label: 'Dashboard', href: '/dashboard',  icon: Home },
   { label: 'Login', href: '/login',  icon: Construction },
   { label: 'Register', href: '/register',  icon: Construction },
 ];

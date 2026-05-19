@@ -36,15 +36,14 @@ describe('Sidebar', () => {
 
 	it('renders navigation links', () => {
 		renderWithWrapper();
-		expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Case Management' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Register' })).toBeInTheDocument();
 	});
 
 	it('marks the active route', () => {
 		renderWithWrapper();
-		const homeLink = screen.getByRole('link', { name: 'Home' });
+		const homeLink = screen.getByRole('link', { name: 'Dashboard' });
 		expect(homeLink.className).toContain('bg-[#231F20]');
 	});
 

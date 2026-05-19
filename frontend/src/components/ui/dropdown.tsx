@@ -11,6 +11,7 @@ type DropdownProps = {
 	defaultValue?: string;
 	disabled?: boolean;
 	className?: string;
+	optionClassName?: string;
 };
 //still might review all of these comps that i created if we need to add styling here.
 export default function Dropdown(
@@ -19,7 +20,8 @@ export default function Dropdown(
 	onChange,
 	defaultValue,
 	disabled = false,
-	className
+	className,
+	optionClassName
 }: DropdownProps)
 {
 	return (
@@ -30,7 +32,7 @@ export default function Dropdown(
 			className={className}
 		>
 			{options.map((option) => (
-				<option key={option.value} value={option.value}>
+				<option key={option.value} value={option.value} className={optionClassName}>
 					{option.label}
 				</option>
 			))}
