@@ -1,11 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
 
-type RegisterFormState = {
-    username: string;
+type LoginFormState = {
     email: string;
     password: string;
-    confirmPassword: string;
 };
 
 type StatusState = {
@@ -14,16 +12,13 @@ type StatusState = {
     isSubmitting: boolean;
 };
 
-const initialFormState: RegisterFormState = {
-    username: '',
+const initialFormState: LoginFormState = {
     email: '',
     password: '',
-    confirmPassword: '',
 };
 
-export default function useRegisterForm()
-{
-    const [formState, setFormState] = useState<RegisterFormState>(initialFormState);
+export default function useLoginForm() {
+    const [formState, setFormState] = useState<LoginFormState>(initialFormState);
     const [status, setStatus] = useState<StatusState>({
         error: null,
         success: null,
@@ -38,12 +33,10 @@ export default function useRegisterForm()
 
         return process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
     }, []);
-
-    //regex for email and password creation - password must be atleast 8 chars long and must make use of atleast 1 upper, 1 special and 1 number.
+    //ensure the entered email is still an actual email before even attempting to send with the submit
     const emailPattern = /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
-    const updateField = (field: keyof RegisterFormState, value: string) => {
+    const updateField = (field: keyof LoginFormState, value: string) => {
         setFormState((prev) => ({
             ...prev,
             [field]: value,
@@ -51,24 +44,14 @@ export default function useRegisterForm()
     };
 
     const validateForm = () => {
-        if(!formState.username.trim())
-        {
-            return 'Please enter a username.';
-        }
-
         if(!emailPattern.test(formState.email.trim()))
         {
-            return 'Please enter a valid work email.';
+            return 'Please enter a valid email.';
         }
 
-        if(!passwordPattern.test(formState.password))
+        if(!formState.password.trim())
         {
-            return 'Password must be at least 8 characters and include upper, lower, number, and special character.';
-        }
-
-        if(formState.password !== formState.confirmPassword)
-        {
-            return 'Passwords do not match.';
+            return 'Please enter your password.';
         }
 
         return null;
@@ -83,11 +66,10 @@ export default function useRegisterForm()
             setStatus({ error: validationMessage, success: null, isSubmitting: false });
             return;
         }
-
         setStatus({ error: null, success: null, isSubmitting: true });
 
         try{
-            const response = await fetch(`${apiBaseUrl}/api/register`, {
+            const response = await fetch(`${apiBaseUrl}/api/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -95,7 +77,6 @@ export default function useRegisterForm()
                 body: JSON.stringify({
                     email: formState.email.trim(),
                     password: formState.password,
-                    username: formState.username.trim(),
                 }),
             });
 
@@ -103,14 +84,14 @@ export default function useRegisterForm()
 
             if(!response.ok)
             {
-                const message = data?.message ?? 'Registration failed. Please try again.';
+                const message = data?.message ?? 'Login failed. Please try again.';
                 setStatus({ error: message, success: null, isSubmitting: false });
                 return;
             }
 
             setStatus({
                 error: null,
-                success: data?.message ?? 'Account created successfully.',
+                success: 'Login successful.',
                 isSubmitting: false,
             });
             setFormState(initialFormState);
@@ -125,7 +106,7 @@ export default function useRegisterForm()
         }
     };
 
-    return {
+    return{
         formState,
         status,
         updateField,

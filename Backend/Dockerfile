@@ -6,7 +6,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libimage-exiftool-perl \
     libmagic1 \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     gcc \
     && rm -rf /var/lib/apt/lists/*
@@ -31,7 +30,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libimage-exiftool-perl \
     libmagic1 \
-    libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -47,4 +45,4 @@ EXPOSE 8000
 
 #uvicorn runs the fastapi app
 #0.0.0.0 means it can be accessed outside the container
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
