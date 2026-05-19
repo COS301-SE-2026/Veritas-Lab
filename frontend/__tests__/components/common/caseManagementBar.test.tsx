@@ -16,7 +16,7 @@ describe('CaseManagementBar', () => {
 
     it('render the Case status dropdown', () => {
         render(<CaseManagementBar/>);
-        expect(screen.getByText('All Cases')).toBeInTheDocument();
+        expect(screen.getByText('All')).toBeInTheDocument();
     })
 
     it('render the Filter by dropdown', () => {
