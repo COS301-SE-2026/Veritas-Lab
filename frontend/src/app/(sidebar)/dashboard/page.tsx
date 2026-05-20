@@ -18,6 +18,8 @@ export default function Dashboard() {
         setSortKey,
         visibleCases,
         showDashboardCards,
+        isLoading,
+        error,
     } = useCaseDashboard({ initialRole: 'INVESTIGATOR' });
 
     const openModal = () => setIsModalOpen(true);
@@ -55,7 +57,11 @@ export default function Dashboard() {
             </div>
             <div>
                 <div className="grid grid-cols-1 gap-4 mt-4">
-                    {visibleCases.length === 0 ? (
+                    {isLoading ? (
+                        <div className="text-sm text-gray-500">Loading cases...</div>
+                    ) : error ? (
+                        <div className="text-sm text-red-600">{error}</div>
+                    ) : visibleCases.length === 0 ? (
                         <div className="text-sm text-gray-500">No cases found.</div>
                     ) : (
                         visibleCases.map((item) => (
@@ -64,6 +70,7 @@ export default function Dashboard() {
                                 caseTitle={item.caseName}
                                 caseDescription={`Created by ${item.caseCreator}`}
                                 caseStatus={item.caseClosed ? 'Closed' : 'Open'}
+                                href={`/case-page/${item.caseId}`}
                             />
                         ))
                     )}

@@ -6,20 +6,13 @@ import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
 import useCase from "@/hooks/useCase";
 export default function CasePage({ params }: { params: Promise<{ id: string }> }) {
-    const { fetchCases } = useCase();
+    const { fetchCases, mockEvidenceFiles } = useCase();
       
     const { id } = React.use(params);
     // Fetch case details when the component mounts or when the id changes.
     useEffect(() => {
-        const cases = fetchCases(id);
+        void fetchCases(id);
     }, [fetchCases, id]);
-
-    // Mock evidence files this can be replaced with data from fetchCases.
-    const mockEvidenceFiles: File[] = [
-        new File([""], "vid1.png", { type: "image/png" }),
-        new File([""], "social_post.png", { type: "image/png" }),
-        new File([""], "news_article.pdf", { type: "application/pdf" }),
-    ];
     // Mock case details this can also be replaced with data from fetchCases.
     const mockCaseDetails = {
         title: "Viral deepfaked influencer",

@@ -2,7 +2,6 @@
 import React from 'react';
 import RegisterForm from '@/components/common/registerForm';
 import Image from 'next/image';
-//import Logo from '../../../public/VL_Logo.svg';
 export default function Register() {
     return (
         <div className="grid grid-cols-2 min-h-screen ">

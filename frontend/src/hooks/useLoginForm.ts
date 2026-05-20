@@ -1,5 +1,6 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { login } from '@/api/login';
+import { useState } from 'react';
 
 type LoginFormState = {
     email: string;
@@ -25,14 +26,6 @@ export default function useLoginForm() {
         isSubmitting: false,
     });
 
-    const apiBaseUrl = useMemo(() => {
-        if(typeof window === 'undefined')
-        {
-            return '';
-        }
-
-        return process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
-    }, []);
     //ensure the entered email is still an actual email before even attempting to send with the submit
     const emailPattern = /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
@@ -57,7 +50,7 @@ export default function useLoginForm() {
         return null;
     };
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         const validationMessage = validateForm();
@@ -69,25 +62,18 @@ export default function useLoginForm() {
         setStatus({ error: null, success: null, isSubmitting: true });
 
         try{
-            const response = await fetch(`${apiBaseUrl}/api/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: formState.email.trim(),
-                    password: formState.password,
-                }),
-            });
+            const response = await login(formState.email.trim(), formState.password);
 
-            const data = await response.json().catch(() => null);
-
-            if(!response.ok)
-            {
-                const message = data?.message ?? 'Login failed. Please try again.';
-                setStatus({ error: message, success: null, isSubmitting: false });
+            if(response.status !== 'success') {
+                setStatus({
+                    error: response.message || 'Login failed. Please check your credentials and try again.',
+                    success: null,
+                    isSubmitting: false,
+                });
                 return;
             }
+
+            localStorage.setItem('authToken', response.token);
 
             setStatus({
                 error: null,
@@ -98,8 +84,10 @@ export default function useLoginForm() {
         }
         catch(error)
         {
+            const message = error instanceof Error ? error.message : 'Unable to reach the server. Please try again later.';
+
             setStatus({
-                error: 'Unable to reach the server. Please try again later.',
+                error: message,
                 success: null,
                 isSubmitting: false,
             });

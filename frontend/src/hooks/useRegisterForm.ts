@@ -1,6 +1,6 @@
 'use client';
-import { useMemo, useState } from 'react';
-
+import { useState } from 'react';
+import { register } from '@/api/register';
 type RegisterFormState = {
     username: string;
     email: string;
@@ -29,15 +29,6 @@ export default function useRegisterForm()
         success: null,
         isSubmitting: false,
     });
-
-    const apiBaseUrl = useMemo(() => {
-        if(typeof window === 'undefined')
-        {
-            return '';
-        }
-
-        return process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
-    }, []);
 
     //regex for email and password creation - password must be atleast 8 chars long and must make use of atleast 1 upper, 1 special and 1 number.
     const emailPattern = /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -74,7 +65,7 @@ export default function useRegisterForm()
         return null;
     };
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         const validationMessage = validateForm();
@@ -87,38 +78,28 @@ export default function useRegisterForm()
         setStatus({ error: null, success: null, isSubmitting: true });
 
         try{
-            const response = await fetch(`${apiBaseUrl}/api/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: formState.email.trim(),
-                    password: formState.password,
-                    username: formState.username.trim(),
-                }),
-            });
+            const response = await register(formState.username, formState.email, formState.password);
 
-            const data = await response.json().catch(() => null);
-
-            if(!response.ok)
+            if(!response.status || response.status !== 'success')
             {
-                const message = data?.message ?? 'Registration failed. Please try again.';
+                const message = response.message ?? 'Registration failed. Please try again.';
                 setStatus({ error: message, success: null, isSubmitting: false });
                 return;
             }
 
             setStatus({
                 error: null,
-                success: data?.message ?? 'Account created successfully.',
+                success: response.message ?? 'Account created successfully.',
                 isSubmitting: false,
             });
             setFormState(initialFormState);
         }
         catch(error)
         {
+            const message = error instanceof Error ? error.message : 'Unable to reach the server. Please try again later.';
+
             setStatus({
-                error: 'Unable to reach the server. Please try again later.',
+                error: message,
                 success: null,
                 isSubmitting: false,
             });
