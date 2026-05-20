@@ -2,14 +2,15 @@
 import Input from '../ui/input';
 import Dropdown from '../ui/dropdown';
 import SliderBar from '../ui/sliderBar';
+import type { SortKey, StatusFilter } from '@/hooks/useCaseDashboard';
 
 type DashboardBarProps = {
     searchValue?: string;
     onSearchChange?: (value: string) => void;
-    statusFilter?: string;
-    onStatusChange?: (filter: string) => void;
-    sortValue?: string;
-    onSortChange?: (value: string) => void;
+    statusFilter?: StatusFilter;
+    onStatusChange?: (filter: StatusFilter) => void;
+    sortValue?: SortKey;
+    onSortChange?: (value: SortKey) => void;
 };
 
 export default function DashboardBar({
@@ -20,6 +21,8 @@ export default function DashboardBar({
     sortValue,
     onSortChange,
 }: DashboardBarProps) {
+    const statusFilters = ['All', 'Open', 'Closed'] as const;
+
     return (
         <>
         <div className='grid grid-cols-3 gap-4 rounded-full font-semibold text-[var(--color-text)] p-4 mt-4'>
@@ -33,7 +36,7 @@ export default function DashboardBar({
             </div>
             <div>
                 <SliderBar
-                    filters={['All', 'Open', 'Closed']}
+                    filters={statusFilters}
                     className='w-full'
                     defaultFilter={statusFilter}
                     onChange={onStatusChange}
@@ -49,7 +52,7 @@ export default function DashboardBar({
                     className='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] pl-5 ml-3 w-full py-3.5 rounded-full'
                     optionClassName='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-full'
                     defaultValue={sortValue}
-                    onChange={(event) => onSortChange?.(event.target.value)}
+                    onChange={(event) => onSortChange?.(event.target.value as SortKey)}
                 />
             </div>
         </div>

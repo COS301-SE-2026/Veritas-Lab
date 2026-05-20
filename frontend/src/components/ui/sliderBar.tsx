@@ -1,17 +1,17 @@
 'use client';
 import { useState } from 'react';
 
-type SliderBarProps = {
-    filters: string[];
-    defaultFilter?: string;
-    onChange?: (filter: string) => void;
+type SliderBarProps<T extends string = string> = {
+    filters: ReadonlyArray<T>;
+    defaultFilter?: T;
+    onChange?: (filter: T) => void;
     className?: string;
 };
 
-export default function SliderBar({ filters, defaultFilter, onChange, className }: SliderBarProps) {
-    const [active, setActive] = useState(defaultFilter ?? filters[0]);
+export default function SliderBar<T extends string>({ filters, defaultFilter, onChange, className }: SliderBarProps<T>) {
+    const [active, setActive] = useState<T>(defaultFilter ?? filters[0]);
 
-    const handleClick = (filter: string) => {
+    const handleClick = (filter: T) => {
         setActive(filter);
         onChange?.(filter);
     };
