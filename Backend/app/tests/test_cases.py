@@ -115,7 +115,7 @@ async def test_images_upload_success(mockUuid, mockMinioClass, mockDbConnect):
 
     mockMedia = UploadFile(
         file=testContent,
-        fileName = "success.png",
+        filename = "success.png",
         headers={"content-type": "image/png"}
     )
 
@@ -131,7 +131,9 @@ async def test_images_upload_success(mockUuid, mockMinioClass, mockDbConnect):
         "MediaExtension": ".png"
     }
 
-    mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-123")
+
+    mockDbConnection.fetchrow.side_effect = [mockMediaTypeRecord, None]  # First call returns type record, second call returns None to see if there are dupes
+    mockDbConnection.fetchval = AsyncMock(return_value=fakeUuidString)
     mockDbConnection.close = AsyncMock()
 
     mockMinioClient = MagicMock()
@@ -159,14 +161,14 @@ async def test_images_upload_success(mockUuid, mockMinioClass, mockDbConnect):
     paramHash = insertCallArgs[3]  
 
     assert "INSERT INTO \"Cases_DB\".\"Media\"" in sqlQuery
-    assert "(\"mediaid\", \"mediatype\", \"mediahash\")" in sqlQuery
+    assert "(MediaId, MediaType, MediaHash)" in sqlQuery
 
     assert paramUuid == fakeUuidString
     assert paramTypeId == "type-111" 
     assert len(paramHash) == 64
 
-    expectedFilename = f"{fakeUuidString}.png"
-    assert result["url"] == f"http://localhost:9000/images/{expectedFilename}"
+    expectedFileName = f"{fakeUuidString}.png"
+    assert result["url"] == f"http://localhost:9000/images/{expectedFileName}"
 
     mockDbConnection.close.assert_called_once()
 
