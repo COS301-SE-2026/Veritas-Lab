@@ -6,6 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
 Create TABLE IF NOT EXISTS "Cases_DB"."MediaType"(
     MediaTypeId UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     MediaName varchar(100) UNIQUE NOT NULL,
+    MediaBucket varchar(255) NOT NULL,
     MediaExtension varchar(10) UNIQUE
 );
 
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Media"(
     MediaId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     MediaType UUID NOT NULL REFERENCES "Cases_DB"."MediaType"(MediaTypeId) ON DELETE RESTRICT ON UPDATE CASCADE,
-    MediaBucket varchar(255) NOT NULL,
+    MediaHash TEXT UNIQUE,
     MediaUploadDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

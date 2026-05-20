@@ -1,12 +1,24 @@
 'use client';
 import { useState } from 'react';
 import Button from '@/components/ui/button';
-import CaseManagementBar from '@/components/common/caseManagementBar';
+import DashboardBar from '@/components/common/dashboardBar';
 import CaseCard from '@/components/common/caseCard';
-import CaseManagementModal from '@/components/common/caseManagementModal';
+import DashboardModal from '@/components/common/dashboardModal';
 import DashboardCards from '@/components/common/dashboardCards';
-export default function CaseManagement() {
+import useCaseDashboard from '@/hooks/useCaseDashboard';
+export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const{
+        searchQuery,
+        setSearchQuery,
+        statusFilter,
+        setStatusFilter,
+        sortKey,
+        setSortKey,
+        visibleCases,
+        showDashboardCards,
+    } = useCaseDashboard({ initialRole: 'INVESTIGATOR' });
 
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
@@ -20,26 +32,47 @@ export default function CaseManagement() {
                     <div className="text-[16px] font-bold text-[#231F20]">Manage and Track Cases</div>
                 </div>
                 <div  className="justify-end flex items-center ">
-                    <div>
-                        <Button variant="submit" onClick={openModal}>
-                            <div className="text-[16px] font-bold">New Case</div>
-                        </Button>
-                    </div>
+                    {showDashboardCards && (
+                        <div>
+                            <Button variant="submit" onClick={openModal}>
+                                <div className="text-[16px] font-bold">New Case</div>
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
             <div>
-                <DashboardCards />
+                {showDashboardCards && <DashboardCards />}
             </div>
             <div className="mt-10">
-                <CaseManagementBar />
+                <DashboardBar searchValue={searchQuery}//made this the more readable version rather than single line.
+                    onSearchChange={setSearchQuery} 
+                    statusFilter={statusFilter}
+                    onStatusChange={setStatusFilter} 
+                    sortValue={sortKey} 
+                    onSortChange={setSortKey} 
+                />
             </div>
             <div>
                 <div className="grid grid-cols-1 gap-4 mt-4">
-                    <CaseCard caseTitle="Mock Case" caseDescription="This is the description for Mock Case." caseStatus="Open" />
+                    {visibleCases.length === 0 ? (
+                        <div className="text-sm text-gray-500">No cases found.</div>
+                    ) : (
+                        visibleCases.map((item) => (
+                            <CaseCard
+                                key={item.caseId}
+                                caseTitle={item.caseName}
+                                caseDescription={`Created by ${item.caseCreator}`}
+                                caseStatus={item.caseClosed ? 'Closed' : 'Open'}
+                            />
+                        ))
+                    )}
                 </div>
             </div>
         </div>
-        <CaseManagementModal isOpen={isModalOpen} onClose={closeModal} />
+        {showDashboardCards && (
+            <DashboardModal isOpen={isModalOpen} onClose={closeModal} />
+        )}
         </>
     );
 }

@@ -2,11 +2,11 @@ import Modal from "../ui/modal";
 import Button from "../ui/button";
 import Label from "../ui/label";
 import Input from "../ui/input";
-type CaseManagementModalProps = {
+type DashboardModalProps = {
     isOpen: boolean;
     onClose: () => void;
 };
-export default function CaseManagementModal({ isOpen, onClose }: CaseManagementModalProps) {
+export default function DashboardModal({ isOpen, onClose }: DashboardModalProps) {
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
             <form>
