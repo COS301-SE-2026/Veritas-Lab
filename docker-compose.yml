@@ -9,7 +9,7 @@ services:
         ports:
             - "3000:3000"
         environment:
-            - NEXT_PUBLIC_API_URL=http://localhost:8000
+            - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
         depends_on:
             - backend
         networks:
@@ -23,10 +23,15 @@ services:
         ports:
             - "8000:8000"
         environment:
-            - DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@postgres:${DB_PORT}/${DB_NAME}
+            - DB_USER=${DB_USER}
+            - DB_PASSWORD=${DB_PASSWORD}
+            - DB_HOST=postgres
+            - DB_PORT=${DB_PORT:-5432}
+            - DB_NAME=${DB_NAME}
             - REDIS_URL=redis://redis:6379/0
-            - OPENSEARCH_URL=http://opensearch:9200
             - JWT_SECRET=${JWT_SECRET}
+            - HASH=${HASH}
+            - TOKEN_EXPIRE=${TOKEN_EXPIRE}
             # BOTO3 / MINIO CONFIGURATION
             - STORAGE_PROVIDER=minio
             - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}      
@@ -36,7 +41,6 @@ services:
         depends_on:
             - postgres
             - redis
-            - opensearch
             - minio
         networks:
             - app-network
@@ -92,18 +96,6 @@ services:
         networks:
             - app-network
 
-    opensearch:
-        image: opensearchproject/opensearch:2.11.0
-        environment:
-            - discovery.type=single-node
-            - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
-            - DISABLE_SECURITY_PLUGIN=true
-        ports:
-            - "9200:9200"
-        volumes:
-            - opensearch_data:/usr/share/opensearch/data
-        networks:
-            - app-network
     minio:
         image: minio/minio:latest
         ports:
@@ -140,7 +132,6 @@ services:
 volumes:
     postgres_data:
     redis_data:
-    opensearch_data:
     minio_data:
 
 networks:
