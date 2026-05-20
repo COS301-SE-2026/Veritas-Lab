@@ -1,0 +1,123 @@
+#Editors note from Arran - if you edit this please make sure to use spaces to indent, yaml doesnt do tabs. also please keep it to 4 as it looks much cleaner than 2 spaces.
+name: CI
+#we want the CI to only run when we create a pull request to main or when that PR is updated
+#obviously if the CI fails you dont merge.
+on:
+    pull_request:
+        branches: ["main"]
+#the backend testing, frontend testing and the integration testing
+jobs:
+    backend-tests:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: set up Python
+                uses: actions/setup-python@v5
+                with:
+                    python-version: "3.14"
+
+            - name: install dependencies
+                run: |
+                    cd Backend
+                    pip install -r requirements/base.txt
+
+            - name: run PyTest
+                run: |
+                    cd Backend
+                    pytest app/tests/ --asyncio-mode=auto --cov=app
+
+    frontend-tests:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: set up Node
+                uses: actions/setup-node@v4
+                with:
+                    node-version: "20"
+
+            - name: install dependencies
+                run: |
+                    cd frontend
+                    npm ci
+
+            - name: run Jest
+                run: |
+                    cd frontend
+                    npm test
+
+    e2e-tests:
+        runs-on: ubuntu-latest
+        needs: [backend-tests, frontend-tests]
+        steps:
+            - uses: actions/checkout@v4
+
+            #create local env used by docker compose for integration tests.
+            - name: create CI env
+                run: |
+                    cat <<'EOF' > .env.ci
+                    DB_USER=postgres
+                    DB_PASSWORD=postgres
+                    DB_NAME=veritas_ci
+                    DB_PORT=5432
+                    JWT_SECRET=test-secret
+                    HASH=HS256
+                    TOKEN_EXPIRE=5
+                    MINIO_ROOT_USER=minioadmin
+                    MINIO_ROOT_PASSWORD=minioadmin
+                    MINIO_API_PORT=9000
+                    MINIO_CONSOLE_PORT=9001
+                    AWS_REGION=af-south-1
+                    EOF
+
+            #build and start the docker-compose
+            - name: start services
+                run: docker compose --env-file .env.ci up -d --build
+
+            #check the backend endpoint until it is ready or fails
+            - name: wait on backend
+                run: |
+                    for i in {1..30}; do
+                        if curl -fsS http://localhost:8000/docs > /dev/null; then
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+                    echo "Backend did not become ready";
+                    docker compose logs backend;
+                    exit 1
+
+            #check the frontend endpoint until it is ready or fails
+            - name: wait on frontend
+                run: |
+                    for i in {1..30}; do
+                        if curl -fsS http://localhost:3000 > /dev/null; then
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+                    echo "Frontend did not become ready";
+                    docker compose logs frontend;
+                    exit 1
+
+            - name: set up Node
+                uses: actions/setup-node@v4
+                with:
+                    node-version: "20"
+
+            - name: install dependencies
+                run: |
+                    cd frontend
+                    npm ci
+                    npx playwright install --with-deps
+
+            - name: run Playwright
+                run: |
+                    cd frontend
+                    npx playwright test
+
+            #shut down services and remove volumes after the run
+            - name: Remover
+                if: always()
+                run: docker compose --env-file .env.ci down -v
