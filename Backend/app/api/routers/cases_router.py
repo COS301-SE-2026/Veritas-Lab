@@ -10,10 +10,10 @@ router = APIRouter(
 )
 
 class CreateCaseRequest(BaseModel):
-    CaseName: str | None = None
-    CaseCreator: str | None = None
+    title: str | None = None
+    description: str | None = None
 
-@router.post("/cases")
+@router.post("/createCase")
 async def create_case(request: CreateCaseRequest, authorization: str | None = Header(default=None)):
     try:
         payload = verifyJWT(authorization)
@@ -26,8 +26,17 @@ async def create_case(request: CreateCaseRequest, authorization: str | None = He
             }
         )
     
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
     try:
-        case = Case(CaseName=request.CaseName, CaseCreator=request.CaseCreator)
+        case = Case(CaseName=request.title, CaseCreator=payload["username"], CaseDescription=request.description)
     except ValueError as e:
         return JSONResponse(
             status_code=400,
@@ -37,7 +46,7 @@ async def create_case(request: CreateCaseRequest, authorization: str | None = He
             }
         )
 
-    case_id = await case.save()
+    case_id = await case.create()
 
     return JSONResponse(
         status_code=201,

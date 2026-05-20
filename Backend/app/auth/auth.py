@@ -153,6 +153,38 @@ async def searchUsersViaEmail(email:str):
         }
     finally:
         await connection.close()
+    
+async def searchUsersViaUsername(username: str):
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT userid, useremail, username, userrole, userpassword
+            FROM "Users_DB"."Users"
+            WHERE username = $1
+            """,
+            username
+        )
+
+        if row is None:
+            return None
+        
+        return {
+            "id": str(row["userid"]),
+            "email": row["useremail"],
+            "username": row["username"],
+            "role": row["userrole"],
+            "password": row["userpassword"]
+        }
+    finally:
+        await connection.close()
 
 async def insertUser(email: str, username: str, role: str, hashedPassword: str):
     connection = await asyncpg.connect(
@@ -284,6 +316,17 @@ async def register(request: RegisterRequest):
             content={
                 "status": "error",
                 "message": "An account with this email already exists"
+            }
+        )
+    
+    existingUsername = await searchUsersViaUsername(request.username.strip())
+    
+    if existingUsername is not None:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "error",
+                "message": "An account with this username already exists"
             }
         )
 
