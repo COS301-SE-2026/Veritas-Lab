@@ -1,11 +1,17 @@
 import pytest
-import io
-from fastapi import UploadFile, HTTPException
+from fastapi.testclient import TestClient
+from unittest.mock import patch, AsyncMock
+from datetime import datetime, timezone
+
+from app.api.main import app
 from app.core.cases import Case
-from unittest.mock import patch, AsyncMock, MagicMock
+import app.api.routers.cases_router as cases_router
+
+
+client = TestClient(app)
+
 
 def test_CaseCreationWithValidData():
-    """Test successful case creation with valid inputs"""
     case = Case(CaseCreator="James Bond", CaseName="Flood in Durban")
     
     assert case.CaseCreator == "James Bond"
@@ -14,36 +20,36 @@ def test_CaseCreationWithValidData():
     assert case.CaseCreationDate is None
     assert case.CaseClosed is False
 
+
 def test_CaseCreationRequiresCreator():
-    """Test that case creation fails without CaseCreator"""
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseName="Test Case")
 
+
 def test_CaseCreationRequiresCaseName():
-    """Test that case creation fails without CaseName"""
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev")
 
+
 def test_CaseCreationRejectsBlankCreator():
-    """Test that whitespace-only CaseCreator is rejected"""
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseCreator="   ", CaseName="Test Case")
 
+
 def test_CaseCreationRejectsBlankCaseName():
-    """Test that whitespace-only CaseName is rejected"""
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev", CaseName="   ")
 
+
 def test_NameIsTooLong():
-    """Test that CaseCreator longer than 100 characters is rejected"""
     with pytest.raises(ValueError, match="Name is too long"):
         Case(
             CaseName="Test Case",
             CaseCreator="A" * 101
         )
 
+
 def test_NameAt100Characters():
-    """Test that CaseCreator at exactly 100 characters is accepted"""
     creator_name_100 = "A" * 100
 
     case = Case(
@@ -54,39 +60,39 @@ def test_NameAt100Characters():
     assert len(case.CaseCreator) == 100
     assert case.CaseCreator == creator_name_100
 
+
 def test_CaseNameAt99Characters():
-    """Test case creation with CaseName at 99 characters"""
-    caseName99 = "A" * 99
-    case = Case(CaseCreator="alice_dev", CaseName=caseName99)
+    case_name_99 = "A" * 99
+    case = Case(CaseCreator="alice_dev", CaseName=case_name_99)
     
     assert len(case.CaseName) == 99
-    assert case.CaseName == caseName99
+    assert case.CaseName == case_name_99
+
 
 def test_CaseNameAt254Characters():
-    """Test case creation with CaseName at 254 characters"""
     case_name_254 = "A" * 254
     case = Case(CaseCreator="alice_dev", CaseName=case_name_254)
     
     assert len(case.CaseName) == 254
-    assert case.CaseName == caseName254
+    assert case.CaseName == case_name_254
+
 
 def test_CaseNameAt255Characters():
-    """Test case creation with CaseName at 255 characters"""
     case_name_255 = "A" * 255
     case = Case(CaseCreator="alice_dev", CaseName=case_name_255)
     
     assert len(case.CaseName) == 255
-    assert case.CaseName == caseName255
+    assert case.CaseName == case_name_255
+
 
 def test_CaseNameAt256Characters():
-    """Test case creation with CaseName at 256 characters is rejected"""
     case_name_256 = "A" * 256
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
-        Case(CaseCreator="alice_dev", CaseName=caseName256)
+        Case(CaseCreator="alice_dev", CaseName=case_name_256)
+
 
 def test_CaseStoresDescription():
-    """Test that CaseDescription is stored correctly"""
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
@@ -95,8 +101,8 @@ def test_CaseStoresDescription():
 
     assert case.CaseDescription == "This is a test description"
 
+
 def test_CaseStoresReviews():
-    """Test that CaseReviews is stored correctly"""
     reviews = {
         "reviewer": "admin",
         "status": "pending"
@@ -110,10 +116,73 @@ def test_CaseStoresReviews():
 
     assert case.CaseReviews == reviews
 
+
+def test_CaseToJSONBeforeCreate():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="This is a test description",
+        CaseReviews={"status": "pending"}
+    )
+
+    result = case.toJSON()
+
+    assert result == {
+        "case_id": None,
+        "case_name": "Test Case",
+        "case_creator": "alice_dev",
+        "case_reviews": {"status": "pending"},
+        "case_description": "This is a test description",
+        "case_closed": False,
+        "case_creation_date": None
+    }
+
+
+def test_CaseToJSONAfterCreateValuesSet():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="This is a test description",
+        CaseReviews={"reviewer": "admin", "status": "approved"}
+    )
+
+    case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
+    case.CaseClosed = True
+    case.CaseCreationDate = datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+
+    result = case.toJSON()
+
+    assert result == {
+        "case_id": "12345678-abcd-ef01-2345-6789abcdef01",
+        "case_name": "Test Case",
+        "case_creator": "alice_dev",
+        "case_reviews": {"reviewer": "admin", "status": "approved"},
+        "case_description": "This is a test description",
+        "case_closed": True,
+        "case_creation_date": "2026-05-20T19:43:02+00:00"
+    }
+
+
+def test_CaseToJSONWithNoDescriptionOrReviews():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case"
+    )
+
+    assert case.toJSON() == {
+        "case_id": None,
+        "case_name": "Test Case",
+        "case_creator": "alice_dev",
+        "case_reviews": None,
+        "case_description": None,
+        "case_closed": False,
+        "case_creation_date": None
+    }
+
+
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 async def test_CreateCaseWithMock(mock_connect):
-    """Test successful database insert using mocked asyncpg connection"""
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
@@ -144,13 +213,10 @@ async def test_CreateCaseWithMock(mock_connect):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
 
-    assert excInfo.value.status_code == 400
-    assert "Unsupported file extension: .food" in excInfo.value.detail    
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 async def test_CreateCaseCannotBeCalledTwice(mock_connect):
-    """Test that create() rejects a case that already has a CaseId"""
     case = Case(CaseCreator="alice_dev", CaseName="Test Case")
     case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
 
@@ -158,3 +224,170 @@ async def test_CreateCaseCannotBeCalledTwice(mock_connect):
         await case.create()
 
     mock_connect.assert_not_called()
+
+
+def testGetCasesMissingJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Missing Authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/getCases", json={})
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing Authorization header"
+    }
+
+
+def testGetCasesInvalidJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Invalid token")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
+
+def testGetCasesUserRoleReturns403(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "error",
+        "message": "User unauthorized"
+    }
+
+
+def testGetCasesAdminReturnsCases(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_rows = [
+        {
+            "caseid": "12345678-abcd-ef01-2345-6789abcdef01",
+            "casecreator": "admin_user",
+            "casename": "Flood in Durban",
+            "casereviews": None,
+            "casedescription": "Flood investigation case",
+            "caseclosed": False,
+            "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+        },
+        {
+            "caseid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "casecreator": "investigator_user",
+            "casename": "Fake Evidence Case",
+            "casereviews": {"status": "pending"},
+            "casedescription": "Media verification case",
+            "caseclosed": False,
+            "casecreationdate": datetime(2026, 5, 21, 10, 30, 0, tzinfo=timezone.utc)
+        }
+    ]
+
+    mock_connection = AsyncMock()
+    mock_connection.fetch = AsyncMock(return_value=fake_rows)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert len(data["cases"]) == 2
+
+    assert data["cases"][0] == {
+        "case_id": "12345678-abcd-ef01-2345-6789abcdef01",
+        "case_name": "Flood in Durban",
+        "case_creator": "admin_user",
+        "case_reviews": None,
+        "case_description": "Flood investigation case",
+        "case_closed": False,
+        "case_creation_date": "2026-05-20T19:43:02+00:00"
+    }
+
+    assert data["cases"][1] == {
+        "case_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "case_name": "Fake Evidence Case",
+        "case_creator": "investigator_user",
+        "case_reviews": {"status": "pending"},
+        "case_description": "Media verification case",
+        "case_closed": False,
+        "case_creation_date": "2026-05-21T10:30:00+00:00"
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetch.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+
+def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetch = AsyncMock(return_value=[])
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "cases": []
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetch.assert_called_once()
+    mock_connection.close.assert_called_once()

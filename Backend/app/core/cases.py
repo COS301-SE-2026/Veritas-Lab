@@ -173,3 +173,14 @@ class Case:
         finally:
             await connection.close()
             await media.close()
+
+    def toJSON(self):
+        return {
+            "case_id": str(self.CaseId) if self.CaseId is not None else None,
+            "case_name": self.CaseName,
+            "case_creator": self.CaseCreator,
+            "case_reviews": self.CaseReviews,
+            "case_description": self.CaseDescription,
+            "case_closed": self.CaseClosed,
+            "case_creation_date": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
+        }
