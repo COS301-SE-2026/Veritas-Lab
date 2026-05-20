@@ -43,6 +43,7 @@ describe('Dashboard page', () => {
         expect(screen.queryByText('New Case')).not.toBeInTheDocument();
     });
 
+    //ensures that only the investigator can see the create button and their own dashboard cards.
     it('shows dashboard cards and create button for investigators', () => {
         mockUseCaseDashboard.mockReturnValue({
             ...baseHookState,
