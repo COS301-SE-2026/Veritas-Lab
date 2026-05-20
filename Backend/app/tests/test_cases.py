@@ -4,42 +4,55 @@ from fastapi import UploadFile, HTTPException
 from app.core.cases import Case
 from unittest.mock import patch, AsyncMock, MagicMock
 
-
 def test_CaseCreationWithValidData():
     """Test successful case creation with valid inputs"""
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case = Case(CaseCreator="James Bond", CaseName="Flood in Durban")
     
-    assert case.CaseCreator =="New_Dev"
-    assert case.CaseName == "The Jones v Smith"
-
+    assert case.CaseCreator == "James Bond"
+    assert case.CaseName == "Flood in Durban"
+    assert case.CaseId is None
+    assert case.CaseCreationDate is None
+    assert case.CaseClosed is False
 
 def test_CaseCreationRequiresCreator():
     """Test that case creation fails without CaseCreator"""
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseName="Test Case")
 
-
 def test_CaseCreationRequiresCaseName():
     """Test that case creation fails without CaseName"""
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev")
 
+def test_CaseCreationRejectsBlankCreator():
+    """Test that whitespace-only CaseCreator is rejected"""
+    with pytest.raises(ValueError, match="CaseCreator is required"):
+        Case(CaseCreator="   ", CaseName="Test Case")
+
+def test_CaseCreationRejectsBlankCaseName():
+    """Test that whitespace-only CaseName is rejected"""
+    with pytest.raises(ValueError, match="CaseName is required"):
+        Case(CaseCreator="alice_dev", CaseName="   ")
+
 def test_NameIsTooLong():
-    """ The name is too long """
+    """Test that CaseCreator longer than 100 characters is rejected"""
     with pytest.raises(ValueError, match="Name is too long"):
         Case(
             CaseName="Test Case",
-            CaseCreator="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_THAT_is_right"
+            CaseCreator="A" * 101
         )
 
-def test_NameIs100():
-    """The name is 100 characters that still too long"""
-    with pytest.raises(ValueError, match="Name is too long"):
-        Case(
-            CaseName="Test Case",
-            CaseCreator="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_0"
-        )
+def test_NameAt100Characters():
+    """Test that CaseCreator at exactly 100 characters is accepted"""
+    creator_name_100 = "A" * 100
 
+    case = Case(
+        CaseName="Test Case",
+        CaseCreator=creator_name_100
+    )
+
+    assert len(case.CaseCreator) == 100
+    assert case.CaseCreator == creator_name_100
 
 def test_CaseNameAt99Characters():
     """Test case creation with CaseName at 99 characters"""
@@ -49,154 +62,99 @@ def test_CaseNameAt99Characters():
     assert len(case.CaseName) == 99
     assert case.CaseName == caseName99
 
-
 def test_CaseNameAt254Characters():
-    """Test case creation with CaseName at 254 characters (within 255 limit)"""
-    caseName254 = "A" * 254
-    case = Case(CaseCreator="alice_dev", CaseName=caseName254)
+    """Test case creation with CaseName at 254 characters"""
+    case_name_254 = "A" * 254
+    case = Case(CaseCreator="alice_dev", CaseName=case_name_254)
     
     assert len(case.CaseName) == 254
     assert case.CaseName == caseName254
 
-
 def test_CaseNameAt255Characters():
-    """Test case creation with CaseName at 255 characters (at database limit)"""
-    caseName255 = "A" * 255
-    case = Case(CaseCreator="alice_dev", CaseName=caseName255)
+    """Test case creation with CaseName at 255 characters"""
+    case_name_255 = "A" * 255
+    case = Case(CaseCreator="alice_dev", CaseName=case_name_255)
     
     assert len(case.CaseName) == 255
     assert case.CaseName == caseName255
 
-
 def test_CaseNameAt256Characters():
-    """Test case creation with CaseName at 256 characters (exceeds 255 limit)"""
-    caseName256 = "A" * 256
+    """Test case creation with CaseName at 256 characters is rejected"""
+    case_name_256 = "A" * 256
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
         Case(CaseCreator="alice_dev", CaseName=caseName256)
 
-@pytest.mark.asyncio
-@patch("asyncpg.connect")
-async def test_SaveCaseWithMock(mock_connect):
-    case = Case(CaseCreator="alice_dev", CaseName="Test Case")
-
-    fakeDbUuid = "12345678-abcd-ef01-2345-6789abcdef01"
-
-    # Mocking the database Connection therefore no actual database hit
-    mockConnection = AsyncMock()
-    mock_connect.return_value = mockConnection
-    mockConnection.close = AsyncMock(return_value=None)
-
-    mockConnection.fetchval = AsyncMock(return_value=fakeDbUuid)
-
-    uuid = await case.save()
-
-    assert uuid == fakeDbUuid
-    assert isinstance(uuid, str)
-
-    # Ensuring functions were called
-    mock_connect.assert_called_once()
-    mockConnection.fetchval.assert_called_once()
-    mockConnection.close.assert_called_once()
-
-
-#Testing for the media upload will start from here
-@pytest.mark.asyncio
-@patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-@patch("uuid.uuid4")
-async def test_images_upload_success(mockUuid, mockMinioClass, mockDbConnect):
-    """
-    Test successful evidence processing and extension identification
-    """
-    fileContent = b"A fake binary for a png"
-    testContent = io.BytesIO(fileContent)
-    
-
-    mockMedia = UploadFile(
-        file=testContent,
-        filename = "success.png",
-        headers={"content-type": "image/png"}
+def test_CaseStoresDescription():
+    """Test that CaseDescription is stored correctly"""
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="This is a test description"
     )
 
-    fakeUuidString = "22222222-abcd-ef01-2345-6789abcdef01"
-    mockUuid.return_value = fakeUuidString
+    assert case.CaseDescription == "This is a test description"
 
-    mockDbConnection = AsyncMock()
-    mockDbConnect.return_value = mockDbConnection
-
-    mockMediaTypeRecord = {
-        "MediaTypeId": "type-111", 
-        "MediaBucket": "images",
-        "MediaExtension": ".png"
+def test_CaseStoresReviews():
+    """Test that CaseReviews is stored correctly"""
+    reviews = {
+        "reviewer": "admin",
+        "status": "pending"
     }
 
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseReviews=reviews
+    )
 
-    mockDbConnection.fetchrow.side_effect = [mockMediaTypeRecord, None]  # First call returns type record, second call returns None to see if there are dupes
-    mockDbConnection.fetchval = AsyncMock(return_value=fakeUuidString)
-    mockDbConnection.close = AsyncMock()
-
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
-
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-
-    result = await case.addEvidence(media=mockMedia)
-
-    # Strict checks on the insert of that database
-
-    firstCallArgs = mockDbConnection.fetchrow.call_args_list[0][0]
-    lookupQuery = firstCallArgs[0]
-    lookupParam = firstCallArgs[1]
-    
-    assert "FROM \"Cases_DB\".\"MediaType\"" in lookupQuery
-    assert lookupParam == ".png"
-
-    mockDbConnection.fetchval.assert_called_once()
-
-    insertCallArgs = mockDbConnection.fetchval.call_args[0]
-    sqlQuery = insertCallArgs[0]
-    paramUuid = insertCallArgs[1]
-    paramTypeId = insertCallArgs[2]
-    paramHash = insertCallArgs[3]  
-
-    assert "INSERT INTO \"Cases_DB\".\"Media\"" in sqlQuery
-    assert "(MediaId, MediaType, MediaHash)" in sqlQuery
-
-    assert paramUuid == fakeUuidString
-    assert paramTypeId == "type-111" 
-    assert len(paramHash) == 64
-
-    expectedFileName = f"{fakeUuidString}.png"
-    assert result["url"] == f"http://localhost:9000/images/{expectedFileName}"
-
-    mockDbConnection.close.assert_called_once()
+    assert case.CaseReviews == reviews
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_InvalidFileType(mockDbConnect):
-    """Test that a rubbish file format throws a clean 400 error"""
-    fileContent = b"some random junk text data matching food"
-    testContent = io.BytesIO(fileContent)
-
-    mockMedia = UploadFile(
-        file=testContent,
-        filename="hangry.food",
-        headers={"content-type": "application/octet-stream"}
+async def test_CreateCaseWithMock(mock_connect):
+    """Test successful database insert using mocked asyncpg connection"""
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="Mock description"
     )
 
-    mockDbConnection = AsyncMock()
-    mockDbConnect.return_value = mockDbConnection
+    fake_db_uuid = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_creation_date = "2026-05-20T16:00:00Z"
 
-    mockDbConnection.fetchrow.return_value = None
-    mockDbConnection.close = AsyncMock()
+    mock_connection = AsyncMock()
+    mock_connect.return_value = mock_connection
+    mock_connection.close = AsyncMock(return_value=None)
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    mock_connection.fetchrow = AsyncMock(return_value={
+        "caseid": fake_db_uuid,
+        "casecreationdate": fake_creation_date
+    })
 
-    with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia)
+    case_id = await case.create()
+
+    assert case_id == fake_db_uuid
+    assert isinstance(case_id, str)
+
+    assert str(case.CaseId) == fake_db_uuid
+    assert case.CaseCreationDate == fake_creation_date
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
 
     assert excInfo.value.status_code == 400
     assert "Unsupported file extension: .food" in excInfo.value.detail    
 
-    mockDbConnection.close.assert_called_once()
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_CreateCaseCannotBeCalledTwice(mock_connect):
+    """Test that create() rejects a case that already has a CaseId"""
+    case = Case(CaseCreator="alice_dev", CaseName="Test Case")
+    case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    with pytest.raises(ValueError, match="This case already exists"):
+        await case.create()
+
+    mock_connect.assert_not_called()

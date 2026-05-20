@@ -6,7 +6,10 @@ client = TestClient(app)
 
 def testSuccessfulRegistration(monkeypatch):
     async def mock_searchUsersViaEmail(email):
-        return None  # No existing user so email is free to register
+        return None
+
+    async def mock_searchUsersViaUsername(username):
+        return None
 
     async def mock_insertUser(email, username, role, hashedPassword):
         return {
@@ -17,6 +20,7 @@ def testSuccessfulRegistration(monkeypatch):
         }
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
+    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
     monkeypatch.setattr(auth, "insertUser", mock_insertUser)
 
     response = client.post(
@@ -96,12 +100,20 @@ def testMissingUsernameReturns400():
 
     assert response.status_code == 400
 
-#testing duplicate email. SO email is already in use or registered
 def testDuplicateEmailReturns409(monkeypatch):
     async def mock_searchUsersViaEmail(email):
-        return {"id": "existing-id", "email": email, "username": "Existing User", "role": "analyst"}
+        return {
+            "id": "existing-id",
+            "email": email,
+            "username": "Existing User",
+            "role": "USER"
+        }
+
+    async def mock_searchUsersViaUsername(username):
+        return None
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
+    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
 
     response = client.post(
         "/api/register",

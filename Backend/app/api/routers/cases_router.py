@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.core.cases import Case
+from app.auth.auth import verifyJWT
 
 router = APIRouter(
     prefix="/api",
@@ -9,13 +10,33 @@ router = APIRouter(
 )
 
 class CreateCaseRequest(BaseModel):
-    CaseName: str | None = None
-    CaseCreator: str | None = None
+    title: str | None = None
+    description: str | None = None
 
-@router.post("/cases")
-async def create_case(request: CreateCaseRequest):
+@router.post("/createCase")
+async def create_case(request: CreateCaseRequest, authorization: str | None = Header(default=None)):
     try:
-        case = Case(CaseName=request.CaseName, CaseCreator=request.CaseCreator)
+        payload = verifyJWT(authorization)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+    
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
+    try:
+        case = Case(CaseName=request.title, CaseCreator=payload["username"], CaseDescription=request.description)
     except ValueError as e:
         return JSONResponse(
             status_code=400,
@@ -25,7 +46,7 @@ async def create_case(request: CreateCaseRequest):
             }
         )
 
-    case_id = await case.save()
+    case_id = await case.create()
 
     return JSONResponse(
         status_code=201,
