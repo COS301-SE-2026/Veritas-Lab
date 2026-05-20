@@ -73,7 +73,7 @@ jobs:
 
             #build and start the docker-compose
             - name: start services
-                            run: docker compose --env-file .env.ci up -d --build
+              run: docker compose --env-file .env.ci up -d --build
 
             #check the backend endpoint until it is ready or fails
             - name: wait on backend
@@ -119,5 +119,5 @@ jobs:
 
             #shut down services and remove volumes after the run
             - name: Remover
-                            if: always()
-                            run: docker compose --env-file .env.ci down -v
+              if: always()
+              run: docker compose --env-file .env.ci down -v
