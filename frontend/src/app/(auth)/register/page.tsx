@@ -11,7 +11,11 @@ export default function Register() {
                 </div>
                 <RegisterForm />
             </div>
-            <div className="bg-(--color-primary)" />
+            <div className="flex flex-col text-8xl font-bold pr-30 pt-30 items-end bg-(--color-primary) " >
+                <div className="flex flex-row justify-end items-end">
+                    Veritas Lab
+                </div>
+            </div>
         </div>
     );
 }

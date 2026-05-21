@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from '@/context/SidebarContext';
 import { useLogOut } from '@/hooks/useLogOut';
+import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool.
 import {
     ChevronLeft, Menu, Home, Construction, LogOut,
@@ -36,16 +37,19 @@ export default function Sidebar() {
         >
         <div className="flex items-center justify-between px-4 py-5">
             {!collapsed && (
-            <div className="font-semibold text-sm text-white">
-                Veritas Lab
-            </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Image src="/VL_Logo.svg" alt="Veritas Lab Logo" width={0} height={0} className="w-10 h-10" />
+                <div className="font-semibold text-xl mt-1 text-white">
+                  Veritas Lab
+                </div>
+              </div>
             )}
             {/* Toggle button to collapse or expand the sidebar */}
             <Button
             onClick={toggle}
             variant="sidebar"
             >
-            {collapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
+            {collapsed ? <Menu size={18} /> : <ChevronLeft size={18} className='text-(--color-light)'/>}
             </Button>
         </div>
         {/* Navigation items */}
