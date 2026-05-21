@@ -9,7 +9,7 @@ services:
         ports:
             - "3000:3000"
         environment:
-            - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+            - NEXT_PUBLIC_API_URL=http://localhost:8000
         depends_on:
             - backend
         networks:
@@ -106,6 +106,7 @@ services:
         environment:
             - MINIO_ROOT_USER=${MINIO_ROOT_USER}
             - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+            - MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:3000,http://127.0.0.1:3000
         command: server /data --address ":${MINIO_API_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
         networks:
             - app-network
@@ -114,20 +115,6 @@ services:
             interval: 5s
             timeout: 5s
             retries: 5
-
-    minio-init:
-        image: minio/mc:latest
-        entrypoint: >
-            /bin/sh -c "
-            /usr/bin/mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
-            /usr/bin/mc mb minio/images --ignore-existing &&
-            /usr/bin/mc mb minio/pdf --ignore-existing
-            "
-        depends_on:
-            minio:
-                condition: service_healthy
-        networks:
-            - app-network
 
 volumes:
     postgres_data:

@@ -1,3 +1,3 @@
 INSERT INTO "Users_DB"."Users" (UserEmail,UserName,UserRole,UserPassword) VALUES
-('admin@gmail.com','InvestAdmin','INVESTIGATOR','7efe68ba63fd87f8b53e10800dedf5179cf4897e3fc28a57998bd8f7e3e4e66a')
+('admin@gmail.com','InvestAdmin','INVESTIGATOR','f3ec3f2fecd0464ccd3251d6253a821bf8cffd2e4305f62921ba912883353879')
 ON CONFLICT (UserEmail) DO NOTHING;

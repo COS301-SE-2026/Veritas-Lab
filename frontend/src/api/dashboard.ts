@@ -1,5 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+import { getAuthHeaders } from './authHeaders';
+
 export type DashboardCase = {
 	caseId: string;
 	caseReviews: Record<string, unknown> | null;
@@ -11,7 +13,11 @@ export type DashboardCase = {
 
 export async function fetchCases(): Promise<DashboardCase[]> {
 	try {
-		const res = await fetch(`${API_BASE_URL}/api/getCases`);
+		const res = await fetch(`${API_BASE_URL}/api/getCases`, {
+			headers: {
+				...getAuthHeaders(),
+			},
+		});
 
 		if (!res.ok) {
 			throw new Error('Failed to fetch dashboard cases');
