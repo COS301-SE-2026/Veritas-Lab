@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import re as regex
 import bcrypt
 from jose import jwt
+from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
 from app.core.env import ENVLoader
@@ -23,6 +24,33 @@ router = APIRouter(
     prefix="/api",
     tags=["Auth"]
 )
+
+def verifyJWT(authorizationHeader: str) -> dict:
+    if authorizationHeader is None or authorizationHeader.strip() == "":
+        raise ValueError("Missing Authorization header")
+
+    if not authorizationHeader.startswith("Bearer "):
+        raise ValueError("Invalid Authorization header format")
+
+    token = authorizationHeader.replace("Bearer ", "", 1).strip()
+
+    if token == "":
+        raise ValueError("Missing JWT token")
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        return payload
+
+    except ExpiredSignatureError:
+        raise ValueError("Token has expired")
+
+    except JWTError:
+        raise ValueError("Invalid token")
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
@@ -81,17 +109,17 @@ async def updateUserJWTIssued(email: str):
         host=DB_HOST,
         port=DB_PORT
     )
-
-    await connection.execute(
-        """
-        UPDATE "Users_DB"."Users"
-        SET "UserJWTIssued" = NOW()
-        WHERE "UserEmail" = $1
-        """,
-        email
-    )
-
-    await connection.close()
+    try:
+        await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userjwtissued = NOW()
+            WHERE useremail = $1
+            """,
+            email
+        )
+    finally:
+        await connection.close()
 
 # Once the envs are setup this will need to be updated
 async def searchUsersViaEmail(email:str):
@@ -103,27 +131,60 @@ async def searchUsersViaEmail(email:str):
         port=DB_PORT
     )
 
-    row = await connection.fetchrow(
-         """
-        SELECT "UserId", "UserEmail", "UserName", "UserRole", "UserPassword"
-        FROM "Users"
-        WHERE "UserEmail" = $1
-        """,
-        email
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT userid, useremail, username, userrole, userpassword
+            FROM "Users_DB"."Users"
+            WHERE useremail = $1
+            """,
+            email
+        )
+
+        if row is None:
+            return None
+        
+        return {
+            "id": str(row["userid"]),
+            "email": row["useremail"],
+            "username": row["username"],
+            "role": row["userrole"],
+            "password": row["userpassword"]
+        }
+    finally:
+        await connection.close()
+    
+async def searchUsersViaUsername(username: str):
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
     )
 
-    await connection.close
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT userid, useremail, username, userrole, userpassword
+            FROM "Users_DB"."Users"
+            WHERE username = $1
+            """,
+            username
+        )
 
-    if row is None:
-        return None
-    
-    return {
-        "id": str(row["UserId"]),
-        "email": row["UserEmail"],
-        "username": row["UserName"],
-        "role": row["UserRole"],
-        "password": row["UserPassword"]
-    }
+        if row is None:
+            return None
+        
+        return {
+            "id": str(row["userid"]),
+            "email": row["useremail"],
+            "username": row["username"],
+            "role": row["userrole"],
+            "password": row["userpassword"]
+        }
+    finally:
+        await connection.close()
 
 async def insertUser(email: str, username: str, role: str, hashedPassword: str):
     connection = await asyncpg.connect(
@@ -134,23 +195,25 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
         port=DB_PORT
     )
 
-    row = await connection.fetchrow(
-        """
-        INSERT INTO "Users" ("UserEmail", "UserName", "UserRole", "UserPassword")
-        VALUES ($1, $2, $3, $4)
-        RETURNING "UserId", "UserEmail", "UserName", "UserRole"
-        """,
-        email, username, role, hashedPassword
-    )
+    try:
+        row = await connection.fetchrow(
+            """
+            INSERT INTO "Users_DB"."Users"
+            (useremail, username, userrole, userpassword)
+            VALUES ($1, $2, $3, $4)
+            RETURNING userid, useremail, username, userrole
+            """,
+            email, username, role, hashedPassword
+        )
 
-    await connection.close()
-
-    return {
-        "id": str(row["UserId"]),
-        "email": row["UserEmail"],
-        "username": row["UserName"],
-        "role": row["UserRole"]
-    }
+        return {
+            "id": str(row["userid"]),
+            "email": row["useremail"],
+            "username": row["username"],
+            "role": row["userrole"]
+        }
+    finally:
+        await connection.close()
 
 def createToken(user: dict) ->str:
     expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -255,9 +318,20 @@ async def register(request: RegisterRequest):
                 "message": "An account with this email already exists"
             }
         )
+    
+    existingUsername = await searchUsersViaUsername(request.username.strip())
+    
+    if existingUsername is not None:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "error",
+                "message": "An account with this username already exists"
+            }
+        )
 
     hashedPassword = hashPassword(request.password)
-    await insertUser(request.email.strip(), request.username.strip(), "user", hashedPassword)
+    await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
 
     return JSONResponse(
         status_code=201,

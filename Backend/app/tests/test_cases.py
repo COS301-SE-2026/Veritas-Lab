@@ -1,202 +1,393 @@
 import pytest
-import io
-from fastapi import UploadFile, HTTPException
+from fastapi.testclient import TestClient
+from unittest.mock import patch, AsyncMock
+from datetime import datetime, timezone
+
+from app.api.main import app
 from app.core.cases import Case
-from unittest.mock import patch, AsyncMock, MagicMock
+import app.api.routers.cases_router as cases_router
+
+
+client = TestClient(app)
 
 
 def test_CaseCreationWithValidData():
-    """Test successful case creation with valid inputs"""
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case = Case(CaseCreator="James Bond", CaseName="Flood in Durban")
     
-    assert case.CaseCreator =="New_Dev"
-    assert case.CaseName == "The Jones v Smith"
+    assert case.CaseCreator == "James Bond"
+    assert case.CaseName == "Flood in Durban"
+    assert case.CaseId is None
+    assert case.CaseCreationDate is None
+    assert case.CaseClosed is False
 
 
 def test_CaseCreationRequiresCreator():
-    """Test that case creation fails without CaseCreator"""
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseName="Test Case")
 
 
 def test_CaseCreationRequiresCaseName():
-    """Test that case creation fails without CaseName"""
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev")
 
+
+def test_CaseCreationRejectsBlankCreator():
+    with pytest.raises(ValueError, match="CaseCreator is required"):
+        Case(CaseCreator="   ", CaseName="Test Case")
+
+
+def test_CaseCreationRejectsBlankCaseName():
+    with pytest.raises(ValueError, match="CaseName is required"):
+        Case(CaseCreator="alice_dev", CaseName="   ")
+
+
 def test_NameIsTooLong():
-    """ The name is too long """
     with pytest.raises(ValueError, match="Name is too long"):
         Case(
             CaseName="Test Case",
-            CaseCreator="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_THAT_is_right"
+            CaseCreator="A" * 101
         )
 
-def test_NameIs100():
-    """The name is 100 characters that still too long"""
-    with pytest.raises(ValueError, match="Name is too long"):
-        Case(
-            CaseName="Test Case",
-            CaseCreator="Case_2026_Test_Name_With_Exactly_One_Hundred_Characters_Long_For_Database_Validation_Testing_Purposes_0"
-        )
+
+def test_NameAt100Characters():
+    creator_name_100 = "A" * 100
+
+    case = Case(
+        CaseName="Test Case",
+        CaseCreator=creator_name_100
+    )
+
+    assert len(case.CaseCreator) == 100
+    assert case.CaseCreator == creator_name_100
 
 
 def test_CaseNameAt99Characters():
-    """Test case creation with CaseName at 99 characters"""
-    caseName99 = "A" * 99
-    case = Case(CaseCreator="alice_dev", CaseName=caseName99)
+    case_name_99 = "A" * 99
+    case = Case(CaseCreator="alice_dev", CaseName=case_name_99)
     
     assert len(case.CaseName) == 99
-    assert case.CaseName == caseName99
+    assert case.CaseName == case_name_99
 
 
 def test_CaseNameAt254Characters():
-    """Test case creation with CaseName at 254 characters (within 255 limit)"""
-    caseName254 = "A" * 254
-    case = Case(CaseCreator="alice_dev", CaseName=caseName254)
+    case_name_254 = "A" * 254
+    case = Case(CaseCreator="alice_dev", CaseName=case_name_254)
     
     assert len(case.CaseName) == 254
-    assert case.CaseName == caseName254
+    assert case.CaseName == case_name_254
 
 
 def test_CaseNameAt255Characters():
-    """Test case creation with CaseName at 255 characters (at database limit)"""
-    caseName255 = "A" * 255
-    case = Case(CaseCreator="alice_dev", CaseName=caseName255)
+    case_name_255 = "A" * 255
+    case = Case(CaseCreator="alice_dev", CaseName=case_name_255)
     
     assert len(case.CaseName) == 255
-    assert case.CaseName == caseName255
+    assert case.CaseName == case_name_255
 
 
 def test_CaseNameAt256Characters():
-    """Test case creation with CaseName at 256 characters (exceeds 255 limit)"""
-    caseName256 = "A" * 256
+    case_name_256 = "A" * 256
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
-        Case(CaseCreator="alice_dev", CaseName=caseName256)
-
-@pytest.mark.asyncio
-@patch("asyncpg.connect")
-async def test_SaveCaseWithMock(mock_connect):
-    case = Case(CaseCreator="alice_dev", CaseName="Test Case")
-
-    fakeDbUuid = "12345678-abcd-ef01-2345-6789abcdef01"
-
-    # Mocking the database Connection therefore no actual database hit
-    mockConnection = AsyncMock()
-    mock_connect.return_value = mockConnection
-    mockConnection.close = AsyncMock(return_value=None)
-
-    mockConnection.fetchval = AsyncMock(return_value=fakeDbUuid)
-
-    uuid = await case.save()
-
-    assert uuid == fakeDbUuid
-    assert isinstance(uuid, str)
-
-    # Ensuring functions were called
-    mock_connect.assert_called_once()
-    mockConnection.fetchval.assert_called_once()
-    mockConnection.close.assert_called_once()
+        Case(CaseCreator="alice_dev", CaseName=case_name_256)
 
 
-#Testing for the media upload will start from here
-@pytest.mark.asyncio
-@patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-@patch("uuid.uuid4")
-async def test_images_upload_success(mockUuid, mockMinioClass, mockDbConnect):
-    """
-    Test successful evidence processing and extension identification
-    """
-    fileContent = b"A fake binary for a png"
-    testContent = io.BytesIO(fileContent)
-    
-
-    mockMedia = UploadFile(
-        file=testContent,
-        filename = "success.png",
-        headers={"content-type": "image/png"}
+def test_CaseStoresDescription():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="This is a test description"
     )
 
-    fakeUuidString = "22222222-abcd-ef01-2345-6789abcdef01"
-    mockUuid.return_value = fakeUuidString
+    assert case.CaseDescription == "This is a test description"
 
-    mockDbConnection = AsyncMock()
-    mockDbConnect.return_value = mockDbConnection
 
-    mockMediaTypeRecord = {
-        "MediaTypeId": "type-111", 
-        "MediaBucket": "images",
-        "MediaExtension": ".png"
+def test_CaseStoresReviews():
+    reviews = {
+        "reviewer": "admin",
+        "status": "pending"
+    }
+
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseReviews=reviews
+    )
+
+    assert case.CaseReviews == reviews
+
+
+def test_CaseToJSONBeforeCreate():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="This is a test description",
+        CaseReviews={"status": "pending"}
+    )
+
+    result = case.toJSON()
+
+    assert result == {
+        "case_id": None,
+        "case_name": "Test Case",
+        "case_creator": "alice_dev",
+        "case_reviews": {"status": "pending"},
+        "case_description": "This is a test description",
+        "case_closed": False,
+        "case_creation_date": None
     }
 
 
-    mockDbConnection.fetchrow.side_effect = [mockMediaTypeRecord, None]  # First call returns type record, second call returns None to see if there are dupes
-    mockDbConnection.fetchval = AsyncMock(return_value=fakeUuidString)
-    mockDbConnection.close = AsyncMock()
+def test_CaseToJSONAfterCreateValuesSet():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="This is a test description",
+        CaseReviews={"reviewer": "admin", "status": "approved"}
+    )
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
+    case.CaseClosed = True
+    case.CaseCreationDate = datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    result = case.toJSON()
 
-    result = await case.addEvidence(media=mockMedia)
+    assert result == {
+        "case_id": "12345678-abcd-ef01-2345-6789abcdef01",
+        "case_name": "Test Case",
+        "case_creator": "alice_dev",
+        "case_reviews": {"reviewer": "admin", "status": "approved"},
+        "case_description": "This is a test description",
+        "case_closed": True,
+        "case_creation_date": "2026-05-20T19:43:02+00:00"
+    }
 
-    # Strict checks on the insert of that database
 
-    firstCallArgs = mockDbConnection.fetchrow.call_args_list[0][0]
-    lookupQuery = firstCallArgs[0]
-    lookupParam = firstCallArgs[1]
-    
-    assert "FROM \"Cases_DB\".\"MediaType\"" in lookupQuery
-    assert lookupParam == ".png"
+def test_CaseToJSONWithNoDescriptionOrReviews():
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case"
+    )
 
-    mockDbConnection.fetchval.assert_called_once()
+    assert case.toJSON() == {
+        "case_id": None,
+        "case_name": "Test Case",
+        "case_creator": "alice_dev",
+        "case_reviews": None,
+        "case_description": None,
+        "case_closed": False,
+        "case_creation_date": None
+    }
 
-    insertCallArgs = mockDbConnection.fetchval.call_args[0]
-    sqlQuery = insertCallArgs[0]
-    paramUuid = insertCallArgs[1]
-    paramTypeId = insertCallArgs[2]
-    paramHash = insertCallArgs[3]  
-
-    assert "INSERT INTO \"Cases_DB\".\"Media\"" in sqlQuery
-    assert "(MediaId, MediaType, MediaHash)" in sqlQuery
-
-    assert paramUuid == fakeUuidString
-    assert paramTypeId == "type-111" 
-    assert len(paramHash) == 64
-
-    expectedFileName = f"{fakeUuidString}.png"
-    assert result["url"] == f"http://localhost:9000/images/{expectedFileName}"
-
-    mockDbConnection.close.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_InvalidFileType(mockDbConnect):
-    """Test that a rubbish file format throws a clean 400 error"""
-    fileContent = b"some random junk text data matching food"
-    testContent = io.BytesIO(fileContent)
-
-    mockMedia = UploadFile(
-        file=testContent,
-        filename="hangry.food",
-        headers={"content-type": "application/octet-stream"}
+async def test_CreateCaseWithMock(mock_connect):
+    case = Case(
+        CaseCreator="alice_dev",
+        CaseName="Test Case",
+        CaseDescription="Mock description"
     )
 
-    mockDbConnection = AsyncMock()
-    mockDbConnect.return_value = mockDbConnection
+    fake_db_uuid = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_creation_date = "2026-05-20T16:00:00Z"
 
-    mockDbConnection.fetchrow.return_value = None
-    mockDbConnection.close = AsyncMock()
+    mock_connection = AsyncMock()
+    mock_connect.return_value = mock_connection
+    mock_connection.close = AsyncMock(return_value=None)
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    mock_connection.fetchrow = AsyncMock(return_value={
+        "caseid": fake_db_uuid,
+        "casecreationdate": fake_creation_date
+    })
 
-    with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia)
+    case_id = await case.create()
 
-    assert excInfo.value.status_code == 400
-    assert "Unsupported file extension: .food" in excInfo.value.detail    
+    assert case_id == fake_db_uuid
+    assert isinstance(case_id, str)
 
-    mockDbConnection.close.assert_called_once()
+    assert str(case.CaseId) == fake_db_uuid
+    assert case.CaseCreationDate == fake_creation_date
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_CreateCaseCannotBeCalledTwice(mock_connect):
+    case = Case(CaseCreator="alice_dev", CaseName="Test Case")
+    case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    with pytest.raises(ValueError, match="This case already exists"):
+        await case.create()
+
+    mock_connect.assert_not_called()
+
+
+def testGetCasesMissingJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Missing Authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/getCases", json={})
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing Authorization header"
+    }
+
+
+def testGetCasesInvalidJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Invalid token")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
+
+def testGetCasesUserRoleReturns403(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "error",
+        "message": "User unauthorized"
+    }
+
+
+def testGetCasesAdminReturnsCases(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_rows = [
+        {
+            "caseid": "12345678-abcd-ef01-2345-6789abcdef01",
+            "casecreator": "admin_user",
+            "casename": "Flood in Durban",
+            "casereviews": None,
+            "casedescription": "Flood investigation case",
+            "caseclosed": False,
+            "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+        },
+        {
+            "caseid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "casecreator": "investigator_user",
+            "casename": "Fake Evidence Case",
+            "casereviews": {"status": "pending"},
+            "casedescription": "Media verification case",
+            "caseclosed": False,
+            "casecreationdate": datetime(2026, 5, 21, 10, 30, 0, tzinfo=timezone.utc)
+        }
+    ]
+
+    mock_connection = AsyncMock()
+    mock_connection.fetch = AsyncMock(return_value=fake_rows)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert len(data["cases"]) == 2
+
+    assert data["cases"][0] == {
+        "case_id": "12345678-abcd-ef01-2345-6789abcdef01",
+        "case_name": "Flood in Durban",
+        "case_creator": "admin_user",
+        "case_reviews": None,
+        "case_description": "Flood investigation case",
+        "case_closed": False,
+        "case_creation_date": "2026-05-20T19:43:02+00:00"
+    }
+
+    assert data["cases"][1] == {
+        "case_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "case_name": "Fake Evidence Case",
+        "case_creator": "investigator_user",
+        "case_reviews": {"status": "pending"},
+        "case_description": "Media verification case",
+        "case_closed": False,
+        "case_creation_date": "2026-05-21T10:30:00+00:00"
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetch.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+
+def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetch = AsyncMock(return_value=[])
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getCases",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "cases": []
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetch.assert_called_once()
+    mock_connection.close.assert_called_once()

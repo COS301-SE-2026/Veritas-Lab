@@ -1,11 +1,9 @@
 import React from 'react';
 import LoginForm from '@/components/common/loginForm';
 import Image from 'next/image';
-//import Logo from '/';
 
 export default function Login() {
     return (
-        // The page imports the Logo and LoginForm components.
         <div className="grid grid-cols-2 min-h-screen ">
             <div className="flex flex-col justify-center px-30 bg-white">
                 <div className="mb-10">

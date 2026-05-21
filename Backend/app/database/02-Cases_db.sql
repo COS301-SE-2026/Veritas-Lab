@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseReviews JSONB,
     CaseName varchar(255) NOT NULL,
     CaseCreator varchar(100) NOT NULL, -- A case has to have a creator 
-    CaseClosed boolean NOT NULL,
+    CaseDescription TEXT,
+    CaseClosed boolean NOT NULL DEFAULT FALSE,
     CaseCreationDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
