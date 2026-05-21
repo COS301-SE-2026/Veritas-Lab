@@ -1,17 +1,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+import { getAuthHeaders } from './authHeaders';
+
 type RegisterResponse = {
     status: 'success' | 'error';
     message: string;
 };
 
-export async function register(name: string, email: string, password: string): Promise<RegisterResponse > {
+export async function register(username: string, email: string, password: string): Promise<RegisterResponse > {
     const res = await fetch(`${API_URL}/api/register`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...getAuthHeaders()
         },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ username, email, password })
     });
     
     const data: RegisterResponse = await res.json();

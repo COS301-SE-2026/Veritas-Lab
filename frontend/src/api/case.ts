@@ -1,4 +1,6 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+import { getAuthHeaders } from './authHeaders';
 type CaseResponse = {
     caseID: string;
     caseName: string;
@@ -10,7 +12,11 @@ type CaseResponse = {
 
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/getCase/${caseID}`);
+        const res = await fetch(`${API_BASE_URL}/api/getCase/${caseID}`, {
+            headers: {
+                ...getAuthHeaders()
+            }
+        });
         if (!res.ok) {
             throw new Error(`Failed to fetch case with ID ${caseID}`);
         }
@@ -28,7 +34,8 @@ export async function caseUploadLink(evidence: File): Promise<string> {
         const res = await fetch(`${API_BASE_URL}/api/evidence/upload-link`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
             },
             // We only need to send the name and type of the file to generate the upload link, the actual file will be sent in a separate request to the generated link
             body: JSON.stringify({ name: evidence.name, type: evidence.type })

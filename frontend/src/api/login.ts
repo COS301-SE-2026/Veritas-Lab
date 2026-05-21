@@ -1,5 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+import { getAuthHeaders } from './authHeaders';
+
 type LoginResponse = {
     status: 'success' | 'error';
     token: string;
@@ -10,7 +12,8 @@ export async function login(email: string, password: string): Promise<LoginRespo
     const res = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...getAuthHeaders()
         },
         body: JSON.stringify({ email, password })
     });
