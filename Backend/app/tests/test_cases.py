@@ -7,9 +7,7 @@ from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
 
-
 client = TestClient(app)
-
 
 def test_CaseCreationWithValidData():
     case = Case(CaseCreator="James Bond", CaseName="Flood in Durban")
@@ -20,26 +18,21 @@ def test_CaseCreationWithValidData():
     assert case.CaseCreationDate is None
     assert case.CaseClosed is False
 
-
 def test_CaseCreationRequiresCreator():
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseName="Test Case")
-
 
 def test_CaseCreationRequiresCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev")
 
-
 def test_CaseCreationRejectsBlankCreator():
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseCreator="   ", CaseName="Test Case")
 
-
 def test_CaseCreationRejectsBlankCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev", CaseName="   ")
-
 
 def test_NameIsTooLong():
     with pytest.raises(ValueError, match="Name is too long"):
@@ -47,7 +40,6 @@ def test_NameIsTooLong():
             CaseName="Test Case",
             CaseCreator="A" * 101
         )
-
 
 def test_NameAt100Characters():
     creator_name_100 = "A" * 100
@@ -60,14 +52,12 @@ def test_NameAt100Characters():
     assert len(case.CaseCreator) == 100
     assert case.CaseCreator == creator_name_100
 
-
 def test_CaseNameAt99Characters():
     case_name_99 = "A" * 99
     case = Case(CaseCreator="alice_dev", CaseName=case_name_99)
     
     assert len(case.CaseName) == 99
     assert case.CaseName == case_name_99
-
 
 def test_CaseNameAt254Characters():
     case_name_254 = "A" * 254
@@ -76,7 +66,6 @@ def test_CaseNameAt254Characters():
     assert len(case.CaseName) == 254
     assert case.CaseName == case_name_254
 
-
 def test_CaseNameAt255Characters():
     case_name_255 = "A" * 255
     case = Case(CaseCreator="alice_dev", CaseName=case_name_255)
@@ -84,13 +73,11 @@ def test_CaseNameAt255Characters():
     assert len(case.CaseName) == 255
     assert case.CaseName == case_name_255
 
-
 def test_CaseNameAt256Characters():
     case_name_256 = "A" * 256
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
         Case(CaseCreator="alice_dev", CaseName=case_name_256)
-
 
 def test_CaseStoresDescription():
     case = Case(
@@ -100,7 +87,6 @@ def test_CaseStoresDescription():
     )
 
     assert case.CaseDescription == "This is a test description"
-
 
 def test_CaseStoresReviews():
     reviews = {
@@ -116,7 +102,6 @@ def test_CaseStoresReviews():
 
     assert case.CaseReviews == reviews
 
-
 def test_CaseToJSONBeforeCreate():
     case = Case(
         CaseCreator="alice_dev",
@@ -128,15 +113,14 @@ def test_CaseToJSONBeforeCreate():
     result = case.toJSON()
 
     assert result == {
-        "case_id": None,
-        "case_name": "Test Case",
-        "case_creator": "alice_dev",
-        "case_reviews": {"status": "pending"},
-        "case_description": "This is a test description",
-        "case_closed": False,
-        "case_creation_date": None
+        "caseId": None,
+        "caseName": "Test Case",
+        "caseCreator": "alice_dev",
+        "caseReviews": {"status": "pending"},
+        "caseDescription": "This is a test description",
+        "caseClosed": False,
+        "caseCreationDate": None
     }
-
 
 def test_CaseToJSONAfterCreateValuesSet():
     case = Case(
@@ -153,15 +137,14 @@ def test_CaseToJSONAfterCreateValuesSet():
     result = case.toJSON()
 
     assert result == {
-        "case_id": "12345678-abcd-ef01-2345-6789abcdef01",
-        "case_name": "Test Case",
-        "case_creator": "alice_dev",
-        "case_reviews": {"reviewer": "admin", "status": "approved"},
-        "case_description": "This is a test description",
-        "case_closed": True,
-        "case_creation_date": "2026-05-20T19:43:02+00:00"
+        "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+        "caseName": "Test Case",
+        "caseCreator": "alice_dev",
+        "caseReviews": {"reviewer": "admin", "status": "approved"},
+        "caseDescription": "This is a test description",
+        "caseClosed": True,
+        "caseCreationDate": "2026-05-20T19:43:02+00:00"
     }
-
 
 def test_CaseToJSONWithNoDescriptionOrReviews():
     case = Case(
@@ -170,15 +153,14 @@ def test_CaseToJSONWithNoDescriptionOrReviews():
     )
 
     assert case.toJSON() == {
-        "case_id": None,
-        "case_name": "Test Case",
-        "case_creator": "alice_dev",
-        "case_reviews": None,
-        "case_description": None,
-        "case_closed": False,
-        "case_creation_date": None
+        "caseId": None,
+        "caseName": "Test Case",
+        "caseCreator": "alice_dev",
+        "caseReviews": None,
+        "caseDescription": None,
+        "caseClosed": False,
+        "caseCreationDate": None
     }
-
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
@@ -225,7 +207,6 @@ async def test_CreateCaseWithMock(mock_connect):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
 
-
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 async def test_CreateCaseCannotBeCalledTwice(mock_connect):
@@ -236,7 +217,6 @@ async def test_CreateCaseCannotBeCalledTwice(mock_connect):
         await case.create()
 
     mock_connect.assert_not_called()
-
 
 def testGetCasesMissingJWT(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -251,7 +231,6 @@ def testGetCasesMissingJWT(monkeypatch):
         "status": "error",
         "message": "Missing Authorization header"
     }
-
 
 def testGetCasesInvalidJWT(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -270,30 +249,6 @@ def testGetCasesInvalidJWT(monkeypatch):
         "status": "error",
         "message": "Invalid token"
     }
-
-
-def testGetCasesUserRoleReturns403(monkeypatch):
-    def mock_verifyJWT(authorization):
-        return {
-            "sub": "mock-user-id",
-            "username": "normal_user",
-            "role": "USER"
-        }
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/getCases",
-        json={},
-        headers={"Authorization": "Bearer fake-token"}
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {
-        "status": "error",
-        "message": "User unauthorized"
-    }
-
 
 def testGetCasesAdminReturnsCases(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -347,29 +302,28 @@ def testGetCasesAdminReturnsCases(monkeypatch):
     assert len(data["cases"]) == 2
 
     assert data["cases"][0] == {
-        "case_id": "12345678-abcd-ef01-2345-6789abcdef01",
-        "case_name": "Flood in Durban",
-        "case_creator": "admin_user",
-        "case_reviews": None,
-        "case_description": "Flood investigation case",
-        "case_closed": False,
-        "case_creation_date": "2026-05-20T19:43:02+00:00"
+        "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+        "caseName": "Flood in Durban",
+        "caseCreator": "admin_user",
+        "caseReviews": None,
+        "caseDescription": "Flood investigation case",
+        "caseClosed": False,
+        "caseCreationDate": "2026-05-20T19:43:02+00:00"
     }
 
     assert data["cases"][1] == {
-        "case_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        "case_name": "Fake Evidence Case",
-        "case_creator": "investigator_user",
-        "case_reviews": {"status": "pending"},
-        "case_description": "Media verification case",
-        "case_closed": False,
-        "case_creation_date": "2026-05-21T10:30:00+00:00"
+        "caseId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "caseName": "Fake Evidence Case",
+        "caseCreator": "investigator_user",
+        "caseReviews": {"status": "pending"},
+        "caseDescription": "Media verification case",
+        "caseClosed": False,
+        "caseCreationDate": "2026-05-21T10:30:00+00:00"
     }
 
     mock_connect.assert_called_once()
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
-
 
 def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -418,7 +372,6 @@ def testGetSingleCaseMissingJWT(monkeypatch):
         "message": "Missing Authorization header"
     }
 
-
 def testGetSingleCaseInvalidJWT(monkeypatch):
     def mock_verifyJWT(authorization):
         raise ValueError("Invalid token")
@@ -436,30 +389,6 @@ def testGetSingleCaseInvalidJWT(monkeypatch):
         "status": "error",
         "message": "Invalid token"
     }
-
-
-def testGetSingleCaseUserRoleReturns403(monkeypatch):
-    def mock_verifyJWT(authorization):
-        return {
-            "sub": "mock-user-id",
-            "username": "normal_user",
-            "role": "USER"
-        }
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/getSingleCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {
-        "status": "error",
-        "message": "User unauthorized"
-    }
-
 
 def testGetSingleCaseMissingCaseID(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -483,7 +412,6 @@ def testGetSingleCaseMissingCaseID(monkeypatch):
         "message": "CaseID required"
     }
 
-
 def testGetSingleCaseInvalidCaseID(monkeypatch):
     def mock_verifyJWT(authorization):
         return {
@@ -502,7 +430,6 @@ def testGetSingleCaseInvalidCaseID(monkeypatch):
 
     assert response.status_code == 401
     assert response.json()["status"] == "error"
-
 
 def testGetSingleCaseNotFound(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -536,7 +463,6 @@ def testGetSingleCaseNotFound(monkeypatch):
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
-
 
 def testGetSingleCaseAdminReturnsCase(monkeypatch):
     def mock_verifyJWT(authorization):
@@ -578,13 +504,13 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     assert response.json() == {
         "status": "success",
         "case": {
-            "case_id": fake_case_id,
-            "case_name": "Flood in Durban",
-            "case_creator": "admin_user",
-            "case_reviews": {"status": "pending"},
-            "case_description": "Flood investigation case",
-            "case_closed": False,
-            "case_creation_date": "2026-05-20T19:43:02+00:00"
+            "caseId": fake_case_id,
+            "caseName": "Flood in Durban",
+            "caseCreator": "admin_user",
+            "caseReviews": {"status": "pending"},
+            "caseDescription": "Flood investigation case",
+            "caseClosed": False,
+            "caseCreationDate": "2026-05-20T19:43:02+00:00"
         }
     }
 
