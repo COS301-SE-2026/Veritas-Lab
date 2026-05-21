@@ -77,16 +77,22 @@ class Case:
         finally:
             await connection.close()
 
-    async def addEvidence(self,media: UploadFile):
+    async def addEvidence(self, media: UploadFile, case_id: uuid.UUID):
         filename = media.filename
         localExtension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
 
+        # validate case_id is a UUID
+        try:
+            case_uuid = uuid.UUID(str(case_id)) if not isinstance(case_id, uuid.UUID) else case_id
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid case_id UUID")
+
         connection = await asyncpg.connect(
-            user=os.getenv("DB_USER", "postgres"),
-            password=os.getenv("DB_PASSWORD", ""),
-            database=os.getenv("DB_NAME", ""),
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", 5432))
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
         )
 
         try:
@@ -160,6 +166,21 @@ class Case:
                     length=len(fileBytes),
                     content_type=media.content_type
                 )  
+
+            try:
+                await connection.execute(
+                    """
+                    INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ReportArtifacts, ReportFindings, ReportComments)
+                    VALUES ($1, $2, $3, $4, $5)
+                    """,
+                    case_uuid,
+                    mediaId,
+                    None,
+                    None,
+                    None
+                )
+            except Exception:
+                pass
 
             minioDomain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
             fileUrl = f"{minioDomain}/{bucketName}/{targetFilename}"

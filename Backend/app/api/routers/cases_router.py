@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.core.cases import Case
@@ -231,3 +231,63 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
 
     finally:
         await connection.close()
+
+
+@router.post("/cases/evidence")
+async def upload_evidence(case_id: str = Form(...), media: UploadFile = File(...), authorization: str | None = Header(default=None)):
+    try:
+        payload = verifyJWT(authorization)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "User unauthorized"}
+        )
+
+    try:
+        case_uuid = UUID(case_id)
+    except ValueError as e:
+        return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
+
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT * FROM "Cases_DB"."Cases" WHERE caseid = $1
+            """,
+            case_uuid
+        )
+
+        if row is None:
+            return JSONResponse(status_code=404, content={"status": "error", "message": "Case not found"})
+
+        case = Case(
+            CaseCreator=row["casecreator"],
+            CaseName=row["casename"],
+            CaseReviews=row["casereviews"],
+            CaseDescription=row["casedescription"]
+        )
+
+        case.CaseId = row["caseid"]
+        case.CaseClosed = row["caseclosed"]
+        case.CaseCreationDate = row["casecreationdate"]
+
+        result = await case.addEvidence(media, case_uuid)
+
+        return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
+
+    finally:
+        await connection.close()
+
