@@ -8,9 +8,11 @@ import useCase from '@/hooks/useCase';
 type MediaUploadModalProps = {
     isOpen: boolean;
     onClose: () => void;
+    caseId?: string;
+    onUploaded?: () => void | Promise<void>;
 };
 
-export default function MediaUploadModal({ isOpen, onClose }: MediaUploadModalProps) {
+export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }: MediaUploadModalProps) {
     const { addEvidence } = useCase();
     const [file, setFile] = useState<File | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -28,11 +30,11 @@ export default function MediaUploadModal({ isOpen, onClose }: MediaUploadModalPr
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!file) {
+        if (!file || !caseId) {
             return;
         }
-
-        await addEvidence(file);
+        await addEvidence(file, caseId);
+        await onUploaded?.();
         setFile(null);
         onClose();
     };
@@ -61,7 +63,7 @@ export default function MediaUploadModal({ isOpen, onClose }: MediaUploadModalPr
                 <input ref={inputRef} type="file" id="file" className="hidden" onChange={handleChange} required />
 
                 <div className="flex justify-end mt-6 gap-2">
-                    <Button variant="sadSack" onClick={handleClose}>
+                    <Button variant="sadSack" type="button" onClick={handleClose}>
                         <div className="text-[16px] font-bold">Cancel</div>
                     </Button>
                     <Button variant="submit" type="submit">

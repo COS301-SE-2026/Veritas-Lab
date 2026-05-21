@@ -9,12 +9,12 @@ describe('MediaUploadModal', () => {
     });
     //render tests
     it('does not render when closed', () => {
-        render(<MediaUploadModal isOpen={false} onClose={onClose} />);
+        render(<MediaUploadModal isOpen={false} onClose={onClose} caseId="case-123" />);
         expect(screen.queryByText('Upload Media')).not.toBeInTheDocument();
     });
 
     it('renders when open and handles file selection', () => {
-        render(<MediaUploadModal isOpen onClose={onClose} />);
+        render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
         const input = screen.getByLabelText('Upload Media') as HTMLInputElement;
         const file = new File(['file-content'], 'report.pdf', { type: 'application/pdf' });
         fireEvent.change(input, { target: { files: [file] } });
@@ -22,13 +22,13 @@ describe('MediaUploadModal', () => {
     });
     
     it('calls onClose when clicking cancel', () => {
-        render(<MediaUploadModal isOpen onClose={onClose} />);
+        render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
         fireEvent.click(screen.getByText('Cancel'));
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('calls onClose when clicking overlay', () => {
-        const { container } = render(<MediaUploadModal isOpen onClose={onClose} />);
+        const { container } = render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
         const overlay = container.querySelector('div.fixed.inset-0');
 
         if(!overlay)

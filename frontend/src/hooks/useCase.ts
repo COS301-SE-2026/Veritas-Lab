@@ -13,13 +13,12 @@ export default function useCase() {
     }, []);
 
     const addCaseEvidence = useCallback(async (evidence: File, caseId: string) => {
-        await submitEvidence(evidence, caseId);
+        return await submitEvidence(evidence, caseId);
     }, []);
 
     return {
         fetchCase: fetchCaseById,
         fetchCases: fetchCaseById,
         addEvidence: addCaseEvidence,
-        mockEvidenceFiles,
     };
 }

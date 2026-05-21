@@ -30,9 +30,9 @@ export default function useRegisterForm()
         isSubmitting: false,
     });
 
-    //regex for email and password creation - password must be atleast 8 chars long and must make use of atleast 1 upper, 1 special and 1 number.
+    //regex for email and password creation - password must be atleast 12 chars long and must make use of atleast 1 upper, 1 special and 1 number.
     const emailPattern = /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
 
     const updateField = (field: keyof RegisterFormState, value: string) => {
         setFormState((prev) => ({
@@ -54,7 +54,7 @@ export default function useRegisterForm()
 
         if(!passwordPattern.test(formState.password))
         {
-            return 'Password must be at least 8 characters and include upper, lower, number, and special character.';
+            return 'Password must be atleast 12 characters, have an upper and lower case character and a special character';
         }
 
         if(formState.password !== formState.confirmPassword)
