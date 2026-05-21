@@ -1,10 +1,5 @@
-'use client';
-import Button from "@/components/ui/button";
-import Sidebar from "@/components/common/sidebar";
+import { redirect } from 'next/navigation';
+
 export default function Home() {
-  return (
-    <>
-      <Sidebar />
-    </>
-  );
+  redirect('/dashboard');
 }

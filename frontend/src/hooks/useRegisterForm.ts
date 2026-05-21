@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { register } from '@/api/register';
 type RegisterFormState = {
     username: string;
@@ -23,6 +24,7 @@ const initialFormState: RegisterFormState = {
 
 export default function useRegisterForm()
 {
+    const router = useRouter();
     const [formState, setFormState] = useState<RegisterFormState>(initialFormState);
     const [status, setStatus] = useState<StatusState>({
         error: null,
@@ -93,6 +95,7 @@ export default function useRegisterForm()
                 isSubmitting: false,
             });
             setFormState(initialFormState);
+            router.replace('/login');
         }
         catch(error)
         {
