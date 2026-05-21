@@ -512,11 +512,31 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
             "caseDescription": "Flood investigation case",
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
-        }
+        },
+        "evidence": []
+    }
+
+    fake_media_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    fake_report_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+    fake_evidence_rows = [
+    {
+        "reportid": fake_report_id,
+        "mediaid": fake_media_id,
+        "medianame": "123",
+        "mediabucket": "images",
+        "mediaextension": ".png",
+        "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "mediaurl": f"http://localhost:9000/images/{fake_media_id}.png",
+        "reportartifacts": {"ocr": "captured"},
+        "reportfindings": "Flood watermark detected",
+        "reportcomments": "Upload approved",
+        "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
+    }
     ]
 
     mock_connection = AsyncMock()
-    mock_connection.fetchrow = AsyncMock(return_value=fake_case_row)
+    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
     mock_connection.fetch = AsyncMock(return_value=fake_evidence_rows)
     mock_connection.close = AsyncMock(return_value=None)
 
@@ -535,13 +555,13 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     assert response.json() == {
         "status": "success",
         "case": {
-            "case_id": fake_case_id,
-            "case_name": "Flood in Durban",
-            "case_creator": "admin_user",
-            "case_reviews": {"status": "pending"},
-            "case_description": "Flood investigation case",
-            "case_closed": False,
-            "case_creation_date": "2026-05-20T19:43:02+00:00"
+            "caseId": fake_case_id,
+            "caseName": "Flood in Durban",
+            "caseCreator": "admin_user",
+            "caseReviews": {"status": "pending"},
+            "caseDescription": "Flood investigation case",
+            "caseClosed": False,
+            "caseCreationDate": "2026-05-20T19:43:02+00:00"
         },
         "evidence": [
             {
