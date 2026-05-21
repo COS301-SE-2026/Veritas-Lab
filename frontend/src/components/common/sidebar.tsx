@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from '@/context/SidebarContext';
+import { useLogOut } from '@/hooks/useLogOut';
 // Uses Lucide for some nice icons. Pretty cool.
 import {
-    ChevronLeft, Menu, Home, Construction, Briefcase,
+    ChevronLeft, Menu, Home, Construction, LogOut,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 
@@ -22,6 +22,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     // State to manage whether the sidebar is collapsed or expanded
     const { collapsed, toggle } = useSidebar();
+  const { logOut } = useLogOut();
 
     return (
       // Sidebar container with dynamic width based on collapsed state
@@ -71,6 +72,21 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        <footer className="absolute bottom-0 w-full p-4 text-center text-xs text-gray-400">
+            <Button variant="sidebar" onClick={logOut} className="">
+              <div className="flex items-center gap-2 justify-center pr-15 rounded-full text-sm text-white hover:bg-(--color-dark) transition-colors">
+                {!collapsed && (
+                  <div>
+                    Log Out
+                  </div>
+                )}
+                <div>
+                  <LogOut size={18} />
+                </div>
+              </div>
+                
+            </Button>
+        </footer>
       </nav>
         </div>
   );
