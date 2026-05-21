@@ -30,9 +30,9 @@ export default function CasePage({ params }: { params: Promise<{ id: string }> }
                 <div className="flex flex-cols-2 ">
                     <div className="w-4/5">
                             <h1 className="text-2xl font-bold text-[var(--color-text)]">{mockCaseDetails.title}</h1>
-                            <p className="text-gray-600 mt-2">{mockCaseDetails.description}</p>
+                            <p className="text-[var(--color-light)] mt-2">{mockCaseDetails.description}</p>
                         {/* <h1 className="text-2xl font-bold text-[var(--color-text)]">Viral deepfaked influencer</h1>
-                        <p className="text-gray-600 mt-2">This case involves a viral deepfake of a popular influencer, which has garnered significant attention on social media platforms.</p> */}
+                        <p className="text-(--color-light) mt-2">This case involves a viral deepfake of a popular influencer, which has garnered significant attention on social media platforms.</p> */}
                     </div>
                     <div className="w-1/5 flex items-end justify-end">
                         <Button variant="submit" className="py-4" text="Upload Evidence" onClick={openModal} />
@@ -61,10 +61,10 @@ export default function CasePage({ params }: { params: Promise<{ id: string }> }
                     <div className="w-1/5">
                         <div className="shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-[21px] p-4">
                             <h2 className="text-xl font-bold text-[var(--color-text)]">Case Details</h2>
-                                <p className="text-gray-600 mt-2">Status: {mockCaseDetails.status}</p>
-                                <p className="text-gray-600 mt-1">Created: {mockCaseDetails.createdAt}</p>
-                            {/* <p className="text-gray-600 mt-2">Status: Open</p>
-                            <p className="text-gray-600 mt-1">Created: Jan 15, 2024</p> */}
+                                <p className="text-(--color-light) mt-2">Status: {mockCaseDetails.status}</p>
+                                <p className="text-(--color-light) mt-1">Created: {mockCaseDetails.createdAt}</p>
+                            {/* <p className="text-(--color-light) mt-2">Status: Open</p>
+                            <p className="text-(--color-light) mt-1">Created: Jan 15, 2024</p> */}
                         </div>
                     </div>
                 </div>

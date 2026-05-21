@@ -28,7 +28,7 @@ export default function Sidebar() {
         <div
         className={`
             flex flex-col h-screen sticky top-0
-            bg-[#3DBF79] text-[#ffffff] border-r 
+            bg-(--color-primary) text-(--color-background) border-r 
             transition-all duration-300 ease-in-out
             ${collapsed ? 'w-16' : 'w-64'}
         `}
@@ -60,8 +60,8 @@ export default function Sidebar() {
                 flex items-center gap-3 px-3 py-2.5 rounded-full text-sm
                 transition-colors duration-150
                 ${isActive
-                  ? 'bg-[#231F20] text-white font-medium'
-                  : 'text-white hover:bg-[#231F20] hover:text-white'
+                  ? 'bg-(--color-secondary) text-(--color-text) font-medium'
+                  : 'text-white hover:bg-(--color-dark) hover:text-white'
                 }
                 ${collapsed ? 'justify-center' : 'justify-start'}
               `}

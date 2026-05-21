@@ -24,7 +24,7 @@ export default function SliderBar<T extends string>({ filters, defaultFilter, on
                     onClick={() => handleClick(filter)}
                     className={`flex-1 py-3 rounded-full text-sm font-semibold transition-colors duration-200
                         ${active === filter
-                            ? 'text-white bg-[var(--color-primary)]'
+                            ? 'text-[var(--color-text)] bg-[var(--color-secondary)]'
                             : 'text-[var(--color-text)] hover:bg-gray-100'
                         }`}
                 >

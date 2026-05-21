@@ -46,8 +46,8 @@ export default function Dashboard() {
         <div className="mt-8 ml-8 mr-8">
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <div className="text-[32px] font-bold text-[#231F20]">Dashboard</div>
-                    <div className="text-[16px] font-bold text-[#231F20]">Manage and Track Cases</div>
+                    <div className="text-[32px] font-bold text-(--color-text)">Dashboard</div>
+                    <div className="text-[16px] text-(--color-light)">Manage and Track Cases</div>
                 </div>
                 <div  className="justify-end flex items-center ">
                     {showDashboardCards && (
@@ -74,11 +74,11 @@ export default function Dashboard() {
             <div>
                 <div className="grid grid-cols-1 gap-4 mt-4">
                     {isLoading ? (
-                        <div className="text-sm text-gray-500">Loading cases...</div>
+                        <div className="text-sm text-(--color-light)">Loading cases...</div>
                     ) : error ? (
-                        <div className="text-sm text-red-600">{error}</div>
+                        <div className="text-sm text-(--color-error)">{error}</div>
                     ) : visibleCases.length === 0 ? (
-                        <div className="text-sm text-gray-500">No cases found.</div>
+                        <div className="text-sm text-(--color-light)">No cases found.</div>
                     ) : (
                         visibleCases.map((item) => (
                             <CaseCard

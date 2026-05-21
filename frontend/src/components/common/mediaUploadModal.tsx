@@ -45,7 +45,7 @@ export default function MediaUploadModal({ isOpen, onClose }: MediaUploadModalPr
                 <div
                     onClick={() => inputRef.current?.click()}
                     className="
-                    mt-4 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-xl 
+                    mt-4 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-(--color-light) rounded-xl 
                     p-10 cursor-pointer hover:border-[var(--color-primary)] hover:bg-gray-50 transition-colors duration-200"
                 >
                     <UploadCloud size={36} className="text-[var(--color-primary)]" />

@@ -19,7 +19,7 @@ export default function DashboardCards({ cases = [] }: DashboardCardsProps) {
                     content={String(total)}
                     contentClassName='text-[24px] font-bold'
                     footer="All time"
-                    className='text-[var(--color-text)] border border-gray-300 rounded-[21px] p-4 bg-[var(--color-primary)]/10'
+                    className='text-[var(--color-text)] border border-(--color-light) rounded-[21px] p-4 bg-[var(--color-secondary)]/10'
                 />
             </div>
             <div>
@@ -28,7 +28,7 @@ export default function DashboardCards({ cases = [] }: DashboardCardsProps) {
                     content={String(openCount)}
                     contentClassName='text-[24px] font-bold'
                     footer="Open"
-                    className='text-[var(--color-text)] border border-gray-300 rounded-[21px] p-4 bg-[var(--color-primary)]/10'
+                    className='text-[var(--color-text)] border border-(--color-light) rounded-[21px] p-4 bg-[var(--color-secondary)]/10'
                 />
             </div>
             <div>
@@ -37,7 +37,7 @@ export default function DashboardCards({ cases = [] }: DashboardCardsProps) {
                     content={String(closedAllTime)}
                     contentClassName='text-[24px] font-bold'
                     footer="Closed (all time)"
-                    className='text-[var(--color-text)] border border-gray-300 rounded-[21px] p-4 bg-[var(--color-primary)]/10'
+                    className='text-[var(--color-text)] border border-(--color-light) rounded-[21px] p-4 bg-[var(--color-secondary)]/10'
                 />
             </div>
         </div>

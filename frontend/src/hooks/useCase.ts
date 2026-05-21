@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { caseUploadLink, fetchCase, uploadEvidence } from '@/api/case';
+import { fetchCase, addEvidence as submitEvidence } from '@/api/case';
 
 const mockEvidenceFiles: File[] = [
     new File([''], 'vid1.png', { type: 'image/png' }),
@@ -12,15 +12,14 @@ export default function useCase() {
         return fetchCase(caseId);
     }, []);
 
-    const addEvidence = useCallback(async (evidence: File) => {
-        const uploadLink = await caseUploadLink(evidence);
-        await uploadEvidence(evidence, uploadLink);
+    const addCaseEvidence = useCallback(async (evidence: File, caseId: string) => {
+        await submitEvidence(evidence, caseId);
     }, []);
 
     return {
         fetchCase: fetchCaseById,
         fetchCases: fetchCaseById,
-        addEvidence,
+        addEvidence: addCaseEvidence,
         mockEvidenceFiles,
     };
 }
