@@ -9,6 +9,20 @@ import useCaseDashboard from '@/hooks/useCaseDashboard';
 export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    const getRoleFromToken = () => {
+        if (typeof window === 'undefined') return 'USER';
+        const token = window.localStorage.getItem('authToken');
+        if (!token) return 'USER';
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return (payload.role ?? 'USER') as 'ADMIN' | 'INVESTIGATOR' | 'USER';
+        } catch {
+            return 'USER';
+        }
+    };
+
+    const userRole = getRoleFromToken();
+
     const{
         searchQuery,
         setSearchQuery,
@@ -17,10 +31,12 @@ export default function Dashboard() {
         sortKey,
         setSortKey,
         visibleCases,
+        allCases,
+        refreshCases,
         showDashboardCards,
         isLoading,
         error,
-    } = useCaseDashboard({ initialRole: 'INVESTIGATOR' });
+    } = useCaseDashboard({ initialRole: userRole });
 
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
@@ -44,7 +60,7 @@ export default function Dashboard() {
                 </div>
             </div>
             <div>
-                {showDashboardCards && <DashboardCards />}
+                {showDashboardCards && <DashboardCards cases={allCases} />}
             </div>
             <div className="mt-10">
                 <DashboardBar searchValue={searchQuery}//made this the more readable version rather than single line.
@@ -78,7 +94,7 @@ export default function Dashboard() {
             </div>
         </div>
         {showDashboardCards && (
-            <DashboardModal isOpen={isModalOpen} onClose={closeModal} />
+            <DashboardModal isOpen={isModalOpen} onClose={closeModal} onCreated={() => { closeModal(); void refreshCases(); }} />
         )}
         </>
     );

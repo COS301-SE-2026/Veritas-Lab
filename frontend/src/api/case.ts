@@ -13,9 +13,12 @@ type CaseResponse = {
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {
         const res = await fetch(`${API_BASE_URL}/api/getCase/${caseID}`, {
+            method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 ...getAuthHeaders()
-            }
+            },
+            body: JSON.stringify({caseID: '<uuid-string>'})
         });
         if (!res.ok) {
             throw new Error(`Failed to fetch case with ID ${caseID}`);
