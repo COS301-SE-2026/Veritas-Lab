@@ -176,11 +176,11 @@ class Case:
 
     def toJSON(self):
         return {
-            "case_id": str(self.CaseId) if self.CaseId is not None else None,
-            "case_name": self.CaseName,
-            "case_creator": self.CaseCreator,
-            "case_reviews": self.CaseReviews,
-            "case_description": self.CaseDescription,
-            "case_closed": self.CaseClosed,
-            "case_creation_date": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
+            "caseId": str(self.CaseId) if self.CaseId is not None else None,
+            "caseName": self.CaseName,
+            "caseCreator": self.CaseCreator,
+            "caseReviews": self.CaseReviews,
+            "caseDescription": self.CaseDescription,
+            "caseClosed": self.CaseClosed,
+            "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
         }

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { fetchCases as fetchDashboardCases, type DashboardCase } from '@/api/dashboard';
 
 export type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
@@ -36,38 +36,38 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
     const [error, setError] = useState<string | null>(null);
     const cases = options.initialCases ?? fetchedCases;
 
+    const isMounted = useRef(true);
+
+    const loadCases = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const dashboardCases = await fetchDashboardCases();
+
+            if (isMounted.current) {
+                setFetchedCases(dashboardCases);
+            }
+        } catch (loadError) {
+            if (isMounted.current) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load cases');
+            }
+        } finally {
+            if (isMounted.current) {
+                setIsLoading(false);
+            }
+        }
+    };
+
     useEffect(() => {
         if (options.initialCases) {
             return;
         }
 
-        let isCancelled = false;
-
-        const loadCases = async () => {
-            setIsLoading(true);
-            setError(null);
-
-            try {
-                const dashboardCases = await fetchDashboardCases();
-
-                if (!isCancelled) {
-                    setFetchedCases(dashboardCases);
-                }
-            } catch (loadError) {
-                if (!isCancelled) {
-                    setError(loadError instanceof Error ? loadError.message : 'Failed to load cases');
-                }
-            } finally {
-                if (!isCancelled) {
-                    setIsLoading(false);
-                }
-            }
-        };
-
         void loadCases();
 
         return () => {
-            isCancelled = true;
+            isMounted.current = false;
         };
     }, [options.initialCases]);
 
@@ -106,6 +106,8 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
         userRole,
         setUserRole,
         visibleCases,
+        allCases: cases,
+        refreshCases: loadCases,
         showDashboardCards: userRole === 'ADMIN' || userRole === 'INVESTIGATOR',
         isLoading,
         error,
