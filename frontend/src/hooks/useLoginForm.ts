@@ -85,7 +85,7 @@ export default function useLoginForm() {
                 isSubmitting: false,
             });
             setFormState(initialFormState);
-            router.replace('/dashboard');
+            router.push('/dashboard');
         }
         catch(error)
         {
