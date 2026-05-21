@@ -3,17 +3,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LoginForm from '../../../src/components/common/loginForm';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('next/navigation', () => ({
 	useRouter: () => ({
-		push: mockPush
-	})
+		push: mockPush,
+		replace: mockReplace,
+	}),
 }));
-//basic rendering and navigation 
+
 describe('LoginForm', () => {
 	beforeEach(() => {
 		mockPush.mockClear();
-		(global as { fetch?: jest.Mock }).fetch = jest.fn();
+		mockReplace.mockClear();
+		(globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn();
 	});
 
 	afterEach(() => {
@@ -43,7 +46,7 @@ describe('LoginForm', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }));
 		expect(mockPush).toHaveBeenCalledWith('/register');
 	});
-	//validation testing and loading tests
+
 	it('shows validation error for invalid email', async () => {
 		render(<LoginForm />);
 		fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'invalid-email' } });
@@ -65,11 +68,12 @@ describe('LoginForm', () => {
 	});
 
 	it('shows loading state during submit and resets after success', async () => {
-		let resolveFetch: (value: { ok: boolean; json: () => Promise<{ token: string }> }) => void;
+		let resolveFetch!: (value: { ok: boolean; json: () => Promise<{ status: string; token: string }> }) => void;
 		const fetchPromise = new Promise((resolve) => {
 			resolveFetch = resolve;
 		});
-		(global as { fetch?: jest.Mock }).fetch = jest.fn(() => fetchPromise as Promise<Response>);
+
+		(globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn(() => fetchPromise as Promise<Response>);
 
 		render(<LoginForm />);
 		fillValidForm();
@@ -79,19 +83,18 @@ describe('LoginForm', () => {
 
 		resolveFetch({
 			ok: true,
-			json: async () => ({ token: 'token' }),
+			json: async () => ({ status: 'success', token: 'token' }),
 		});
 
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'Login' })).toBeEnabled();
-		});
-		await waitFor(() => {
+			expect(mockReplace).toHaveBeenCalledWith('/dashboard');
 			expect(screen.getByRole('status')).toHaveTextContent('Login successful.');
 		});
 	});
-	//err0r message shows?
+
 	it('shows server error message if login fails', async () => {
-		(global as { fetch?: jest.Mock }).fetch = jest.fn(() => Promise.resolve({
+		(globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn(() => Promise.resolve({
 			ok: false,
 			json: async () => ({ message: 'Invalid credentials' }),
 		}) as Promise<Response>);

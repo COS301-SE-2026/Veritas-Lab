@@ -3,17 +3,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import RegisterForm from '../../../src/components/common/registerForm';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('next/navigation', () => ({
 	useRouter: () => ({
-		push: mockPush
+		push: mockPush,
+		replace: mockReplace,
 	})
 }));
 //rendering and nav tests
 describe('RegisterForm', () => {
 	beforeEach(() => {
 		mockPush.mockClear();
-		(global as { fetch?: jest.Mock }).fetch = jest.fn();
+		mockReplace.mockClear();
+		(globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn();
 	});
 
 	afterEach(() => {
@@ -71,7 +74,7 @@ describe('RegisterForm', () => {
 		fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
 
 		expect(await screen.findByRole('alert')).toHaveTextContent(
-			'Password must be at least 8 characters and include upper, lower, number, and special character.'
+			'Password must be atleast 12 characters, have an upper and lower case character and a special character'
 		);
 	});
 
@@ -88,12 +91,12 @@ describe('RegisterForm', () => {
 	});
 
 	it('shows loading state during submit and resets after success', async () => {
-		let resolveFetch: (value: { ok: boolean; json: () => Promise<{ message: string }> }) => void;
+		let resolveFetch!: (value: { ok: boolean; json: () => Promise<{ message: string }> }) => void;
 		const fetchPromise = new Promise((resolve) => {
 			resolveFetch = resolve;
 		});
 
-		(global as { fetch?: jest.Mock }).fetch = jest.fn(() => fetchPromise as Promise<Response>);
+		(globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn(() => fetchPromise as Promise<Response>);
 
 		render(<RegisterForm />);
 		fillValidForm();
@@ -104,14 +107,13 @@ describe('RegisterForm', () => {
 
 		resolveFetch({
 			ok: true,
-			json: async () => ({ message: 'Account created successfully.' }),
+			json: async () => ({ status: 'success', message: 'Account created successfully.' }),
 		});
 
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'Create Account' })).toBeEnabled();
 		});
-		await waitFor(() => {
-			expect(screen.getByRole('status')).toHaveTextContent('Account created successfully.');
-		});
+		expect(mockReplace).toHaveBeenCalledWith('/login');
+		expect(screen.getByRole('status')).toHaveTextContent('Account created successfully.');
 	});
 });

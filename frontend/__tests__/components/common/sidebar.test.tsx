@@ -4,6 +4,7 @@ import Sidebar from '../../../src/components/common/sidebar';
 import { SidebarWrapper } from '../../../src/context/SidebarContext';
 
 const mockUsePathname = jest.fn();
+const mockLogOut = jest.fn();
 
 jest.mock('next/navigation', () => ({
 	usePathname: () => mockUsePathname()
@@ -17,10 +18,17 @@ jest.mock('next/link', () => ({
 		</a>
 	)
 }));
+
+jest.mock('../../../src/hooks/useLogOut', () => ({
+	useLogOut: () => ({
+		logOut: mockLogOut,
+	}),
+}));
 //
 describe('Sidebar', () => {
 	beforeEach(() => {
 		mockUsePathname.mockReturnValue('/');
+		mockLogOut.mockClear();
 	});
 
 	const renderWithWrapper = () => render(
@@ -42,15 +50,17 @@ describe('Sidebar', () => {
 	});
 
 	it('marks the active route', () => {
+		mockUsePathname.mockReturnValue('/dashboard');
 		renderWithWrapper();
 		const homeLink = screen.getByRole('link', { name: 'Dashboard' });
-		expect(homeLink.className).toContain('bg-(--color-dark)');
+		expect(homeLink.className).toContain('bg-(--color-secondary)');
+		expect(homeLink.className).toContain('text-(--color-text)');
 	});
 
 	it('toggles collapsed state when the button is clicked', () => {
 		renderWithWrapper();
 		expect(screen.getByText('Veritas Lab')).toBeInTheDocument();
-		fireEvent.click(screen.getByRole('button'));
+		fireEvent.click(screen.getAllByRole('button')[0]);
 		expect(screen.queryByText('Veritas Lab')).not.toBeInTheDocument();
 	});
 });
