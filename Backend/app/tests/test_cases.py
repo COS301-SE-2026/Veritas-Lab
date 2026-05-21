@@ -560,6 +560,7 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=fake_row)
+    mock_connection.fetch = AsyncMock(return_value=[])
     mock_connection.close = AsyncMock(return_value=None)
 
     mock_connect = AsyncMock(return_value=mock_connection)
@@ -585,9 +586,100 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
             "case_description": "Flood investigation case",
             "case_closed": False,
             "case_creation_date": "2026-05-20T19:43:02+00:00"
-        }
+        },
+        "evidence": []
     }
 
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
+    mock_connection.fetch.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+
+def testGetSingleCaseReturnsLinkedEvidence(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_report_id = "87654321-abcd-ef01-2345-6789abcdef01"
+    fake_media_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+    fake_case_row = {
+        "caseid": fake_case_id,
+        "casecreator": "admin_user",
+        "casename": "Flood in Durban",
+        "casereviews": {"status": "pending"},
+        "casedescription": "Flood investigation case",
+        "caseclosed": False,
+        "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+    }
+
+    fake_evidence_rows = [
+        {
+            "reportid": fake_report_id,
+            "caseid": fake_case_id,
+            "mediaid": fake_media_id,
+            "medianame": "123",
+            "reportartifacts": {"ocr": "captured"},
+            "reportfindings": "Flood watermark detected",
+            "reportcomments": "Upload approved",
+            "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc),
+            "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "mediabucket": "images",
+            "mediaextension": ".png"
+        }
+    ]
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=fake_case_row)
+    mock_connection.fetch = AsyncMock(return_value=fake_evidence_rows)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": fake_case_id},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "case": {
+            "case_id": fake_case_id,
+            "case_name": "Flood in Durban",
+            "case_creator": "admin_user",
+            "case_reviews": {"status": "pending"},
+            "case_description": "Flood investigation case",
+            "case_closed": False,
+            "case_creation_date": "2026-05-20T19:43:02+00:00"
+        },
+        "evidence": [
+            {
+                "reportId": fake_report_id,
+                "mediaId": fake_media_id,
+                "mediaName": "123",
+                "mediaBucket": "images",
+                "mediaExtension": ".png",
+                "mediaTypeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "mediaUrl": f"http://localhost:9000/images/{fake_media_id}.png",
+                "reportArtifacts": {"ocr": "captured"},
+                "reportFindings": "Flood watermark detected",
+                "reportComments": "Upload approved",
+                "reportDateCreation": "2026-05-21T08:15:00+00:00"
+            }
+        ]
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()

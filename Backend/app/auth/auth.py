@@ -245,7 +245,7 @@ async def login(request: LoginRequest):
             status_code=400,
             content={
                 "status": "error",
-                "message": "Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+                "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
         )
 
@@ -295,7 +295,7 @@ async def register(request: RegisterRequest):
             status_code=400,
             content={
                 "status": "error",
-                "message": "Invalid or missing password. Password must be longer than 11 characters, have an upper and lower case char and a special character"
+                "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
         )
 

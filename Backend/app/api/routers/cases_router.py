@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from app.core.env import ENVLoader
 import asyncpg
 from uuid import UUID
+import os
 
 env = ENVLoader()
 
@@ -28,6 +29,28 @@ class CreateCaseRequest(BaseModel):
 
 class CreateSingleCaseRequest(BaseModel):
     CaseID: str | None = None
+
+
+def _format_case_evidence(row: dict) -> dict:
+    media_id = row["mediaid"]
+    media_extension = row["mediaextension"] or ""
+    media_bucket = row["mediabucket"]
+    media_name = row["medianame"]
+    minio_domain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
+
+    return {
+        "reportId": str(row["reportid"]),
+        "mediaId": str(media_id),
+        "mediaName": media_name,
+        "mediaBucket": media_bucket,
+        "mediaExtension": media_extension,
+        "mediaTypeId": str(row["mediatypeid"]),
+        "mediaUrl": f"{minio_domain}/{media_bucket}/{media_id}{media_extension}",
+        "reportArtifacts": row["reportartifacts"],
+        "reportFindings": row["reportfindings"],
+        "reportComments": row["reportcomments"],
+        "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
+    }
 
 @router.post("/createCase")
 async def create_case(request: CreateCaseRequest, authorization: str | None = Header(default=None)):
@@ -221,11 +244,35 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
         case.CaseClosed = row["caseclosed"]
         case.CaseCreationDate = row["casecreationdate"]
 
+        evidence_rows = await connection.fetch(
+            """
+            SELECT
+                r.ReportId AS "reportid",
+                r.CaseId AS "caseid",
+                r.ImageId AS "mediaid",
+                r.ReportArtifacts AS "reportartifacts",
+                r.ReportFindings AS "reportfindings",
+                r.ReportComments AS "reportcomments",
+                r.ReportDateCreation AS "reportdatecreation",
+                m.MediaTypeId AS "mediatypeid",
+                m.MediaName AS "medianame",
+                m.MediaBucket AS "mediabucket",
+                m.MediaExtension AS "mediaextension"
+            FROM "Cases_DB"."Reports" r
+            JOIN "Cases_DB"."Media" media ON r.ImageId = media.MediaId
+            JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
+            WHERE r.CaseId = $1
+            ORDER BY r.ReportDateCreation DESC
+            """,
+            case_id
+        )
+
         return JSONResponse(
             status_code=200,
             content={
                 "status": "success",
-                "case": case.toJSON()
+                "case": case.toJSON(),
+                "evidence": [_format_case_evidence(row) for row in evidence_rows]
             }
         )
 

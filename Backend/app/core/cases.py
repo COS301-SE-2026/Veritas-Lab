@@ -119,6 +119,20 @@ class Case:
             fileBytes = await media.read()
             mediaHash = hashlib.sha256(fileBytes).hexdigest()
 
+            minioEndpointRaw = (
+                os.getenv("MINIO_ENDPOINT")
+                or os.getenv("AWS_S3_ENDPOINT_URL")
+                or "localhost:9000"
+            )
+            minioSecure = minioEndpointRaw.startswith("https://")
+            minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
+            minioClient = Minio(
+                minioEndpoint,
+                access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+                secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+                secure=minioSecure
+            )
+
             
 
             existingMedia = await connection.fetchrow(
@@ -150,14 +164,6 @@ class Case:
                 targetFilename = f"{mediaId}{dbExtension}"
 
                 await media.seek(0)
-
-                minioEndpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-                minioClient = Minio(
-                    minioEndpoint,
-                    access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-                    secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
-                    secure=False
-                )
                 
                 minioClient.put_object(
                     bucket_name=bucketName,
@@ -182,7 +188,7 @@ class Case:
             except Exception:
                 pass
 
-            minioDomain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
+            minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
             fileUrl = f"{minioDomain}/{bucketName}/{targetFilename}"
 
             return{
