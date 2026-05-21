@@ -13,7 +13,7 @@ export default function RegisterForm() {
     return(
         //adapted the following so that they are more readable 
         <div className="flex flex-col justify-center ">
-            <div className="text-[36px] font-bold text-(--color-text) justify-left items-left">Create your account</div>
+            <div className="text-5xl text-(--color-text) justify-left items-left">Create your account</div>
             <form className="flex flex-col  w-full text-(--color-text)" onSubmit={handleSubmit}>
                 <Label text="Username" htmlFor="username" className="font-medium mt-8" />
                 <Input id="username"
