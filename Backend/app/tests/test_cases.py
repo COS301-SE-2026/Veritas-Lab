@@ -209,6 +209,18 @@ async def test_CreateCaseWithMock(mock_connect):
     assert str(case.CaseId) == fake_db_uuid
     assert case.CaseCreationDate == fake_creation_date
 
+    called_args = mock_connection.fetchrow.call_args[0]
+
+    params = called_args[1:]
+
+    assert params == (
+        case.CaseCreator,
+        case.CaseName,
+        None,
+        case.CaseDescription,
+        case.CaseClosed
+    )
+
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
