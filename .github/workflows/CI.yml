@@ -113,6 +113,9 @@ jobs:
                   npx playwright install --with-deps
 
             - name: run Playwright
+              env:
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
               run: |
                   cd frontend
                   npx playwright test
