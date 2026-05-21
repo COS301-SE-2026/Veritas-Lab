@@ -1,6 +1,8 @@
 'use client';
 import { login } from '@/api/login';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 type LoginFormState = {
     email: string;
@@ -19,6 +21,8 @@ const initialFormState: LoginFormState = {
 };
 
 export default function useLoginForm() {
+    const router = useRouter();
+    const { setToken } = useAuth();
     const [formState, setFormState] = useState<LoginFormState>(initialFormState);
     const [status, setStatus] = useState<StatusState>({
         error: null,
@@ -73,7 +77,7 @@ export default function useLoginForm() {
                 return;
             }
 
-            localStorage.setItem('authToken', response.token);
+            setToken(response.token);
 
             setStatus({
                 error: null,
@@ -81,6 +85,7 @@ export default function useLoginForm() {
                 isSubmitting: false,
             });
             setFormState(initialFormState);
+            router.replace('/dashboard');
         }
         catch(error)
         {

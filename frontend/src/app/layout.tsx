@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { AuthProvider } from '@/context/AuthContext';
 import { Geist_Mono } from "next/font/google";
 import "../styles/globals.css";
 
@@ -34,7 +35,9 @@ export default function RootLayout({
       lang="en"
       className={`${afacad.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <AuthProvider>
+        <body className="min-h-full flex flex-col">{children}</body>
+      </AuthProvider>
     </html>
   );
 }
