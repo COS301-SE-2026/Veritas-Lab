@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS "Users_DB"."Users"(
     UserId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     UserEmail VARCHAR(255) UNIQUE NOT NULL,
     UserName VARCHAR(100) UNIQUE NOT NULL,
-    UserRole User_Role_Enum NOT NULL DEFAULT 'ADMIN',
+    UserRole User_Role_Enum NOT NULL DEFAULT 'USER',
     UserPassword VARCHAR(255) NOT NULL,
     UserJWTIssued TIMESTAMPTZ
 );
