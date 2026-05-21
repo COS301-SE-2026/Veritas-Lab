@@ -10,7 +10,7 @@ export default function DashboardCards() {
                     content="15"
                     contentClassName='text-[24px] font-bold'
                     footer="All time"
-                    className='text-[var(--color-text)] border border-gray-300 rounded-[21px] p-4 bg-[var(--color-primary)]/10'
+                    className='text-[var(--color-text)] border border-(--color-light) rounded-[21px] p-4 bg-[var(--color-secondary)]/10'
                 />
             </div>
             <div>
@@ -19,7 +19,7 @@ export default function DashboardCards() {
                     content="5"
                     contentClassName='text-[24px] font-bold'
                     footer="In progress"
-                    className='text-[var(--color-text)] border border-gray-300 rounded-[21px] p-4 bg-[var(--color-primary)]/10'
+                    className='text-[var(--color-text)] border border-(--color-light) rounded-[21px] p-4 bg-[var(--color-secondary)]/10'
                 />
             </div>
             <div>
@@ -28,7 +28,7 @@ export default function DashboardCards() {
                     content="10"
                     contentClassName='text-[24px] font-bold'
                     footer="Resolved"
-                    className='text-[var(--color-text)] border border-gray-300 rounded-[21px] p-4 bg-[var(--color-primary)]/10'
+                    className='text-[var(--color-text)] border border-(--color-light) rounded-[21px] p-4 bg-[var(--color-secondary)]/10'
                 />
             </div>
         </div>

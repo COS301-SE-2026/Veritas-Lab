@@ -44,7 +44,7 @@ describe('Sidebar', () => {
 	it('marks the active route', () => {
 		renderWithWrapper();
 		const homeLink = screen.getByRole('link', { name: 'Dashboard' });
-		expect(homeLink.className).toContain('bg-[#231F20]');
+		expect(homeLink.className).toContain('bg-(--color-dark)');
 	});
 
 	it('toggles collapsed state when the button is clicked', () => {

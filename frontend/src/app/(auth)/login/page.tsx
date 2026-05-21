@@ -11,7 +11,7 @@ export default function Login() {
                 </div>
                 <LoginForm />
             </div>
-            <div className="bg-[#3DBF79]" />
+            <div className="bg-(--color-primary)" />
         </div>
     );
 }
