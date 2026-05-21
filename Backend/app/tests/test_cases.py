@@ -391,3 +391,191 @@ def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
     mock_connect.assert_called_once()
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
+
+def testGetSingleCaseMissingJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Missing Authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/getSingleCase", json={})
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing Authorization header"
+    }
+
+
+def testGetSingleCaseInvalidJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Invalid token")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
+
+def testGetSingleCaseUserRoleReturns403(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "error",
+        "message": "User unauthorized"
+    }
+
+
+def testGetSingleCaseMissingCaseID(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "CaseID required"
+    }
+
+
+def testGetSingleCaseInvalidCaseID(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": "not-a-valid-uuid"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json()["status"] == "error"
+
+
+def testGetSingleCaseNotFound(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=None)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found"
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+
+def testGetSingleCaseAdminReturnsCase(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    fake_row = {
+        "caseid": fake_case_id,
+        "casecreator": "admin_user",
+        "casename": "Flood in Durban",
+        "casereviews": {"status": "pending"},
+        "casedescription": "Flood investigation case",
+        "caseclosed": False,
+        "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+    }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": fake_case_id},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "status": "success",
+        "case": {
+            "case_id": fake_case_id,
+            "case_name": "Flood in Durban",
+            "case_creator": "admin_user",
+            "case_reviews": {"status": "pending"},
+            "case_description": "Flood investigation case",
+            "case_closed": False,
+            "case_creation_date": "2026-05-20T19:43:02+00:00"
+        }
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()

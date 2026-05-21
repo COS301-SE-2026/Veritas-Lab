@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from app.core.env import ENVLoader
 import asyncpg
+from uuid import UUID
 
 env = ENVLoader()
 
@@ -24,6 +25,9 @@ router = APIRouter(
 class CreateCaseRequest(BaseModel):
     title: str | None = None
     description: str | None = None
+
+class CreateSingleCaseRequest(BaseModel):
+    CaseID: str | None = None
 
 @router.post("/createCase")
 async def create_case(request: CreateCaseRequest, authorization: str | None = Header(default=None)):
@@ -129,6 +133,97 @@ async def get_cases(request:dict,authorization: str | None = Header(default=None
             content={
                 "status": "success",
                 "cases": cases
+            }
+        )
+
+    finally:
+        await connection.close()
+    
+@router.post("/getSingleCase")
+async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | None = Header(default=None)):
+    try:
+        payload = verifyJWT(authorization)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+    
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+    
+    if not request.CaseID:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "CaseID required"
+            }
+        )
+
+    try:
+        case_id = UUID(request.CaseID)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row= await connection.fetchrow(
+            """
+            SELECT *
+            FROM "Cases_DB"."Cases"
+            WHERE caseid = $1
+            """,
+            case_id
+        )
+    
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found"
+                }
+            )
+
+        case = Case(
+            CaseCreator=row["casecreator"],
+            CaseName=row["casename"],
+            CaseReviews=row["casereviews"],
+            CaseDescription=row["casedescription"]
+        )
+
+        case.CaseId = row["caseid"]
+        case.CaseClosed = row["caseclosed"]
+        case.CaseCreationDate = row["casecreationdate"]
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "case": case.toJSON()
             }
         )
 
