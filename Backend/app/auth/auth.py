@@ -17,7 +17,7 @@ DB_HOST= env.getRequiredEnv("DB_HOST")
 DB_PORT= env.getRequiredIntEnv("DB_PORT")
 DB_NAME= env.getRequiredEnv("DB_NAME")
 SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
-ALGORITHM = env.getRequiredEnv("HASH")
+ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 
 router = APIRouter(
