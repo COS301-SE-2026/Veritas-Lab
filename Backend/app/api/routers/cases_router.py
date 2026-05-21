@@ -85,14 +85,15 @@ async def get_cases(request:dict,authorization: str | None = Header(default=None
             }
         )
     
-    if payload.get("role") == "USER":
-        return JSONResponse(
-            status_code=403,
-            content={
-                "status": "error",
-                "message": "User unauthorized"
-            }
-        )
+    # this should not be here as any user can load the number of cases
+    # if payload.get("role") == "USER":
+    #     return JSONResponse(
+    #         status_code=403,
+    #         content={
+    #             "status": "error",
+    #             "message": "User unauthorized"
+    #         }
+    #     )
     
     connection = await asyncpg.connect(
         user=DB_USER,
@@ -152,14 +153,15 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
             }
         )
     
-    if payload.get("role") == "USER":
-        return JSONResponse(
-            status_code=403,
-            content={
-                "status": "error",
-                "message": "User unauthorized"
-            }
-        )
+    #this should not be here as any user type can clikc on one case
+    # if payload.get("role") == "USER":
+    #     return JSONResponse(
+    #         status_code=403,
+    #         content={
+    #             "status": "error",
+    #             "message": "User unauthorized"
+    #         }
+    #     )
     
     if not request.CaseID:
         return JSONResponse(
