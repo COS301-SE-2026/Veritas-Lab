@@ -1,5 +1,10 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import useCaseDashboard, { CaseSummary } from '@/hooks/useCaseDashboard';
+import { fetchCases } from '../../src/api/dashboard';
+
+jest.mock('../../src/api/dashboard', () => ({
+    fetchCases: jest.fn(),
+}));
 
 //bsaic case example to test 
 const sampleCases: CaseSummary[] = [
@@ -22,6 +27,10 @@ const sampleCases: CaseSummary[] = [
 ];
 //check if search works with alpha entered.
 describe('useCaseDashboard', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
     it('filters cases by search query and status', () => {
         const { result } = renderHook(() =>
             useCaseDashboard({ initialCases: sampleCases, initialRole: 'USER' })
@@ -59,5 +68,69 @@ describe('useCaseDashboard', () => {
         );
 
         expect(result.current.showDashboardCards).toBe(true);
+    });
+
+    it('loads dashboard cases on mount', async () => {
+        const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
+        mockedFetchCases.mockResolvedValue(sampleCases);
+
+        const { result } = renderHook(() => useCaseDashboard({ initialRole: 'USER' }));
+
+        expect(result.current.isLoading).toBe(true);
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.allCases).toHaveLength(2);
+        expect(result.current.visibleCases).toHaveLength(2);
+        expect(result.current.error).toBeNull();
+    });
+
+    it('stores an error when loading fails', async () => {
+        const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
+        mockedFetchCases.mockRejectedValue(new Error('Failed to load cases'));
+
+        const { result } = renderHook(() => useCaseDashboard({ initialRole: 'USER' }));
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.error).toBe('Failed to load cases');
+    });
+
+    it('uses the fallback error when loading fails with a non-Error value', async () => {
+        const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
+        mockedFetchCases.mockRejectedValue('network down');
+
+        const { result } = renderHook(() => useCaseDashboard({ initialRole: 'USER' }));
+
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
+
+        expect(result.current.error).toBe('Failed to load cases');
+    });
+
+    it('keeps the load cleanup safe after unmount', async () => {
+        let resolveCases!: (value: CaseSummary[]) => void;
+        const fetchPromise = new Promise<CaseSummary[]>((resolve) => {
+            resolveCases = resolve;
+        });
+
+        const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
+        mockedFetchCases.mockReturnValue(fetchPromise);
+
+        const { unmount } = renderHook(() => useCaseDashboard({ initialRole: 'USER' }));
+
+        unmount();
+
+        resolveCases(sampleCases);
+        await act(async () => {
+            await fetchPromise;
+        });
+
+        expect(mockedFetchCases).toHaveBeenCalledTimes(1);
     });
 });
