@@ -1,0 +1,20 @@
+#dependencies are freshly installed when Docker is built
+node_modules/
+#next.js is rebuilt when Docker is built
+.next/
+#environment files
+.env
+.env*
+.env.local
+#testing files dont need to be in the image
+tests/
+#git
+.git/
+.gitignore
+#dev files
+.vscode/
+.idea/
+*.md
+#playwright
+playwright-report/
+test-results/
