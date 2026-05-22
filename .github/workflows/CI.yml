@@ -31,6 +31,18 @@ jobs:
             - name: run PyTest
               env:
                   DB_HOST: localhost
+                  DB_USER: postgres
+                  DB_PASSWORD: postgres
+                  DB_NAME: test_db
+                  DB_PORT: 5432
+                  JWT_SECRET: test-secret
+                  HASH: HS256
+                  TOKEN_EXPIRE: 5
+                  MINIO_ROOT_USER: minioadmin
+                  MINIO_ROOT_PASSWORD: minioadmin
+                  MINIO_API_PORT: 9000
+                  MINIO_CONSOLE_PORT: 9001
+                  AWS_REGION: af-south-1
               run: |
                   cd Backend
                   python -m pytest app/tests/ --asyncio-mode=auto --cov=app
