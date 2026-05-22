@@ -1,5 +1,4 @@
 ## Frontend File Structure
-
 ```
 frontend/
 ├── public/ # Next.js application
