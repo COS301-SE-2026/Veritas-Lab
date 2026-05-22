@@ -5,7 +5,7 @@ name: CI
 on:
     pull_request:
         branches: ["main"]
-#the backend testing, frontend testing and the integration testing
+#the backend testing, frontend testing and the integration testing y
 jobs:
     backend-tests:
         runs-on: ubuntu-latest
