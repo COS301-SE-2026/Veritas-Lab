@@ -88,7 +88,7 @@ describe('LoginForm', () => {
 
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'Login' })).toBeEnabled();
-			expect(mockReplace).toHaveBeenCalledWith('/dashboard');
+			expect(mockPush).toHaveBeenCalledWith('/dashboard');
 			expect(screen.getByRole('status')).toHaveTextContent('Login successful.');
 		});
 	});
