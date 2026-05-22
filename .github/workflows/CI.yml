@@ -21,22 +21,16 @@ jobs:
               run: |
                   cd Backend
                   python -m pip install -r requirements/base.txt
+                  
+            - name: debug env
+              run: |
+                  echo "DB_HOST=$DB_HOST"
+              env:
+                  DB_HOST: localhost
 
             - name: run PyTest
               env:
-                  DB_USER: postgres
-                  DB_PASSWORD: postgres
-                  DB_NAME: test_db
-                  DB_PORT: 5432
-                  DB_HOST: localhost
-                  JWT_SECRET: test-secret
-                  HASH: HS256
-                  TOKEN_EXPIRE: 5
-                  MINIO_ROOT_USER: minioadmin
-                  MINIO_ROOT_PASSWORD: minioadmin
-                  MINIO_API_PORT: 9000
-                  MINIO_CONSOLE_PORT: 9001
-                  AWS_REGION: af-south-1
+                  DB_Host: localhost
               run: |
                   cd Backend
                   python -m pytest app/tests/ --asyncio-mode=auto --cov=app
@@ -75,7 +69,7 @@ jobs:
                   DB_PASSWORD=postgres
                   DB_NAME=veritas_ci
                   DB_PORT=5432
-                  DB_HOST: localhost
+                  DB_HOST=localhost
                   JWT_SECRET=test-secret
                   HASH=HS256
                   TOKEN_EXPIRE=5
