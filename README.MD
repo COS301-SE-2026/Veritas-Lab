@@ -14,7 +14,11 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 
 | Resources | Description |
 |-----------|-------------|
-| [Functional Requirements](Docs/Functional_Requirements.MD) | Functional Requirement (Example) |
+| [SRS Document](Docs/Veritas-Labs_SRS.pdf) | System Requirement Specification |
+| [Style Guide](Docs/Veritas-Labs_BrandStyleGuide.pdf) | Brand Style Guide |
+| [Wireframes Doc](Docs/Veritas-Labs_WireframesDoc.pdf) | Wireframes Design Document |
+| [Wireframes Figma](Docs/Veritas-Labs_WireframesDemo1.fig) | Wireframes Figma File |
+
 
 </div>
 <br/>
@@ -48,13 +52,9 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 
 <table style="margin: 0 auto 20px; border-collapse: collapse;">
 <tr>
-    <td style="vertical-align: middle; text-align: center; border: none;">
-      <img src="" alt="Byron Pillay" style="width: 100%; border-radius: 8px;">
-    </td>
     <td style="vertical-align: top; padding: 15px; border: none;">
       <h3 style="margin-top: 0; margin-bottom: 5px;">Byron Pillay</h3>
       <h4 style="margin-top: 0; margin-bottom: 15px; color: #555;">Product Manager, Full Stack Engineer</h4>
-      <p>Add some info about yourself</p>
     </td>
     <td style="vertical-align: middle; text-align: center; padding: 15px; border: none;">
       <a href="https://github.com/BPillay27" style="text-decoration: none; margin-right: 10px; display: inline-block;">
@@ -67,13 +67,9 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 </tr>
 
 <tr>
-    <td style="vertical-align: middle; text-align: center; border: none;">
-      <img src="" alt="Mulondi Makhado" style="width: 100%; border-radius: 8px;">
-    </td>
     <td style="vertical-align: top; padding: 15px; border: none;">
       <h3 style="margin-top: 0; margin-bottom: 5px;">Mulondi Makhado</h3>
       <h4 style="margin-top: 0; margin-bottom: 15px; color: #555;">UI Designer, Full Stack Engineer</h4>
-      <p>Add some info about yourself</p>
     </td>
     <td style="vertical-align: middle; text-align: center; padding: 15px; border: none;">
       <a href="https://github.com/Mulondi-25" style="text-decoration: none; margin-right: 10px; display: inline-block;">
@@ -86,13 +82,9 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 </tr>
 
 <tr>
-    <td style="vertical-align: middle; text-align: center; border: none;">
-      <img src="" alt="Arran Lamond" style="width: 100%; border-radius: 8px;">
-    </td>
     <td style="vertical-align: top; padding: 15px; border: none;">
       <h3 style="margin-top: 0; margin-bottom: 5px;">Arran Lamond</h3>
       <h4 style="margin-top: 0; margin-bottom: 15px; color: #555;">Full Stack Engineer</h4>
-      <p>Add some info about yourself</p>
     </td>
     <td style="vertical-align: middle; text-align: center; padding: 15px; border: none;">
       <a href="https://github.com/ArranTuksUni" style="text-decoration: none; margin-right: 10px; display: inline-block;">
@@ -105,17 +97,12 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 </tr>
 
 <tr>
-    <td style="vertical-align: middle; text-align: center; border: none;">
-      <img src="" alt="Keegan Lewis" style="width: 100%; border-radius: 8px;">
-    </td>
     <td style="vertical-align: top; padding: 15px; border: none;">
       <h3 style="margin-top: 0; margin-bottom: 5px;">Keegan Lewis</h3>
       <h4 style="margin-top: 0; margin-bottom: 15px; color: #555;">Data Engineer, AI Engineer</h4>
-      <p>Add some info about yourself</p>
     </td>
     <td style="vertical-align: middle; text-align: center; padding: 15px; border: none;">
       <a href="https://github.com/Keegan-l-star" style="text-decoration: none; margin-right: 10px; display: inline-block;">
-        <img src="https://skillicons.dev/icons?i=github" alt="GitHub" />
       </a>
       <a href="https://www.linkedin.com/in/keegan-lewis-1bbb78373/" style="text-decoration: none; display: inline-block;">
         <img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" />
@@ -124,13 +111,9 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 </tr>
 
 <tr>
-    <td style="vertical-align: middle; text-align: center; border: none;">
-      <img src="" alt="Tshepiso Makalana" style="width: 100%; border-radius: 8px;">
-    </td>
     <td style="vertical-align: top; padding: 15px; border: none;">
       <h3 style="margin-top: 0; margin-bottom: 5px;">Tshepiso Makalana</h3>
       <h4 style="margin-top: 0; margin-bottom: 15px; color: #555;">Data Engineer, AI Engineer</h4>
-      <p>Add some info about yourself</p>
     </td>
     <td style="vertical-align: middle; text-align: center; padding: 15px; border: none;">
       <a href="https://github.com/CodeMakelana" style="text-decoration: none; margin-right: 10px; display: inline-block;">
