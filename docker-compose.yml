@@ -1,0 +1,141 @@
+#version: '3.9' <- obsolete
+#VERY LIKELY NEEDS TO BE REVISED FOR OUR ENV AND IF ANY PACKAGE CHANGES OCCUR, SAME IS TRUE FOR BOTH FRONTEND AND BACKEND FILES.
+services:
+    #frontend
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        ports:
+            - "3000:3000"
+        environment:
+            - NEXT_PUBLIC_API_URL=http://localhost:8000
+        depends_on:
+            - backend
+        networks:
+            - app-network
+
+    #Backend api
+    backend:
+        build:
+            context: ./Backend
+            dockerfile: Dockerfile
+        ports:
+            - "8000:8000"
+        environment:
+            - DB_USER=${DB_USER}
+            - DB_PASSWORD=${DB_PASSWORD}
+            - DB_HOST=postgres
+            - DB_PORT=${DB_PORT:-5432}
+            - DB_NAME=${DB_NAME}
+            - REDIS_URL=redis://redis:6379/0
+            - JWT_SECRET=${JWT_SECRET}
+            - HASH=${HASH}
+            - TOKEN_EXPIRE=${TOKEN_EXPIRE}
+            # BOTO3 / MINIO CONFIGURATION
+            - STORAGE_PROVIDER=minio
+            - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}      
+            - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+            - AWS_S3_ENDPOINT_URL=http://minio:9000     
+            - AWS_DEFAULT_REGION=${AWS_REGION}        
+        depends_on:
+            - postgres
+            - redis
+            - minio
+        networks:
+            - app-network
+
+    # #Celery Worker (This is missing a that tells it what is a celery task in : Backend/app/tasks/celery_app.py)
+    # #same image as backend 
+    # celery-worker:
+    #     build:
+    #         context: ./Backend
+    #         dockerfile: Dockerfile
+    #     command: celery -A app.tasks.celery_app worker --loglevel=info
+    #     environment:
+    #         - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/veridian
+    #         - REDIS_URL=redis://redis:6379/0
+    #         - OPENSEARCH_URL=http://opensearch:9200
+    #         - JWT_SECRET=${JWT_SECRET}
+    #         # BOTO3 / MINIO CONFIGURATION
+    #         - STORAGE_PROVIDER=minio
+    #         - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}       
+    #         - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+    #         - AWS_S3_ENDPOINT_URL=${STORAGE_URL} 
+    #         - AWS_DEFAULT_REGION=${AWS_REGION} 
+    #     depends_on:
+    #         - backend
+    #         - redis
+    #         - postgres
+    #     networks:
+    #         - app-network
+
+    postgres:
+        image: postgres:16-alpine
+        environment:
+            - POSTGRES_USER=${DB_USER}
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+            - POSTGRES_DB=${DB_NAME}
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+            - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/schema-users.sql
+            - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/schema-cases.sql
+            - ./Backend/app/database/seedingUsers.sql:/docker-entrypoint-initdb.d/seed-users.sql
+            - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/seed-cases.sql
+            - ./Backend/app/database/seed_cases.sql:/docker-entrypoint-initdb.d/seed-cases-extra.sql
+        networks:
+            - app-network
+
+    redis:
+        image: redis:7-alpine
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        networks:
+            - app-network
+
+    minio:
+        image: minio/minio:latest
+        ports:
+            - "${MINIO_API_PORT}:${MINIO_API_PORT}" 
+            - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}" 
+        volumes:
+            - minio_data:/data
+        environment:
+            - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+            - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+            - MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:3000,http://127.0.0.1:3000
+        command: server /data --address ":${MINIO_API_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    minio-init:
+        image: minio/mc:latest
+        entrypoint: >
+            /bin/sh -c "
+            /usr/bin/mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+            /usr/bin/mc mb minio/images --ignore-existing &&
+            /usr/bin/mc mb minio/pdf --ignore-existing
+            "
+        depends_on:
+            minio:
+                condition: service_healthy
+        networks:
+            - app-network
+
+volumes:
+    postgres_data:
+    redis_data:
+    minio_data:
+
+networks:
+    app-network:
+        driver: bridge
