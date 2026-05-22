@@ -30,7 +30,7 @@ jobs:
 
             - name: run PyTest
               env:
-                  DB_Host: localhost
+                  DB_HOST: localhost
               run: |
                   cd Backend
                   python -m pytest app/tests/ --asyncio-mode=auto --cov=app
