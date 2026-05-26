@@ -1,5 +1,4 @@
 ## Frontend File Structure
-
 ```
 frontend/
 ├── public/ # Next.js application
@@ -15,6 +14,8 @@ frontend/
 │   │   └── dashboard/ # Dashboard page
 │   ├── assets/ # Icons, fonts, etc 
 │   ├── components/ # Reusable components
+|   |   ├── commons/ # Larger components
+|   |   └── ui/ # Small atomic components
 │   ├── hooks/ # Custom react hooks
 │   ├── styles/ # CSS and stylings
 │   └── types/ # Custom interfaces/types to used
