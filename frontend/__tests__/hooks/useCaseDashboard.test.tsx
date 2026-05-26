@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import useCaseDashboard, { CaseSummary } from '@/hooks/useCaseDashboard';
-import { fetchCases } from '../../src/api/dashboard';
+import useCaseDashboard, { CaseSummary } from '@/lib/hooks/useCaseDashboard';
+import { fetchCases } from '../../src/lib/api/dashboard';
 
-jest.mock('../../src/api/dashboard', () => ({
+jest.mock('../../src/lib/api/dashboard', () => ({
     fetchCases: jest.fn(),
 }));
 

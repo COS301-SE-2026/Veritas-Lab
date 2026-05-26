@@ -1,12 +1,12 @@
 'use client';
+import { login } from '@/lib/api/login';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { register } from '@/api/register';
-type RegisterFormState = {
-    username: string;
+import { useAuth } from '@/context/AuthContext';
+
+type LoginFormState = {
     email: string;
     password: string;
-    confirmPassword: string;
 };
 
 type StatusState = {
@@ -15,28 +15,25 @@ type StatusState = {
     isSubmitting: boolean;
 };
 
-const initialFormState: RegisterFormState = {
-    username: '',
+const initialFormState: LoginFormState = {
     email: '',
     password: '',
-    confirmPassword: '',
 };
 
-export default function useRegisterForm()
-{
+export default function useLoginForm() {
     const router = useRouter();
-    const [formState, setFormState] = useState<RegisterFormState>(initialFormState);
+    const { setToken } = useAuth();
+    const [formState, setFormState] = useState<LoginFormState>(initialFormState);
     const [status, setStatus] = useState<StatusState>({
         error: null,
         success: null,
         isSubmitting: false,
     });
 
-    //regex for email and password creation - password must be atleast 12 chars long and must make use of atleast 1 upper, 1 special and 1 number.
+    //ensure the entered email is still an actual email before even attempting to send with the submit
     const emailPattern = /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
 
-    const updateField = (field: keyof RegisterFormState, value: string) => {
+    const updateField = (field: keyof LoginFormState, value: string) => {
         setFormState((prev) => ({
             ...prev,
             [field]: value,
@@ -44,24 +41,14 @@ export default function useRegisterForm()
     };
 
     const validateForm = () => {
-        if(!formState.username.trim())
-        {
-            return 'Please enter a username.';
-        }
-
         if(!emailPattern.test(formState.email.trim()))
         {
-            return 'Please enter a valid work email.';
+            return 'Please enter a valid email.';
         }
 
-        if(!passwordPattern.test(formState.password))
+        if(!formState.password.trim())
         {
-            return 'Password must be atleast 12 characters, have an upper and lower case character and a special character';
-        }
-
-        if(formState.password !== formState.confirmPassword)
-        {
-            return 'Passwords do not match.';
+            return 'Please enter your password.';
         }
 
         return null;
@@ -76,26 +63,29 @@ export default function useRegisterForm()
             setStatus({ error: validationMessage, success: null, isSubmitting: false });
             return;
         }
-
         setStatus({ error: null, success: null, isSubmitting: true });
 
         try{
-            const response = await register(formState.username, formState.email, formState.password);
+            const response = await login(formState.email.trim(), formState.password);
 
-            if(!response.status || response.status !== 'success')
-            {
-                const message = response.message ?? 'Registration failed. Please try again.';
-                setStatus({ error: message, success: null, isSubmitting: false });
+            if(response.status !== 'success') {
+                setStatus({
+                    error: response.message || 'Login failed. Please check your credentials and try again.',
+                    success: null,
+                    isSubmitting: false,
+                });
                 return;
             }
 
+            setToken(response.token);
+
             setStatus({
                 error: null,
-                success: response.message ?? 'Account created successfully.',
+                success: 'Login successful.',
                 isSubmitting: false,
             });
             setFormState(initialFormState);
-            router.replace('/login');
+            router.push('/dashboard');
         }
         catch(error)
         {
@@ -109,7 +99,7 @@ export default function useRegisterForm()
         }
     };
 
-    return {
+    return{
         formState,
         status,
         updateField,

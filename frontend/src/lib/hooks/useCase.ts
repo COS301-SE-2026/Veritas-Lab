@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { fetchCase, addEvidence as submitEvidence } from '@/api/case';
+import { fetchCase, addEvidence as submitEvidence } from '@/lib/api/case';
 
 const mockEvidenceFiles: File[] = [
     new File([''], 'vid1.png', { type: 'image/png' }),

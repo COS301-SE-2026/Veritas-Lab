@@ -3,7 +3,7 @@ import Button from "../ui/button";
 import Label from "../ui/label";
 import Input from "../ui/input";
 import { useState } from 'react';
-import { createCase } from '@/api/dashboard';
+import { createCase } from '@/lib/api/dashboard';
 
 type DashboardModalProps = {
     isOpen: boolean;

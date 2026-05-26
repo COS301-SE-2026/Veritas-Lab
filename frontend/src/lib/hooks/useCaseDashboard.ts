@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { fetchCases as fetchDashboardCases, type DashboardCase } from '@/api/dashboard';
+import { fetchCases as fetchDashboardCases, type DashboardCase } from '@/lib/api/dashboard';
 
 export type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 export type CaseStatus = 'Open' | 'Closed';

@@ -4,7 +4,7 @@ import Modal from "../ui/modal";
 import Button from "../ui/button";
 import Label from "../ui/label";
 import { UploadCloud } from 'lucide-react';
-import useCase from '@/hooks/useCase';
+import useCase from '@/lib/hooks/useCase';
 type MediaUploadModalProps = {
     isOpen: boolean;
     onClose: () => void;

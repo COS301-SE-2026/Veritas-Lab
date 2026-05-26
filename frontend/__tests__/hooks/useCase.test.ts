@@ -1,8 +1,8 @@
 import { renderHook } from '@testing-library/react';
-import useCase from '../../src/hooks/useCase';
-import { addEvidence, fetchCase } from '../../src/api/case';
+import useCase from '../../src/lib/hooks/useCase';
+import { addEvidence, fetchCase } from '../../src/lib/api/case';
 
-jest.mock('../../src/api/case', () => ({
+jest.mock('../../src/lib/api/case', () => ({
 	fetchCase: jest.fn(),
 	addEvidence: jest.fn(),
 }));

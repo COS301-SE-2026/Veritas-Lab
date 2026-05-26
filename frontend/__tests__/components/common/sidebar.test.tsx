@@ -19,7 +19,7 @@ jest.mock('next/link', () => ({
 	)
 }));
 
-jest.mock('../../../src/hooks/useLogOut', () => ({
+jest.mock('../../../src/lib/hooks/useLogOut', () => ({
 	useLogOut: () => ({
 		logOut: mockLogOut,
 	}),

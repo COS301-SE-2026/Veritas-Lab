@@ -1,12 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { AuthProvider } from '../../src/context/AuthContext';
-import useLoginForm from '../../src/hooks/useLoginForm';
-import { login } from '../../src/api/login';
+import useLoginForm from '../../src/lib/hooks/useLoginForm';
+import { login } from '../../src/lib/api/login';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 
-jest.mock('../../src/api/login', () => ({
+jest.mock('../../src/lib/api/login', () => ({
 	login: jest.fn(),
 }));
 

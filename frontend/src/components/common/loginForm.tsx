@@ -4,7 +4,7 @@ import Label from '../ui/label';
 import Input from '../ui/input';
 import Button from '../ui/button';
 import { useRouter } from 'next/navigation';
-import useLoginForm from '@/hooks/useLoginForm';
+import useLoginForm from '@/lib/hooks/useLoginForm';
 export default function LoginForm() {
     const router = useRouter();
     const { formState, status, updateField, handleSubmit } = useLoginForm();

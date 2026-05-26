@@ -1,5 +1,5 @@
 import Card from '@/components/ui/card';
-import type { DashboardCase } from '@/api/dashboard';
+import type { DashboardCase } from '@/lib/api/dashboard';
 
 type DashboardCardsProps = {
     cases?: DashboardCase[];

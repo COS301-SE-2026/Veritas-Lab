@@ -2,7 +2,7 @@
 import Input from '../ui/input';
 import Dropdown from '../ui/dropdown';
 import SliderBar from '../ui/sliderBar';
-import type { SortKey, StatusFilter } from '@/hooks/useCaseDashboard';
+import type { SortKey, StatusFilter } from '@/lib/hooks/useCaseDashboard';
 
 type DashboardBarProps = {
     searchValue?: string;

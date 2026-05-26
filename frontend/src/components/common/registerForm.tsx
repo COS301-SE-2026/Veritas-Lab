@@ -4,7 +4,7 @@ import Label from '../ui/label';
 import Input from '../ui/input';
 import Button from '../ui/button';
 import { useRouter } from 'next/navigation';
-import useRegisterForm from '@/hooks/useRegisterForm'; //hook where our functionality is coming from
+import useRegisterForm from '@/lib/hooks/useRegisterForm'; //hook where our functionality is coming from
 
 export default function RegisterForm() {
     const router = useRouter();
