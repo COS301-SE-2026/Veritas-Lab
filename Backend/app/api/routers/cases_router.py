@@ -35,7 +35,7 @@ def _format_case_evidence(row: dict) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
-    media_name = row["medianame"]
+    media_name = row["mediatitle"]
     minio_domain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
 
     return {
@@ -251,11 +251,11 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
                 r.CaseId AS "caseid",
                 r.ImageId AS "mediaid",
                 r.ReportArtifacts AS "reportartifacts",
+                r.imagetitle AS mediatitle,
                 r.ReportFindings AS "reportfindings",
                 r.ReportComments AS "reportcomments",
                 r.ReportDateCreation AS "reportdatecreation",
                 m.MediaTypeId AS "mediatypeid",
-                m.MediaName AS "medianame",
                 m.MediaBucket AS "mediabucket",
                 m.MediaExtension AS "mediaextension"
             FROM "Cases_DB"."Reports" r
