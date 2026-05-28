@@ -65,3 +65,30 @@ def testFetchUsersSuccess(monkeypatch):
         "username": "Normal User",
         "role":"USER"
     }
+
+def testFetchUsersNotAdmin(monkeypatch):
+    def mockVerifyJWT(authorization):
+        return{
+            "userId": "normal-user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+
+    response = client.post(
+        "/api/fetchUsers",
+        json={},
+        headers={
+            "Authorization" : "Bearer valid-user-token"
+        }
+    )
+
+    assert response.status_code == 403
+
+    data = response.json()
+
+    assert data == {
+        "status": "error",
+        "message": "User unauthorized"
+    }
