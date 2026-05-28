@@ -173,8 +173,8 @@ class Case:
                 )  
 
             try:
-                // Insesrt into the Reports table allowing the report to have the image's name in the image title column
-                //
+                # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+
                 await connection.execute(
                     """
                     INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
