@@ -92,3 +92,64 @@ def testFetchUsersNotAdmin(monkeypatch):
         "status": "error",
         "message": "User unauthorized"
     }
+
+def testFetchUsersInvalidToken(monkeypatch):
+    def mockVerifyJWT(authorization):
+        raise ValueError("Invalid token")
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+
+    response = client.post(
+        "/api/fetchUsers",
+        json={},
+        headers={
+            "Authorization": "Bearer invalid-token"
+        }
+    )
+
+    assert response.status_code  == 401
+
+    data=response.json()
+
+    assert data == {
+        "status":"error",
+        "message": "Invalid token" 
+    }
+
+def testFetchUsersNoUsers(monkeypatch):
+    class EmptyMockConnection:
+        async def fetch(self, query):
+            return []
+        
+        async def close(self):
+            pass
+
+    async def empty_mock_connect(*args, **kwargs):
+        return EmptyMockConnection()
+    
+    def mockVerifyJWT(authorization):
+        return{
+            "userId":"admin-id",
+            "username": "Admin User",
+            "role": "ADMIN"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+    monkeypatch.setattr(auth.asyncpg, "connect", empty_mock_connect)
+
+    response = client.post(
+        "/api/fetchUsers",
+        json={},
+        headers={
+            "Authorization":"Bearer valid-token"
+        }
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data == {
+        "status": "success",
+        "users":[]
+    }
