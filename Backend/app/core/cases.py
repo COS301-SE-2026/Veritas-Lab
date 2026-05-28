@@ -189,10 +189,10 @@ class Case:
                 )
 
             except asyncpg.UniqueViolationError:
-                return {
-                    "Status": "duplicate_report - image already associated with this case",
-                    "MediaId": str(mediaId),
-                }
+                raise HTTPException(
+                    status_code=409, 
+                    detail="Image already associated with this case"
+                )
             except Exception:
                 pass
 

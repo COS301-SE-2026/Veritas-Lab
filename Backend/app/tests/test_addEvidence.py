@@ -3,6 +3,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi import HTTPException
 import io
 import uuid
+import asyncpg
 
 from app.core.cases import Case
 from starlette.datastructures import UploadFile
@@ -141,11 +142,12 @@ async def test_sameImageDifferentName(mockUuid, mockMinioClass, mockDbConnect):
     mockMinioClass.return_value = mockMinioClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    test_case_id = uuid.uuid4()
+    test_case_id_1 = uuid.uuid4()
+    test_case_id_2 = uuid.uuid4()
 
-    result1 = await case.addEvidence(media=mockMedia1, case_id=test_case_id)
+    result1 = await case.addEvidence(media=mockMedia1, case_id=test_case_id_1)
     
-    result2 = await case.addEvidence(media=mockMedia2, case_id=test_case_id)
+    result2 = await case.addEvidence(media=mockMedia2, case_id=test_case_id_2)
 
     assert result1 is not None
     assert "url" in result1
@@ -160,4 +162,78 @@ async def test_sameImageDifferentName(mockUuid, mockMinioClass, mockDbConnect):
     
     # Verify the URLs are the same (same file, same link)
     assert result1.get("url") == result2.get("url"), "Same file with different names should return the same URL"
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+@patch("uuid.uuid4")
+async def test_duplicateReportViolatesConstraint(mockUuid, mockMinioClass, mockDbConnect):
+    """
+    Test uniqueness error handling when dupes in same case appear
+    """
+    fileContent = b"A fake binary for a png"
+    
+    # First upload: success.png
+    testContent1 = io.BytesIO(fileContent)
+    mockMedia1 = UploadFile(
+        file=testContent1,
+        filename="success.png",
+        headers={"content-type": "image/png"}
+    )
+    
+    # Second upload: same content and same case
+    testContent2 = io.BytesIO(fileContent)
+    mockMedia2 = UploadFile(
+        file=testContent2,
+        filename="success-copy.png",
+        headers={"content-type": "image/png"}
+    )
+
+    fakeUuidString = "22222222-abcd-ef01-2345-6789abcdef01"
+    mockUuid.return_value = fakeUuidString
+
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockMediaTypeRecord = {
+        "MediaTypeId": "type-111", 
+        "MediaBucket": "images",
+        "MediaExtension": ".png"
+    }
+    
+    existingMediaRecord = {
+        "MediaId": "mocked-evidence-uuid-123"
+    }
+
+    mockDbConnection.fetchrow = AsyncMock(
+        side_effect=[mockMediaTypeRecord, None, mockMediaTypeRecord, existingMediaRecord]
+    )
+    mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-123")
+    
+    # First execute succeeds, second execute throws UniqueViolationError 
+    mockDbConnection.execute = AsyncMock(
+        side_effect=[
+            None,  # First insert succeeds
+            asyncpg.exceptions.UniqueViolationError("Duplicate key value violates unique constraint")
+        ]
+    )
+    mockDbConnection.close = AsyncMock()
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    test_case_id = uuid.uuid4()
+
+    result1 = await case.addEvidence(media=mockMedia1, case_id=test_case_id)
+    assert result1 is not None
+    assert result1.get("Status") == "uploaded"
+    
+    # Second upload should raise HTTPException with 409 Conflict
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addEvidence(media=mockMedia2, case_id=test_case_id)
+    
+    assert excInfo.value.status_code == 409
+    assert "already associated with this case" in excInfo.value.detail
 
