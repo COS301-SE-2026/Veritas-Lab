@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseCreationDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Media"(
     MediaId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     MediaType UUID NOT NULL REFERENCES "Cases_DB"."MediaType"(MediaTypeId) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -31,12 +32,14 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Reports"(
     ReportId UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     CaseId UUID NOT NULL REFERENCES "Cases_DB"."Cases"(CaseId) ON DELETE CASCADE ON UPDATE CASCADE,
     ImageId UUID NOT NULL REFERENCES "Cases_DB"."Media"(MediaId) ON UPDATE CASCADE,
+    ImageTitle Text,
     ReportArtifacts JSONB,
     ReportFindings TEXT,
     ReportComments TEXT,
     ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+create UNIQUE INDEX CaseImage ON "Cases_DB"."Reports"(CaseId, ImageId);
 
 
 

@@ -147,7 +147,6 @@ class Case:
             if existingMedia:
                 mediaId=existingMedia["MediaId"]
                 targetFilename = f"{mediaId}{dbExtension}"
-                # Allow the dupe we just won't save it
             else: 
                 newMediaUuid = uuid.uuid4()
 
@@ -174,16 +173,25 @@ class Case:
                 )  
 
             try:
+                # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+
                 await connection.execute(
                     """
-                    INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ReportArtifacts, ReportFindings, ReportComments)
+                    INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
                     VALUES ($1, $2, $3, $4, $5)
                     """,
                     case_uuid,
                     mediaId,
+                    filename,
                     None,
                     None,
                     None
+                )
+
+            except asyncpg.UniqueViolationError:
+                raise HTTPException(
+                    status_code=409, 
+                    detail="Image already associated with this case"
                 )
             except Exception:
                 pass
@@ -193,6 +201,7 @@ class Case:
 
             return{
                 "MediaId": str(mediaId),
+                "Filename": filename,
                 "url": fileUrl,
                 "Status": "existing" if existingMedia else "uploaded"
             }
