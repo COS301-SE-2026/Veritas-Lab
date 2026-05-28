@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, UploadFile, File, Form
+from fastapi import APIRouter, Header, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.core.cases import Case
@@ -334,6 +334,16 @@ async def upload_evidence(case_id: str = Form(...), media: UploadFile = File(...
         result = await case.addEvidence(media, case_uuid)
 
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
+
+    except HTTPException as e:
+        # Handle 409 Conflict when image already associated with case
+        if e.status_code == 409:
+            return JSONResponse(status_code=409, content={"status": "error", "message": e.detail})
+        # Handle 400 Bad Request for unsupported file types
+        elif e.status_code == 400:
+            return JSONResponse(status_code=400, content={"status": "error", "message": e.detail})
+        else:
+            raise
 
     finally:
         await connection.close()
