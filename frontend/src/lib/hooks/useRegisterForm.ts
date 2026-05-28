@@ -84,7 +84,7 @@ export default function useRegisterForm()
                 isSubmitting: false,
             });
             setFormState(initialFormState);
-            router.replace('/');
+            router.replace('/login');
         }
         catch(error)
         {
