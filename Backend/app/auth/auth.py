@@ -376,7 +376,7 @@ async def fetchUsers(request: dict,authorization: str | None = Header(default=No
 
         for row in rows:
             users.append({
-                "userId":str(row["userid"]),
+                "id":str(row["userid"]),
                 "username":row["username"],
                 "role": row["userrole"]
             })
