@@ -1,12 +1,4 @@
-type InputProps = {
-    placeholder?: string;
-    value?: string;
-    onChange?: (value: string) => void;
-    id?: string;
-    type?: string;
-    className?: string;
-    required?: boolean;
-};
+import type { InputProps } from '@/types/components';
 
 export default function Input({ placeholder, value, onChange, id, type, className, required }: InputProps) {
     return (

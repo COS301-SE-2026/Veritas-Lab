@@ -1,15 +1,4 @@
-import React from 'react';
-
-type ButtonProps = {
-    children?: React.ReactNode;
-    text?: string;
-    onClick?: () => void;
-    disabled?: boolean;
-    type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack';
-    size?: 'small' | 'medium' | 'large';
-    className?: string;
-};
+import type { ButtonProps } from '@/types/components';
 
 export default function Button({ 
     children,

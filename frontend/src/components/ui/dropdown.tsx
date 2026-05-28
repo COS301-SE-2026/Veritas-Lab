@@ -1,18 +1,4 @@
-import React from 'react';
-
-type DropdownOption = {
-	label: string;
-	value: string;
-};
-
-type DropdownProps = {
-	options: DropdownOption[];
-	onChange?: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-	defaultValue?: string;
-	disabled?: boolean;
-	className?: string;
-	optionClassName?: string;
-};
+import type { DropdownProps } from '@/types/components';
 //still might review all of these comps that i created if we need to add styling here.
 export default function Dropdown(
 {

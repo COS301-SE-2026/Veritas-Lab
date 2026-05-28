@@ -1,9 +1,4 @@
-import React, { ReactNode } from 'react';
-
-type ContainerProps = {
-	children: ReactNode;
-	className?: string;
-};
+import type { ContainerProps } from '@/types/components';
 
 //creation of Container comp
 export default function Container({ children, className }: ContainerProps)

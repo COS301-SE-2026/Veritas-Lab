@@ -1,12 +1,4 @@
-type CardProps = {
-    header: string | React.ReactNode;
-    content: string | React.ReactNode;
-    footer: string | React.ReactNode;
-    className?: string;
-    headerClassName?: string;
-    contentClassName?: string;
-    footerClassName?: string;
-};
+import type { CardProps } from '@/types/components';
 
 export default function Card({ header, content, footer, className, headerClassName, contentClassName, footerClassName }: CardProps) {
     return (

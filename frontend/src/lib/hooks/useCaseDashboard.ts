@@ -1,18 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { fetchCases as fetchDashboardCases, type DashboardCase } from '@/lib/api/dashboard';
-
-export type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
-export type CaseStatus = 'Open' | 'Closed';
-export type StatusFilter = 'All' | CaseStatus;
-export type SortKey = 'caseCreationDate' | 'caseName' | 'caseCreator';
-
-export type CaseSummary = DashboardCase;
-
-type UseCaseDashboardOptions = {
-    initialCases?: CaseSummary[];
-    initialRole?: UserRole;
-};
+import { fetchCases as fetchDashboardCases } from '@/lib/api/dashboard';
+import type { CaseStatus, CaseSummary, SortKey, StatusFilter, UseCaseDashboardOptions, UserRole } from '@/types/hooks';
 
 const sortCases = (cases: CaseSummary[], sortKey: SortKey) => {
     return [...cases].sort((left, right) => {

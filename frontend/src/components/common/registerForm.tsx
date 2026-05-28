@@ -11,7 +11,6 @@ export default function RegisterForm() {
     const { formState, status, updateField, handleSubmit } = useRegisterForm();
 
     return(
-        //adapted the following so that they are more readable 
         <div className="flex flex-col justify-center ">
             <div className="text-5xl text-(--color-text) justify-left items-left">Create your account</div>
             <form className="flex flex-col  w-full text-(--color-text)" onSubmit={handleSubmit}>

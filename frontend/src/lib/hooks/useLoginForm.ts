@@ -3,17 +3,7 @@ import { login } from '@/lib/api/login';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-
-type LoginFormState = {
-    email: string;
-    password: string;
-};
-
-type StatusState = {
-    error: string | null;
-    success: string | null;
-    isSubmitting: boolean;
-};
+import type { FormStatusState, LoginFormState } from '@/types/hooks';
 
 const initialFormState: LoginFormState = {
     email: '',
@@ -24,7 +14,7 @@ export default function useLoginForm() {
     const router = useRouter();
     const { setToken } = useAuth();
     const [formState, setFormState] = useState<LoginFormState>(initialFormState);
-    const [status, setStatus] = useState<StatusState>({
+    const [status, setStatus] = useState<FormStatusState>({
         error: null,
         success: null,
         isSubmitting: false,
