@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re as regex
@@ -341,6 +341,64 @@ async def register(request: RegisterRequest):
         }
     )
 
+@router.post("/fetchUsers")
+async def fetchUsers(request: dict,authorization: str | None = Header(default=None)):
+    connection = None
+
+    try:
+        payload = verifyJWT(authorization)
+
+        if payload.get("role") != "ADMIN":
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "status":"error",
+                    "message": "User unauthorized"
+                }
+            )
+        
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        rows = await connection.fetch(
+            """
+            SELECT userid, username, userrole
+            FROM "Users_DB"."Users"
+            """
+        )
+
+        users = []
+
+        for row in rows:
+            users.append({
+                "id":str(row["userid"]),
+                "username":row["username"],
+                "role": row["userrole"]
+            })
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status":"success",
+                "users": users
+            }
+        )
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+    finally:
+        if connection is not None:
+            await connection.close()
 
 
 
