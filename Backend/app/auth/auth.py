@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re as regex
 import bcrypt
+import uuid as uuidlib
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
@@ -67,6 +68,18 @@ def validateEmail(email: str) -> bool:
     
     pattern = r"^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
     return regex.match(pattern, email) is not None
+
+#Validates that a string is a well-formed UUID
+#The delete endpoint gets userId as  a arw string from the URL path
+# Thus checking it before sending it to the db to avoid db level-error
+def validateUUID(value: str) -> bool:
+    if  not isinstance(value, str):
+        return False
+    try:
+        uuidlib.UUID(value.strip())
+        return True
+    except ValueError:
+        return False
 
 # Validates a password. 
 # Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
@@ -183,6 +196,32 @@ async def searchUsersViaUsername(username: str):
             "role": row["userrole"],
             "password": row["userpassword"]
         }
+    finally:
+        await connection.close()
+
+#Delete functionaslity hard deletes the user row by UUID in the db
+#Returns True if found and False if not found
+async def deleteUsersById(userId: str) -> bool:
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            For Debugging purposes to see it happen in
+            Delete from "Users db"
+            Where userId = $1::uuid
+            Returning userId
+            """,
+            userId
+        )
+
+        return row is not None # when the specified user is not found in the Db
     finally:
         await connection.close()
 
@@ -400,5 +439,9 @@ async def fetchUsers(request: dict,authorization: str | None = Header(default=No
         if connection is not None:
             await connection.close()
 
-
-
+#Allows a loggged in ADMIN to permanently delete another user by UUID
+@router.delete("/users/{userId}")
+async def deleteUser(userId: str, authorization: str | None = Header(default=None)):
+    try:
+        #Verify the JWT for security
+        payload = verifyJWT(authorization)
