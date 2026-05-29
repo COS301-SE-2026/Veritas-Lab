@@ -251,7 +251,7 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
                 r.CaseId AS "caseid",
                 r.ImageId AS "mediaid",
                 r.ReportArtifacts AS "reportartifacts",
-                r.imagetitle AS mediatitle,
+                r.imagetitle AS "mediatitle",
                 r.ReportFindings AS "reportfindings",
                 r.ReportComments AS "reportcomments",
                 r.ReportDateCreation AS "reportdatecreation",

@@ -178,7 +178,7 @@ class Case:
                 await connection.execute(
                     """
                     INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
-                    VALUES ($1, $2, $3, $4, $5)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     """,
                     case_uuid,
                     mediaId,
