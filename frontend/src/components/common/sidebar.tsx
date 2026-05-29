@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from '@/context/SidebarContext';
-import { useLogOut } from '@/hooks/useLogOut';
+import { useLogOut } from '@/lib/hooks/useLogOut';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool.
 import {

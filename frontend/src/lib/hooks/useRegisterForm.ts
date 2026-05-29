@@ -1,19 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { register } from '@/api/register';
-type RegisterFormState = {
-    username: string;
-    email: string;
-    password: string;
-    confirmPassword: string;
-};
-
-type StatusState = {
-    error: string | null;
-    success: string | null;
-    isSubmitting: boolean;
-};
+import { register } from '@/lib/api/register';
+import type { FormStatusState, RegisterFormState } from '@/types/hooks';
 
 const initialFormState: RegisterFormState = {
     username: '',
@@ -26,7 +15,7 @@ export default function useRegisterForm()
 {
     const router = useRouter();
     const [formState, setFormState] = useState<RegisterFormState>(initialFormState);
-    const [status, setStatus] = useState<StatusState>({
+    const [status, setStatus] = useState<FormStatusState>({
         error: null,
         success: null,
         isSubmitting: false,

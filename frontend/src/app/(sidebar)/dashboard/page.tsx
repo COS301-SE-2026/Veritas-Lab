@@ -5,7 +5,7 @@ import DashboardBar from '@/components/common/dashboardBar';
 import CaseCard from '@/components/common/caseCard';
 import DashboardModal from '@/components/common/dashboardModal';
 import DashboardCards from '@/components/common/dashboardCards';
-import useCaseDashboard from '@/hooks/useCaseDashboard';
+import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
 export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
 

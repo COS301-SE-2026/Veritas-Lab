@@ -5,7 +5,7 @@ import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
-import useCase from "@/hooks/useCase";
+import useCase from "@/lib/hooks/useCase";
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);

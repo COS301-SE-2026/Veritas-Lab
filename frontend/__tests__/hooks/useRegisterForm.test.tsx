@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import useRegisterForm from '../../src/hooks/useRegisterForm';
-import { register } from '../../src/api/register';
+import useRegisterForm from '../../src/lib/hooks/useRegisterForm';
+import { register } from '../../src/lib/api/register';
 
 const mockReplace = jest.fn();
 
-jest.mock('../../src/api/register', () => ({
+jest.mock('../../src/lib/api/register', () => ({
 	register: jest.fn(),
 }));
 

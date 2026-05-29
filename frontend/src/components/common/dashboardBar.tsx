@@ -2,16 +2,8 @@
 import Input from '../ui/input';
 import Dropdown from '../ui/dropdown';
 import SliderBar from '../ui/sliderBar';
-import type { SortKey, StatusFilter } from '@/hooks/useCaseDashboard';
-
-type DashboardBarProps = {
-    searchValue?: string;
-    onSearchChange?: (value: string) => void;
-    statusFilter?: StatusFilter;
-    onStatusChange?: (filter: StatusFilter) => void;
-    sortValue?: SortKey;
-    onSortChange?: (value: SortKey) => void;
-};
+import type { DashboardBarProps } from '@/types/components';
+import type { SortKey } from '@/types/hooks';
 
 export default function DashboardBar({
     searchValue,

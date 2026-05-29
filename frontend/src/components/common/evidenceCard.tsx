@@ -1,10 +1,5 @@
 import Card from "../ui/card";
-
-type EvidenceCardProps = {
-    mediaName: string;
-    mediaUrl: string;
-    mediaExtension: string;
-};
+import type { EvidenceCardProps } from "@/types/components";
 export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension }: EvidenceCardProps) {
     return (
         <Card

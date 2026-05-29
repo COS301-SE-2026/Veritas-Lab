@@ -4,14 +4,13 @@ import Label from '../ui/label';
 import Input from '../ui/input';
 import Button from '../ui/button';
 import { useRouter } from 'next/navigation';
-import useRegisterForm from '@/hooks/useRegisterForm'; //hook where our functionality is coming from
+import useRegisterForm from '@/lib/hooks/useRegisterForm'; //hook where our functionality is coming from
 
 export default function RegisterForm() {
     const router = useRouter();
     const { formState, status, updateField, handleSubmit } = useRegisterForm();
 
     return(
-        //adapted the following so that they are more readable 
         <div className="flex flex-col justify-center ">
             <div className="text-5xl text-(--color-text) justify-left items-left">Create your account</div>
             <form className="flex flex-col  w-full text-(--color-text)" onSubmit={handleSubmit}>

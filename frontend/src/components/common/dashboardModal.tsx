@@ -3,13 +3,8 @@ import Button from "../ui/button";
 import Label from "../ui/label";
 import Input from "../ui/input";
 import { useState } from 'react';
-import { createCase } from '@/api/dashboard';
-
-type DashboardModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    onCreated?: () => void;
-};
+import { createCase } from '@/lib/api/dashboard';
+import type { DashboardModalProps } from '@/types/components';
 //made it so that the dashboard page refreshes when a new case is created so that the case appears
 export default function DashboardModal({ isOpen, onClose, onCreated }: DashboardModalProps) {
     const [title, setTitle] = useState('');

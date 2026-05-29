@@ -1,12 +1,6 @@
 'use client';
 import { useState } from 'react';
-
-type SliderBarProps<T extends string = string> = {
-    filters: ReadonlyArray<T>;
-    defaultFilter?: T;
-    onChange?: (filter: T) => void;
-    className?: string;
-};
+import type { SliderBarProps } from '@/types/components';
 
 export default function SliderBar<T extends string>({ filters, defaultFilter, onChange, className }: SliderBarProps<T>) {
     const [active, setActive] = useState<T>(defaultFilter ?? filters[0]);

@@ -1,15 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 import { getAuthHeaders } from './authHeaders';
-
-export type DashboardCase = {
-	caseId: string;
-	caseReviews: Record<string, unknown> | null;
-	caseName: string;
-	caseCreator: string;
-	caseClosed: boolean;
-	caseCreationDate: string;
-};
+import type { DashboardCase } from '@/types/api';
 
 export async function fetchCases(): Promise<DashboardCase[]> {
 	try {

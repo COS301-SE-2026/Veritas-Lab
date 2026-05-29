@@ -1,34 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 import { getAuthHeaders } from './authHeaders';
-
-export type CaseEvidence = {
-    reportId: string;
-    mediaId: string;
-    mediaName: string;
-    mediaBucket: string;
-    mediaExtension: string;
-    mediaTypeId: string;
-    mediaUrl: string;
-    reportArtifacts: Record<string, unknown> | null;
-    reportFindings: string | null;
-    reportComments: string | null;
-    reportDateCreation: string | null;
-};
-
-export type CaseResponse = {
-    status: string;
-    case: {
-        caseId: string | null;
-        caseName: string;
-        caseCreator: string;
-        caseReviews: Record<string, unknown> | null;
-        caseDescription: string | null;
-        caseClosed: boolean;
-        caseCreationDate: string | null;
-    };
-    evidence: CaseEvidence[];
-};
+import type { CaseResponse } from '@/types/api';
 
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {

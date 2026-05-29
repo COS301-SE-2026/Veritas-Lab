@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
-import { useLogOut } from '@/hooks/useLogOut';
+import { useLogOut } from '@/lib/hooks/useLogOut';
 
 const mockReplace = jest.fn();
 const mockRefresh = jest.fn();
