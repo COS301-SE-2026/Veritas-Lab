@@ -1,0 +1,64 @@
+name: CI Dev
+#we want the CI to only run when we create a pull request to dev or when that PR is updated
+#obviously if the CI fails you dont merge.
+on:
+    pull_request:
+        branches: ["dev"]
+    workflow_dispatch:
+#similar to main but added timeout.
+jobs:
+    backend-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 1
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: install dependencies
+              run: |
+                  cd Backend
+                  python -m pip install -r requirements/base.txt
+
+            - name: run PyTest
+              env:
+                  DB_HOST: localhost
+                  DB_USER: postgres
+                  DB_PASSWORD: postgres
+                  DB_NAME: test_db
+                  DB_PORT: 5432
+                  JWT_SECRET: test-secret
+                  HASH: HS256
+                  TOKEN_EXPIRE: 5
+                  MINIO_ROOT_USER: minioadmin
+                  MINIO_ROOT_PASSWORD: minioadmin
+                  MINIO_API_PORT: 9000
+                  MINIO_CONSOLE_PORT: 9001
+                  AWS_REGION: af-south-1
+              run: |
+                  cd Backend
+                  python -m pytest app/tests/ --asyncio-mode=auto --cov=app
+
+    frontend-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 1
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+
+            - name: run Jest
+              run: |
+                  cd frontend
+                  npx jest
