@@ -523,7 +523,7 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     {
         "reportid": fake_report_id,
         "mediaid": fake_media_id,
-        "medianame": "123",
+        "mediatitle": "123",
         "mediabucket": "images",
         "mediaextension": ".png",
         "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
