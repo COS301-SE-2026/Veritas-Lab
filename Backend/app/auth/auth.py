@@ -445,3 +445,17 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
     try:
         #Verify the JWT for security
         payload = verifyJWT(authorization)
+
+        #Authorization. Only Admins can delete
+        if payload.get("role") != "ADMIN":
+            return JSONResponse(
+                status_code = 400
+                content = {"status": "error", "message": "User is unauthorized."}
+            )
+
+        #Validate input. This rejects improper UUIDs before touching the DB
+        if not validateUUID(userId):
+            return JSONResponse(
+                status_code = 400
+                content = {"status": "error", "message": "Invalid User ID format."}
+            )
