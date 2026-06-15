@@ -156,7 +156,7 @@ def testFetchUsersNoUsers(monkeypatch):
 
 def test_ChangeUserRoleSuccess(monkeypatch):
     class MockConnection:
-        async def execute(self, query):
+        async def execute(self, query, *args):
             return "UPDATE 1"
         
         async def close(self):
@@ -224,7 +224,7 @@ def test_ChangeUserRoleNotAdmin(monkeypatch):
 
 def test_ChangeUserRoleNoUser(monkeypatch):
     class MockConnection:
-        async def execute(self, query):
+        async def execute(self, query, *args):
             return "UPDATE 0"
         
         async def close(self):
