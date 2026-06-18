@@ -429,7 +429,16 @@ async def changeUserRole(
                 "message": "User unauthorized"
             }
         )
-    
+
+    if payload.get("sub") == request.userId:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+               "message": "Not allowed to change own role"
+           }
+      )
+
     user_id = request.userId
     newRole = request.NewRole
 
