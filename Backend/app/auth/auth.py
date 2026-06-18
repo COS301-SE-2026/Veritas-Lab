@@ -101,6 +101,10 @@ class LoginRequest(BaseModel):
 class RegisterRequest(LoginRequest):
     username: str | None = None
 
+class ChangeRoleRequest(BaseModel):
+    userId: str | None = None
+    NewRole: str | None = None
+
 async def updateUserJWTIssued(email: str):
     connection = await asyncpg.connect(
         user=DB_USER,
@@ -400,5 +404,89 @@ async def fetchUsers(request: dict,authorization: str | None = Header(default=No
         if connection is not None:
             await connection.close()
 
+@router.post("/changeUserRole")
+async def changeUserRole(
+    request: ChangeRoleRequest,
+    authorization: str = Header(...)
+):
+    connection = None
+    try:
+        payload = verifyJWT(authorization)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
 
+    if payload.get("role") != "ADMIN":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status":"error",
+                "message": "User unauthorized"
+            }
+        )
+    
+    user_id = request.userId
+    newRole = request.NewRole
+
+    if not user_id or not newRole:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Missing userId or NewRole field."
+            }
+        )
+
+    if newRole not in ["USER", "ADMIN", "INVESTIGATOR"]:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing NewRole field."
+            }
+        )
+
+    try:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        result = await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userrole = $1
+            WHERE userid = $2
+            """,
+            newRole, user_id
+        )
+
+        if result == "UPDATE 0":
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "No user found with the provided user_id"
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status":"success",
+                "message": f"User role updated to {newRole} successfully"
+            }
+        )
+    finally:
+        if connection is not None:
+            await connection.close()
+            await connection.close()
 

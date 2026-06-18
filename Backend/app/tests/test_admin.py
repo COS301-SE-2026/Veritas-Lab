@@ -153,3 +153,142 @@ def testFetchUsersNoUsers(monkeypatch):
         "status": "success",
         "users":[]
     }
+
+def test_ChangeUserRoleSuccess(monkeypatch):
+    class MockConnection:
+        async def execute(self, query, *args):
+            return "UPDATE 1"
+        
+        async def close(self):
+            pass
+
+    async def mock_connect(*args, **kwargs):
+        return MockConnection()
+    
+    def mockVerifyJWT(authorization):
+        return {
+            "userId": "admin-id",
+            "username": "Admin User",
+            "role": "ADMIN"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "22222222-2222-2222-2222-222222222222",
+            "NewRole": "INVESTIGATOR"
+        },
+        headers={
+            "Authorization": "Bearer valid-token"
+        }
+    )
+
+    assert response.status_code == 200
+    
+    data = response.json()
+    
+    assert data == {
+        "status": "success",
+        "message": "User role updated to INVESTIGATOR successfully"
+    }
+
+def test_ChangeUserRoleNotAdmin(monkeypatch):
+    def mockVerifyJWT(authorization):
+        return{
+            "userId": "normal-user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={},
+        headers={
+            "Authorization" : "Bearer valid-user-token"
+        }
+    )
+
+    assert response.status_code == 403
+
+    data = response.json()
+
+    assert data == {
+        "status": "error",
+        "message": "User unauthorized"
+    }
+
+def test_ChangeUserRoleNoUser(monkeypatch):
+    class MockConnection:
+        async def execute(self, query, *args):
+            return "UPDATE 0"
+        
+        async def close(self):
+            pass
+
+    async def mock_connect(*args, **kwargs):
+        return MockConnection()
+    
+    def mockVerifyJWT(authorization):
+        return {
+            "userId": "admin-id",
+            "username": "Admin User",
+            "role": "ADMIN"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "nonexistent-user-id",
+            "NewRole": "INVESTIGATOR"
+        },
+        headers={
+            "Authorization": "Bearer valid-token"
+        }
+    )
+
+    assert response.status_code == 404
+    
+    data = response.json()
+    
+    assert data == {
+        "status": "error",
+        "message": "No user found with the provided user_id"
+    }
+
+def test_ChangeUserRoleInvalidRole(monkeypatch):
+    def mockVerifyJWT(authorization):
+        return {
+            "userId": "admin-id",
+            "username": "Admin User",
+            "role": "ADMIN"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "22222222-2222-2222-2222-222222222222",
+            "NewRole": "Monkey"
+        },
+        headers={
+            "Authorization": "Bearer valid-token"
+        }
+    )
+
+    assert response.status_code == 400
+    
+    data = response.json()
+    
+    assert data == {
+        "status": "error",
+        "message": "Invalid or missing NewRole field."
+    }
