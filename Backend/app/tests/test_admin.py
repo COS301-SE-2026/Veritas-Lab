@@ -292,3 +292,47 @@ def test_ChangeUserRoleInvalidRole(monkeypatch):
         "status": "error",
         "message": "Invalid or missing NewRole field."
     }
+
+def test_AdminCannotChangeSelf(monkeypatch):
+    """Test that the admin cannot change their own role"""
+    class MockConnection:
+        async def execute(self, query, *args):
+            return "UPDATE 1"
+        
+        async def close(self):
+            pass
+
+    async def mock_connect(*args, **kwargs):
+        return MockConnection()
+    
+    admin_id = "11111111-1111-1111-1111-111111111111"
+    
+    def mockVerifyJWT(authorization):
+        return {
+            "sub": admin_id,
+            "username": "Admin User",
+            "role": "ADMIN"
+        }
+    
+    monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
+    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": admin_id,
+            "NewRole": "USER"
+        },
+        headers={
+            "Authorization": "Bearer valid-token"
+        }
+    )
+
+    assert response.status_code == 403
+    
+    data = response.json()
+    
+    assert data == {
+        "status": "error",
+        "message": "Not allowed to change own role"
+    }
