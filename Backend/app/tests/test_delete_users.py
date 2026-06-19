@@ -79,7 +79,7 @@ def test_admin_cannot_delete_themself(client, monkeypatch):
     response = client.delete(f"/api/users/{ADMIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     assert response.status_code == 400
     assert response.json()["status"] == "error"
-    assert response.json()["message"] == "Admin cannot delete their own account."
+    assert response.json()["message"] == "Admins cannot delete their own account."
 
 #Testing nonexistent user with error code 404 
 def test_nonexistent_user_delete_404(client, monkeypatch):
