@@ -459,3 +459,34 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
                 status_code = 400
                 content = {"status": "error", "message": "Invalid User ID format."}
             )
+
+        #An admin cannot delete themselves
+        callerId = payload.get("sub")
+        if callerId is not None and callerId == userId.strip():
+            return JSONResponse(
+                status_code = 400
+                content = {"status": "error", "message": "Admins cannot delete themselves."}
+            )
+
+        #Now delete
+        deleted = await deleteUsersById(userId.strip())
+
+        #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
+        if not deleted:
+            return JSONResponse(
+                status_code = 404
+                content = {"status": "error", "message": "No user found with the provided ID."}
+            )
+
+        return JSONResponse(
+            status_code = 200
+            content = {"status": "success", "message": "User deleted successfully."}
+        )
+
+        #safety net for unexpected errors
+    except ValueError as e:
+        #Errors from Jwt.
+        return JSONResponse(
+            status_code = 401
+            content = {"status": "error", "message": str(e)}
+        )
