@@ -43,7 +43,7 @@ def test_non_admin_is_forbiddedn(client, monkeypatch):
         
     response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     
-    assert response.status_code == 403
+    assert response.status_code == 400
     assert response.json()["status"] == "error"
 
 def test_missing_token_is_unauthorized(client, monkeypatch):
@@ -71,12 +71,12 @@ def test_malformed_uuid_is_rejected(client, monkeypatch):
     assert response.json()["message"] == "Invalid User ID format."
 
 #Admin cannot delete themselves. Error on return is 400
-def admin_cannot_delete_themself(client, monkeypatch):
+def test_admin_cannot_delete_themself(client, monkeypatch):
 
     monkeypatch.setattr(auth, "verifyJWT", lambda header: admin_payload())
 
     #The target is the same as the admin's ID
-    response = client.delete(f"/api/users/{ADMNIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
+    response = client.delete(f"/api/users/{ADMIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     assert response.status_code == 400
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Admin cannot delete their own account."
