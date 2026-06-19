@@ -39,7 +39,7 @@ def test_non_admin_is_forbiddedn(client, monkeypatch):
 
     monkeypatch.setattr(auth ,
         "verifyJWT", 
-        lambda header: {"sub": ADMIN_USER_ID, "username": "Alex", "role": "USER"})
+        lambda header: {"sub": ADMNIN_USER_ID, "username": "Alex", "role": "USER"})
         
     response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     
@@ -76,10 +76,10 @@ def test_admin_cannot_delete_themself(client, monkeypatch):
     monkeypatch.setattr(auth, "verifyJWT", lambda header: admin_payload())
 
     #The target is the same as the admin's ID
-    response = client.delete(f"/api/users/{ADMIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
+    response = client.delete(f"/api/users/{ADMNIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     assert response.status_code == 400
     assert response.json()["status"] == "error"
-    assert response.json()["message"] == "Admins cannot delete their own account."
+    assert response.json()["message"] == "Admins cannot delete themselves."
 
 #Testing nonexistent user with error code 404 
 def test_nonexistent_user_delete_404(client, monkeypatch):
