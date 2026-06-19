@@ -449,14 +449,14 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
             return JSONResponse(
-                status_code = 400
+                status_code = 400,
                 content = {"status": "error", "message": "User is unauthorized."}
             )
 
         #Validate input. This rejects improper UUIDs before touching the DB
         if not validateUUID(userId):
             return JSONResponse(
-                status_code = 400
+                status_code = 400,
                 content = {"status": "error", "message": "Invalid User ID format."}
             )
 
@@ -464,7 +464,7 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
         callerId = payload.get("sub")
         if callerId is not None and callerId == userId.strip():
             return JSONResponse(
-                status_code = 400
+                status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
             )
 
@@ -474,12 +474,12 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
         #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
         if not deleted:
             return JSONResponse(
-                status_code = 404
+                status_code = 404,
                 content = {"status": "error", "message": "No user found with the provided ID."}
             )
 
         return JSONResponse(
-            status_code = 200
+            status_code = 200,
             content = {"status": "success", "message": "User deleted successfully."}
         )
 
@@ -487,6 +487,6 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
     except ValueError as e:
         #Errors from Jwt.
         return JSONResponse(
-            status_code = 401
+            status_code = 401,
             content = {"status": "error", "message": str(e)}
         )
