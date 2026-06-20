@@ -7,7 +7,7 @@ import app.auth.auth as auth
 
 #Create a calid uuid for testing as the target to delete
 TARGET_USER_ID = "11111111-1111-1111-1111-111111111111"
-ADMNIN_USER_ID = "22222222-2222-2222-2222-222222222222"
+ADMIN_USER_ID = "22222222-2222-2222-2222-222222222222"
 
 @pytest.fixture
 def client():
@@ -17,7 +17,7 @@ def client():
     return TestClient(app)
 
 def admin_payload():
-    return {"sub": ADMNIN_USER_ID, "username": "Admin", "role": "ADMIN"}
+    return {"sub": ADMIN_USER_ID, "username": "Admin", "role": "ADMIN"}
 
 def test_admin_deletes_user_successfully(client, monkeypatch):
 
@@ -35,11 +35,11 @@ def test_admin_deletes_user_successfully(client, monkeypatch):
     assert response.json()["message"] == "User deleted successfully."
 
 #Test for a logged in non-admin who tries to delete and gets blocked by 403 code error
-def test_non_admin_is_forbiddedn(client, monkeypatch):
+def test_non_admin_is_forbidden(client, monkeypatch):
 
     monkeypatch.setattr(auth ,
         "verifyJWT", 
-        lambda header: {"sub": ADMNIN_USER_ID, "username": "Alex", "role": "USER"})
+        lambda header: {"sub": ADMIN_USER_ID, "username": "Alex", "role": "USER"})
         
     response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     
@@ -76,7 +76,7 @@ def test_admin_cannot_delete_themself(client, monkeypatch):
     monkeypatch.setattr(auth, "verifyJWT", lambda header: admin_payload())
 
     #The target is the same as the admin's ID
-    response = client.delete(f"/api/users/{ADMNIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
+    response = client.delete(f"/api/users/{ADMIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     assert response.status_code == 400
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Admins cannot delete themselves."
