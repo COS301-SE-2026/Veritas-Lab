@@ -6,11 +6,13 @@ from datetime import datetime, timezone
 import asyncpg
 import asyncio
 import os
+import io
 import hashlib
 from dotenv import load_dotenv
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from minio import Minio
+from pypdf import PdfReader
 
 load_dotenv()
 env = ENVLoader()
@@ -78,13 +80,58 @@ class Case:
             await connection.close()
 
     async def addEvidence(self, media: UploadFile, case_id: uuid.UUID):
+        print(f"DEBUG: Received request - Filename: {media.filename}, Content-Type: {media.content_type}, case_id: {case_id}")
         filename = media.filename
         localExtension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
+        fileBytes = await media.read()
+        await media.seek(0)
+        #script detection
+        if localExtension == ".pdf":
 
+            try:
+                pdfFile = io.BytesIO(fileBytes)
+                reader = PdfReader(pdfFile)
+
+                try:
+                    root = reader.trailer.get("/Root", {}) #checcking for automatic triggers
+                    if root:
+                        root = root.get_object()
+                        if "/OpenAction" in root or "/AA" in root:
+                            raise HTTPException(
+                                status_code=400, 
+                                detail="We don't allow scripts in pdfs. They are a security concern."
+                            )
+
+                        if "/Names" in root:
+                            names=root["/Names"].get_object()
+                            if "/JavaScript" in names:
+                                raise HTTPException(
+                                        status_code=400,
+                                        detail="We don't allow scripts in pdfs. They are a security concern."
+                                    )
+                except HTTPException:
+                    raise
+                except KeyError as k_err:
+                    print(f"DEBUG: Skipped specific PDF structural quirk: {str(k_err)}")
+                except Exception as scan_err:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Could not verify PDF security. File rejected."
+                    )  
+                     
+            except HTTPException:
+                raise 
+            except Exception as e:
+                print(f"DEBUG: PDF scan error: {str(e)}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid or corrupted PDF file: {str(e)}"
+                )
         # validate case_id is a UUID
         try:
             case_uuid = uuid.UUID(str(case_id)) if not isinstance(case_id, uuid.UUID) else case_id
         except Exception:
+            print(f"DEBUG: Invalid UUID received: {case_id}")
             raise HTTPException(status_code=400, detail="Invalid case_id UUID")
 
         connection = await asyncpg.connect(
@@ -116,7 +163,6 @@ class Case:
             dbExtension = typeRecord["MediaExtension"] 
             
                 #Hash the image for uniqueness
-            fileBytes = await media.read()
             mediaHash = hashlib.sha256(fileBytes).hexdigest()
 
             minioEndpointRaw = (
@@ -164,10 +210,11 @@ class Case:
 
                 await media.seek(0)
                 
+                fileStream = io.BytesIO(fileBytes)
                 minioClient.put_object(
                     bucket_name=bucketName,
                     object_name=targetFilename,
-                    data=media.file,
+                    data=fileStream,
                     length=len(fileBytes),
                     content_type=media.content_type
                 )  
@@ -205,6 +252,13 @@ class Case:
                 "url": fileUrl,
                 "Status": "existing" if existingMedia else "uploaded"
             }
+        
+        except HTTPException as e:
+            print(f"DEBUG: HTTPException: {e.detail}")
+            raise e
+        except Exception as e:
+            print(f"DEBUG: Unexpected error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
 
         finally:
             await connection.close()
