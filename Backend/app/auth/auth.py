@@ -201,7 +201,7 @@ async def searchUsersViaUsername(username: str):
 
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
-async def deleteUsersById(userId: str) -> bool:
+async def deleteUserById(userId: str) -> bool:
     connection = await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -213,10 +213,9 @@ async def deleteUsersById(userId: str) -> bool:
     try:
         row = await connection.fetchrow(
             """
-            For Debugging purposes to see it happen in
-            Delete from "Users db"
-            Where userId = $1::uuid
-            Returning userId
+            DELETE FROM "Users_DB"."Users"
+            WHERE userid = $1::uuid
+            RETURNING userid
             """,
             userId
         )
@@ -449,7 +448,7 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
             return JSONResponse(
-                status_code = 400,
+                status_code = 403,
                 content = {"status": "error", "message": "User is unauthorized."}
             )
 
@@ -461,15 +460,15 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
             )
 
         #An admin cannot delete themselves
-        callerId = payload.get("sub")
-        if callerId is not None and callerId == userId.strip():
+        callerId = payload["sub"]
+        if callerId == userId.strip():
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
             )
 
         #Now delete
-        deleted = await deleteUsersById(userId.strip())
+        deleted = await deleteUserById(userId.strip())
 
         #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
         if not deleted:
