@@ -26,7 +26,7 @@ def test_admin_deletes_user_successfully(client, monkeypatch):
     async def fake_delete(user_id):
         return True #row found and deleted
 
-    monkeypatch.setattr(auth, "deleteUsersById", fake_delete)
+    monkeypatch.setattr(auth, "deleteUserById", fake_delete)
 
     response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToen"},)
 
@@ -43,7 +43,7 @@ def test_non_admin_is_forbiddedn(client, monkeypatch):
         
     response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
     
-    assert response.status_code == 400
+    assert response.status_code == 403
     assert response.json()["status"] == "error"
 
 def test_missing_token_is_unauthorized(client, monkeypatch):
@@ -89,7 +89,7 @@ def test_nonexistent_user_delete_404(client, monkeypatch):
     async def fake_delete(user_id):
         return False # found no one 
 
-    monkeypatch.setattr(auth, "deleteUsersById", fake_delete)
+    monkeypatch.setattr(auth, "deleteUserById", fake_delete)
 
     response = client.delete(
         f"/api/users/{TARGET_USER_ID}",
