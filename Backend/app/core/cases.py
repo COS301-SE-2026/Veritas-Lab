@@ -192,6 +192,43 @@ class Case:
                 mediaId=existingMedia["MediaId"]
                 targetFilename = f"{mediaId}{dbExtension}"
                 # Need to reproduce the same db report for this case.
+
+                try:
+                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+
+                   await connection.execute(
+                        """
+                        INSERT INTO "Cases_DB"."Reports" (
+                            CaseId, 
+                            ImageId, 
+                            ImageTitle, 
+                            ReportArtifacts, 
+                            ReportFindings, 
+                            ReportComments
+                        )
+                        SELECT 
+                            $1,
+                            $2,
+                            $3,
+                            ReportArtifacts, 
+                            ReportFindings, 
+                            ReportComments
+                        FROM "Cases_DB"."Reports"
+                        WHERE ImageId = $2
+                        LIMIT 1;
+                        """,
+                        case_uuid,
+                        mediaId,
+                        filename
+                    )
+
+                except asyncpg.UniqueViolationError:
+                    raise HTTPException(
+                        status_code=409, 
+                        detail="Image already associated with this case"
+                    )
+                except Exception:
+                    pass
             else: 
                 newMediaUuid = uuid.uuid4()
 
@@ -218,29 +255,29 @@ class Case:
                     content_type=media.content_type
                 )  
 
-            try:
-                # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+                try:
+                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
 
-                await connection.execute(
-                    """
-                    INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                    """,
-                    case_uuid,
-                    mediaId,
-                    filename,
-                    None,
-                    None,
-                    None
-                )
+                    await connection.execute(
+                        """
+                        INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        case_uuid,
+                        mediaId,
+                        filename,
+                        None,
+                        None,
+                        None
+                    )
 
-            except asyncpg.UniqueViolationError:
-                raise HTTPException(
-                    status_code=409, 
-                    detail="Image already associated with this case"
-                )
-            except Exception:
-                pass
+                except asyncpg.UniqueViolationError:
+                    raise HTTPException(
+                        status_code=409, 
+                        detail="Image already associated with this case"
+                    )
+                except Exception:
+                    pass
 
             minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
             parsedUrl = urlparse(minioDomain)
