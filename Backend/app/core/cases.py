@@ -80,7 +80,6 @@ class Case:
             await connection.close()
 
     async def addEvidence(self, media: UploadFile, case_id: uuid.UUID):
-        print(f"DEBUG: Received request - Filename: {media.filename}, Content-Type: {media.content_type}, case_id: {case_id}")
         filename = media.filename
         localExtension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
         fileBytes = await media.read()
@@ -112,7 +111,7 @@ class Case:
                 except HTTPException:
                     raise
                 except KeyError as k_err:
-                    print(f"DEBUG: Skipped specific PDF structural quirk: {str(k_err)}")
+                    pass
                 except Exception as scan_err:
                     raise HTTPException(
                         status_code=400,
@@ -122,7 +121,6 @@ class Case:
             except HTTPException:
                 raise 
             except Exception as e:
-                print(f"DEBUG: PDF scan error: {str(e)}")
                 raise HTTPException(
                     status_code=400, 
                     detail=f"Invalid or corrupted PDF file: {str(e)}"
@@ -131,7 +129,6 @@ class Case:
         try:
             case_uuid = uuid.UUID(str(case_id)) if not isinstance(case_id, uuid.UUID) else case_id
         except Exception:
-            print(f"DEBUG: Invalid UUID received: {case_id}")
             raise HTTPException(status_code=400, detail="Invalid case_id UUID")
 
         connection = await asyncpg.connect(
@@ -254,10 +251,8 @@ class Case:
             }
         
         except HTTPException as e:
-            print(f"DEBUG: HTTPException: {e.detail}")
             raise e
         except Exception as e:
-            print(f"DEBUG: Unexpected error: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
 
         finally:
