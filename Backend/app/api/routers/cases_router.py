@@ -9,6 +9,9 @@ from app.core.env import ENVLoader
 import asyncpg
 from uuid import UUID
 import os
+from urllib.parse import urlparse
+from minio import Minio
+from datetime import datetime, timedelta, timezone
 
 env = ENVLoader()
 
@@ -36,7 +39,27 @@ def _format_case_evidence(row: dict) -> dict:
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
     media_name = row["mediatitle"]
-    minio_domain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
+    
+
+    minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
+    parsedUrl = urlparse(minioDomain)
+    minioEndpoint = parsedUrl.netloc if parsedUrl.netloc else minioDomain
+    isSecure = parsedUrl.scheme == "https"
+            #Creation of presigned URL below
+    presign_client = Minio(
+        minioEndpoint, # External domain the browser uses
+        access_key=os.getenv("MINIO_ROOT_USER"),
+        secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
+        region=os.getenv("AWS_REGION"),
+        secure=isSecure
+    )
+    targetFilename = f"{media_id}{media_extension}"
+
+    fileUrl = presign_client.presigned_get_object(
+        bucket_name=media_bucket,
+        object_name=targetFilename,
+        expires=timedelta(hours=1)
+    )
 
     return {
         "reportId": str(row["reportid"]),
@@ -45,7 +68,7 @@ def _format_case_evidence(row: dict) -> dict:
         "mediaBucket": media_bucket,
         "mediaExtension": media_extension,
         "mediaTypeId": str(row["mediatypeid"]),
-        "mediaUrl": f"{minio_domain}/{media_bucket}/{media_id}{media_extension}",
+        "mediaUrl": fileUrl,
         "reportArtifacts": row["reportartifacts"],
         "reportFindings": row["reportfindings"],
         "reportComments": row["reportcomments"],
@@ -339,7 +362,7 @@ async def upload_evidence(case_id: str = Form(...), media: UploadFile = File(...
         # Handle 409 Conflict when image already associated with case
         if e.status_code == 409:
             return JSONResponse(status_code=409, content={"status": "error", "message": e.detail})
-        # Handle 400 Bad Request for unsupported file types
+        # Handle 400 Bad Request for unsupported file types and malformed or scripted   
         elif e.status_code == 400:
             return JSONResponse(status_code=400, content={"status": "error", "message": e.detail})
         else:
