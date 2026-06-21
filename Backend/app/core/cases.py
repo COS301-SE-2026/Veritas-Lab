@@ -2,7 +2,6 @@ import uuid
 from uuid import uuid4
 import json
 from app.core.env import ENVLoader
-from datetime import datetime, timezone
 import asyncpg
 import asyncio
 import os
@@ -13,6 +12,8 @@ from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from minio import Minio
 from pypdf import PdfReader
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 load_dotenv()
 env = ENVLoader()
@@ -91,7 +92,7 @@ class Case:
                 pdfFile = io.BytesIO(fileBytes)
                 reader = PdfReader(pdfFile)
 
-                try:
+                try: 
                     root = reader.trailer.get("/Root", {}) #checcking for automatic triggers
                     if root:
                         root = root.get_object()
@@ -177,7 +178,7 @@ class Case:
             )
 
             
-
+            #checking for a duplicate
             existingMedia = await connection.fetchrow(
                 """
                 SELECT MediaId  AS "MediaId" 
@@ -190,6 +191,7 @@ class Case:
             if existingMedia:
                 mediaId=existingMedia["MediaId"]
                 targetFilename = f"{mediaId}{dbExtension}"
+                # Need to reproduce the same db report for this case.
             else: 
                 newMediaUuid = uuid.uuid4()
 
@@ -241,7 +243,23 @@ class Case:
                 pass
 
             minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
-            fileUrl = f"{minioDomain}/{bucketName}/{targetFilename}"
+            parsedUrl = urlparse(minioDomain)
+            minioEndpoint = parsedUrl.netloc if parsedUrl.netloc else minioDomain
+            isSecure = parsedUrl.scheme == "https"
+            #Creation of presigned URL below
+            presign_client = Minio(
+                minioEndpoint, # External domain the browser uses
+                access_key=os.getenv("MINIO_ROOT_USER"),
+                secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
+                region=os.getenv("AWS_REGION"),
+                secure=isSecure
+            )
+
+            fileUrl = presign_client.presigned_get_object(
+                bucket_name=bucketName,
+                object_name=targetFilename,
+                expires=timedelta(hours=1)
+            )
 
             return{
                 "MediaId": str(mediaId),
@@ -253,7 +271,10 @@ class Case:
         except HTTPException as e:
             raise e
         except Exception as e:
-            raise HTTPException(status_code=500, detail="Internal Server Error")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Internal Server Error: {str(e)}"
+                )
 
         finally:
             await connection.close()
