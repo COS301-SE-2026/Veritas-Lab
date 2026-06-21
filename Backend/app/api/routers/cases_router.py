@@ -3,8 +3,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.core.cases import Case
 from app.auth.auth import verifyJWT
-from datetime import datetime
-from pydantic import BaseModel
 from app.core.env import ENVLoader
 import asyncpg
 from uuid import UUID
@@ -319,6 +317,8 @@ async def upload_evidence(case_id: str = Form(...), media: UploadFile = File(...
             content={"status": "error", "message": "User unauthorized"}
         )
 
+    CaseCreator=payload["username"]
+
     try:
         case_uuid = UUID(case_id)
     except ValueError as e:
@@ -333,15 +333,18 @@ async def upload_evidence(case_id: str = Form(...), media: UploadFile = File(...
     )
 
     try:
-        row = await connection.fetchrow(
-            """
-            SELECT * FROM "Cases_DB"."Cases" WHERE caseid = $1
-            """,
-            case_uuid
+        row = await connection.fetchrow("""
+            SELECT * FROM "Cases_DB"."Cases" 
+            WHERE caseid = $1 
+            AND "casecreator" = $2
+            AND "caseclosed" = false;
+            """, 
+            case_uuid,
+            CaseCreator
         )
-
+        
         if row is None:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "Case not found"})
+            return JSONResponse(status_code=404, content={"status": "error", "message": "Case not found/ Nor permissions"})
 
         case = Case(
             CaseCreator=row["casecreator"],
