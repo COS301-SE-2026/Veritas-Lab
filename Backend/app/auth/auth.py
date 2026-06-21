@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re as regex
 import bcrypt
+import uuid as uuidlib
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
@@ -67,6 +68,18 @@ def validateEmail(email: str) -> bool:
     
     pattern = r"^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
     return regex.match(pattern, email) is not None
+
+#Validates that a string is a well-formed UUID
+#The delete endpoint gets userId as  a arw string from the URL path
+# Thus checking it before sending it to the db to avoid db level-error
+def validateUUID(value: str) -> bool:
+    if  not isinstance(value, str):
+        return False
+    try:
+        uuidlib.UUID(value.strip())
+        return True
+    except ValueError:
+        return False
 
 # Validates a password. 
 # Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
@@ -187,6 +200,31 @@ async def searchUsersViaUsername(username: str):
             "role": row["userrole"],
             "password": row["userpassword"]
         }
+    finally:
+        await connection.close()
+
+#Delete functionaslity hard deletes the user row by UUID in the db
+#Returns True if found and False if not found
+async def deleteUserById(userId: str) -> bool:
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            DELETE FROM "Users_DB"."Users"
+            WHERE userid = $1::uuid
+            RETURNING userid
+            """,
+            userId
+        )
+
+        return row is not None # when the specified user is not found in the Db
     finally:
         await connection.close()
 
@@ -488,5 +526,54 @@ async def changeUserRole(
     finally:
         if connection is not None:
             await connection.close()
-            await connection.close()
+            await connection.close()#Allows a loggged in ADMIN to permanently delete another user by UUID
+@router.delete("/users/{userId}")
+async def deleteUser(userId: str, authorization: str | None = Header(default=None)):
+    try:
+        #Verify the JWT for security
+        payload = verifyJWT(authorization)
 
+        #Authorization. Only Admins can delete
+        if payload.get("role") != "ADMIN":
+            return JSONResponse(
+                status_code = 403,
+                content = {"status": "error", "message": "User is unauthorized."}
+            )
+
+        #Validate input. This rejects improper UUIDs before touching the DB
+        if not validateUUID(userId):
+            return JSONResponse(
+                status_code = 400,
+                content = {"status": "error", "message": "Invalid User ID format."}
+            )
+
+        #An admin cannot delete themselves
+        callerId = payload["sub"]
+        if callerId == userId.strip():
+            return JSONResponse(
+                status_code = 400,
+                content = {"status": "error", "message": "Admins cannot delete themselves."}
+            )
+
+        #Now delete
+        deleted = await deleteUserById(userId.strip())
+
+        #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
+        if not deleted:
+            return JSONResponse(
+                status_code = 404,
+                content = {"status": "error", "message": "No user found with the provided ID."}
+            )
+
+        return JSONResponse(
+            status_code = 200,
+            content = {"status": "success", "message": "User deleted successfully."}
+        )
+
+        #safety net for unexpected errors
+    except ValueError as e:
+        #Errors from Jwt.
+        return JSONResponse(
+            status_code = 401,
+            content = {"status": "error", "message": str(e)}
+        )
