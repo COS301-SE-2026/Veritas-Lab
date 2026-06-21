@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 from datetime import datetime, timezone
 
 from app.api.main import app
@@ -472,6 +472,9 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
             "role": "ADMIN"
         }
 
+    mock_minio_client = MagicMock()
+    
+
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
@@ -519,6 +522,10 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     fake_media_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     fake_report_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
+    fake_url = f"http://localhost:9000/images/{fake_media_id}.png"
+    mock_minio_client.presigned_get_object.return_value = fake_url
+    monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
+
     fake_evidence_rows = [
     {
         "reportid": fake_report_id,
@@ -527,7 +534,7 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
         "mediabucket": "images",
         "mediaextension": ".png",
         "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-        "mediaurl": f"http://localhost:9000/images/{fake_media_id}.png",
+        "mediaurl": fake_url,
         "reportartifacts": {"ocr": "captured"},
         "reportfindings": "Flood watermark detected",
         "reportcomments": "Upload approved",
@@ -571,7 +578,7 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
                 "mediaBucket": "images",
                 "mediaExtension": ".png",
                 "mediaTypeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-                "mediaUrl": f"http://localhost:9000/images/{fake_media_id}.png",
+                "mediaUrl": fake_url,
                 "reportArtifacts": {"ocr": "captured"},
                 "reportFindings": "Flood watermark detected",
                 "reportComments": "Upload approved",
