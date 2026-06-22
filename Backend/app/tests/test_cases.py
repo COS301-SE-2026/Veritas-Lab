@@ -617,3 +617,82 @@ def testCloseCaseInvalidJWT(monkeypatch):
         "message": "Invalid token"
     }
 
+def testCloseCaseUserUnauthorized(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role":"USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "message":"error",
+        "error": "User unauthorized"
+    }
+
+def testCloseCaseInvalidCaseID(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "not-a-valid-uuid"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid CaseID"
+    }
+
+def testCloseCaseNotFound(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+    
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=None)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found"
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.execute.assert_not_called()
+    mock_connection.close.assert_called_once()
+
+    
