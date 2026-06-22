@@ -695,4 +695,47 @@ def testCloseCaseNotFound(monkeypatch):
     mock_connection.execute.assert_not_called()
     mock_connection.close.assert_called_once()
 
+def testCloseCaseNotCaseCreator(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "different_user",
+            "role": "INVESTIGATOR"
+        }
     
+    fake_row = {
+        "caseid": "12345678-abcd-ef01-2345-6789abcdef01",
+        "casecreator": "original_creator",
+        "casename": "Flood in Durban",
+        "casereviews": None,
+        "casedescription": "Flood investigation case",
+        "caseclosed": False,
+        "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+    }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "error",
+        "message": "User unauthorized."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.execute.assert_not_called()
+    mock_connection.close.assert_called_once()
+
