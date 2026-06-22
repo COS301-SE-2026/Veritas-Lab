@@ -74,6 +74,7 @@ python-jose==3.5.0
 python-magic==0.4.27
 python-multipart==0.0.28
 PyYAML==6.0.3
+pypdf==5.2.0
 redis==6.4.0
 requests==2.34.0
 responses==0.26.0

@@ -2,15 +2,18 @@ import uuid
 from uuid import uuid4
 import json
 from app.core.env import ENVLoader
-from datetime import datetime, timezone
 import asyncpg
 import asyncio
 import os
+import io
 import hashlib
 from dotenv import load_dotenv
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from minio import Minio
+from pypdf import PdfReader
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 load_dotenv()
 env = ENVLoader()
@@ -80,7 +83,49 @@ class Case:
     async def addEvidence(self, media: UploadFile, case_id: uuid.UUID):
         filename = media.filename
         localExtension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
+        fileBytes = await media.read()
+        await media.seek(0)
+        #script detection
+        if localExtension == ".pdf":
 
+            try:
+                pdfFile = io.BytesIO(fileBytes)
+                reader = PdfReader(pdfFile)
+
+                try: 
+                    root = reader.trailer.get("/Root", {}) #checcking for automatic triggers
+                    if root:
+                        root = root.get_object()
+                        if "/OpenAction" in root or "/AA" in root:
+                            raise HTTPException(
+                                status_code=400, 
+                                detail="We don't allow scripts in pdfs. They are a security concern."
+                            )
+
+                        if "/Names" in root:
+                            names=root["/Names"].get_object()
+                            if "/JavaScript" in names:
+                                raise HTTPException(
+                                        status_code=400,
+                                        detail="We don't allow scripts in pdfs. They are a security concern."
+                                    )
+                except HTTPException:
+                    raise
+                except KeyError as k_err:
+                    pass
+                except Exception as scan_err:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Could not verify PDF security. File rejected."
+                    )  
+                     
+            except HTTPException:
+                raise 
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid or corrupted PDF file: {str(e)}"
+                )
         # validate case_id is a UUID
         try:
             case_uuid = uuid.UUID(str(case_id)) if not isinstance(case_id, uuid.UUID) else case_id
@@ -116,7 +161,6 @@ class Case:
             dbExtension = typeRecord["MediaExtension"] 
             
                 #Hash the image for uniqueness
-            fileBytes = await media.read()
             mediaHash = hashlib.sha256(fileBytes).hexdigest()
 
             minioEndpointRaw = (
@@ -134,7 +178,7 @@ class Case:
             )
 
             
-
+            #checking for a duplicate
             existingMedia = await connection.fetchrow(
                 """
                 SELECT MediaId  AS "MediaId" 
@@ -147,6 +191,44 @@ class Case:
             if existingMedia:
                 mediaId=existingMedia["MediaId"]
                 targetFilename = f"{mediaId}{dbExtension}"
+                # Need to reproduce the same db report for this case.
+
+                try:
+                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+
+                   await connection.execute(
+                        """
+                        INSERT INTO "Cases_DB"."Reports" (
+                            CaseId, 
+                            ImageId, 
+                            ImageTitle, 
+                            ReportArtifacts, 
+                            ReportFindings, 
+                            ReportComments
+                        )
+                        SELECT 
+                            $1,
+                            $2,
+                            $3,
+                            ReportArtifacts, 
+                            ReportFindings, 
+                            ReportComments
+                        FROM "Cases_DB"."Reports"
+                        WHERE ImageId = $2
+                        LIMIT 1;
+                        """,
+                        case_uuid,
+                        mediaId,
+                        filename
+                    )
+
+                except asyncpg.UniqueViolationError:
+                    raise HTTPException(
+                        status_code=409, 
+                        detail="Image already associated with this case"
+                    )
+                except Exception:
+                    pass
             else: 
                 newMediaUuid = uuid.uuid4()
 
@@ -164,40 +246,57 @@ class Case:
 
                 await media.seek(0)
                 
+                fileStream = io.BytesIO(fileBytes)
                 minioClient.put_object(
                     bucket_name=bucketName,
                     object_name=targetFilename,
-                    data=media.file,
+                    data=fileStream,
                     length=len(fileBytes),
                     content_type=media.content_type
                 )  
 
-            try:
-                # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+                try:
+                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
 
-                await connection.execute(
-                    """
-                    INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                    """,
-                    case_uuid,
-                    mediaId,
-                    filename,
-                    None,
-                    None,
-                    None
-                )
+                    await connection.execute(
+                        """
+                        INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        case_uuid,
+                        mediaId,
+                        filename,
+                        None,
+                        None,
+                        None
+                    )
 
-            except asyncpg.UniqueViolationError:
-                raise HTTPException(
-                    status_code=409, 
-                    detail="Image already associated with this case"
-                )
-            except Exception:
-                pass
+                except asyncpg.UniqueViolationError:
+                    raise HTTPException(
+                        status_code=409, 
+                        detail="Image already associated with this case"
+                    )
+                except Exception:
+                    pass
 
             minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
-            fileUrl = f"{minioDomain}/{bucketName}/{targetFilename}"
+            parsedUrl = urlparse(minioDomain)
+            minioEndpoint = parsedUrl.netloc if parsedUrl.netloc else minioDomain
+            isSecure = parsedUrl.scheme == "https"
+            #Creation of presigned URL below
+            presign_client = Minio(
+                minioEndpoint, # External domain the browser uses
+                access_key=os.getenv("MINIO_ROOT_USER"),
+                secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
+                region=os.getenv("AWS_REGION"),
+                secure=isSecure
+            )
+
+            fileUrl = presign_client.presigned_get_object(
+                bucket_name=bucketName,
+                object_name=targetFilename,
+                expires=timedelta(hours=1)
+            )
 
             return{
                 "MediaId": str(mediaId),
@@ -205,6 +304,14 @@ class Case:
                 "url": fileUrl,
                 "Status": "existing" if existingMedia else "uploaded"
             }
+        
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Internal Server Error: {str(e)}"
+                )
 
         finally:
             await connection.close()

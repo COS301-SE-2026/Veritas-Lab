@@ -71,7 +71,7 @@ services:
     #         - app-network
 
     postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         environment:
             - POSTGRES_USER=${DB_USER}
             - POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -79,7 +79,7 @@ services:
         ports:
             - "5432:5432"
         volumes:
-            - postgres_data:/var/lib/postgresql/data
+            - postgres_data:/var/lib/postgresql
             - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/schema-users.sql
             - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/schema-cases.sql
             - ./Backend/app/database/seedingUsers.sql:/docker-entrypoint-initdb.d/seed-users.sql
