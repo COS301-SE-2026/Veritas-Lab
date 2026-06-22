@@ -584,3 +584,36 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
+
+def testCloseCaseMissingJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Missing Authorization header")
+    
+    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/closeCase", json={})
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing Authorization header"
+    }
+
+def testCloseCaseInvalidJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Invalid token")
+
+    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
