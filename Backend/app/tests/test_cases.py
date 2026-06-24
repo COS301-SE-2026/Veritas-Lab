@@ -687,12 +687,11 @@ def testCloseCaseNotFound(monkeypatch):
     assert response.status_code == 404
     assert response.json() == {
         "status": "error",
-        "message": "Case not found"
+        "message": "Case not found or user unauthorized."
     }
 
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
-    mock_connection.execute.assert_not_called()
     mock_connection.close.assert_called_once()
 
 def testCloseCaseNotCaseCreator(monkeypatch):
@@ -702,19 +701,10 @@ def testCloseCaseNotCaseCreator(monkeypatch):
             "username": "different_user",
             "role": "INVESTIGATOR"
         }
-    
-    fake_row = {
-        "caseid": "12345678-abcd-ef01-2345-6789abcdef01",
-        "casecreator": "original_creator",
-        "casename": "Flood in Durban",
-        "casereviews": "None",
-        "casedescription": "Flood investigation case",
-        "caseclosed": False,
-        "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
-    }
+
 
     mock_connection = AsyncMock()
-    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
+    mock_connection.fetchrow = AsyncMock(return_value=None)
     mock_connection.close = AsyncMock(return_value=None)
 
     mock_connect = AsyncMock(return_value=mock_connection)
@@ -728,15 +718,14 @@ def testCloseCaseNotCaseCreator(monkeypatch):
         headers={"Authorization": "Bearer fake-token"}
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
     assert response.json() == {
         "status": "error",
-        "message": "User unauthorized."
+        "message": "Case not found or user unauthorized."
     }
 
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
-    mock_connection.execute.assert_not_called()
     mock_connection.close.assert_called_once()
 
 def testCloseCaseSuccess(monkeypatch):
@@ -750,18 +739,11 @@ def testCloseCaseSuccess(monkeypatch):
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
-        "caseid": fake_case_id,
-        "casecreator": "investigator_user",
-        "casename": "Flood in Durban",
-        "casereviews": "None",
-        "casedescription": "Flood investigation case",
-        "caseclosed": False,
-        "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+        "caseid": fake_case_id
     }
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=fake_row)
-    mock_connection.execute = AsyncMock(return_value="UPDATE 1")
     mock_connection.close = AsyncMock(return_value=None)
 
     mock_connect = AsyncMock(return_value=mock_connection)
@@ -783,16 +765,17 @@ def testCloseCaseSuccess(monkeypatch):
 
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
-    mock_connection.execute.assert_called_once()
     mock_connection.close.assert_called_once()
 
-    execute_args = mock_connection.execute.call_args[0]
+    fetchrow_args = mock_connection.fetchrow.call_args[0]
 
-    assert "UPDATE" in execute_args[0]
-    assert "caseclosed = TRUE" in execute_args[0]
-    assert execute_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert "UPDATE" in fetchrow_args[0]
+    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casecreator = $2" in fetchrow_args[0]
+    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert fetchrow_args[2] == "investigator_user"
 
-def testCloseCaseSuccessAdminAsCreator(monkeypatch):
+def testCloseCaseSuccess(monkeypatch):
     def mock_verifyJWT(authorization):
         return {
             "sub": "mock-investigator-id",
@@ -803,18 +786,11 @@ def testCloseCaseSuccessAdminAsCreator(monkeypatch):
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
-        "caseid": fake_case_id,
-        "casecreator": "investigator_user",
-        "casename": "Flood in Durban",
-        "casereviews": "None",
-        "casedescription": "Flood investigation case",
-        "caseclosed": False,
-        "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+        "caseid": fake_case_id
     }
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=fake_row)
-    mock_connection.execute = AsyncMock(return_value="UPDATE 1")
     mock_connection.close = AsyncMock(return_value=None)
 
     mock_connect = AsyncMock(return_value=mock_connection)
@@ -836,11 +812,12 @@ def testCloseCaseSuccessAdminAsCreator(monkeypatch):
 
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
-    mock_connection.execute.assert_called_once()
     mock_connection.close.assert_called_once()
 
-    execute_args = mock_connection.execute.call_args[0]
+    fetchrow_args = mock_connection.fetchrow.call_args[0]
 
-    assert "UPDATE" in execute_args[0]
-    assert "caseclosed = TRUE" in execute_args[0]
-    assert execute_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert "UPDATE" in fetchrow_args[0]
+    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casecreator = $2" in fetchrow_args[0]
+    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert fetchrow_args[2] == "investigator_user"
