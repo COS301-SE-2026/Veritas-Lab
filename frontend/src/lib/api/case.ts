@@ -7,9 +7,10 @@ export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {
         const res = await fetch(`${API_BASE_URL}/api/getSingleCase`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                ...getAuthHeaders()
+ //               ...getAuthHeaders()
             },
             body: JSON.stringify({ CaseID: caseID })
         });
@@ -33,8 +34,9 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
 
         const res = await fetch(`${API_BASE_URL}/api/cases/evidence`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
-                ...getAuthHeaders()
+ //               ...getAuthHeaders()
             },
             body: formData
         });

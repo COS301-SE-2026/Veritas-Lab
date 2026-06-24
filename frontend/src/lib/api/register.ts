@@ -8,7 +8,7 @@ export async function register(username: string, email: string, password: string
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...getAuthHeaders()
+        //    ...getAuthHeaders()
         },
         body: JSON.stringify({ username, email, password })
     });

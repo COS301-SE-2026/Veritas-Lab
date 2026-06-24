@@ -8,13 +8,13 @@ const mockEvidenceFiles: File[] = [
 ];
 
 export default function useCase() {
-    const fetchCaseById = useCallback((caseId: string) => {
+    const fetchCaseById = (caseId: string) => {
         return fetchCase(caseId);
-    }, []);
+    };
 
-    const addCaseEvidence = useCallback(async (evidence: File, caseId: string) => {
+    const addCaseEvidence = async (evidence: File, caseId: string) => {
         return await submitEvidence(evidence, caseId);
-    }, []);
+    };
 
     return {
         fetchCase: fetchCaseById,

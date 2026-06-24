@@ -60,7 +60,7 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
         };
     }, [options.initialCases]);
 
-    const visibleCases = useMemo(() => {
+   
         const normalizedQuery = searchQuery.trim().toLowerCase();
 
         const filtered = cases.filter((item) => {
@@ -82,8 +82,7 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
             );
         });
 
-        return sortCases(filtered, sortKey);
-    }, [cases, searchQuery, sortKey, statusFilter]);
+        const visibleCases = sortCases(filtered, sortKey);
 
     return {
         searchQuery,

@@ -6,9 +6,10 @@ import type { LoginResponse } from '@/types/api';
 export async function login(email: string, password: string): Promise<LoginResponse> {
     const res = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
-            ...getAuthHeaders()
+       //     ...getAuthHeaders()
         },
         body: JSON.stringify({ email, password })
     });

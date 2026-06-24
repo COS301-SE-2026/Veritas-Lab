@@ -15,16 +15,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return localStorage.getItem('authToken');
     });
 
-    const setToken = useCallback((token: string | null) => {
+    const setToken = (token: string | null) => {
         if (token) {
             localStorage.setItem('authToken', token);
         } else {
             localStorage.removeItem('authToken');
         }
         setTokenState(token);
-    }, []);
+    };
 
-    const value = useMemo(() => ({ token, setToken }), [token, setToken]);
+    const value = { token, setToken };
 
     return (
         <AuthContext.Provider value={value}>
