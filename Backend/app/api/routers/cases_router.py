@@ -385,9 +385,14 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
     try:
         row = await connection.fetchrow(
             """
-            SELECT * FROM "Cases_DB"."Cases" WHERE caseid = $1
+            UPDATE "Cases_DB"."Cases"
+            SET caseclosed = TRUE
+            WHERE caseid = $1
+            AND casecreator = $2
+            RETURNING caseid
             """,
-            case_uuid
+            case_uuid,
+            payload.get("username")
         )
 
         if row is None:
@@ -395,27 +400,9 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "Case not found"
+                    "message": "Case not found or user unauthorized."
                 }
             )
-
-        if row["casecreator"] != payload.get("username"):
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "status": "error",
-                    "message": "User unauthorized."
-                }
-            )
-
-        await connection.execute(
-            """
-            UPDATE "Cases_DB"."Cases"
-            SET caseclosed = TRUE
-            WHERE caseid = $1
-            """,
-            case_uuid
-        )
 
         return JSONResponse(
             status_code=200,
