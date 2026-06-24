@@ -138,7 +138,7 @@ async def updateUserJWTIssued(email: str):
     finally:
         await connection.close()
 
-async def updateUserJWTIssuedViaUser(user: dict):
+async def update_user_jwt_issued_via_user(user: dict):
     connection = await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -695,7 +695,7 @@ async def refresh_token(authorization: str | None = Header(default=None)):
     new_token = createToken(user)
 
     try:
-        await updateUserJWTIssuedViaUser(user)
+        await update_user_jwt_issued_via_user(user)
     except Exception:
         return JSONResponse(
             status_code=500,
