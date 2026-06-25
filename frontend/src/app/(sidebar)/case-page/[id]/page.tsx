@@ -1,55 +1,49 @@
 'use client';
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+//import { getCookie } from '@/auth/cookie';
 import { useParams } from "next/navigation";
 import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
 import useCase from "@/lib/hooks/useCase";
+import { useUserRole } from '@/context/UserRoleContext';
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [userRole, setUserRole] = useState<'ADMIN' | 'INVESTIGATOR' | 'USER'>('USER');
-
+    const userRole = useUserRole();
     const params = useParams<{ id: string }>();
     const id = params.id;
 
-    const loadCase = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            setError(null);
-            const response = await fetchCase(id);
-            setCaseData(response);
-        } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : 'Failed to load case');
-        } finally {
-            setIsLoading(false);
-        }
+    useEffect(() => {
+        let isActive = true;
+
+        void (async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                const response = await fetchCase(id);
+
+                if (isActive) {
+                    setCaseData(response);
+                }
+            } catch (loadError) {
+                if (isActive) {
+                    setError(loadError instanceof Error ? loadError.message : 'Failed to load case');
+                }
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            isActive = false;
+        };
     }, [fetchCase, id]);
-
-    useEffect(() => {
-        void loadCase();
-    }, [loadCase]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const token = window.localStorage.getItem('authToken');
-
-        if (!token) {
-            setUserRole('USER');
-            return;
-        }
-
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            setUserRole((payload.role ?? 'USER') as 'ADMIN' | 'INVESTIGATOR' | 'USER');
-        } catch {
-            setUserRole('USER');
-        }
-    }, []);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const openModal = () => setIsModalOpen(true);
@@ -113,7 +107,20 @@ export default function CasePage() {
                 </div>
             </div>
             {canUploadEvidence ? (
-                <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={loadCase} />
+                <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={() => {
+                    void (async () => {
+                        try {
+                            setIsLoading(true);
+                            setError(null);
+                            const response = await fetchCase(id);
+                            setCaseData(response);
+                        } catch (loadError) {
+                            setError(loadError instanceof Error ? loadError.message : 'Failed to load case');
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    })();
+                }} />
             ) : null}
         </>
     );

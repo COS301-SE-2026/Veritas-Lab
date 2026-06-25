@@ -1,29 +1,19 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getCookie } from '@/auth/cookie';
 import Button from '@/components/ui/button';
 import DashboardBar from '@/components/common/dashboardBar';
 import CaseCard from '@/components/common/caseCard';
 import DashboardModal from '@/components/common/dashboardModal';
 import DashboardCards from '@/components/common/dashboardCards';
 import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
+import { useUserRole } from '@/context/UserRoleContext';
+//type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
+
 export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-    const getRoleFromToken = () => {
-        if (typeof window === 'undefined') return 'USER';
-        const token = window.localStorage.getItem('authToken');
-        if (!token) return 'USER';
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return (payload.role ?? 'USER') as 'ADMIN' | 'INVESTIGATOR' | 'USER';
-        } catch {
-            return 'USER';
-        }
-    };
-
-    const userRole = getRoleFromToken();
-
-    const{
+    const userRole = useUserRole();
+    const {
         searchQuery,
         setSearchQuery,
         statusFilter,
@@ -37,7 +27,7 @@ export default function Dashboard() {
         isLoading,
         error,
     } = useCaseDashboard({ initialRole: userRole });
-
+    
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
 
