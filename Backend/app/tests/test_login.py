@@ -38,7 +38,7 @@ def testSuccessfulLogin(monkeypatch):
 
     assert response.json() =={
         "status":"success",
-        "token": "mockedJWTToken"
+        "message":"Logged in successfully"
     }
 
 def testLoginIncorrectPassword(monkeypatch):
