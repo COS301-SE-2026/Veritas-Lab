@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { fetchCases as fetchDashboardCases } from '@/lib/api/dashboard';
 import type { CaseStatus, CaseSummary, SortKey, StatusFilter, UseCaseDashboardOptions, UserRole } from '@/types/hooks';
 
@@ -24,7 +24,6 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
     const [isLoading, setIsLoading] = useState(!options.initialCases);
     const [error, setError] = useState<string | null>(null);
     const cases = options.initialCases ?? fetchedCases;
-
     const isMounted = useRef(true);
 
     const loadCases = async () => {
@@ -53,10 +52,32 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
             return;
         }
 
-        void loadCases();
+        let isActive = true;
+
+        void (async () => {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const dashboardCases = await fetchDashboardCases();
+
+                if (isActive) {
+                    setFetchedCases(dashboardCases);
+                }
+            } catch (loadError) {
+                if (isActive) {
+                    setError(loadError instanceof Error ? loadError.message : 'Failed to load cases');
+                }
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                }
+            }
+        })();
 
         return () => {
             isMounted.current = false;
+            isActive = false;
         };
     }, [options.initialCases]);
 
