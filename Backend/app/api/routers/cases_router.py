@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.core.cases import Case
@@ -74,9 +74,9 @@ def _format_case_evidence(row: dict) -> dict:
     }
 
 @router.post("/createCase")
-async def create_case(request: CreateCaseRequest, authorization: str | None = Header(default=None)):
+async def create_case(case_request: CreateCaseRequest, request: Request):
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -96,7 +96,7 @@ async def create_case(request: CreateCaseRequest, authorization: str | None = He
         )
 
     try:
-        case = Case(CaseName=request.title, CaseCreator=payload["username"], CaseDescription=request.description)
+        case = Case(CaseName=case_request.title, CaseCreator=payload["username"], CaseDescription=case_request.description)
     except ValueError as e:
         return JSONResponse(
             status_code=400,
@@ -117,9 +117,9 @@ async def create_case(request: CreateCaseRequest, authorization: str | None = He
     )
 
 @router.post("/getCases")
-async def get_cases(request:dict,authorization: str | None = Header(default=None)):
+async def get_cases(request: Request):
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -185,9 +185,9 @@ async def get_cases(request:dict,authorization: str | None = Header(default=None
         await connection.close()
     
 @router.post("/getSingleCase")
-async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | None = Header(default=None)):
+async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -207,7 +207,7 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
     #         }
     #     )
     
-    if not request.CaseID:
+    if not case_request.CaseID:
         return JSONResponse(
             status_code=400,
             content={
@@ -217,7 +217,7 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
         )
 
     try:
-        case_id = UUID(request.CaseID)
+        case_id = UUID(case_request.CaseID)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -302,9 +302,9 @@ async def getSingleCase(request: CreateSingleCaseRequest,authorization: str | No
 
 
 @router.post("/cases/evidence")
-async def upload_evidence(case_id: str = Form(...), media: UploadFile = File(...), authorization: str | None = Header(default=None)):
+async def upload_evidence(request: Request, case_id: str = Form(...), media: UploadFile = File(...)):
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
