@@ -7,9 +7,10 @@ export async function fetchCases(): Promise<DashboardCase[]> {
 	try {
 		const res = await fetch(`${API_BASE_URL}/api/getCases`, {
 			method: 'POST',
+			 credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
-				...getAuthHeaders(),
+		//		...getAuthHeaders(),
 			},
 			body: JSON.stringify({})
 		});
@@ -31,9 +32,10 @@ export async function createCase(title: string, description?: string): Promise<{
 	try {
 		const res = await fetch(`${API_BASE_URL}/api/createCase`, {
 			method: 'POST',
+			 credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
-				...getAuthHeaders(),
+	//			...getAuthHeaders(),
 			},
 			body: JSON.stringify({ title, description }),
 		});

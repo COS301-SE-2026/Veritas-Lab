@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Response, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re as regex
@@ -20,23 +20,28 @@ DB_NAME= env.getRequiredEnv("DB_NAME")
 SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
+COOKIE_NAME = "JWT_token"
 
 router = APIRouter(
     prefix="/api",
     tags=["Auth"]
 )
 
-def verifyJWT(authorizationHeader: str) -> dict:
-    if authorizationHeader is None or authorizationHeader.strip() == "":
-        raise ValueError("Missing Authorization header")
+def verifyJWT(request: Request) -> dict:
+    #if authorizationHeader is None or authorizationHeader.strip() == "":
+    #    raise ValueError("Missing Authorization header")
 
-    if not authorizationHeader.startswith("Bearer "):
-        raise ValueError("Invalid Authorization header format")
+    #if not authorizationHeader.startswith("Bearer "):
+    #    raise ValueError("Invalid Authorization header format")
 
-    token = authorizationHeader.replace("Bearer ", "", 1).strip()
+    ## token = authorizationHeader.replace("Bearer ", "", 1).strip()
+    #token = 
+    #if token == "":
+    #    raise ValueError("Missing JWT token")
 
-    if token == "":
-        raise ValueError("Missing JWT token")
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise ValueError("Not authenticated")
 
     try:
         payload = jwt.decode(
@@ -292,7 +297,7 @@ def createToken(user: dict) ->str:
 
 # POST /api/login
 @router.post("/login")
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, response: Response):
     if not validateEmail(request.email):
         return JSONResponse(
             status_code=400,
@@ -335,9 +340,18 @@ async def login(request: LoginRequest):
 
     await updateUserJWTIssued(user["email"])
 
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=1800
+    )
+
     return {
         "status" : "success",
-        "token" : token
+        "message" : "Logged in successfully"
     }
 
 # POST /api/register
@@ -404,11 +418,11 @@ async def register(request: RegisterRequest):
     )
 
 @router.post("/fetchUsers")
-async def fetchUsers(request: dict,authorization: str | None = Header(default=None)):
+async def fetchUsers(request: Request):
     connection = None
 
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
 
         if payload.get("role") != "ADMIN":
             return JSONResponse(
@@ -464,12 +478,12 @@ async def fetchUsers(request: dict,authorization: str | None = Header(default=No
 
 @router.post("/changeUserRole")
 async def changeUserRole(
-    request: ChangeRoleRequest,
-    authorization: str = Header(...)
+    changeRoleRequest: ChangeRoleRequest,
+    request: Request
 ):
     connection = None
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -488,7 +502,7 @@ async def changeUserRole(
             }
         )
 
-    if payload.get("sub") == request.userId:
+    if payload.get("sub") == changeRoleRequest.userId:
         return JSONResponse(
             status_code=403,
             content={
@@ -497,8 +511,8 @@ async def changeUserRole(
            }
       )
 
-    user_id = request.userId
-    newRole = request.NewRole
+    user_id = changeRoleRequest.userId
+    newRole = changeRoleRequest.NewRole
 
     if not user_id or not newRole:
         return JSONResponse(
@@ -557,10 +571,10 @@ async def changeUserRole(
             await connection.close()
             await connection.close()#Allows a loggged in ADMIN to permanently delete another user by UUID
 @router.delete("/users/{userId}")
-async def deleteUser(userId: str, authorization: str | None = Header(default=None)):
+async def deleteUser(userId: str, request: Request):
     try:
         #Verify the JWT for security
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
 
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
@@ -608,20 +622,13 @@ async def deleteUser(userId: str, authorization: str | None = Header(default=Non
         )
 
 @router.post("/refreshToken")
-async def refresh_token(authorization: str | None = Header(default=None)):
-    if authorization is None or authorization.strip() == "":
+async def refresh_token(request: Request, response: Response):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Missing Authorization header"}
+            content={"status": "error", "message": "Not authenticated"}
         )
-
-    if not authorization.startswith("Bearer "):
-        return JSONResponse(
-            status_code=401,
-            content={"status": "error", "message": "Invalid Authorization header format"}
-        )
-
-    token = authorization.replace("Bearer ", "", 1).strip()
 
     if token == "":
         return JSONResponse(
@@ -704,12 +711,20 @@ async def refresh_token(authorization: str | None = Header(default=None)):
                 "message": "Failed to update token issue time"
             }
         )
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=new_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=1800
+    )
     
     return JSONResponse(
         status_code=200,
         content={
             "status":"success",
-            "message":"Token refreshed",
-            "token": new_token
+            "message":"Token refreshed"
         }
     )
