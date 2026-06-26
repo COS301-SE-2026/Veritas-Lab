@@ -622,20 +622,13 @@ async def deleteUser(userId: str, request: Request):
         )
 
 @router.post("/refreshToken")
-async def refresh_token(authorization: str | None = Header(default=None)):
-    if authorization is None or authorization.strip() == "":
+async def refresh_token(request: Request, response: Response):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Missing Authorization header"}
+            content={"status": "error", "message": "Not authenticated"}
         )
-
-    if not authorization.startswith("Bearer "):
-        return JSONResponse(
-            status_code=401,
-            content={"status": "error", "message": "Invalid Authorization header format"}
-        )
-
-    token = authorization.replace("Bearer ", "", 1).strip()
 
     if token == "":
         return JSONResponse(
@@ -718,12 +711,20 @@ async def refresh_token(authorization: str | None = Header(default=None)):
                 "message": "Failed to update token issue time"
             }
         )
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=new_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=1800
+    )
     
     return JSONResponse(
         status_code=200,
         content={
             "status":"success",
-            "message":"Token refreshed",
-            "token": new_token
+            "message":"Token refreshed"
         }
     )
