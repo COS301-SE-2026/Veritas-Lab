@@ -31,7 +31,6 @@ class CreateCaseRequest(BaseModel):
 class CreateSingleCaseRequest(BaseModel):
     CaseID: str | None = None
 
-
 def _format_case_evidence(row: dict) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
@@ -374,3 +373,69 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
     finally:
         await connection.close()
 
+@router.post("/closeCase")
+async def close_case(request: CreateSingleCaseRequest, authorization: str | None = Header(default=None)):
+    try:
+        payload = verifyJWT(authorization)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "User unauthorized"}
+        )
+    
+    try:
+        case_uuid = UUID(request.CaseID)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400, 
+            content={
+                "status": "error", 
+                "message": "Invalid CaseID"
+            }
+        )
+        
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."Cases"
+            SET caseclosed = TRUE
+            WHERE caseid = $1
+            AND casecreator = $2
+            RETURNING caseid
+            """,
+            case_uuid,
+            payload.get("username")
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found or user unauthorized."
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Case closed successfully."
+            }
+        )
+    finally:
+        await connection.close()

@@ -591,3 +591,283 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
+
+def testCloseCaseMissingJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Missing Authorization header")
+    
+    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/closeCase", json={})
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing Authorization header"
+    }
+
+def testCloseCaseInvalidJWT(monkeypatch):
+    def mock_verifyJWT(authorization):
+        raise ValueError("Invalid token")
+
+    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
+def testCloseCaseUserUnauthorized(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role":"USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status" :"error",
+        "message": "User unauthorized"
+    }
+
+def testCloseCaseInvalidCaseID(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "not-a-valid-uuid"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid CaseID"
+    }
+
+def testCloseCaseNotFound(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+    
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=None)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found or user unauthorized."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+def testCloseCaseNotCaseCreator(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "different_user",
+            "role": "INVESTIGATOR"
+        }
+
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=None)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found or user unauthorized."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+def testCloseCaseSuccess(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR",
+        }
+    
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    fake_row = {
+        "caseid": fake_case_id
+    }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": fake_case_id},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Case closed successfully."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+    fetchrow_args = mock_connection.fetchrow.call_args[0]
+
+    assert "UPDATE" in fetchrow_args[0]
+    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casecreator = $2" in fetchrow_args[0]
+    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert fetchrow_args[2] == "investigator_user"
+
+def testCloseCaseSuccess(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "ADMIN",
+        }
+    
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    fake_row = {
+        "caseid": fake_case_id
+    }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": fake_case_id},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Case closed successfully."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+    fetchrow_args = mock_connection.fetchrow.call_args[0]
+
+    assert "UPDATE" in fetchrow_args[0]
+    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casecreator = $2" in fetchrow_args[0]
+    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert fetchrow_args[2] == "investigator_user"
+
+def test_close_case_admin_not_case_creator(monkeypatch):
+    def mock_verifyJWT(authorization):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+    
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=None)
+    mock_connection.close = AsyncMock(return_value=None)
+
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/closeCase",
+        json={"CaseID": fake_case_id},
+        headers={"Authorization": "Bearer fake-token"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found or user unauthorized."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+    fetchrow_args = mock_connection.fetchrow.call_args[0]
+
+    assert "UPDATE" in fetchrow_args[0]
+    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casecreator = $2" in fetchrow_args[0]
+    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
+    assert fetchrow_args[2] == "admin_user"

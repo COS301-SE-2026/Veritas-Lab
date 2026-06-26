@@ -143,6 +143,26 @@ async def updateUserJWTIssued(email: str):
     finally:
         await connection.close()
 
+async def update_user_jwt_issued_via_user(user: dict):
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+    try:
+        await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userjwtissued = NOW()
+            WHERE userid = $1
+            """,
+            user["id"]
+        )
+    finally:
+        await connection.close()
+
 # Once the envs are setup this will need to be updated
 async def searchUsersViaEmail(email:str):
     connection = await asyncpg.connect(
@@ -600,3 +620,110 @@ async def deleteUser(userId: str, request: Request):
             status_code = 401,
             content = {"status": "error", "message": str(e)}
         )
+
+@router.post("/refreshToken")
+async def refresh_token(authorization: str | None = Header(default=None)):
+    if authorization is None or authorization.strip() == "":
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": "Missing Authorization header"}
+        )
+
+    if not authorization.startswith("Bearer "):
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": "Invalid Authorization header format"}
+        )
+
+    token = authorization.replace("Bearer ", "", 1).strip()
+
+    if token == "":
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": "Missing JWT token"}
+        )
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+    except ExpiredSignatureError:
+        #I can make a new token here
+        try:
+            payload = jwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=[ALGORITHM],
+                options={"verify_exp": False}
+            )
+        except JWTError:
+            return JSONResponse(
+                status_code=401,
+                content={"status": "error", "message": "Invalid token"}
+            )
+
+    except JWTError:
+        return JSONResponse(
+                status_code=401,
+                content={"status": "error", "message": "Invalid token"}
+            )
+    
+    expiry = payload.get("exp")
+
+    if expiry is None:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": "Token missing expiry"}
+        )
+
+    current_time = datetime.now(timezone.utc).timestamp()
+    seconds_until_expiry = expiry - current_time
+
+    if seconds_until_expiry > 60:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Token does not need refreshing"
+            }
+        )
+    
+    if "sub" not in payload or "username" not in payload or "role" not in payload:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": "Token missing required fields"
+            }
+        )
+    
+    user = {
+        "id":payload["sub"],
+        "username": payload["username"],
+        "role": payload["role"]
+    }
+
+    new_token = createToken(user)
+
+    try:
+        await update_user_jwt_issued_via_user(user)
+    except Exception:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message": "Failed to update token issue time"
+            }
+        )
+    
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status":"success",
+            "message":"Token refreshed",
+            "token": new_token
+        }
+    )
