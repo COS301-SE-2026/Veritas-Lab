@@ -31,6 +31,9 @@ class CreateCaseRequest(BaseModel):
 class CreateSingleCaseRequest(BaseModel):
     CaseID: str | None = None
 
+class UpdateCommentRequest(BaseModel):
+    comment: str
+
 def _format_case_evidence(row: dict) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
@@ -435,6 +438,79 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
             content={
                 "status": "success",
                 "message": "Case closed successfully."
+            }
+        )
+    finally:
+        await connection.close()
+
+
+@router.post("/editComment/case/{case_id}/comment/{comment_id}")
+async def update_comment(
+    case_id: str,
+    comment_id: int,
+    update_data: UpdateCommentRequest,
+    authorization: str = Header(...)
+):
+    try:
+        payload = verifyJWT(authorization)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    #verify the username 
+    requester_name=payload["username"]
+
+    try:
+        case_uuid = UUID(case_id)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400, 
+            content={
+                "status": "error", 
+                "message": "Invalid CaseID"
+            }
+        )
+
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."Comments"
+            SET Comment = $3
+            WHERE caseid = $1
+            AND username = $2
+            AND commentid = $4
+            RETURNING commentid
+            """,
+            case_uuid,
+            payload.get("username"),
+            update_data.comment,
+            comment_id
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found or user unauthorized."
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Comment edit successfully."
             }
         )
     finally:
