@@ -196,16 +196,6 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             }
         )
     
-    #this should not be here as any user type can clikc on one case
-    # if payload.get("role") == "USER":
-    #     return JSONResponse(
-    #         status_code=403,
-    #         content={
-    #             "status": "error",
-    #             "message": "User unauthorized"
-    #         }
-    #     )
-    
     if not case_request.CaseID:
         return JSONResponse(
             status_code=400,
@@ -295,7 +285,14 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "evidence": [_format_case_evidence(row) for row in evidence_rows]
             }
         )
-
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
     finally:
         await connection.close()
 
