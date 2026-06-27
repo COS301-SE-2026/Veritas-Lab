@@ -222,7 +222,7 @@ def test_ChangeUserRoleNotAdmin(monkeypatch):
         "message": "User unauthorized"
     }
 
-def test_ChangeUserRoleNoUser(monkeypatch):
+def test_change_user_role_no_user(monkeypatch):
     class MockConnection:
         async def execute(self, query, *args):
             return "UPDATE 0"
@@ -246,7 +246,7 @@ def test_ChangeUserRoleNoUser(monkeypatch):
     response = client.post(
         "/api/changeUserRole",
         json={
-            "userId": "nonexistent-user-id",
+            "userId": "12345678-abcd-ef01-2345-6789abcdef01",
             "NewRole": "INVESTIGATOR"
         },
         headers={
@@ -293,8 +293,9 @@ def test_ChangeUserRoleInvalidRole(monkeypatch):
         "message": "Invalid or missing NewRole field."
     }
 
-def test_AdminCannotChangeSelf(monkeypatch):
+def test_admin_cannot_change_self(monkeypatch):
     """Test that the admin cannot change their own role"""
+    
     class MockConnection:
         async def execute(self, query, *args):
             return "UPDATE 1"
@@ -322,9 +323,6 @@ def test_AdminCannotChangeSelf(monkeypatch):
         json={
             "userId": admin_id,
             "NewRole": "USER"
-        },
-        headers={
-            "Authorization": "Bearer valid-token"
         }
     )
 
