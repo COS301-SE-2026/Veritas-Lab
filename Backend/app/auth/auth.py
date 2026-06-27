@@ -594,6 +594,7 @@ async def deleteUser(userId: str, request: Request):
     try:
         #Verify the JWT for security
         payload = verifyJWT(request)
+        userId = userId.strip()
 
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
@@ -610,16 +611,25 @@ async def deleteUser(userId: str, request: Request):
             )
 
         #An admin cannot delete themselves
-        callerId = payload["sub"]
-        if callerId == userId.strip():
+        callerId = payload.get("sub")
+        if callerId == userId:
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
             )
 
         #Now delete
-        deleted = await deleteUserById(userId.strip())
-
+        try:
+            deleted = await deleteUserById(userId)
+        except asyncpg.PostgresError:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status":"error",
+                    "message":"Database error"
+                }
+            )
+        
         #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
         if not deleted:
             return JSONResponse(
