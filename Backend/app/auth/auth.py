@@ -502,15 +502,6 @@ async def changeUserRole(
             }
         )
 
-    if payload.get("sub") == changeRoleRequest.userId:
-        return JSONResponse(
-            status_code=403,
-            content={
-                "status": "error",
-               "message": "Not allowed to change own role"
-           }
-      )
-
     user_id = changeRoleRequest.userId
     newRole = changeRoleRequest.NewRole
 
@@ -523,6 +514,17 @@ async def changeUserRole(
             }
         )
 
+    try:
+        user_id = uuidlib.UUID(user_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status":"error",
+                "message":"Invalid userId format."
+            }
+        )
+
     if newRole not in ["USER", "ADMIN", "INVESTIGATOR"]:
         return JSONResponse(
             status_code=400,
@@ -532,6 +534,15 @@ async def changeUserRole(
             }
         )
 
+    if payload.get("sub") == str(user_id):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+               "message": "Not allowed to change own role"
+           }
+        )
+    
     try:
         connection = await asyncpg.connect(
             user=DB_USER,
@@ -566,15 +577,24 @@ async def changeUserRole(
                 "message": f"User role updated to {newRole} successfully"
             }
         )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
     finally:
         if connection is not None:
             await connection.close()
-            await connection.close()#Allows a loggged in ADMIN to permanently delete another user by UUID
+
 @router.delete("/users/{userId}")
 async def deleteUser(userId: str, request: Request):
     try:
         #Verify the JWT for security
         payload = verifyJWT(request)
+        userId = userId.strip()
 
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
@@ -591,16 +611,25 @@ async def deleteUser(userId: str, request: Request):
             )
 
         #An admin cannot delete themselves
-        callerId = payload["sub"]
-        if callerId == userId.strip():
+        callerId = payload.get("sub")
+        if callerId == userId:
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
             )
 
         #Now delete
-        deleted = await deleteUserById(userId.strip())
-
+        try:
+            deleted = await deleteUserById(userId)
+        except asyncpg.PostgresError:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status":"error",
+                    "message":"Database error"
+                }
+            )
+        
         #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
         if not deleted:
             return JSONResponse(
@@ -712,7 +741,15 @@ async def refresh_token(request: Request, response: Response):
             }
         )
 
-    response.set_cookie(
+    final_response = JSONResponse(
+        status_code=200,
+        content={
+            "status":"success",
+            "message": "Token refreshed"
+        }
+    )
+
+    final_response.set_cookie(
         key=COOKIE_NAME,
         value=new_token,
         httponly=True,
@@ -721,10 +758,4 @@ async def refresh_token(request: Request, response: Response):
         max_age=1800
     )
     
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status":"success",
-            "message":"Token refreshed"
-        }
-    )
+    return final_response
