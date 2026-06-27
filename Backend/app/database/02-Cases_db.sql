@@ -35,8 +35,15 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Reports"(
     ImageTitle Text,
     ReportArtifacts JSONB,
     ReportFindings TEXT,
-    ReportComments TEXT,
     ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Comments"(
+    CommentID BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    CaseId UUID NOT NULL REFERENCES "Cases_DB"."Cases"(CaseId) ON DELETE CASCADE ON UPDATE CASCADE,
+    Username varchar(100) NOT NULL,
+    Comment TEXT,
+    CommentTimestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 create UNIQUE INDEX CaseImage ON "Cases_DB"."Reports"(CaseId, ImageId);
