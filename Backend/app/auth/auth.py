@@ -741,7 +741,15 @@ async def refresh_token(request: Request, response: Response):
             }
         )
 
-    response.set_cookie(
+    final_response = JSONResponse(
+        status_code=200,
+        content={
+            "status":"success",
+            "message": "Token refreshed"
+        }
+    )
+
+    final_response.set_cookie(
         key=COOKIE_NAME,
         value=new_token,
         httponly=True,
@@ -750,10 +758,4 @@ async def refresh_token(request: Request, response: Response):
         max_age=1800
     )
     
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status":"success",
-            "message":"Token refreshed"
-        }
-    )
+    return final_response
