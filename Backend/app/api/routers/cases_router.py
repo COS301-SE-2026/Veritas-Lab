@@ -449,18 +449,16 @@ async def update_comment(
     case_id: str,
     comment_id: int,
     update_data: UpdateCommentRequest,
-    authorization: str = Header(...)
+    request: Request
 ):
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
             content={"status": "error", "message": str(e)}
         )
 
-    #verify the username 
-    requester_name=payload["username"]
 
     try:
         case_uuid = UUID(case_id)
