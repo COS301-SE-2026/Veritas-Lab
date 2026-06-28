@@ -148,7 +148,7 @@ def test_delete_comment_database_error(monkeypatch):
         "message": "Database error"
     }
 
-def test_delete_comment_invalid_comment_id_type(monkeypatch):
+def test_delete_comment_invalid_comment_id_type():
     client.cookies.clear()
 
     response = client.delete("/api/deleteComment/comment/not-an-int")
@@ -187,3 +187,48 @@ def test_delete_comment_uses_comment_id_and_username(monkeypatch):
     assert fetchrow_args[1] == 5
     assert fetchrow_args[2] == "Normal User"
 
+def test_delete_comment_closes_connection_on_success(monkeypatch):
+    client.cookies.clear()
+
+    mock_connection = MockConnectionSuccess()
+
+    async def mock_connect_same_connection(*args, **kwargs):
+        return mock_connection
+    
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_same_connection)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 200
+    mock_connection.close.assert_awaited_once()
+
+def test_delete_comment_closes_connection_on_database_error(monkeypatch):
+    client.cookies.clear()
+
+    mock_connection = MockConnectionDatabaseError()
+
+    async def mock_connect_same_connection(*args, **kwargs):
+        return mock_connection
+    
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_same_connection)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 500
+    mock_connection.close.assert_awaited_once()
