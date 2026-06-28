@@ -30,7 +30,6 @@ def test_update_comment_success(monkeypatch):
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/7",
         json={"comment": "Updated findings after verification"},
-        headers={"Authorization": "Bearer valid-token"}
     )
 
     assert response.status_code == 200
@@ -49,7 +48,6 @@ def test_update_comment_invalid_token_returns_401(monkeypatch):
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/7",
         json={"comment": "Edited comment"},
-        headers={"Authorization": "Bearer invalid-token"}
     )
 
     assert response.status_code == 401
@@ -72,7 +70,6 @@ def test_update_comment_invalid_case_id_returns_400(monkeypatch):
     response = client.post(
         "/api/editComment/case/not-a-valid-uuid/comment/7",
         json={"comment": "Edited comment"},
-        headers={"Authorization": "Bearer valid-token"}
     )
 
     assert response.status_code == 400
@@ -106,7 +103,6 @@ def test_update_comment_not_found_returns_404(monkeypatch):
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/404",
         json={"comment": "Edited comment"},
-        headers={"Authorization": "Bearer valid-token"}
     )
 
     assert response.status_code == 404
