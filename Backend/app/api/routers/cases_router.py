@@ -162,7 +162,6 @@ async def get_cases(request: Request):
             case = Case(
                 CaseCreator=row["casecreator"],
                 CaseName=row["casename"],
-                CaseReviews=row["casereviews"],
                 CaseDescription=row["casedescription"]
             )
 
@@ -256,7 +255,6 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
         case = Case(
             CaseCreator=row["casecreator"],
             CaseName=row["casename"],
-            CaseReviews=row["casereviews"],
             CaseDescription=row["casedescription"]
         )
 
@@ -348,7 +346,6 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         case = Case(
             CaseCreator=row["casecreator"],
             CaseName=row["casename"],
-            CaseReviews=row["casereviews"],
             CaseDescription=row["casedescription"]
         )
 
