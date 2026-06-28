@@ -88,26 +88,12 @@ def test_CaseStoresDescription():
 
     assert case.CaseDescription == "This is a test description"
 
-def test_CaseStoresReviews():
-    reviews = {
-        "reviewer": "admin",
-        "status": "pending"
-    }
-
-    case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case",
-        CaseReviews=reviews
-    )
-
-    assert case.CaseReviews == reviews
 
 def test_CaseToJSONBeforeCreate():
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
         CaseDescription="This is a test description",
-        CaseReviews={"status": "pending"}
     )
 
     result = case.toJSON()
@@ -116,7 +102,6 @@ def test_CaseToJSONBeforeCreate():
         "caseId": None,
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
-        "caseReviews": {"status": "pending"},
         "caseDescription": "This is a test description",
         "caseClosed": False,
         "caseCreationDate": None
@@ -127,7 +112,6 @@ def test_CaseToJSONAfterCreateValuesSet():
         CaseCreator="alice_dev",
         CaseName="Test Case",
         CaseDescription="This is a test description",
-        CaseReviews={"reviewer": "admin", "status": "approved"}
     )
 
     case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
@@ -140,7 +124,6 @@ def test_CaseToJSONAfterCreateValuesSet():
         "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
-        "caseReviews": {"reviewer": "admin", "status": "approved"},
         "caseDescription": "This is a test description",
         "caseClosed": True,
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
@@ -156,7 +139,6 @@ def test_CaseToJSONWithNoDescriptionOrReviews():
         "caseId": None,
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
-        "caseReviews": None,
         "caseDescription": None,
         "caseClosed": False,
         "caseCreationDate": None
@@ -198,7 +180,6 @@ async def test_CreateCaseWithMock(mock_connect):
     assert params == (
         case.CaseCreator,
         case.CaseName,
-        None,
         case.CaseDescription,
         case.CaseClosed
     )
@@ -263,7 +244,6 @@ def testGetCasesAdminReturnsCases(monkeypatch):
             "caseid": "12345678-abcd-ef01-2345-6789abcdef01",
             "casecreator": "admin_user",
             "casename": "Flood in Durban",
-            "casereviews": None,
             "casedescription": "Flood investigation case",
             "caseclosed": False,
             "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
@@ -272,7 +252,6 @@ def testGetCasesAdminReturnsCases(monkeypatch):
             "caseid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             "casecreator": "investigator_user",
             "casename": "Fake Evidence Case",
-            "casereviews": {"status": "pending"},
             "casedescription": "Media verification case",
             "caseclosed": False,
             "casecreationdate": datetime(2026, 5, 21, 10, 30, 0, tzinfo=timezone.utc)
@@ -305,7 +284,6 @@ def testGetCasesAdminReturnsCases(monkeypatch):
         "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
         "caseName": "Flood in Durban",
         "caseCreator": "admin_user",
-        "caseReviews": None,
         "caseDescription": "Flood investigation case",
         "caseClosed": False,
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
@@ -315,7 +293,6 @@ def testGetCasesAdminReturnsCases(monkeypatch):
         "caseId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         "caseName": "Fake Evidence Case",
         "caseCreator": "investigator_user",
-        "caseReviews": {"status": "pending"},
         "caseDescription": "Media verification case",
         "caseClosed": False,
         "caseCreationDate": "2026-05-21T10:30:00+00:00"
@@ -464,7 +441,7 @@ def testGetSingleCaseNotFound(monkeypatch):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testGetSingleCaseAdminReturnsCase(monkeypatch):
+def test_get_single_case_admin_returns_case(monkeypatch):
     def mock_verifyJWT(authorization):
         return {
             "sub": "mock-admin-id",
@@ -481,7 +458,6 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
         "caseid": fake_case_id,
         "casecreator": "admin_user",
         "casename": "Flood in Durban",
-        "casereviews": {"status": "pending"},
         "casedescription": "Flood investigation case",
         "caseclosed": False,
         "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
@@ -511,7 +487,6 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
             "caseId": fake_case_id,
             "caseName": "Flood in Durban",
             "caseCreator": "admin_user",
-            "caseReviews": {"status": "pending"},
             "caseDescription": "Flood investigation case",
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
@@ -565,7 +540,6 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
             "caseId": fake_case_id,
             "caseName": "Flood in Durban",
             "caseCreator": "admin_user",
-            "caseReviews": {"status": "pending"},
             "caseDescription": "Flood investigation case",
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
