@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.core.cases import Case
@@ -439,3 +439,62 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
         )
     finally:
         await connection.close()
+
+@router.delete("/deleteComment/comment/{comment_id}")
+async def delete_comment(request: Request, comment_id: int):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+    
+    connection = None
+    try:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        row = await connection.fetchrow(
+            """
+            DELETE FROM "Cases_DB"."Comments"
+            WHERE commentid = $1
+            AND username = $2
+            RETURNING commentid
+            """,
+            comment_id,
+            payload.get("username")
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status":"error",
+                    "message": "Comment not found or user unauthorized"
+                }
+            )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Comment deleted successfully."
+            }
+        )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
+    finally:
+        if connection is not None:
+            await connection.close()
