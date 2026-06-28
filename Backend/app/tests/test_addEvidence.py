@@ -13,7 +13,7 @@ from starlette.datastructures import UploadFile
 @patch("asyncpg.connect")
 @patch("app.core.cases.Minio")
 @patch("uuid.uuid4")
-async def test_imagesUploadSuccess(mockUuid, mockMinioClass, mockDbConnect):
+async def test_images_Upload_Success(mockUuid, mockMinioClass, mockDbConnect):
     """
     Test successful evidence processing and extension identification
     """
