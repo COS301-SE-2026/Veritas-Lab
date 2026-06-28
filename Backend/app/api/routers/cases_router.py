@@ -470,16 +470,15 @@ async def update_comment(
                 "message": "Invalid CaseID"
             }
         )
-
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
-
     try:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Comments"
@@ -511,5 +510,13 @@ async def update_comment(
                 "message": "Comment edit successfully."
             }
         )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
+
     finally:
         await connection.close()
