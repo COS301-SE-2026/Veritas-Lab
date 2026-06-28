@@ -26,7 +26,7 @@ class MockConnectionDatabaseError:
 async def mock_connect_success(*args, **kwargs):
     return MockConnectionSuccess()
 
-async def mock_connect_no_rows(*args, **kwargs):
+async def mock_connect_no_row(*args, **kwargs):
     return MockConnectionNoRow()
 
 async def mock_connect_database_error(*args, **kwargs):
@@ -53,4 +53,78 @@ def test_delete_comment_success(monkeypatch):
         "message": "Comment deleted successfully."
     }
 
+def test_delete_comment_invalid_jwt(monkeypatch):
+    client.cookies.clear()
 
+    def mock_verifyJWT(request):
+        raise ValueError("Invalid token")
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
+def test_delete_comment_missing_jwt_cookie(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        raise ValueError("Missing authentication cookie")
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing authentication cookie"
+    }
+
+def test_delete_comment_not_found(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_no_row)
+
+    response = client.delete("/api/deleteComment/comment/999")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Comment not found or user unauthorized"
+    }
+
+def test_delete_comment_unauthorized_user(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "other-user-id",
+            "username": "Different User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_no_row)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Comment not found or user unauthorized"
+    }
+
+    
