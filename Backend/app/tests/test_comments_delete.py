@@ -127,4 +127,63 @@ def test_delete_comment_unauthorized_user(monkeypatch):
         "message": "Comment not found or user unauthorized"
     }
 
+def test_delete_comment_database_error(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_database_error)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "status": "error",
+        "message": "Database error"
+    }
+
+def test_delete_comment_invalid_comment_id_type(monkeypatch):
+    client.cookies.clear()
+
+    response = client.delete("/api/deleteComment/comment/not-an-int")
+
+    assert response.status_code == 422
+
+def test_delete_comment_uses_comment_id_and_username(monkeypatch):
+    client.cookies.clear()
+
+    mock_connection = MockConnectionSuccess()
+    async def mock_connect_same_connection(*args, **kwargs):
+        return mock_connection
     
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "Normal User",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_same_connection)
+
+    response = client.delete("/api/deleteComment/comment/5")
+
+    assert response.status_code == 200
+
+    fetchrow_args = mock_connection.fetchrow.call_args[0]
+
+    assert "DELETE FROM" in fetchrow_args[0]
+    assert '"Cases_DB"."Comments"' in fetchrow_args[0]
+    assert "commentid = $1" in fetchrow_args[0]
+    assert "username = $2" in fetchrow_args[0]
+    assert "RETURNING commentid" in fetchrow_args[0]
+
+    assert fetchrow_args[1] == 5
+    assert fetchrow_args[2] == "Normal User"
+
