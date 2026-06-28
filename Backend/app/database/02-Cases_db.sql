@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseName varchar(255) NOT NULL,
     CaseCreator varchar(100) NOT NULL, -- A case has to have a creator 
     CaseDescription TEXT,
+    ReportComments TEXT,
     CaseClosed boolean NOT NULL DEFAULT FALSE,
     CaseCreationDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
