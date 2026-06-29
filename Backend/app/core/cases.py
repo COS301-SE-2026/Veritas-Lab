@@ -24,25 +24,33 @@ DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 
-# If the CaseId is None then the case is not in the db. You may call create().
-# When the CaseId is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
+# If the case_id is None then the case is not in the db. You may call create().
+# When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 
 class Case:
-    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseDescription: str=None):
-        if not CaseCreator or not CaseCreator.strip():
-            raise ValueError("CaseCreator is required")
-        if not CaseName or not CaseName.strip():
-            raise ValueError("CaseName is required")
-        if len(CaseName) > 255:
+    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseDescription: str=None, CaseID: str=None):
+        #if not CaseCreator or not CaseCreator.strip():
+            #raise ValueError("CaseCreator is required")
+        #if not CaseName or not CaseName.strip():
+            #raise ValueError("CaseName is required")
+        if (not (CaseName is None) and not CaseName.strip()) and len(CaseName) > 255:
             raise ValueError("CaseName must be 255 characters or less")
-        if len(CaseCreator) > 100:
+        if (not (CaseCreator is None) and not CaseCreator.strip()) and len(CaseCreator) > 100:
             raise ValueError("Name is too long. Must be 100 characters or less")
 
-        self.CaseCreator = CaseCreator.strip()
-        self.CaseName = CaseName.strip()
+        self.CaseCreator = None if CaseCreator is None else CaseCreator.strip()
+        self.CaseName = None if CaseName is None else CaseName.strip()
         self.CaseDescription = CaseDescription
         self.CaseClosed = False
-        self.CaseId = None
+        if CaseID is not None:
+            cleaned_id = CaseID.strip()
+            try:
+                uuid.UUID(cleaned_id)
+                self.CaseId = cleaned_id
+            except ValueError:
+                raise ValueError(f"'{CaseID}' is not a valid UUID format")
+        else:
+            self.CaseId = None
         self.CaseCreationDate = None
 
     async def create(self):
@@ -192,7 +200,7 @@ class Case:
                 # Need to reproduce the same db report for this case.
 
                 try:
-                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+                    # Insert into the Reports table allowing the report to have the image's name in the image title column
 
                    await connection.execute(
                         """
@@ -324,3 +332,7 @@ class Case:
             "caseClosed": self.CaseClosed,
             "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
         }
+
+    async def getComments(self):
+        if self.CaseId is None:
+            raise HTTPException(status_code=400, detail="Case id is missing")
