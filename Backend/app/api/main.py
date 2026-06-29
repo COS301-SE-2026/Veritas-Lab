@@ -4,6 +4,7 @@ import re
 from pydantic import BaseModel # For JSON
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
+from app.api.routers.comments_router import router as comments_router
 
 app = FastAPI(
     title="Veritas Lab API",
