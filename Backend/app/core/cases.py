@@ -29,15 +29,17 @@ DB_NAME = env.getRequiredEnv("DB_NAME")
 
 class Case:
     def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseDescription: str=None, CaseID: str=None):
-        #if not CaseCreator or not CaseCreator.strip():
-            #raise ValueError("CaseCreator is required")
-        #if not CaseName or not CaseName.strip():
-            #raise ValueError("CaseName is required")
-        if (not (CaseName is None) and not CaseName.strip()) and len(CaseName) > 255:
-            raise ValueError("CaseName must be 255 characters or less")
-        if (not (CaseCreator is None) and not CaseCreator.strip()) and len(CaseCreator) > 100:
-            raise ValueError("Name is too long. Must be 100 characters or less")
-
+        if  not (CaseCreator is None):
+            if not CaseCreator.strip():
+                raise ValueError("CaseCreator is required")
+            if  len(CaseCreator) > 100:
+                raise ValueError("Name is too long. Must be 100 characters or less")
+        if not (CaseName is None):
+            if not CaseName.strip():
+                raise ValueError("CaseName is required")
+            if len(CaseName) > 255:
+                raise ValueError("CaseName must be 255 characters or less")
+        
         self.CaseCreator = None if CaseCreator is None else CaseCreator.strip()
         self.CaseName = None if CaseName is None else CaseName.strip()
         self.CaseDescription = CaseDescription

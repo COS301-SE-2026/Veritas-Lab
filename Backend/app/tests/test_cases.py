@@ -21,15 +21,19 @@ def test_CaseCreationWithValidData():
 
 def test_Case_Creation_Does_Not_Require_Creator():
     test_case = Case(CaseName="Flood in Durban")
-    assert case.CaseCreator is None
-    assert case.CaseName == "Flood in Durban"
-    assert case.CaseId is None
-    assert case.CaseCreationDate is None
-    assert case.CaseClosed is False
+    assert test_case.CaseCreator is None
+    assert test_case.CaseName == "Flood in Durban"
+    assert test_case.CaseId is None
+    assert test_case.CaseCreationDate is None
+    assert test_case.CaseClosed is False
 
-def test_CaseCreationRequiresCaseName():
-    with pytest.raises(ValueError, match="CaseName is required"):
-        Case(CaseCreator="alice_dev")
+def test_Case_Creation_Does_Not_Require_CaseName():
+    test_case = Case(CaseCreator="Terry")
+    assert test_case.CaseCreator == "Terry"
+    assert test_case.CaseName is None
+    assert test_case.CaseId is None
+    assert test_case.CaseCreationDate is None
+    assert test_case.CaseClosed is False
 
 def test_CaseCreationRejectsBlankCreator():
     with pytest.raises(ValueError, match="CaseCreator is required"):
