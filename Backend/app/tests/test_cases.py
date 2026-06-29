@@ -887,36 +887,35 @@ Return a dict of the comments belonging to the case id
     #Enter a random fake number for the case id
     fake_id = uuid4()
     fake_case_id=str(fake_id)
-    fake_record={
+    fake_record=[{
         "commentID": "1",
         "username": "Billy Jean",
         "comment": "I am your child",
         "commenttimestamp":"2026-06-29 15:37:28.458993+00"
-    }
+    }]
 
-    mock_connection=AsyncMock()
-
-    mock_connection.fetchrow.return_value = fake_record
-
-    test_case=Case(
+    mock_connection = AsyncMock()
+    mock_connection.fetch.return_value = fake_record
+    
+    test_case = Case(
         CaseID=fake_case_id
     )
 
-    result = await test_case.getComments()
+    with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
+        mock_connect.return_value = mock_connection
 
-    assert isinstance(result, dict), "Should be a single returned record"
-    assert result["commentID"] == "1"
-    assert result["username"]== "Billy Jean"
-    assert result["comment"]== "I am your child"
-    assert result["commenttimestamp"]=="2026-06-29 15:37:28.458993+00"
+        result = await test_case.getComments()
 
-    mock_connection.fetchrow.assert_called_once_with(
-        """
-        SELECT CommentID, Username, Comment, CommentTimestamp 
-        from "Cases_DB"."Comments" 
-        WHERE CaseId = $1
-        """
-        , fake_id
+    assert isinstance(result, list), "Should be a single returned record"
+    assert result[0]["commentID"] == "1"
+    assert len(result) == 1
+    assert result[0]["username"] == "Billy Jean"
+    assert result[0]["comment"] == "I am your child"
+    assert result[0]["commenttimestamp"]=="2026-06-29 15:37:28.458993+00"
+
+    mock_connection.fetch.assert_called_once_with(
+        """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
+        , str(fake_id)
     )
 
 @pytest.mark.asyncio
@@ -928,16 +927,16 @@ Raises an error due to the database going down
     fake_id = uuid4()
     fake_case_id=str(fake_id)
     
-    mock_connection=AsyncMock()
-
-    mock_connection.fetchrow.side_effect = asyncpg.PostgresConnectionError("Connection lost")
 
     test_case=Case(
         CaseID=fake_case_id
     )
 
-    with pytest.raises(HTTPException) as exc_info:
-        await test_case.getComments()
+    with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
+        mock_connect.side_effect = asyncpg.PostgresConnectionError("Connection lost")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await test_case.getComments()
 
     assert exc_info.value.status_code == 500
     assert "Internal Server Error" in exc_info.value.detail or "database" in exc_info.value.detail.lower()

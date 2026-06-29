@@ -338,3 +338,31 @@ class Case:
     async def getComments(self):
         if self.CaseId is None:
             raise HTTPException(status_code=400, detail="Case id is missing")
+
+        connection = None
+        try:
+            connection=await asyncpg.connect(
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME,
+                host=DB_HOST,
+                port=DB_PORT
+            )
+
+            rows = await connection.fetch(
+            """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
+            , self.CaseId
+        )
+
+            return [dict(row) for row in rows]
+
+        except asyncpg.PostgresError:
+            raise HTTPException(
+                status_code=500, 
+                detail="Database connection failure. Internal Server Error."
+            )
+
+        finally:
+            if connection is not None:
+                await connection.close()
+        
