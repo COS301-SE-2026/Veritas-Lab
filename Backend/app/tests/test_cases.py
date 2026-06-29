@@ -4,6 +4,8 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from uuid import uuid4
+import asyncpg
+
 from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
@@ -35,9 +37,15 @@ def test_Case_Creation_Does_Not_Require_CaseName():
     assert test_case.CaseCreationDate is None
     assert test_case.CaseClosed is False
 
-def test_CaseCreationRejectsBlankCreator():
+@pytest.mark.asyncio
+async def test_Case_Creation_Rejects_Blank_Creator():
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseCreator="   ", CaseName="Test Case")
+
+@pytest.mark.asyncio
+async def test_Cas_creation_Rejects_Invalid_UUID():
+    with pytest.raises(ValueError, match="'2' is not a valid UUID format"):
+        Case(CaseID="2")
 
 def test_CaseCreationRejectsBlankCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
@@ -910,3 +918,26 @@ Return a dict of the comments belonging to the case id
         """
         , fake_id
     )
+
+@pytest.mark.asyncio
+async def test_get_comment_database_error():
+    """
+Raises an error due to the database going down
+    """
+    #Enter a random fake number for the case id
+    fake_id = uuid4()
+    fake_case_id=str(fake_id)
+    
+    mock_connection=AsyncMock()
+
+    mock_connection.fetchrow.side_effect = asyncpg.PostgresConnectionError("Connection lost")
+
+    test_case=Case(
+        CaseID=fake_case_id
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await test_case.getComments()
+
+    assert exc_info.value.status_code == 500
+    assert "Internal Server Error" in exc_info.value.detail or "database" in exc_info.value.detail.lower()
