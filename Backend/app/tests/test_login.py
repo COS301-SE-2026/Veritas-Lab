@@ -5,7 +5,9 @@ from app.auth.auth import hashPassword
 
 client = TestClient(app)
 
-def testSuccessfulLogin(monkeypatch):
+def test_successful_login(monkeypatch):
+    client.cookies.clear()
+    
     async def mock_searchUsersViaEmail(email):
         hashedPassword= hashPassword("StrongP@ssword12334567")
         return {
@@ -41,7 +43,11 @@ def testSuccessfulLogin(monkeypatch):
         "message":"Logged in successfully"
     }
 
-def testLoginIncorrectPassword(monkeypatch):
+    assert auth.COOKIE_NAME in response.cookies
+    assert response.cookies.get(auth.COOKIE_NAME) == "mockedJWTToken"
+
+def test_login_incorrect_password(monkeypatch):
+    client.cookies.clear()
     async def mock_searchUsersViaEmail(email):
         hashedPassword = hashPassword("CorrectP@ssword1234567")
         return {
@@ -68,7 +74,10 @@ def testLoginIncorrectPassword(monkeypatch):
         "message": "Invalid email or password"
     }
 
-def testLoginUserDoesNotExist(monkeypatch):
+    assert auth.COOKIE_NAME not in response.cookies
+
+def test_login_user_does_not_exist(monkeypatch):
+    client.cookies.clear()
     async def mock_searchUsersViaEmail(email):
         return None
 
@@ -87,8 +96,10 @@ def testLoginUserDoesNotExist(monkeypatch):
         "status": "error",
         "message": "A User with this email does not exist. Please register"
     }
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testLoginMissingPassword():
+def test_login_missing_password():
+    client.cookies.clear()
     response = client.post(
         "/api/login",
         json={
@@ -97,9 +108,10 @@ def testLoginMissingPassword():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-
-def testLoginIncorrectEmail():
+def test_login_incorrect_email():
+    client.cookies.clear()
     response = client.post(
         "/api/login",
         json={
@@ -113,9 +125,10 @@ def testLoginIncorrectEmail():
         "status": "error",
         "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
     }
+    assert auth.COOKIE_NAME not in response.cookies
 
-
-def testLoginMissingEmail():
+def test_login_missing_email():
+    client.cookies.clear()
     response = client.post(
         "/api/login",
         json={
@@ -124,3 +137,4 @@ def testLoginMissingEmail():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies

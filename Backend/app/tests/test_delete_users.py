@@ -21,35 +21,37 @@ def admin_payload():
 
 def test_admin_deletes_user_successfully(client, monkeypatch):
 
-    monkeypatch.setattr(auth , "verifyJWT", lambda headers: admin_payload())
+    monkeypatch.setattr(auth , "verifyJWT", lambda request: admin_payload())
 
     async def fake_delete(user_id):
         return True #row found and deleted
 
     monkeypatch.setattr(auth, "deleteUserById", fake_delete)
 
-    response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToen"},)
+    response = client.delete(f"/api/users/{TARGET_USER_ID}")
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     assert response.json()["message"] == "User deleted successfully."
+    assert auth.COOKIE_NAME not in response.cookies
 
 #Test for a logged in non-admin who tries to delete and gets blocked by 403 code error
 def test_non_admin_is_forbidden(client, monkeypatch):
 
     monkeypatch.setattr(auth ,
         "verifyJWT", 
-        lambda header: {"sub": ADMIN_USER_ID, "username": "Alex", "role": "USER"})
+        lambda request: {"sub": ADMIN_USER_ID, "username": "Alex", "role": "USER"})
         
-    response = client.delete(f"/api/users/{TARGET_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
+    response = client.delete(f"/api/users/{TARGET_USER_ID}")
     
     assert response.status_code == 403
     assert response.json()["status"] == "error"
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_missing_token_is_unauthorized(client, monkeypatch):
 
     """No or invalid token: verifyJWT rasises ValueError, the 401"""
-    def raise_value_error(header):
+    def raise_value_error(request):
         raise ValueError("Missing or invalid token")
 
     monkeypatch.setattr(auth, "verifyJWT", raise_value_error)
@@ -58,33 +60,36 @@ def test_missing_token_is_unauthorized(client, monkeypatch):
 
     assert response.status_code == 401
     assert response.json()["status"] == "error"
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_malformed_uuid_is_rejected(client, monkeypatch):
 
-    monkeypatch.setattr(auth , "verifyJWT", lambda headers: admin_payload())
+    monkeypatch.setattr(auth , "verifyJWT", lambda request: admin_payload())
 
     malformed_uuid = "not-a-valid-uuid"
-    response = client.delete(f"/api/users/{malformed_uuid}", headers={"Authorization": "Bearer fakeToken"},)
+    response = client.delete(f"/api/users/{malformed_uuid}")
 
     assert response.status_code == 400
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid User ID format."
+    assert auth.COOKIE_NAME not in response.cookies
 
 #Admin cannot delete themselves. Error on return is 400
 def test_admin_cannot_delete_themself(client, monkeypatch):
 
-    monkeypatch.setattr(auth, "verifyJWT", lambda header: admin_payload())
+    monkeypatch.setattr(auth, "verifyJWT", lambda request: admin_payload())
 
     #The target is the same as the admin's ID
-    response = client.delete(f"/api/users/{ADMIN_USER_ID}", headers={"Authorization": "Bearer fakeToken"},)
+    response = client.delete(f"/api/users/{ADMIN_USER_ID}")
     assert response.status_code == 400
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Admins cannot delete themselves."
+    assert auth.COOKIE_NAME not in response.cookies
 
 #Testing nonexistent user with error code 404 
 def test_nonexistent_user_delete_404(client, monkeypatch):
     
-    monkeypatch.setattr(auth, "verifyJWT", lambda header: admin_payload())
+    monkeypatch.setattr(auth, "verifyJWT", lambda request: admin_payload())
 
     async def fake_delete(user_id):
         return False # found no one 
@@ -92,25 +97,25 @@ def test_nonexistent_user_delete_404(client, monkeypatch):
     monkeypatch.setattr(auth, "deleteUserById", fake_delete)
 
     response = client.delete(
-        f"/api/users/{TARGET_USER_ID}",
-        headers={"Authorization": "Bearer fakeToken"}
+        f"/api/users/{TARGET_USER_ID}"
     )
 
     assert response.status_code == 404
     assert response.json()["status"] == "error"
+    assert auth.COOKIE_NAME not in response.cookies
 
 #invalid jwt is rejected
 def test_invalid_jwt_rejected(client, monkeypatch):
     
-    def fake_verify_raises(headers):
+    def fake_verify_raises(request):
         raise ValueError("Invalid token")
 
     monkeypatch.setattr(auth, "verifyJWT", fake_verify_raises)
 
     response = client.delete(
-        f"/api/users/{TARGET_USER_ID}",
-        headers={"Authorization": "Bearer badToken"}
+        f"/api/users/{TARGET_USER_ID}"
     )
 
     assert response.status_code == 401
     assert response.json()["status"] == "error"
+    assert auth.COOKIE_NAME not in response.cookies

@@ -9,7 +9,8 @@ import app.api.routers.cases_router as cases_router
 
 client = TestClient(app)
 
-def test_CaseCreationWithValidData():
+def test_case_creation_with_valid_data():
+    client.cookies.clear()
     case = Case(CaseCreator="James Bond", CaseName="Flood in Durban")
     
     assert case.CaseCreator == "James Bond"
@@ -18,30 +19,36 @@ def test_CaseCreationWithValidData():
     assert case.CaseCreationDate is None
     assert case.CaseClosed is False
 
-def test_CaseCreationRequiresCreator():
+def test_case_creation_requires_creator():
+    client.cookies.clear()
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseName="Test Case")
 
-def test_CaseCreationRequiresCaseName():
+def test_case_creation_requires_case_name():
+    client.cookies.clear()
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev")
 
-def test_CaseCreationRejectsBlankCreator():
+def test_case_creation_rejects_blank_creator():
+    client.cookies.clear()
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseCreator="   ", CaseName="Test Case")
 
-def test_CaseCreationRejectsBlankCaseName():
+def test_case_creation_rejects_blank_case_name():
+    client.cookies.clear()
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev", CaseName="   ")
 
-def test_NameIsTooLong():
+def test_name_is_too_long():
+    client.cookies.clear()
     with pytest.raises(ValueError, match="Name is too long"):
         Case(
             CaseName="Test Case",
             CaseCreator="A" * 101
         )
 
-def test_NameAt100Characters():
+def test_name_at_100_characters():
+    client.cookies.clear()
     creator_name_100 = "A" * 100
 
     case = Case(
@@ -52,34 +59,39 @@ def test_NameAt100Characters():
     assert len(case.CaseCreator) == 100
     assert case.CaseCreator == creator_name_100
 
-def test_CaseNameAt99Characters():
+def test_case_name_at_99_characters():
+    client.cookies.clear()
     case_name_99 = "A" * 99
     case = Case(CaseCreator="alice_dev", CaseName=case_name_99)
     
     assert len(case.CaseName) == 99
     assert case.CaseName == case_name_99
 
-def test_CaseNameAt254Characters():
+def test_case_name_at_254_characters():
+    client.cookies.clear()
     case_name_254 = "A" * 254
     case = Case(CaseCreator="alice_dev", CaseName=case_name_254)
     
     assert len(case.CaseName) == 254
     assert case.CaseName == case_name_254
 
-def test_CaseNameAt255Characters():
+def test_case_name_at_255_characters():
+    client.cookies.clear()
     case_name_255 = "A" * 255
     case = Case(CaseCreator="alice_dev", CaseName=case_name_255)
     
     assert len(case.CaseName) == 255
     assert case.CaseName == case_name_255
 
-def test_CaseNameAt256Characters():
+def test_case_name_at_256_characters():
+    client.cookies.clear()
     case_name_256 = "A" * 256
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
         Case(CaseCreator="alice_dev", CaseName=case_name_256)
 
-def test_CaseStoresDescription():
+def test_case_stores_description():
+    client.cookies.clear()
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
@@ -88,7 +100,8 @@ def test_CaseStoresDescription():
 
     assert case.CaseDescription == "This is a test description"
 
-def test_CaseStoresReviews():
+def test_case_stores_reviews():
+    client.cookies.clear()
     reviews = {
         "reviewer": "admin",
         "status": "pending"
@@ -102,7 +115,8 @@ def test_CaseStoresReviews():
 
     assert case.CaseReviews == reviews
 
-def test_CaseToJSONBeforeCreate():
+def test_case_to_json_before_create():
+    client.cookies.clear()
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
@@ -122,7 +136,8 @@ def test_CaseToJSONBeforeCreate():
         "caseCreationDate": None
     }
 
-def test_CaseToJSONAfterCreateValuesSet():
+def test_case_to_json_after_create_values_set():
+    client.cookies.clear()
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
@@ -146,7 +161,8 @@ def test_CaseToJSONAfterCreateValuesSet():
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
     }
 
-def test_CaseToJSONWithNoDescriptionOrReviews():
+def test_case_to_json_with_no_description_or_reviews():
+    client.cookies.clear()
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case"
@@ -164,7 +180,8 @@ def test_CaseToJSONWithNoDescriptionOrReviews():
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_CreateCaseWithMock(mock_connect):
+async def test_create_case_with_mock(mock_connect):
+    client.cookies.clear()
     case = Case(
         CaseCreator="alice_dev",
         CaseName="Test Case",
@@ -209,7 +226,8 @@ async def test_CreateCaseWithMock(mock_connect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_CreateCaseCannotBeCalledTwice(mock_connect):
+async def test_create_case_cannot_be_called_twice(mock_connect):
+    client.cookies.clear()
     case = Case(CaseCreator="alice_dev", CaseName="Test Case")
     case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
 
@@ -218,8 +236,9 @@ async def test_CreateCaseCannotBeCalledTwice(mock_connect):
 
     mock_connect.assert_not_called()
 
-def testGetCasesMissingJWT(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_cases_missing_jwt(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         raise ValueError("Missing Authorization header")
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
@@ -232,16 +251,16 @@ def testGetCasesMissingJWT(monkeypatch):
         "message": "Missing Authorization header"
     }
 
-def testGetCasesInvalidJWT(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_cases_invalid_jwt(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         raise ValueError("Invalid token")
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/getCases",
-        json={},
-        headers={"Authorization": "Bearer fake-token"}
+        json={}
     )
 
     assert response.status_code == 401
@@ -250,8 +269,9 @@ def testGetCasesInvalidJWT(monkeypatch):
         "message": "Invalid token"
     }
 
-def testGetCasesAdminReturnsCases(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_cases_admin_returns_cases(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -290,8 +310,7 @@ def testGetCasesAdminReturnsCases(monkeypatch):
 
     response = client.post(
         "/api/getCases",
-        json={},
-        headers={"Authorization": "Bearer fake-token"}
+        json={}
     )
 
     assert response.status_code == 200
@@ -325,8 +344,9 @@ def testGetCasesAdminReturnsCases(monkeypatch):
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_cases_investigator_returns_empty_list(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -344,8 +364,7 @@ def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
 
     response = client.post(
         "/api/getCases",
-        json={},
-        headers={"Authorization": "Bearer fake-token"}
+        json={}
     )
 
     assert response.status_code == 200
@@ -358,8 +377,9 @@ def testGetCasesInvestigatorReturnsEmptyList(monkeypatch):
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testGetSingleCaseMissingJWT(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_single_case_missing_jwt(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         raise ValueError("Missing Authorization header")
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
@@ -372,16 +392,16 @@ def testGetSingleCaseMissingJWT(monkeypatch):
         "message": "Missing Authorization header"
     }
 
-def testGetSingleCaseInvalidJWT(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_single_case_invalid_jwt(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         raise ValueError("Invalid token")
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/getSingleCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
     assert response.status_code == 401
@@ -390,8 +410,9 @@ def testGetSingleCaseInvalidJWT(monkeypatch):
         "message": "Invalid token"
     }
 
-def testGetSingleCaseMissingCaseID(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_single_case_missing_case_id(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -402,8 +423,7 @@ def testGetSingleCaseMissingCaseID(monkeypatch):
 
     response = client.post(
         "/api/getSingleCase",
-        json={},
-        headers={"Authorization": "Bearer fake-token"}
+        json={}
     )
 
     assert response.status_code == 400
@@ -412,8 +432,9 @@ def testGetSingleCaseMissingCaseID(monkeypatch):
         "message": "CaseID required"
     }
 
-def testGetSingleCaseInvalidCaseID(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_single_case_invalid_case_id(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -424,15 +445,15 @@ def testGetSingleCaseInvalidCaseID(monkeypatch):
 
     response = client.post(
         "/api/getSingleCase",
-        json={"CaseID": "not-a-valid-uuid"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "not-a-valid-uuid"}
     )
 
     assert response.status_code == 401
     assert response.json()["status"] == "error"
 
-def testGetSingleCaseNotFound(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_single_case_not_found(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -450,8 +471,7 @@ def testGetSingleCaseNotFound(monkeypatch):
 
     response = client.post(
         "/api/getSingleCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
     assert response.status_code == 404
@@ -464,8 +484,9 @@ def testGetSingleCaseNotFound(monkeypatch):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testGetSingleCaseAdminReturnsCase(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_get_single_case_admin_returns_case(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -499,8 +520,7 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
 
     response = client.post(
         "/api/getSingleCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": fake_case_id}
     )
 
     assert response.status_code == 200
@@ -554,8 +574,7 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
 
     response = client.post(
         "/api/getSingleCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": fake_case_id}
     )
 
     assert response.status_code == 200
@@ -592,8 +611,9 @@ def testGetSingleCaseAdminReturnsCase(monkeypatch):
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testCloseCaseMissingJWT(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_missing_jwt(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         raise ValueError("Missing Authorization header")
     
     monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
@@ -606,16 +626,16 @@ def testCloseCaseMissingJWT(monkeypatch):
         "message": "Missing Authorization header"
     }
 
-def testCloseCaseInvalidJWT(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_invalid_jwt(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         raise ValueError("Invalid token")
 
     monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
     assert response.status_code == 401
@@ -624,8 +644,9 @@ def testCloseCaseInvalidJWT(monkeypatch):
         "message": "Invalid token"
     }
 
-def testCloseCaseUserUnauthorized(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_user_unauthorized(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-user-id",
             "username": "normal_user",
@@ -636,8 +657,7 @@ def testCloseCaseUserUnauthorized(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
     assert response.status_code == 403
@@ -646,8 +666,9 @@ def testCloseCaseUserUnauthorized(monkeypatch):
         "message": "User unauthorized"
     }
 
-def testCloseCaseInvalidCaseID(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_invalid_case_id(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -658,8 +679,7 @@ def testCloseCaseInvalidCaseID(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": "not-a-valid-uuid"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "not-a-valid-uuid"}
     )
 
     assert response.status_code == 400
@@ -668,8 +688,9 @@ def testCloseCaseInvalidCaseID(monkeypatch):
         "message": "Invalid CaseID"
     }
 
-def testCloseCaseNotFound(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_not_found(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -687,8 +708,7 @@ def testCloseCaseNotFound(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
     assert response.status_code == 404
@@ -701,8 +721,9 @@ def testCloseCaseNotFound(monkeypatch):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testCloseCaseNotCaseCreator(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_not_case_creator(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-investigator-id",
             "username": "different_user",
@@ -721,8 +742,7 @@ def testCloseCaseNotCaseCreator(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
     assert response.status_code == 404
@@ -735,8 +755,9 @@ def testCloseCaseNotCaseCreator(monkeypatch):
     mock_connection.fetchrow.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def testCloseCaseSuccess(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_success_investigator(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -760,8 +781,7 @@ def testCloseCaseSuccess(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": fake_case_id}
     )
 
     assert response.status_code == 200
@@ -782,8 +802,9 @@ def testCloseCaseSuccess(monkeypatch):
     assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
     assert fetchrow_args[2] == "investigator_user"
 
-def testCloseCaseSuccess(monkeypatch):
-    def mock_verifyJWT(authorization):
+def test_close_case_success_admin(monkeypatch):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -807,8 +828,7 @@ def testCloseCaseSuccess(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": fake_case_id}
     )
 
     assert response.status_code == 200
@@ -830,7 +850,8 @@ def testCloseCaseSuccess(monkeypatch):
     assert fetchrow_args[2] == "investigator_user"
 
 def test_close_case_admin_not_case_creator(monkeypatch):
-    def mock_verifyJWT(authorization):
+    client.cookies.clear()
+    def mock_verifyJWT(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -850,8 +871,7 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 
     response = client.post(
         "/api/closeCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
+        json={"CaseID": fake_case_id}
     )
 
     assert response.status_code == 404

@@ -196,16 +196,6 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             }
         )
     
-    #this should not be here as any user type can clikc on one case
-    # if payload.get("role") == "USER":
-    #     return JSONResponse(
-    #         status_code=403,
-    #         content={
-    #             "status": "error",
-    #             "message": "User unauthorized"
-    #         }
-    #     )
-    
     if not case_request.CaseID:
         return JSONResponse(
             status_code=400,
@@ -295,7 +285,14 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "evidence": [_format_case_evidence(row) for row in evidence_rows]
             }
         )
-
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
     finally:
         await connection.close()
 
@@ -374,9 +371,10 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         await connection.close()
 
 @router.post("/closeCase")
-async def close_case(request: CreateSingleCaseRequest, authorization: str | None = Header(default=None)):
+async def close_case(case_request: CreateSingleCaseRequest, request: Request):
+    connection = None
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -389,8 +387,17 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
             content={"status": "error", "message": "User unauthorized"}
         )
     
+    if not case_request.CaseID:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "CaseID required"
+            }
+        )
+    
     try:
-        case_uuid = UUID(request.CaseID)
+        case_uuid = UUID(case_request.CaseID)
     except ValueError as e:
         return JSONResponse(
             status_code=400, 
@@ -399,16 +406,16 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
                 "message": "Invalid CaseID"
             }
         )
-        
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
 
-    try:
+    try:    
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
@@ -437,5 +444,14 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
                 "message": "Case closed successfully."
             }
         )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
