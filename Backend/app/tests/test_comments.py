@@ -88,7 +88,7 @@ def test_create_comment_invalid_case_id_format(monkeypatch):
     )
 
     assert response.status_code == 400
-    assert response.json() == {"status": "error", "message": "Invalid case_id format"}
+    assert response.json() == {"status": "error", "message": "Invalid case_id format. Must be a valid UUID"}
 
 def test_create_comment_missing_comment(monkeypatch):
     def mock_verifyJWT(auth):
@@ -198,3 +198,111 @@ def test_create_comment_investigator_on_closed_case(monkeypatch):
     assert response.status_code == 403
     assert response.json() == {"status": "error", "message": "Investigators may only comment on open cases"}
 
+#Success tests
+def test_create_comment_user_on_closed_case(monkeypatch):
+    """A USER commenting on a closed case should succeed with 201."""
+    def mock_verifyJWT(auth):
+        return {"sub": "id", "username": "normal_user", "role": "USER"}
+
+    async def mock_get_case_status(conn, case_id):
+        return "closed"
+
+    async def mock_insert_comment(conn, case_id, username, comment):
+        return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
+
+    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+
+    response = client.post(
+        "/api/cases/comments",
+        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
+        headers={"Authorization": "Bearer fake"}
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["comment"]["username"] == "normal_user"
+    assert data["comment"]["comment"] == VALID_COMMENT
+    assert isinstance(data["comment"]["commentId"], int)
+
+def test_create_comment_investigator_on_open_case(monkeypatch):
+    """An INVESTIGATOR commenting on an open case should succeed with 201."""
+    def mock_verifyJWT(auth):
+        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+
+    async def mock_get_case_status(conn, case_id):
+        return "open"
+
+    async def mock_insert_comment(conn, case_id, username, comment):
+        return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
+
+    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+
+    response = client.post(
+        "/api/cases/comments",
+        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
+        headers={"Authorization": "Bearer fake"}
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["comment"]["username"] == "investigator_user"
+    assert isinstance(data["comment"]["commentId"], int)
+
+def test_create_comment_admin_on_open_case(monkeypatch):
+    """An ADMIN can comment on an open case."""
+    def mock_verifyJWT(auth):
+        return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
+
+    async def mock_get_case_status(conn, case_id):
+        return "open"
+
+    async def mock_insert_comment(conn, case_id, username, comment):
+        return {**FAKE_COMMENT_RESPONSE, "username": username}
+
+    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+
+    response = client.post(
+        "/api/cases/comments",
+        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
+        headers={"Authorization": "Bearer fake"}
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "success"
+
+
+def test_create_comment_admin_on_closed_case(monkeypatch):
+    """An ADMIN can also comment on a closed case."""
+    def mock_verifyJWT(auth):
+        return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
+
+    async def mock_get_case_status(conn, case_id):
+        return "closed"
+
+    async def mock_insert_comment(conn, case_id, username, comment):
+        return {**FAKE_COMMENT_RESPONSE, "username": username}
+
+    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+
+    response = client.post(
+        "/api/cases/comments",
+        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
+        headers={"Authorization": "Bearer fake"}
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "success"
