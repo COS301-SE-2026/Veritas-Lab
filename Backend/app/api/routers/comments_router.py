@@ -1,9 +1,9 @@
-from fastapi import APIROUTER, Header
+from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.auth.auth import verifyJWT
 from app.core.env import ENVLoader
-from app.core.comments import validate_comment_text, get_case_status, insert_comment
+from app.core.comments import validate_comment_length, get_case_status, insert_comment
 import asyncpg
 from uuid import UUID
 
@@ -12,7 +12,7 @@ env = ENVLoader()
 DB_USER = env.getRequiredEnv("DB_USER")
 DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
-DB_PORT = env.getRequiredEnv("DB_PORT")
+DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 
 router = APIRouter(
@@ -22,7 +22,7 @@ router = APIRouter(
 
 class CreateCommentRequest(BaseModel):
     #None is allowed so that FastAPI does not throw a validation error if the field is missing. The validation will be done in the endpoint function.
-    caseId:  str | None = None
+    case_id:  str | None = None
     comment: str | None = None
 
 @router.post("/cases/comments", status_code=201)
@@ -41,9 +41,9 @@ async def create_comment(request: CreateCommentRequest,
     username = payload.get("username")
 
     #Second step is validate the case_id and UUID format
-    if not request.caseId:
+    if not request.case_id:
         return JSONResponse(status_code=400, 
-                            content={"status":"error", "message":"Missing caseId in request body"}
+                            content={"status":"error", "message":"case_id is needed."}
         )
 
     try:
@@ -51,27 +51,27 @@ async def create_comment(request: CreateCommentRequest,
     except ValueError:
         return JSONResponse(status_code=400, 
                             content={"status":"error", 
-                            "message":"Invalid caseId format. Must be a valid UUID"}
+                            "message":"Invalid case_id format. Must be a valid UUID"}
         )
 
     #Third step is to validate the comment text before we even touch the DB
-    if not request.comment or not validate_comment_text(request.comment):
+    if not request.comment or not validate_comment_length(request.comment):
         return JSONResponse(status_code=400, 
                             content={"status":"error", 
                             "message":"Invalid comment. Must be a non-empty string and not exceed 2000 characters"}
         )
 
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            host=DB_HOST,
-            port=DB_PORT,
-            database=DB_NAME
-        )
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME
+    )
 
     try:
         # Fourth sstep is to check whether the case exists and if it is open or closed
-        case_status = await get_case_status(connection, case_uuid)
+        case_status = await get_case_status(connection, case_id)
 
         if case_status == "not_found":
             return JSONResponse(status_code=404, 
@@ -85,24 +85,24 @@ async def create_comment(request: CreateCommentRequest,
         if case_status != "closed" and role == "USER":
             return JSONResponse(status_code=403, 
                 content={"status":"error", 
-                    "message":"Users may only comment on a closed case."
+                    "message":"Users may only comment on closed cases"
                 }
             )
 
-        if case_status != "open" and role != "INVESTIGATOR":
+        if case_status != "open" and role == "INVESTIGATOR":
             return JSONResponse(status_code=403,
                 content={"status":"error",
-                    "message":"Investigators may only comment on open cases."
+                    "message":"Investigators may only comment on open cases"
                 }
             )
 
-    #Sixth step: Make the comment
-    new_comment = await insert_comment(connection, case_uui, username, request.commet)
+        #Sixth step: Make the comment
+        new_comment = await insert_comment(connection, case_id, username, request.comment)
 
-    return JSONResponse(
-        status_code=201,
-        content={"status": "Success", "comment": new_comment}
-    )
+        return JSONResponse(
+            status_code=201,
+            content={"status": "success", "comment": new_comment}
+        )
 
-finally:
-    await.connection.close
+    finally:
+        await connection.close()
