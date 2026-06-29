@@ -29,6 +29,8 @@ app.include_router(cases_router)
 
 app.include_router(auth_router)
 
+app.include_router(comments_router)
+
 @app.get("/")
 def root():
     return {
