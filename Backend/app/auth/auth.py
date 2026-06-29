@@ -513,6 +513,15 @@ async def changeUserRole(
                 "message": "Missing userId or NewRole field."
             }
         )
+    
+    if payload.get("sub") == user_id:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+               "message": "Not allowed to change own role"
+           }
+        )
 
     try:
         user_id = uuidlib.UUID(user_id)
@@ -532,15 +541,6 @@ async def changeUserRole(
                 "status": "error",
                 "message": "Invalid or missing NewRole field."
             }
-        )
-
-    if payload.get("sub") == str(user_id):
-        return JSONResponse(
-            status_code=403,
-            content={
-                "status": "error",
-               "message": "Not allowed to change own role"
-           }
         )
     
     try:
