@@ -2,7 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock, MagicMock
 from datetime import datetime, timezone
-
+from fastapi import HTTPException
+from uuid import uuid4
 from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
@@ -18,9 +19,13 @@ def test_CaseCreationWithValidData():
     assert case.CaseCreationDate is None
     assert case.CaseClosed is False
 
-def test_CaseCreationRequiresCreator():
-    with pytest.raises(ValueError, match="CaseCreator is required"):
-        Case(CaseName="Test Case")
+def test_Case_Creation_Does_Not_Require_Creator():
+    test_case = Case(CaseName="Flood in Durban")
+    assert case.CaseCreator is None
+    assert case.CaseName == "Flood in Durban"
+    assert case.CaseId is None
+    assert case.CaseCreationDate is None
+    assert case.CaseClosed is False
 
 def test_CaseCreationRequiresCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
@@ -845,3 +850,59 @@ def test_close_case_admin_not_case_creator(monkeypatch):
     assert "casecreator = $2" in fetchrow_args[0]
     assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
     assert fetchrow_args[2] == "admin_user"
+
+@pytest.mark.asyncio
+async def test_get_comment_missing_case_id():
+    """
+    Verifies that the case.getComments(self) will throw an error if there is no caseId defined
+    """
+    test_case=Case(
+        CaseCreator="Billy Jean",
+        CaseName="Billy Jean's not my Son"
+    )
+
+    with pytest.raises(HTTPException) as exeInfo:
+        await test_case.getComments()
+
+    assert exeInfo.value.status_code == 400
+    assert "Case id is missing" in exeInfo.value.detail  
+
+@pytest.mark.asyncio
+async def test_get_comment_successful():
+    """
+Return a dict of the comments belonging to the case id
+    """
+    #Enter a random fake number for the case id
+    fake_id = uuid4()
+    fake_case_id=str(fake_id)
+    fake_record={
+        "commentID": "1",
+        "username": "Billy Jean",
+        "comment": "I am your child",
+        "commenttimestamp":"2026-06-29 15:37:28.458993+00"
+    }
+
+    mock_connection=AsyncMock()
+
+    mock_connection.fetchrow.return_value = fake_record
+
+    test_case=Case(
+        CaseID=fake_case_id
+    )
+
+    result = await test_case.getComments()
+
+    assert isinstance(result, dict), "Should be a single returned record"
+    assert result["commentID"] == "1"
+    assert result["username"]== "Billy Jean"
+    assert result["comment"]== "I am your child"
+    assert result["commenttimestamp"]=="2026-06-29 15:37:28.458993+00"
+
+    mock_connection.fetchrow.assert_called_once_with(
+        """
+        SELECT CommentID, Username, Comment, CommentTimestamp 
+        from "Cases_DB"."Comments" 
+        WHERE CaseId = $1
+        """
+        , fake_id
+    )
