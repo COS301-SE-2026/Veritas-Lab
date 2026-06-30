@@ -96,7 +96,7 @@ async def create_comment(request: CreateCommentRequest,
                 }
             )
 
-        #Sixth step: Make the comment
+        #Sixth step: Make the comment.
         new_comment = await insert_comment(connection, case_id, username, request.comment)
 
         return JSONResponse(
