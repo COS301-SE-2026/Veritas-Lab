@@ -128,32 +128,34 @@ async def get_cases(request: Request):
             }
         )
     
-    # this should not be here as any user can load the number of cases
-    # if payload.get("role") == "USER":
-    #     return JSONResponse(
-    #         status_code=403,
-    #         content={
-    #             "status": "error",
-    #             "message": "User unauthorized"
-    #         }
-    #     )
-    
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = None
 
     try:
-        rows = await connection.fetch(
-            """
-            SELECT *
-            FROM "Cases_DB"."Cases"
-            ORDER BY casecreationdate DESC
-            """
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
         )
+
+        if payload.get("role") == "USER":
+            rows = await connection.fetch(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                WHERE caseclosed = TRUE
+                ORDER BY casecreationdate DESC
+                """
+            )
+        else:
+            rows = await connection.fetch(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                ORDER BY casecreationdate DESC
+                """
+            )
 
 
         cases = []
@@ -179,9 +181,17 @@ async def get_cases(request: Request):
                 "cases": cases
             }
         )
-
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
     
 @router.post("/getSingleCase")
 async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request):
