@@ -28,7 +28,7 @@ DB_NAME = env.getRequiredEnv("DB_NAME")
 # When the CaseId is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 
 class Case:
-    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseReviews: dict = None, CaseDescription: str=None):
+    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseDescription: str=None):
         if not CaseCreator or not CaseCreator.strip():
             raise ValueError("CaseCreator is required")
         if not CaseName or not CaseName.strip():
@@ -40,7 +40,6 @@ class Case:
 
         self.CaseCreator = CaseCreator.strip()
         self.CaseName = CaseName.strip()
-        self.CaseReviews = CaseReviews
         self.CaseDescription = CaseDescription
         self.CaseClosed = False
         self.CaseId = None
@@ -62,13 +61,12 @@ class Case:
             row = await connection.fetchrow(
                 """
                 INSERT INTO "Cases_DB"."Cases"
-                (casecreator, casename, casereviews, casedescription, caseclosed)
+                (casecreator, casename, casedescription, caseclosed)
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING caseid, casecreationdate
                 """,
                 self.CaseCreator,
                 self.CaseName,
-                json.dumps(self.CaseReviews) if self.CaseReviews is not None else None,
                 self.CaseDescription,
                 self.CaseClosed
             )
@@ -322,7 +320,6 @@ class Case:
             "caseId": str(self.CaseId) if self.CaseId is not None else None,
             "caseName": self.CaseName,
             "caseCreator": self.CaseCreator,
-            "caseReviews": self.CaseReviews,
             "caseDescription": self.CaseDescription,
             "caseClosed": self.CaseClosed,
             "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
