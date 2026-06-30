@@ -467,8 +467,6 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         }
 
     mock_minio_client = MagicMock()
-    
-
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
@@ -490,14 +488,16 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
-    response = client.post(
-        "/api/getSingleCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
-    )
+    with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
+        mock_get_comments.return_value = []
+    
+        response = client.post(
+            "/api/getSingleCase",
+            json={"CaseID": fake_case_id},
+            headers={"Authorization": "Bearer fake-token"}
+        )
 
     assert response.status_code == 200
-
     assert response.json() == {
         "status": "success",
         "case": {
@@ -508,9 +508,11 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
         },
+        "comments": [],
         "evidence": []
     }
 
+ 
     fake_media_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     fake_report_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
@@ -519,19 +521,19 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
 
     fake_evidence_rows = [
-    {
-        "reportid": fake_report_id,
-        "mediaid": fake_media_id,
-        "mediatitle": "123",
-        "mediabucket": "images",
-        "mediaextension": ".png",
-        "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-        "mediaurl": fake_url,
-        "reportartifacts": {"ocr": "captured"},
-        "reportfindings": "Flood watermark detected",
-        "reportcomments": "Upload approved",
-        "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
-    }
+        {
+            "reportid": fake_report_id,
+            "mediaid": fake_media_id,
+            "mediatitle": "123",
+            "mediabucket": "images",
+            "mediaextension": ".png",
+            "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "mediaurl": fake_url,
+            "reportartifacts": {"ocr": "captured"},
+            "reportfindings": "Flood watermark detected",
+            "reportcomments": "Upload approved",
+            "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
+        }
     ]
 
     mock_connection = AsyncMock()
@@ -544,11 +546,14 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
-    response = client.post(
-        "/api/getSingleCase",
-        json={"CaseID": fake_case_id},
-        headers={"Authorization": "Bearer fake-token"}
-    )
+    with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
+        mock_get_comments.return_value = []
+    
+        response = client.post(
+            "/api/getSingleCase",
+            json={"CaseID": fake_case_id},
+            headers={"Authorization": "Bearer fake-token"}
+        )
 
     assert response.status_code == 200
     assert response.json() == {
@@ -561,6 +566,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
         },
+        "comments": [],
         "evidence": [
             {
                 "reportId": fake_report_id,
@@ -578,10 +584,11 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         ]
     }
 
-    mock_connect.assert_called_once()
-    mock_connection.fetchrow.assert_called_once()
-    mock_connection.fetch.assert_called_once()
-    mock_connection.close.assert_called_once()
+    # asserts counting the calls
+    assert mock_connect.call_count == 1
+    assert mock_connection.fetchrow.call_count == 1
+    assert mock_connection.fetch.call_count == 1
+    assert mock_connection.close.call_count == 1
 
 def testCloseCaseMissingJWT(monkeypatch):
     def mock_verifyJWT(authorization):

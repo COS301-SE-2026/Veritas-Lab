@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from app.core.cases import Case
 from app.auth.auth import verifyJWT
@@ -290,11 +291,12 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
 
         return JSONResponse(
             status_code=200,
-            content={
+            content=jsonable_encoder({
                 "status": "success",
                 "case": case.toJSON(),
+                "comments": await case.getComments(),
                 "evidence": [_format_case_evidence(row) for row in evidence_rows]
-            }
+            })
         )
 
     finally:
