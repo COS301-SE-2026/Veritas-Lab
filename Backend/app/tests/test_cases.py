@@ -947,3 +947,5 @@ Raises an error due to the database going down
 
     assert exc_info.value.status_code == 500
     assert "Internal Server Error" in exc_info.value.detail or "database" in exc_info.value.detail.lower()
+
+

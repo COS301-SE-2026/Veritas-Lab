@@ -519,3 +519,44 @@ async def update_comment(
 
     finally:
         await connection.close()
+
+
+@router.post("/getComments/{case_id}")
+async def retreive_comments(
+    case_id: str,
+    request: Request
+):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    user_role=payload.get("role")
+    if  user_role is None or user_role== "USER":
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "User unauthorized"}
+        )
+
+    try:
+        case = Case(CaseID=case_id)
+        comments_data= await case.getComments()
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "comments": jsonable_encoder(comments_data)
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
