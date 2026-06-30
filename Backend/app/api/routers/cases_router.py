@@ -226,23 +226,36 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             }
         )
 
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = None
 
     try:
-        row= await connection.fetchrow(
-            """
-            SELECT *
-            FROM "Cases_DB"."Cases"
-            WHERE caseid = $1
-            """,
-            case_id
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
         )
+
+        if payload.get("role") != "USER":
+            row= await connection.fetchrow(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                """,
+                case_id
+            )
+        else:
+            row= await connection.fetchrow(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                AND caseclosed = TRUE
+                """,
+                case_id
+            )
     
         if row is None:
             return JSONResponse(
@@ -304,7 +317,8 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             }
         )
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
 
 
 @router.post("/cases/evidence")
