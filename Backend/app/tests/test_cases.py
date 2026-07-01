@@ -919,7 +919,8 @@ def test_delete_case_success_creator(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
@@ -955,7 +956,8 @@ def test_delete_case_success_admin(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
@@ -976,7 +978,8 @@ def test_delete_case_missing_jwt(monkeypatch):
     
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
@@ -999,9 +1002,10 @@ def test_delete_case_user_forbidden(monkeypatch):
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)\
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
@@ -1026,7 +1030,8 @@ def test_delete_case_missing_case_id(monkeypatch):
     
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={}
     )
@@ -1049,7 +1054,8 @@ def test_delete_case_invalid_case_id(monkeypatch):
     
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "not-a-valid-uuid"
@@ -1071,14 +1077,15 @@ def test_delete_case_not_found(monkeypatch):
     
     async def mock_deleteCase(case_id: uuid.UUID, username: str, role: str):
         return {
-            "deleted": "False",
+            "deleted": False,
             "reason": "not_found"
         }
     
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
@@ -1113,7 +1120,8 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
-    response = client.delete(
+    response = client.request(
+        "DELETE",
         "/api/deleteCase",
         json={
             "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
