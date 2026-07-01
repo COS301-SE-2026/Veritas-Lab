@@ -1058,3 +1058,70 @@ def test_delete_case_invalid_case_id(monkeypatch):
 
     assert response.status_code == 401
     assert response.json()["status"] == "error"
+
+def test_delete_case_not_found(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return{
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+    
+    async def mock_deleteCase(case_id: uuid.UUID, username: str, role: str):
+        return {
+            "deleted": "False",
+            "reason": "not_found"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+        }
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found"
+    }
+
+def test_delete_case_unauthorized_non_creator(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "other_investigator",
+            "role": "INVESTIGATOR"
+        }
+    
+    async def mock_deleteCase(case_id: uuid.UUID, username: str, role: str):
+        assert username == "other_investigator"
+        assert role == "INVESTIGATOR"
+        
+        return {
+            "deleted": False,
+            "reason": "unauthorized"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+        }
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "error",
+        "message": "Only the case creator or an admin can delete this case"
+    }
