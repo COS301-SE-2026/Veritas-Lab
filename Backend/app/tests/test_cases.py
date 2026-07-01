@@ -7,6 +7,9 @@ from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
 
+import uuid
+from uuid import uuid4
+
 client = TestClient(app)
 
 def test_case_creation_with_valid_data():
@@ -891,3 +894,76 @@ def test_close_case_admin_not_case_creator(monkeypatch):
     assert "casecreator = $2" in fetchrow_args[0]
     assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
     assert fetchrow_args[2] == "admin_user"
+
+def test_delete_case_success_creator(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "mock-user-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+    
+    async def mock_deleteCase(case_id: uuid.UUID, username: str, role: str):
+        assert isinstance(case_id, uuid.UUID)
+        assert str(case_id) == "12345678-abcd-ef01-2345-6789abcdef01"
+        assert username == "investigator_user"
+        assert role == "INVESTIGATOR"
+    
+        return {
+            "deleted": True,
+            "reason": "deleted"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+        }
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Case deleted successfully"
+    }
+
+def test_delete_case_success_admin(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "mock-admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+    
+    async def mock_deleteCase(case_id: uuid.UUID, username: str, role: str):
+        assert isinstance(case_id, uuid.UUID)
+        assert username == "admin_user"
+        assert role == "ADMIN"
+
+        return {
+            "deleted": True,
+            "reason": "deleted"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+        }
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Case deleted successfully"
+    }
