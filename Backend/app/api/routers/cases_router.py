@@ -482,7 +482,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         if connection is not None:
             await connection.close()
 
-@router.delete("/deleteCases")
+@router.delete("/deleteCase")
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -491,7 +491,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=401,
             content={
                 "status": "error",
-                "messgae": str(e)
+                "message": str(e)
             }
         )
     
@@ -525,4 +525,81 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
     
     connection = None
+
+    try:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        row = await connection.fetchrow(
+            """
+            SELECT casecreator
+            FROM "Cases_DB"."Cases"
+            WHERE caseid = $1
+            """,
+            case_id
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found"
+                }
+            )
+        case_creator = row["casecreator"]
+
+        if payload.get("role") != "ADMIN" and payload.get("username") != case_creator:
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "status": "error",
+                    "message": "Only the case creator or an admin can delete this case"
+                }
+            )
+        
+        case = Case(
+            CaseCreator="temporary",
+            CaseName="temporary",
+            CaseReviews=None,
+            CaseDescription=None
+        )
+
+        case.CaseId = case_id
+
+        deleted = await case.deleteCase()
+
+        if not deleted:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found"
+                }
+            )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Case deleted successfully"
+            }
+        )
     
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
+    
+    finally:
+        if connection is not None:
+            await connection.close()
