@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from app.core.cases import Case
 from app.auth.auth import verifyJWT
@@ -290,11 +291,12 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
 
         return JSONResponse(
             status_code=200,
-            content={
+            content=jsonable_encoder({
                 "status": "success",
                 "case": case.toJSON(),
+                "comments": await case.getComments(),
                 "evidence": [_format_case_evidence(row) for row in evidence_rows]
-            }
+            })
         )
 
     finally:
@@ -557,3 +559,44 @@ async def delete_comment(request: Request, comment_id: int):
     finally:
         if connection is not None:
             await connection.close()
+
+
+@router.post("/getComments/{case_id}")
+async def retreive_comments(
+    case_id: str,
+    request: Request
+):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    user_role=payload.get("role")
+    if  user_role is None or user_role== "USER":
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "User unauthorized"}
+        )
+
+    try:
+        case = Case(CaseID=case_id)
+        comments_data= await case.getComments()
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "comments": jsonable_encoder(comments_data)
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
