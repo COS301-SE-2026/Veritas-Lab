@@ -967,3 +967,94 @@ def test_delete_case_success_admin(monkeypatch):
         "status": "success",
         "message": "Case deleted successfully"
     }
+
+def test_delete_case_missing_jwt(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        raise ValueError("Missing token")
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+        }
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing token"
+    }
+
+def test_delete_case_user_forbidden(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role": "USER"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)\
+    
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+        }
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status": "error",
+        "message": "User unauthorized"
+    }
+
+def test_delete_case_missing_case_id(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "CaseID required"
+    }
+
+def test_delete_case_invalid_case_id(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "mock-investigator-id",
+            "username": "investigator_user",
+            "role": "INVESTIGATOR"
+        }
+    
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.delete(
+        "/api/deleteCase",
+        json={
+            "CaseID": "not-a-valid-uuid"
+        }
+    )
+
+    assert response.status_code == 401
+    assert response.json()["status"] == "error"
