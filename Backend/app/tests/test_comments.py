@@ -307,8 +307,11 @@ def test_create_comment_admin_on_closed_case(monkeypatch):
     assert response.status_code == 201
     assert response.json()["status"] == "success"
 from fastapi.testclient import TestClient
-
+import pytest
+from fastapi import Request
+from unittest.mock import MagicMock
 from app.api.main import app
+from datetime import datetime, timedelta, timezone
 import app.api.routers.cases_router as cases_router
 
 client = TestClient(app)
