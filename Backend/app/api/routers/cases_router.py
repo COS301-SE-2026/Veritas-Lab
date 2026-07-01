@@ -10,6 +10,8 @@ import os
 from urllib.parse import urlparse
 from minio import Minio
 from datetime import datetime, timedelta, timezone
+import uuid
+from uuid import uuid4
 
 env = ENVLoader()
 
@@ -479,3 +481,48 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     finally:
         if connection is not None:
             await connection.close()
+
+@router.delete("/deleteCases")
+async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "messgae": str(e)
+            }
+        )
+    
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+    
+    if not case_request.CaseID:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "CaseID required"
+            }
+        )
+    
+    try:
+        case_id = uuid.UUID(case_request.CaseID)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+    
+    connection = None
+    
