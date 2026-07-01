@@ -327,3 +327,113 @@ class Case:
             "caseClosed": self.CaseClosed,
             "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
         }
+    
+    async def deleteCase(self):
+        if self.CaseId is None:
+            raise ValueError("CaseId is required to delete a case")
+        
+        case_id = uuid.UUID(str(self.CaseId)) if not isinstance(self.CaseId, uuid.UUID) else self.CaseId
+
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        orphan_media = []
+
+        try:
+            async with connection.transaction():
+                media_rows = await connection.fetch(
+                    """
+                    SELECT DISTINCT
+                        media.MediaId AS "mediaid",
+                        mt.MediaBucket AS "mediabucket",
+                        mt.MediaExtension AS "mediaextension"
+                    FROM "Cases_DB"."Reports" r
+                    JOIN "Cases_DB"."Media" media ON r.ImageId = media.MediaId
+                    JOIN "Cases_DB"."MediaType" mt ON media.MediaType = mt.MediaTypeId
+                    WHERE r.CaseId = $1
+                    """,
+                    case_id
+                )
+            
+                await connection.execute(
+                    """
+                    DELETE FROM "Cases_DB"."Reports"
+                    WHERE CaseId = $1
+                    """,
+                    case_id
+                )
+
+                deleted_cases = await connection.fetchrow(
+                    """
+                    DELETE FROM "Cases_DB"."Cases"
+                    WHERE caseid = $1
+                    RETURNING caseid
+                    """,
+                    case_id
+                )
+
+                if deleted_cases is None:
+                    return False
+            
+                for media_row in media_rows:
+                    media_id = media_row["mediaid"]
+
+                    still_used = await connection.fetchval(
+                        """
+                        SELECT COUNT(*)
+                        FROM "Cases_DB"."Reports"
+                        WHERE ImageId = $1
+                        """,
+                        media_id
+                    )
+
+                    if still_used == 0:
+                        await connection.execute(
+                            """
+                            DELETE FROM "Cases_DB"."Media"
+                            WHERE MediaId = $1
+                            """,
+                            media_id
+                        )
+
+                        orphan_media.append({
+                                "mediaid":media_id,
+                                "mediabucket": media_row["mediabucket"],
+                                "mediaextension": media_row["mediaextension"]
+                        })
+                
+            minioEndpointRaw = (
+                os.getenv("MINIO_ENDPOINT")
+                or os.getenv("AWS_S3_ENDPOINT_URL")
+                or "localhost:9000"
+            )
+
+            minioSecure = minioEndpointRaw.startswith("https://")
+            minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
+
+            minioClient = Minio(
+                minioEndpoint,
+                access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+                secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+                secure=minioSecure
+            )
+
+            for media in orphan_media:
+                object_name = f"{media['mediaid']}{media['mediaextension']}"
+
+                try:
+                    minioClient.remove_object(
+                        bucket_name=media["mediabucket"],
+                        object_name=object_name
+                    )
+                except Exception as e:
+                    print(f"Failed to delete MinIO object {object_name}: {e}")
+
+            return True
+        finally:
+            await connection.close()
