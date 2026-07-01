@@ -328,12 +328,8 @@ class Case:
             "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
         }
     
-    async def deleteCase(self):
-        if self.CaseId is None:
-            raise ValueError("CaseId is required to delete a case")
-        
-        case_id = uuid.UUID(str(self.CaseId)) if not isinstance(self.CaseId, uuid.UUID) else self.CaseId
-
+    @staticmethod
+    async def deleteCase(case_id: uuid.UUID, username: str, role: str):
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -346,6 +342,29 @@ class Case:
 
         try:
             async with connection.transaction():
+                case_row = await connection.fetchrow(
+                    """
+                    SELECT casecreator
+                    FROM "Cases_DB"."Cases"
+                    WHERE caseid = $1
+                    """,
+                    case_id
+                )
+
+                if case_row is None:
+                    return {
+                        "deleted": False,
+                        "reason": "not_found"
+                    }
+                
+                case_creator = case_row["casecreator"]
+
+                if role != "ADMIN" and username != case_creator:
+                    return {
+                        "deleted": False,
+                        "reason": "unauthorized"
+                    }
+
                 media_rows = await connection.fetch(
                     """
                     SELECT DISTINCT
@@ -368,7 +387,7 @@ class Case:
                     case_id
                 )
 
-                deleted_cases = await connection.fetchrow(
+                deleted_case = await connection.fetchrow(
                     """
                     DELETE FROM "Cases_DB"."Cases"
                     WHERE caseid = $1
@@ -377,8 +396,11 @@ class Case:
                     case_id
                 )
 
-                if deleted_cases is None:
-                    return False
+                if deleted_case is None:
+                    return {
+                        "deleted": False,
+                        "reason": "not_found"
+                    }
             
                 for media_row in media_rows:
                     media_id = media_row["mediaid"]
@@ -434,6 +456,9 @@ class Case:
                 except Exception as e:
                     print(f"Failed to delete MinIO object {object_name}: {e}")
 
-            return True
+            return {
+                "deleted": True,
+                "reason": "deleted"
+            }
         finally:
             await connection.close()
