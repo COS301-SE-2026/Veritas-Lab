@@ -523,28 +523,15 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
                 "message": str(e)
             }
         )
-    
-    connection = None
 
     try:
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
+        result = await Case.deleteCase(
+            case_id=case_id,
+            username=payload.get("username"),
+            role=payload.get("role")
         )
 
-        row = await connection.fetchrow(
-            """
-            SELECT casecreator
-            FROM "Cases_DB"."Cases"
-            WHERE caseid = $1
-            """,
-            case_id
-        )
-
-        if row is None:
+        if result["reason"] == "not_found":
             return JSONResponse(
                 status_code=404,
                 content={
@@ -552,34 +539,13 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
                     "message": "Case not found"
                 }
             )
-        case_creator = row["casecreator"]
-
-        if payload.get("role") != "ADMIN" and payload.get("username") != case_creator:
+        
+        if result["reason"] == "unauthorized":
             return JSONResponse(
                 status_code=403,
                 content={
                     "status": "error",
                     "message": "Only the case creator or an admin can delete this case"
-                }
-            )
-        
-        case = Case(
-            CaseCreator="temporary",
-            CaseName="temporary",
-            CaseReviews=None,
-            CaseDescription=None
-        )
-
-        case.CaseId = case_id
-
-        deleted = await case.deleteCase()
-
-        if not deleted:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "status": "error",
-                    "message": "Case not found"
                 }
             )
         
@@ -599,7 +565,3 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
                 "message": "Database error"
             }
         )
-    
-    finally:
-        if connection is not None:
-            await connection.close()
