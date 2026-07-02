@@ -1,7 +1,7 @@
 #Here we have unit tests for the comment helper functions in app/core/cases.py
 #Only the validate_comment_length function is tested here, since the other functions are more complex and require a database connection to test properly.
 
-from app.core.cases import validate_comment_length, MAX_COMMENT_LENGTH
+from app.core.cases import validate_comment_length
 
 def test_validate_comment_valid():
     assert validate_comment_length("This is a valid comment") is True
@@ -23,15 +23,6 @@ def test_validate_comment_tabs_and_newlines():
     assert validate_comment_length("\t\n") is False
 
 
-def test_validate_comment_at_max_length():
-    comment = "A" * MAX_COMMENT_LENGTH
-    assert validate_comment_length(comment) is True
-
-
-def test_validate_comment_exceeds_max_length():
-    comment = "A" * (MAX_COMMENT_LENGTH + 1)
-    assert validate_comment_length(comment) is False
-
 def test_validate_comment_none():
     assert validate_comment_length(None) is False
 
@@ -44,8 +35,6 @@ def test_validate_comment_non_string_list():
     assert validate_comment_length(["comment"]) is False
 
 
-def test_validate_comment_strips_before_length_check():
-    # A comment with only surrounding whitespace should be rejected
-    padded = "  " + "A" * MAX_COMMENT_LENGTH + "  "
-    # The stripped length equals MAX_COMMENT_LENGTH, so it should still pass
-    assert validate_comment_length(padded) is True
+def test_validate_comment_strips_whitespace():
+    # Surrounding whitespace is stripped before checking thus content still valid
+    assert validate_comment_length("  hello  ") is True

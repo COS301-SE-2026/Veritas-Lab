@@ -367,17 +367,14 @@ class Case:
                 await connection.close()
 
 
-MAX_COMMENT_LENGTH = 2000
-
 def validate_comment_length(comment: str) -> bool:
     """
-    Returns True if the comment is a non-empty string that does not exceed
-    the max character limit. Returns False if empty, whitespace, or too long.
+    Returns True if the comment is a non-empty, non-whitespace string.
+    No upper length limit is enforced. the DB column is TEXT.
     """
     if not isinstance(comment, str):
         return False
-    stripped_comment = comment.strip()
-    return 0 < len(stripped_comment) <= MAX_COMMENT_LENGTH
+    return len(comment.strip()) > 0
 
 async def get_case_status(connection: asyncpg.Connection, case_id: uuid.UUID) -> str:
     """

@@ -120,21 +120,6 @@ def test_create_comment_blank_comment(monkeypatch):
     assert response.status_code == 400
     assert response.json()["status"] == "error"
 
-def test_create_comment_too_long(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": "A" * 2001},
-        headers={"Authorization": "Bearer fake"}
-    )
-
-    assert response.status_code == 400
-    assert response.json()["status"] == "error"
-
     #case status tests to be able to make a comment.
 
 def test_create_comment_case_not_found(monkeypatch):
