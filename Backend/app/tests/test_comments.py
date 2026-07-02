@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 
 from app.api.main import app
-import app.api.routers.comments_router as comments_router
+import app.api.routers.cases_router as cases_router
 
 client = TestClient(app)
 
@@ -36,7 +36,7 @@ def test_create_comment_missing_jwt(monkeypatch):
     def mock_verifyJWT(authorization):
         raise Exception("Missing Authorization header")
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post("/api/cases/comments", json={})
 
@@ -47,7 +47,7 @@ def test_create_comment_invalid_jwt(monkeypatch):
     def mock_verifyJWT(auth):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/cases/comments",
@@ -64,7 +64,7 @@ def test_create_comment_missing_case_id(monkeypatch):
     def mock_verifyJWT(auth):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/cases/comments",
@@ -79,7 +79,7 @@ def test_create_comment_invalid_case_id_format(monkeypatch):
     def mock_verifyJWT(auth):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/cases/comments",
@@ -88,13 +88,13 @@ def test_create_comment_invalid_case_id_format(monkeypatch):
     )
 
     assert response.status_code == 400
-    assert response.json() == {"status": "error", "message": "Invalid case_id format. Must be a valid UUID"}
+    assert response.json() == {"status": "error", "message": "Invalid case_id format"}
 
 def test_create_comment_missing_comment(monkeypatch):
     def mock_verifyJWT(auth):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/cases/comments",
@@ -109,7 +109,7 @@ def test_create_comment_blank_comment(monkeypatch):
     def mock_verifyJWT(auth):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/cases/comments",
@@ -124,7 +124,7 @@ def test_create_comment_too_long(monkeypatch):
     def mock_verifyJWT(auth):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
 
     response = client.post(
         "/api/cases/comments",
@@ -144,9 +144,9 @@ def test_create_comment_case_not_found(monkeypatch):
     async def mock_get_case_status(conn, case_id):
         return "not_found"
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -164,9 +164,9 @@ def test_create_comment_user_on_open_case(monkeypatch):
     async def mock_get_case_status(conn, case_id):
         return "open"
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -185,9 +185,9 @@ def test_create_comment_investigator_on_closed_case(monkeypatch):
     async def mock_get_case_status(conn, case_id):
         return "closed"
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -210,10 +210,10 @@ def test_create_comment_user_on_closed_case(monkeypatch):
     async def mock_insert_comment(conn, case_id, username, comment):
         return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -239,10 +239,10 @@ def test_create_comment_investigator_on_open_case(monkeypatch):
     async def mock_insert_comment(conn, case_id, username, comment):
         return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -267,10 +267,10 @@ def test_create_comment_admin_on_open_case(monkeypatch):
     async def mock_insert_comment(conn, case_id, username, comment):
         return {**FAKE_COMMENT_RESPONSE, "username": username}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -293,10 +293,10 @@ def test_create_comment_admin_on_closed_case(monkeypatch):
     async def mock_insert_comment(conn, case_id, username, comment):
         return {**FAKE_COMMENT_RESPONSE, "username": username}
 
-    monkeypatch.setattr(comments_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(comments_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(comments_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(comments_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
+    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
 
     response = client.post(
         "/api/cases/comments",
@@ -306,15 +306,6 @@ def test_create_comment_admin_on_closed_case(monkeypatch):
 
     assert response.status_code == 201
     assert response.json()["status"] == "success"
-from fastapi.testclient import TestClient
-import pytest
-from fastapi import Request
-from unittest.mock import MagicMock
-from app.api.main import app
-from datetime import datetime, timedelta, timezone
-import app.api.routers.cases_router as cases_router
-
-client = TestClient(app)
 
 
 def test_update_comment_success(monkeypatch):

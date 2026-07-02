@@ -608,12 +608,11 @@ async def retreive_comments(
         )
 
 @router.post("/cases/comments", status_code=201)
-async def create_comment(request: CreateCommentRequest,
-    authorization: str | None = Header(default=None)):
+async def create_comment(body: CreateCommentRequest, req: Request):
 
-    # Step 1: authenticate
+    # Step 1: authenticate via Request.
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(req)
     except Exception as e:
         return JSONResponse(status_code=401,
                             content={"status": "error", "message": str(e)})
@@ -622,18 +621,18 @@ async def create_comment(request: CreateCommentRequest,
     username = payload.get("username")
 
     # Step 2: validate case_id presence and UUID format
-    if not request.case_id:
+    if not body.case_id:
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "case_id is needed."})
 
     try:
-        case_id = UUID(request.case_id)
+        case_id = UUID(body.case_id)
     except ValueError:
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Invalid case_id format"})
 
     # Step 3: validate comment text
-    if not request.comment or not validate_comment_length(request.comment):
+    if not body.comment or not validate_comment_length(body.comment):
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Comment must be a non-empty string"})
 
@@ -663,7 +662,7 @@ async def create_comment(request: CreateCommentRequest,
                                 content={"status": "error", "message": "Investigators may only comment on open cases"})
 
         # Step 6: insert the comment
-        new_comment = await insert_comment(connection, case_id, username, request.comment)
+        new_comment = await insert_comment(connection, case_id, username, body.comment)
 
         return JSONResponse(status_code=201,
                             content={"status": "success", "comment": new_comment})
