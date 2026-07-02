@@ -367,21 +367,8 @@ class Case:
 
                 media_rows = await connection.fetch(
                     """
-                    SELECT DISTINCT
-                        media.MediaId AS "mediaid",
-                        mt.MediaBucket AS "mediabucket",
-                        mt.MediaExtension AS "mediaextension"
-                    FROM "Cases_DB"."Reports" r
-                    JOIN "Cases_DB"."Media" media ON r.ImageId = media.MediaId
-                    JOIN "Cases_DB"."MediaType" mt ON media.MediaType = mt.MediaTypeId
-                    WHERE r.CaseId = $1
-                    """,
-                    case_id
-                )
-            
-                await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Reports"
+                    SELECT DISTINCT ImageId AS "mediaid"
+                    FROM "Cases_DB"."Reports"
                     WHERE CaseId = $1
                     """,
                     case_id
@@ -405,29 +392,31 @@ class Case:
                 for media_row in media_rows:
                     media_id = media_row["mediaid"]
 
-                    still_used = await connection.fetchval(
+                    deleted_media = await connection.fetchrow(
                         """
-                        SELECT COUNT(*)
-                        FROM "Cases_DB"."Reports"
-                        WHERE ImageId = $1
+                        DELETE FROM "Cases_DB"."Media" media
+                        USING "Cases_DB"."MediaType" mt
+                        WHERE media.MediaId = $1
+                        AND media.MediaType = mt.MediaTypeId
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM "Cases_DB"."Reports" r
+                            WHERE r.ImageId = media.MediaId
+                        )
+                        RETURNING 
+                            media.MediaId AS "mediaid",
+                            mt.MediaBucket AS "mediabucket",
+                            mt.MediaExtension AS "mediaextension"
                         """,
                         media_id
                     )
 
-                    if still_used == 0:
-                        await connection.execute(
-                            """
-                            DELETE FROM "Cases_DB"."Media"
-                            WHERE MediaId = $1
-                            """,
-                            media_id
-                        )
-
+                    if deleted_media is not None:
                         orphan_media.append({
-                                "mediaid":media_id,
-                                "mediabucket": media_row["mediabucket"],
-                                "mediaextension": media_row["mediaextension"]
-                        })
+                                    "mediaid": deleted_media["mediaid"],
+                                    "mediabucket": deleted_media["mediabucket"],
+                                    "mediaextension": deleted_media["mediaextension"]
+                            })                 
                 
             minioEndpointRaw = (
                 os.getenv("MINIO_ENDPOINT")
