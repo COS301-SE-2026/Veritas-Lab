@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from app.core.cases import Case
-from app.core.comments import validate_comment_length, get_case_status, insert_comment
+from app.core.cases import validate_comment_length, get_case_status, insert_comment
 from app.auth.auth import verifyJWT
 from app.core.env import ENVLoader
 import asyncpg

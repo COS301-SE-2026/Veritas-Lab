@@ -1,7 +1,7 @@
-#Here we have unit tests for app/core/comments.py
+#Here we have unit tests for the comment helper functions in app/core/cases.py
 #Only the validate_comment_length function is tested here, since the other functions are more complex and require a database connection to test properly.
 
-from app.core.comments import validate_comment_length, MAX_COMMENT_LENGTH
+from app.core.cases import validate_comment_length, MAX_COMMENT_LENGTH
 
 def test_validate_comment_valid():
     assert validate_comment_length("This is a valid comment") is True
