@@ -365,4 +365,59 @@ class Case:
         finally:
             if connection is not None:
                 await connection.close()
-        
+
+
+def validate_comment_length(comment: str) -> bool:
+    """
+    Returns True if the comment is a non-empty, non-whitespace string.
+    No upper length limit is enforced. the DB column is TEXT.
+    """
+    if not isinstance(comment, str):
+        return False
+    return len(comment.strip()) > 0
+
+async def get_case_status(connection: asyncpg.Connection, case_id: uuid.UUID) -> str:
+    """
+    Looks up a case by id and returns its current status.
+
+    Returns:
+        'not_found' - no case with this id exists
+        'closed'    - the case exists and is closed
+        'open'      - the case exists and is open
+    """
+    row = await connection.fetchrow(
+        """
+        SELECT caseclosed
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        case_id
+    )
+
+    if row is None:
+        return "not_found"
+
+    return "closed" if row["caseclosed"] else "open"
+
+async def insert_comment(connection: asyncpg.Connection, case_id: uuid.UUID, username: str, comment: str) -> dict:
+    """
+    Inserts a new comment into the Comments table and returns the created record.
+    """
+    row = await connection.fetchrow(
+        """
+        INSERT INTO "Cases_DB"."Comments" (caseid, username, comment)
+        VALUES ($1, $2, $3)
+        RETURNING commentid, caseid, username, comment, commenttimestamp
+        """,
+        case_id,
+        username,
+        comment.strip()
+    )
+
+    return {
+        "commentId": row["commentid"],
+        "caseId": str(row["caseid"]),
+        "username": row["username"],
+        "comment": row["comment"],
+        "timestamp": row["commenttimestamp"].isoformat() if row["commenttimestamp"] else None
+    }
