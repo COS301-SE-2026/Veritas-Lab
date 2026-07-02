@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from app.core.cases import Case
+from app.core.comments import validate_comment_length, get_case_status, insert_comment
 from app.auth.auth import verifyJWT
 from app.core.env import ENVLoader
 import asyncpg
@@ -34,6 +35,11 @@ class CreateSingleCaseRequest(BaseModel):
 
 class UpdateCommentRequest(BaseModel):
     comment: str
+
+class CreateCommentRequest(BaseModel):
+    # None is allowed so FastAPI does not reject the request before our validation runs.
+    case_id: str | None = None
+    comment: str | None = None
 
 def _format_case_evidence(row: dict) -> dict:
     media_id = row["mediaid"]
@@ -600,3 +606,67 @@ async def retreive_comments(
             status_code=500,
             content={"status": "error", "message": str(e)}
         )
+
+@router.post("/cases/comments", status_code=201)
+async def create_comment(request: CreateCommentRequest,
+    authorization: str | None = Header(default=None)):
+
+    # Step 1: authenticate
+    try:
+        payload = verifyJWT(authorization)
+    except Exception as e:
+        return JSONResponse(status_code=401,
+                            content={"status": "error", "message": str(e)})
+
+    role = payload.get("role")
+    username = payload.get("username")
+
+    # Step 2: validate case_id presence and UUID format
+    if not request.case_id:
+        return JSONResponse(status_code=400,
+                            content={"status": "error", "message": "case_id is needed."})
+
+    try:
+        case_id = UUID(request.case_id)
+    except ValueError:
+        return JSONResponse(status_code=400,
+                            content={"status": "error", "message": "Invalid case_id format"})
+
+    # Step 3: validate comment text
+    if not request.comment or not validate_comment_length(request.comment):
+        return JSONResponse(status_code=400,
+                            content={"status": "error", "message": "Comment must be a non-empty string"})
+
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME
+    )
+
+    try:
+        # Step 4: check case exists and its status
+        case_status = await get_case_status(connection, case_id)
+
+        if case_status == "not_found":
+            return JSONResponse(status_code=404,
+                                content={"status": "error", "message": "Case not found"})
+
+        # Step 5: enforce role-based commenting rules
+        if role == "USER" and case_status != "closed":
+            return JSONResponse(status_code=403,
+                                content={"status": "error", "message": "Users may only comment on closed cases"})
+
+        if role == "INVESTIGATOR" and case_status != "open":
+            return JSONResponse(status_code=403,
+                                content={"status": "error", "message": "Investigators may only comment on open cases"})
+
+        # Step 6: insert the comment
+        new_comment = await insert_comment(connection, case_id, username, request.comment)
+
+        return JSONResponse(status_code=201,
+                            content={"status": "success", "comment": new_comment})
+
+    finally:
+        await connection.close()
