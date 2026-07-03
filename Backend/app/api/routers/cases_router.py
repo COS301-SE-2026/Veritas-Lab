@@ -492,12 +492,12 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
 
 @router.delete("/deleteComment/comment/{comment_id}")
 async def delete_comment(request: Request, comment_id: int):
-  try:
+    try:
         payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-          content={"status": "error", "message": str(e)}
+            content={"status": "error", "message": str(e)}
         )
     
     connection = None
@@ -529,7 +529,7 @@ async def delete_comment(request: Request, comment_id: int):
                     "message": "Comment not found or user unauthorized"
                 }
             )
-        
+            
         return JSONResponse(
             status_code=200,
             content={
@@ -537,6 +537,7 @@ async def delete_comment(request: Request, comment_id: int):
                 "message": "Comment deleted successfully."
             }
         )
+    
     except asyncpg.PostgresError:
         return JSONResponse(
             status_code=500,
@@ -545,6 +546,7 @@ async def delete_comment(request: Request, comment_id: int):
                 "message": "Database error"
             }
         )
+        
     finally:
         if connection is not None:
             await connection.close()
