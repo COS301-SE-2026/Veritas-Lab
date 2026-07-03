@@ -237,3 +237,193 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockMinioClass, mockD
     assert excInfo.value.status_code == 409
     assert "already associated with this case" in excInfo.value.detail
 
+#Tests for deleting the Evidence
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+async def test_deleteEvidence_investigator_duplicate_entry(mockMinioClass, mockDbConnect):
+    """
+An investigator deletes a duplicate. Only the report is deleted.
+    """
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
+    mockDbConnection.fetchrow = AsyncMock(return_value=None)
+    mockDbConnection.close = AsyncMock()
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = uuid.uuid4()
+    test_media_id = uuid.uuid4()
+    test_user = "Investigator_Bob"
+
+    result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+
+    mockDbConnection.execute.assert_called_once()
+    mockMinioClient.remove_object.assert_not_called()
+    assert result["Status"] == "success"
+    assert result["Deleted"] == test_media_id
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+async def test_deleteEvidence_investigator_only_entry(mockMinioClass, mockDbConnect):
+    """
+An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
+    """
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockMediaData = {
+        "mediaid": "mocked-uuid",
+        "mediabucket": "evidence-bucket",
+        "mediaextension": ".jpg"
+    }
+
+    mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
+    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+    mockDbConnection.close = AsyncMock()
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = uuid.uuid4()
+    test_media_id = uuid.uuid4()
+    test_user = "Investigator_Bob"
+
+    result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+
+    mockMinioClient.remove_object.assert_called_once_with(
+        bucket_name="evidence-bucket",
+        object_name="mocked-uuid.jpg"
+    )
+    assert result["Status"] == "success"
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+async def test_deleteEvidence_admin_duplicate_entry(mockMinioClass, mockDbConnect):
+    """
+An admin deletes a duplicate. Therefore only the report is deleted
+    """
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
+    mockDbConnection.fetchrow = AsyncMock(return_value=None)
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = uuid.uuid4()
+    test_media_id = uuid.uuid4()
+    
+    result = await case.deleteEvidence(media_id=test_media_id)
+
+    mockDbConnection.execute.assert_called_once()
+    mockMinioClient.remove_object.assert_not_called()
+    assert result["Status"] == "success"
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+async def test_deleteEvidence_admin_only_entry(mockMinioClass, mockDbConnect):
+    """
+An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
+    """
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockMediaData = {
+        "mediaid": "admin-mocked-uuid",
+        "mediabucket": "evidence-bucket",
+        "mediaextension": ".png"
+    }
+
+    mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
+    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = uuid.uuid4()
+    test_media_id = uuid.uuid4()
+    
+    result = await case.deleteEvidence(media_id=test_media_id)
+
+    mockMinioClient.remove_object.assert_called_once_with(
+        bucket_name="evidence-bucket",
+        object_name="admin-mocked-uuid.png"
+    )
+    assert result["Status"] == "success"
+
+@pytest.mark.asyncio
+async def test_deleteEvidence_missing_case_id_400():
+    """
+    A missing Media_id should raise an exception
+    """
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = None
+
+    test_media_id = uuid.uuid4()
+    test_user = "Investigator_Bob"
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+
+    assert excInfo.value.status_code == 400
+    assert excInfo.value.detail == "Case id is missing"
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_deleteEvidence_investigator_unauthorized_403(mockDbConnect):
+    """
+An investigator tries to delete evidence but it fails due to either CaseCreator validation or record is missing (returns DELETE 0). Should raise 403.
+    """
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
+    
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = uuid.uuid4()
+    test_media_id = uuid.uuid4()
+    test_user = "Hacker_Eve"
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+
+    assert excInfo.value.status_code == 403
+    assert "Unauthorized" in excInfo.value.detail
+
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_deleteEvidence_admin_not_found_404(mockDbConnect):
+    """
+When an admin tries to delete a record that does not exist. (returns DELETE 0). Should raise 404.
+    """
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+
+    mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
+    
+    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case.CaseId = uuid.uuid4()
+    test_media_id = uuid.uuid4()
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.deleteEvidence(media_id=test_media_id)
+
+    assert excInfo.value.status_code == 404
+    assert excInfo.value.detail == "Media not found."
