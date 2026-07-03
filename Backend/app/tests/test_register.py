@@ -4,7 +4,8 @@ import app.auth.auth as auth
 
 client = TestClient(app)
 
-def testSuccessfulRegistration(monkeypatch):
+def test_successful_registration(monkeypatch):
+    client.cookies.clear()
     async def mock_searchUsersViaEmail(email):
         return None
 
@@ -38,7 +39,10 @@ def testSuccessfulRegistration(monkeypatch):
         "message": "Account created successfully"
     }
 
-def testInvalidEmailReturns400():
+    assert auth.COOKIE_NAME not in response.cookies
+
+def test_invalid_email_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -49,8 +53,10 @@ def testInvalidEmailReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testMissingEmailReturns400():
+def test_missing_email_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -61,9 +67,11 @@ def testMissingEmailReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
 #testing invalid password
-def testInvalidPasswordReturns400():
+def test_invalid_password_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -74,8 +82,10 @@ def testInvalidPasswordReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testMissingPasswordReturns400():
+def test_missing_password_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -86,9 +96,11 @@ def testMissingPasswordReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-    #test missing username
-def testMissingUsernameReturns400():
+#test missing username
+def test_missing_username_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -99,8 +111,10 @@ def testMissingUsernameReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testDuplicateEmailReturns409(monkeypatch):
+def test_duplicate_email_returns_409(monkeypatch):
+    client.cookies.clear()
     async def mock_searchUsersViaEmail(email):
         return {
             "id": "existing-id",
@@ -125,3 +139,4 @@ def testDuplicateEmailReturns409(monkeypatch):
     )
 
     assert response.status_code == 409
+    assert auth.COOKIE_NAME not in response.cookies

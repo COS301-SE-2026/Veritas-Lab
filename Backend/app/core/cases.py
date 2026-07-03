@@ -421,3 +421,127 @@ async def insert_comment(connection: asyncpg.Connection, case_id: uuid.UUID, use
         "comment": row["comment"],
         "timestamp": row["commenttimestamp"].isoformat() if row["commenttimestamp"] else None
     }
+    
+    @staticmethod
+    async def deleteCase(case_id: uuid.UUID, username: str, role: str):
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        orphan_media = []
+
+        try:
+            async with connection.transaction():
+                case_row = await connection.fetchrow(
+                    """
+                    SELECT casecreator
+                    FROM "Cases_DB"."Cases"
+                    WHERE caseid = $1
+                    """,
+                    case_id
+                )
+
+                if case_row is None:
+                    return {
+                        "deleted": False,
+                        "reason": "not_found"
+                    }
+                
+                case_creator = case_row["casecreator"]
+
+                if role != "ADMIN" and username != case_creator:
+                    return {
+                        "deleted": False,
+                        "reason": "unauthorized"
+                    }
+
+                media_rows = await connection.fetch(
+                    """
+                    SELECT DISTINCT ImageId AS "mediaid"
+                    FROM "Cases_DB"."Reports"
+                    WHERE CaseId = $1
+                    """,
+                    case_id
+                )
+
+                deleted_case = await connection.fetchrow(
+                    """
+                    DELETE FROM "Cases_DB"."Cases"
+                    WHERE caseid = $1
+                    RETURNING caseid
+                    """,
+                    case_id
+                )
+
+                if deleted_case is None:
+                    return {
+                        "deleted": False,
+                        "reason": "not_found"
+                    }
+            
+                for media_row in media_rows:
+                    media_id = media_row["mediaid"]
+
+                    deleted_media = await connection.fetchrow(
+                        """
+                        DELETE FROM "Cases_DB"."Media" media
+                        USING "Cases_DB"."MediaType" mt
+                        WHERE media.MediaId = $1
+                        AND media.MediaType = mt.MediaTypeId
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM "Cases_DB"."Reports" r
+                            WHERE r.ImageId = media.MediaId
+                        )
+                        RETURNING 
+                            media.MediaId AS "mediaid",
+                            mt.MediaBucket AS "mediabucket",
+                            mt.MediaExtension AS "mediaextension"
+                        """,
+                        media_id
+                    )
+
+                    if deleted_media is not None:
+                        orphan_media.append({
+                                "mediaid": deleted_media["mediaid"],
+                                "mediabucket": deleted_media["mediabucket"],
+                                "mediaextension": deleted_media["mediaextension"]
+                            })                 
+                
+            minioEndpointRaw = (
+                os.getenv("MINIO_ENDPOINT")
+                or os.getenv("AWS_S3_ENDPOINT_URL")
+                or "localhost:9000"
+            )
+
+            minioSecure = minioEndpointRaw.startswith("https://")
+            minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
+
+            minioClient = Minio(
+                minioEndpoint,
+                access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+                secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+                secure=minioSecure
+            )
+
+            for media in orphan_media:
+                object_name = f"{media['mediaid']}{media['mediaextension']}"
+
+                try:
+                    minioClient.remove_object(
+                        bucket_name=media["mediabucket"],
+                        object_name=object_name
+                    )
+                except Exception as e:
+                    print(f"Failed to delete MinIO object {object_name}: {e}")
+
+            return {
+                "deleted": True,
+                "reason": "deleted"
+            }
+        finally:
+            await connection.close()

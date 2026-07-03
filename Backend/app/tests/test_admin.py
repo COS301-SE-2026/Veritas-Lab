@@ -28,10 +28,11 @@ class MockConnection:
 async def mock_connect(*args, **kwargs):
     return MockConnection()
 
-def testFetchUsersSuccess(monkeypatch):
-    def mockVerifyJWT(authorization):
+def test_fetch_users_success(monkeypatch):
+    client.cookies.clear()
+    def mockVerifyJWT(request):
         return{
-            "userId": "admin-id",
+            "sub": "admin-id",
             "username":"Admin user",
             "role": "ADMIN"
         }
@@ -41,10 +42,7 @@ def testFetchUsersSuccess(monkeypatch):
 
     response =client.post(
         "/api/fetchUsers",
-        json={},
-        headers={
-            "Authorization": "Bearer valid-token"
-        }
+        json={}
     )
 
     assert response.status_code == 200
@@ -66,10 +64,11 @@ def testFetchUsersSuccess(monkeypatch):
         "role":"USER"
     }
 
-def testFetchUsersNotAdmin(monkeypatch):
-    def mockVerifyJWT(authorization):
+def test_fetch_users_not_admin(monkeypatch):
+    client.cookies.clear()
+    def mockVerifyJWT(request):
         return{
-            "userId": "normal-user-id",
+            "sub": "normal-user-id",
             "username": "Normal User",
             "role": "USER"
         }
@@ -78,10 +77,7 @@ def testFetchUsersNotAdmin(monkeypatch):
 
     response = client.post(
         "/api/fetchUsers",
-        json={},
-        headers={
-            "Authorization" : "Bearer valid-user-token"
-        }
+        json={}
     )
 
     assert response.status_code == 403
@@ -93,18 +89,16 @@ def testFetchUsersNotAdmin(monkeypatch):
         "message": "User unauthorized"
     }
 
-def testFetchUsersInvalidToken(monkeypatch):
-    def mockVerifyJWT(authorization):
+def test_fetch_users_invalid_token(monkeypatch):
+    client.cookies.clear()
+    def mockVerifyJWT(request):
         raise ValueError("Invalid token")
     
     monkeypatch.setattr(auth, "verifyJWT", mockVerifyJWT)
 
     response = client.post(
         "/api/fetchUsers",
-        json={},
-        headers={
-            "Authorization": "Bearer invalid-token"
-        }
+        json={}
     )
 
     assert response.status_code  == 401
@@ -116,7 +110,8 @@ def testFetchUsersInvalidToken(monkeypatch):
         "message": "Invalid token" 
     }
 
-def testFetchUsersNoUsers(monkeypatch):
+def test_fetch_users_no_users(monkeypatch):
+    client.cookies.clear()
     class EmptyMockConnection:
         async def fetch(self, query):
             return []
@@ -127,9 +122,9 @@ def testFetchUsersNoUsers(monkeypatch):
     async def empty_mock_connect(*args, **kwargs):
         return EmptyMockConnection()
     
-    def mockVerifyJWT(authorization):
+    def mockVerifyJWT(request):
         return{
-            "userId":"admin-id",
+            "sub":"admin-id",
             "username": "Admin User",
             "role": "ADMIN"
         }
@@ -139,10 +134,7 @@ def testFetchUsersNoUsers(monkeypatch):
 
     response = client.post(
         "/api/fetchUsers",
-        json={},
-        headers={
-            "Authorization":"Bearer valid-token"
-        }
+        json={}
     )
 
     assert response.status_code == 200
@@ -154,7 +146,8 @@ def testFetchUsersNoUsers(monkeypatch):
         "users":[]
     }
 
-def test_ChangeUserRoleSuccess(monkeypatch):
+def test_change_user_role_success(monkeypatch):
+    client.cookies.clear()
     class MockConnection:
         async def execute(self, query, *args):
             return "UPDATE 1"
@@ -165,9 +158,9 @@ def test_ChangeUserRoleSuccess(monkeypatch):
     async def mock_connect(*args, **kwargs):
         return MockConnection()
     
-    def mockVerifyJWT(authorization):
+    def mockVerifyJWT(request):
         return {
-            "userId": "admin-id",
+            "sub": "admin-id",
             "username": "Admin User",
             "role": "ADMIN"
         }
@@ -180,9 +173,6 @@ def test_ChangeUserRoleSuccess(monkeypatch):
         json={
             "userId": "22222222-2222-2222-2222-222222222222",
             "NewRole": "INVESTIGATOR"
-        },
-        headers={
-            "Authorization": "Bearer valid-token"
         }
     )
 
@@ -195,10 +185,11 @@ def test_ChangeUserRoleSuccess(monkeypatch):
         "message": "User role updated to INVESTIGATOR successfully"
     }
 
-def test_ChangeUserRoleNotAdmin(monkeypatch):
-    def mockVerifyJWT(authorization):
+def test_change_user_role_not_admin(monkeypatch):
+    client.cookies.clear()
+    def mockVerifyJWT(request):
         return{
-            "userId": "normal-user-id",
+            "sub": "normal-user-id",
             "username": "Normal User",
             "role": "USER"
         }
@@ -207,10 +198,7 @@ def test_ChangeUserRoleNotAdmin(monkeypatch):
 
     response = client.post(
         "/api/changeUserRole",
-        json={},
-        headers={
-            "Authorization" : "Bearer valid-user-token"
-        }
+        json={}
     )
 
     assert response.status_code == 403
@@ -222,7 +210,8 @@ def test_ChangeUserRoleNotAdmin(monkeypatch):
         "message": "User unauthorized"
     }
 
-def test_ChangeUserRoleNoUser(monkeypatch):
+def test_change_user_role_no_user(monkeypatch):
+    client.cookies.clear()
     class MockConnection:
         async def execute(self, query, *args):
             return "UPDATE 0"
@@ -233,9 +222,9 @@ def test_ChangeUserRoleNoUser(monkeypatch):
     async def mock_connect(*args, **kwargs):
         return MockConnection()
     
-    def mockVerifyJWT(authorization):
+    def mockVerifyJWT(request):
         return {
-            "userId": "admin-id",
+            "sub": "admin-id",
             "username": "Admin User",
             "role": "ADMIN"
         }
@@ -246,11 +235,8 @@ def test_ChangeUserRoleNoUser(monkeypatch):
     response = client.post(
         "/api/changeUserRole",
         json={
-            "userId": "nonexistent-user-id",
+            "userId": "12345678-abcd-ef01-2345-6789abcdef01",
             "NewRole": "INVESTIGATOR"
-        },
-        headers={
-            "Authorization": "Bearer valid-token"
         }
     )
 
@@ -263,10 +249,11 @@ def test_ChangeUserRoleNoUser(monkeypatch):
         "message": "No user found with the provided user_id"
     }
 
-def test_ChangeUserRoleInvalidRole(monkeypatch):
-    def mockVerifyJWT(authorization):
+def test_change_user_role_invalid_role(monkeypatch):
+    client.cookies.clear()
+    def mockVerifyJWT(request):
         return {
-            "userId": "admin-id",
+            "sub": "admin-id",
             "username": "Admin User",
             "role": "ADMIN"
         }
@@ -278,9 +265,6 @@ def test_ChangeUserRoleInvalidRole(monkeypatch):
         json={
             "userId": "22222222-2222-2222-2222-222222222222",
             "NewRole": "Monkey"
-        },
-        headers={
-            "Authorization": "Bearer valid-token"
         }
     )
 
@@ -293,8 +277,9 @@ def test_ChangeUserRoleInvalidRole(monkeypatch):
         "message": "Invalid or missing NewRole field."
     }
 
-def test_AdminCannotChangeSelf(monkeypatch):
+def test_admin_cannot_change_self(monkeypatch):
     """Test that the admin cannot change their own role"""
+    client.cookies.clear()
     class MockConnection:
         async def execute(self, query, *args):
             return "UPDATE 1"
@@ -307,7 +292,7 @@ def test_AdminCannotChangeSelf(monkeypatch):
     
     admin_id = "11111111-1111-1111-1111-111111111111"
     
-    def mockVerifyJWT(authorization):
+    def mockVerifyJWT(request):
         return {
             "sub": admin_id,
             "username": "Admin User",
@@ -322,9 +307,6 @@ def test_AdminCannotChangeSelf(monkeypatch):
         json={
             "userId": admin_id,
             "NewRole": "USER"
-        },
-        headers={
-            "Authorization": "Bearer valid-token"
         }
     )
 

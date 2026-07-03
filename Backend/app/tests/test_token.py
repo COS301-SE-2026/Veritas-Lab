@@ -3,7 +3,7 @@ from app.api.main import app
 import app.auth.auth as auth
 from datetime import datetime, timezone, timedelta
 
-COOKIE_NAME = "JWT_token"
+COOKIE_NAME = auth.COOKIE_NAME
 
 def make_client(token: str | None = None) -> TestClient:
     """Create a TestClient with an optional cookie pre-set."""
@@ -30,6 +30,7 @@ def test_refresh_token_invalid_jwt(monkeypatch):
         "status": "error",
         "message": "Invalid token"
     }
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_refresh_token_does_not_need_refreshing(monkeypatch):
     def mock_jwt_decode(token, secret_key, algorithms, options=None):
@@ -49,6 +50,7 @@ def test_refresh_token_does_not_need_refreshing(monkeypatch):
         "status":"success",
         "message":"Token does not need refreshing"
     }
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_refresh_token_success_within_one_minute(monkeypatch):
     def mock_jwt_decode(token, secret_key, algorithms, options=None):
@@ -85,6 +87,9 @@ def test_refresh_token_success_within_one_minute(monkeypatch):
         "status": "success",
         "message": "Token refreshed",
     }
+
+    assert auth.COOKIE_NAME in response.cookies
+    assert response.cookies.get(auth.COOKIE_NAME) == "new-mock-token"
 
 def test_refresh_token_success_when_expired(monkeypatch):
     decode_call_count = {"count": 0}
@@ -127,6 +132,8 @@ def test_refresh_token_success_when_expired(monkeypatch):
         "message": "Token refreshed",
     }
     assert decode_call_count["count"] == 2
+    assert auth.COOKIE_NAME in response.cookies
+    assert response.cookies.get(auth.COOKIE_NAME) == "new-token-from-expired-token"
 
 def test_refresh_token_expired_but_invalid_on_second_decode(monkeypatch):
     decode_call_count = {"count": 0}
@@ -147,6 +154,7 @@ def test_refresh_token_expired_but_invalid_on_second_decode(monkeypatch):
         "message": "Invalid token"
     }
     assert decode_call_count["count"] == 2
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_refresh_token_missing_expiry(monkeypatch):
     def mock_jwt_decode(token, secret_key, algorithms, options=None):
@@ -165,6 +173,7 @@ def test_refresh_token_missing_expiry(monkeypatch):
         "status": "error",
         "message": "Token missing expiry"
     }
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_refresh_token_missing_required_fields(monkeypatch):
     def mock_jwt_decode(token, secret_key, algorithms, options=None):
@@ -182,6 +191,7 @@ def test_refresh_token_missing_required_fields(monkeypatch):
         "status": "error",
         "message": "Token missing required fields"
     }
+    assert auth.COOKIE_NAME not in response.cookies
 
 def test_refresh_token_update_jwt_issued_fails(monkeypatch):
     def mock_jwt_decode(token, secret_key, algorithms, options=None):
@@ -209,3 +219,4 @@ def test_refresh_token_update_jwt_issued_fails(monkeypatch):
         "status": "error",
         "message": "Failed to update token issue time"
     }
+    assert auth.COOKIE_NAME not in response.cookies

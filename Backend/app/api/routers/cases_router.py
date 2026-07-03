@@ -12,6 +12,8 @@ import os
 from urllib.parse import urlparse
 from minio import Minio
 from datetime import datetime, timedelta, timezone
+import uuid
+from uuid import uuid4
 
 env = ENVLoader()
 
@@ -138,32 +140,34 @@ async def get_cases(request: Request):
             }
         )
     
-    # this should not be here as any user can load the number of cases
-    # if payload.get("role") == "USER":
-    #     return JSONResponse(
-    #         status_code=403,
-    #         content={
-    #             "status": "error",
-    #             "message": "User unauthorized"
-    #         }
-    #     )
-    
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = None
 
     try:
-        rows = await connection.fetch(
-            """
-            SELECT *
-            FROM "Cases_DB"."Cases"
-            ORDER BY casecreationdate DESC
-            """
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
         )
+
+        if payload.get("role") == "USER":
+            rows = await connection.fetch(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                WHERE caseclosed = TRUE
+                ORDER BY casecreationdate DESC
+                """
+            )
+        else:
+            rows = await connection.fetch(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                ORDER BY casecreationdate DESC
+                """
+            )
 
 
         cases = []
@@ -188,9 +192,17 @@ async def get_cases(request: Request):
                 "cases": cases
             }
         )
-
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
     
 @router.post("/getSingleCase")
 async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request):
@@ -204,16 +216,6 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "message": str(e)
             }
         )
-    
-    #this should not be here as any user type can clikc on one case
-    # if payload.get("role") == "USER":
-    #     return JSONResponse(
-    #         status_code=403,
-    #         content={
-    #             "status": "error",
-    #             "message": "User unauthorized"
-    #         }
-    #     )
     
     if not case_request.CaseID:
         return JSONResponse(
@@ -235,23 +237,36 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             }
         )
 
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = None
 
     try:
-        row= await connection.fetchrow(
-            """
-            SELECT *
-            FROM "Cases_DB"."Cases"
-            WHERE caseid = $1
-            """,
-            case_id
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
         )
+
+        if payload.get("role") != "USER":
+            row= await connection.fetchrow(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                """,
+                case_id
+            )
+        else:
+            row= await connection.fetchrow(
+                """
+                SELECT *
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                AND caseclosed = TRUE
+                """,
+                case_id
+            )
     
         if row is None:
             return JSONResponse(
@@ -304,9 +319,17 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "evidence": [_format_case_evidence(row) for row in evidence_rows]
             })
         )
-
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
 
 
 @router.post("/cases/evidence")
@@ -382,9 +405,10 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         await connection.close()
 
 @router.post("/closeCase")
-async def close_case(request: CreateSingleCaseRequest, authorization: str | None = Header(default=None)):
+async def close_case(case_request: CreateSingleCaseRequest, request: Request):
+    connection = None
     try:
-        payload = verifyJWT(authorization)
+        payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -397,8 +421,17 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
             content={"status": "error", "message": "User unauthorized"}
         )
     
+    if not case_request.CaseID:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "CaseID required"
+            }
+        )
+    
     try:
-        case_uuid = UUID(request.CaseID)
+        case_uuid = UUID(case_request.CaseID)
     except ValueError as e:
         return JSONResponse(
             status_code=400, 
@@ -407,16 +440,16 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
                 "message": "Invalid CaseID"
             }
         )
-        
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
 
-    try:
+    try:    
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
@@ -445,17 +478,26 @@ async def close_case(request: CreateSingleCaseRequest, authorization: str | None
                 "message": "Case closed successfully."
             }
         )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
 
 @router.delete("/deleteComment/comment/{comment_id}")
 async def delete_comment(request: Request, comment_id: int):
-    try:
+  try:
         payload = verifyJWT(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": str(e)}
+          content={"status": "error", "message": str(e)}
         )
     
     connection = None
@@ -544,14 +586,14 @@ async def delete_comment(request: Request, comment_id: int):
                 content={
                     "status":"error",
                     "message": "Comment not found or user unauthorized"
-                }
+                  }
             )
         
         return JSONResponse(
             status_code=200,
             content={
                 "status": "success",
-                "message": "Comment deleted successfully."
+              "message": "Comment deleted successfully."
             }
         )
     except asyncpg.PostgresError:
@@ -669,3 +711,87 @@ async def create_comment(body: CreateCommentRequest, req: Request):
 
     finally:
         await connection.close()
+          
+@router.delete("/deleteCase")
+async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+    
+    if payload.get("role") == "USER":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+    
+    if not case_request.CaseID:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "CaseID required"
+            }
+        )
+    
+    try:
+        case_id = uuid.UUID(case_request.CaseID)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+    try:
+        result = await Case.deleteCase(
+            case_id=case_id,
+            username=payload.get("username"),
+            role=payload.get("role")
+        )
+
+        if result["reason"] == "not_found":
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found"
+                }
+            )
+        
+        if result["reason"] == "unauthorized":
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "status": "error",
+                    "message": "Only the case creator or an admin can delete this case"
+                }
+            )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Case deleted successfully"
+            }
+        )
+    
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
