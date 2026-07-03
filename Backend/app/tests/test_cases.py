@@ -2,6 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock, MagicMock
 from datetime import datetime, timezone
+from fastapi import HTTPException
+from uuid import uuid4
+import asyncpg
 
 from app.api.main import app
 from app.core.cases import Case
@@ -22,23 +25,33 @@ def test_case_creation_with_valid_data():
     assert case.CaseCreationDate is None
     assert case.CaseClosed is False
 
-def test_case_creation_requires_creator():
-    client.cookies.clear()
-    with pytest.raises(ValueError, match="CaseCreator is required"):
-        Case(CaseName="Test Case")
+def test_Case_Creation_Does_Not_Require_Creator():
+    test_case = Case(CaseName="Flood in Durban")
+    assert test_case.CaseCreator is None
+    assert test_case.CaseName == "Flood in Durban"
+    assert test_case.CaseId is None
+    assert test_case.CaseCreationDate is None
+    assert test_case.CaseClosed is False
 
-def test_case_creation_requires_case_name():
-    client.cookies.clear()
-    with pytest.raises(ValueError, match="CaseName is required"):
-        Case(CaseCreator="alice_dev")
+def test_Case_Creation_Does_Not_Require_CaseName():
+    test_case = Case(CaseCreator="Terry")
+    assert test_case.CaseCreator == "Terry"
+    assert test_case.CaseName is None
+    assert test_case.CaseId is None
+    assert test_case.CaseCreationDate is None
+    assert test_case.CaseClosed is False
 
-def test_case_creation_rejects_blank_creator():
-    client.cookies.clear()
+@pytest.mark.asyncio
+async def test_Case_Creation_Rejects_Blank_Creator():
     with pytest.raises(ValueError, match="CaseCreator is required"):
         Case(CaseCreator="   ", CaseName="Test Case")
 
-def test_case_creation_rejects_blank_case_name():
-    client.cookies.clear()
+@pytest.mark.asyncio
+async def test_Cas_creation_Rejects_Invalid_UUID():
+    with pytest.raises(ValueError, match="'2' is not a valid UUID format"):
+        Case(CaseID="2")
+
+def test_CaseCreationRejectsBlankCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(CaseCreator="alice_dev", CaseName="   ")
 
@@ -103,20 +116,6 @@ def test_case_stores_description():
 
     assert case.CaseDescription == "This is a test description"
 
-def test_case_stores_reviews():
-    client.cookies.clear()
-    reviews = {
-        "reviewer": "admin",
-        "status": "pending"
-    }
-
-    case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case",
-        CaseReviews=reviews
-    )
-
-    assert case.CaseReviews == reviews
 
 def test_case_to_json_before_create():
     client.cookies.clear()
@@ -124,7 +123,6 @@ def test_case_to_json_before_create():
         CaseCreator="alice_dev",
         CaseName="Test Case",
         CaseDescription="This is a test description",
-        CaseReviews={"status": "pending"}
     )
 
     result = case.toJSON()
@@ -133,7 +131,6 @@ def test_case_to_json_before_create():
         "caseId": None,
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
-        "caseReviews": {"status": "pending"},
         "caseDescription": "This is a test description",
         "caseClosed": False,
         "caseCreationDate": None
@@ -145,7 +142,6 @@ def test_case_to_json_after_create_values_set():
         CaseCreator="alice_dev",
         CaseName="Test Case",
         CaseDescription="This is a test description",
-        CaseReviews={"reviewer": "admin", "status": "approved"}
     )
 
     case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
@@ -158,7 +154,6 @@ def test_case_to_json_after_create_values_set():
         "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
-        "caseReviews": {"reviewer": "admin", "status": "approved"},
         "caseDescription": "This is a test description",
         "caseClosed": True,
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
@@ -175,7 +170,6 @@ def test_case_to_json_with_no_description_or_reviews():
         "caseId": None,
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
-        "caseReviews": None,
         "caseDescription": None,
         "caseClosed": False,
         "caseCreationDate": None
@@ -218,7 +212,6 @@ async def test_create_case_with_mock(mock_connect):
     assert params == (
         case.CaseCreator,
         case.CaseName,
-        None,
         case.CaseDescription,
         case.CaseClosed
     )
@@ -286,7 +279,6 @@ def test_get_cases_admin_returns_cases(monkeypatch):
             "caseid": "12345678-abcd-ef01-2345-6789abcdef01",
             "casecreator": "admin_user",
             "casename": "Flood in Durban",
-            "casereviews": None,
             "casedescription": "Flood investigation case",
             "caseclosed": False,
             "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
@@ -295,7 +287,6 @@ def test_get_cases_admin_returns_cases(monkeypatch):
             "caseid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             "casecreator": "investigator_user",
             "casename": "Fake Evidence Case",
-            "casereviews": {"status": "pending"},
             "casedescription": "Media verification case",
             "caseclosed": False,
             "casecreationdate": datetime(2026, 5, 21, 10, 30, 0, tzinfo=timezone.utc)
@@ -327,7 +318,6 @@ def test_get_cases_admin_returns_cases(monkeypatch):
         "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
         "caseName": "Flood in Durban",
         "caseCreator": "admin_user",
-        "caseReviews": None,
         "caseDescription": "Flood investigation case",
         "caseClosed": False,
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
@@ -337,7 +327,6 @@ def test_get_cases_admin_returns_cases(monkeypatch):
         "caseId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         "caseName": "Fake Evidence Case",
         "caseCreator": "investigator_user",
-        "caseReviews": {"status": "pending"},
         "caseDescription": "Media verification case",
         "caseClosed": False,
         "caseCreationDate": "2026-05-21T10:30:00+00:00"
@@ -497,15 +486,12 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         }
 
     mock_minio_client = MagicMock()
-    
-
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
         "caseid": fake_case_id,
         "casecreator": "admin_user",
         "casename": "Flood in Durban",
-        "casereviews": {"status": "pending"},
         "casedescription": "Flood investigation case",
         "caseclosed": False,
         "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
@@ -521,27 +507,30 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
-    response = client.post(
-        "/api/getSingleCase",
-        json={"CaseID": fake_case_id}
-    )
+    with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
+        mock_get_comments.return_value = []
+    
+        response = client.post(
+          "/api/getSingleCase",
+          json={"CaseID": fake_case_id}
+      )
 
     assert response.status_code == 200
-
     assert response.json() == {
         "status": "success",
         "case": {
             "caseId": fake_case_id,
             "caseName": "Flood in Durban",
             "caseCreator": "admin_user",
-            "caseReviews": {"status": "pending"},
             "caseDescription": "Flood investigation case",
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
         },
+        "comments": [],
         "evidence": []
     }
 
+ 
     fake_media_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     fake_report_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
@@ -550,19 +539,19 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
 
     fake_evidence_rows = [
-    {
-        "reportid": fake_report_id,
-        "mediaid": fake_media_id,
-        "mediatitle": "123",
-        "mediabucket": "images",
-        "mediaextension": ".png",
-        "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-        "mediaurl": fake_url,
-        "reportartifacts": {"ocr": "captured"},
-        "reportfindings": "Flood watermark detected",
-        "reportcomments": "Upload approved",
-        "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
-    }
+        {
+            "reportid": fake_report_id,
+            "mediaid": fake_media_id,
+            "mediatitle": "123",
+            "mediabucket": "images",
+            "mediaextension": ".png",
+            "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "mediaurl": fake_url,
+            "reportartifacts": {"ocr": "captured"},
+            "reportfindings": "Flood watermark detected",
+            "reportcomments": "Upload approved",
+            "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
+        }
     ]
 
     mock_connection = AsyncMock()
@@ -575,10 +564,13 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
-    response = client.post(
-        "/api/getSingleCase",
-        json={"CaseID": fake_case_id}
-    )
+    with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
+        mock_get_comments.return_value = []
+    
+        response = client.post(
+          "/api/getSingleCase",
+          json={"CaseID": fake_case_id}
+      )
 
     assert response.status_code == 200
     assert response.json() == {
@@ -587,11 +579,11 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "caseId": fake_case_id,
             "caseName": "Flood in Durban",
             "caseCreator": "admin_user",
-            "caseReviews": {"status": "pending"},
             "caseDescription": "Flood investigation case",
             "caseClosed": False,
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
         },
+        "comments": [],
         "evidence": [
             {
                 "reportId": fake_report_id,
@@ -609,10 +601,11 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         ]
     }
 
-    mock_connect.assert_called_once()
-    mock_connection.fetchrow.assert_called_once()
-    mock_connection.fetch.assert_called_once()
-    mock_connection.close.assert_called_once()
+    # asserts counting the calls
+    assert mock_connect.call_count == 1
+    assert mock_connection.fetchrow.call_count == 1
+    assert mock_connection.fetch.call_count == 1
+    assert mock_connection.close.call_count == 1
 
 def test_close_case_missing_jwt(monkeypatch):
     client.cookies.clear()
@@ -894,6 +887,85 @@ def test_close_case_admin_not_case_creator(monkeypatch):
     assert "casecreator = $2" in fetchrow_args[0]
     assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
     assert fetchrow_args[2] == "admin_user"
+
+@pytest.mark.asyncio
+async def test_get_comment_missing_case_id():
+    """
+    Verifies that the case.getComments(self) will throw an error if there is no caseId defined
+    """
+    test_case=Case(
+        CaseCreator="Billy Jean",
+        CaseName="Billy Jean's not my Son"
+    )
+
+    with pytest.raises(HTTPException) as exeInfo:
+        await test_case.getComments()
+
+    assert exeInfo.value.status_code == 400
+    assert "Case id is missing" in exeInfo.value.detail  
+
+@pytest.mark.asyncio
+async def test_get_comment_successful():
+    """
+Return a dict of the comments belonging to the case id
+    """
+    #Enter a random fake number for the case id
+    fake_id = uuid4()
+    fake_case_id=str(fake_id)
+    fake_record=[{
+        "commentID": "1",
+        "username": "Billy Jean",
+        "comment": "I am your child",
+        "commenttimestamp":"2026-06-29 15:37:28.458993+00"
+    }]
+
+    mock_connection = AsyncMock()
+    mock_connection.fetch.return_value = fake_record
+    
+    test_case = Case(
+        CaseID=fake_case_id
+    )
+
+    with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
+        mock_connect.return_value = mock_connection
+
+        result = await test_case.getComments()
+
+    assert isinstance(result, list), "Should be a single returned record"
+    assert result[0]["commentID"] == "1"
+    assert len(result) == 1
+    assert result[0]["username"] == "Billy Jean"
+    assert result[0]["comment"] == "I am your child"
+    assert result[0]["commenttimestamp"]=="2026-06-29 15:37:28.458993+00"
+
+    mock_connection.fetch.assert_called_once_with(
+        """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
+        , str(fake_id)
+    )
+
+@pytest.mark.asyncio
+async def test_get_comment_database_error():
+    """
+Raises an error due to the database going down
+    """
+    #Enter a random fake number for the case id
+    fake_id = uuid4()
+    fake_case_id=str(fake_id)
+    
+
+    test_case=Case(
+        CaseID=fake_case_id
+    )
+
+    with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
+        mock_connect.side_effect = asyncpg.PostgresConnectionError("Connection lost")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await test_case.getComments()
+
+    assert exc_info.value.status_code == 500
+    assert "Internal Server Error" in exc_info.value.detail or "database" in exc_info.value.detail.lower()
+
 
 def test_delete_case_success_creator(monkeypatch):
     client.cookies.clear()

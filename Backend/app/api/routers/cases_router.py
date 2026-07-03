@@ -1,7 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from app.core.cases import Case
+from app.core.cases import validate_comment_length, get_case_status, insert_comment
 from app.auth.auth import verifyJWT
 from app.core.env import ENVLoader
 import asyncpg
@@ -32,6 +34,14 @@ class CreateCaseRequest(BaseModel):
 
 class CreateSingleCaseRequest(BaseModel):
     CaseID: str | None = None
+
+class UpdateCommentRequest(BaseModel):
+    comment: str
+
+class CreateCommentRequest(BaseModel):
+    # None is allowed so FastAPI does not reject the request before our validation runs.
+    case_id: str | None = None
+    comment: str | None = None
 
 def _format_case_evidence(row: dict) -> dict:
     media_id = row["mediaid"]
@@ -166,7 +176,6 @@ async def get_cases(request: Request):
             case = Case(
                 CaseCreator=row["casecreator"],
                 CaseName=row["casename"],
-                CaseReviews=row["casereviews"],
                 CaseDescription=row["casedescription"]
             )
 
@@ -271,7 +280,6 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
         case = Case(
             CaseCreator=row["casecreator"],
             CaseName=row["casename"],
-            CaseReviews=row["casereviews"],
             CaseDescription=row["casedescription"]
         )
 
@@ -304,11 +312,12 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
 
         return JSONResponse(
             status_code=200,
-            content={
+            content=jsonable_encoder({
                 "status": "success",
                 "case": case.toJSON(),
+                "comments": await case.getComments(),
                 "evidence": [_format_case_evidence(row) for row in evidence_rows]
-            }
+            })
         )
     except asyncpg.PostgresError:
         return JSONResponse(
@@ -371,7 +380,6 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         case = Case(
             CaseCreator=row["casecreator"],
             CaseName=row["casename"],
-            CaseReviews=row["casereviews"],
             CaseDescription=row["casedescription"]
         )
 
@@ -482,6 +490,248 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         if connection is not None:
             await connection.close()
 
+@router.post("/editComment/case/{case_id}/comment/{comment_id}")
+async def update_comment(
+    case_id: str,
+    comment_id: int,
+    update_data: UpdateCommentRequest,
+    request: Request
+):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+    try:
+        case_uuid = UUID(case_id)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400, 
+            content={
+                "status": "error", 
+                "message": "Invalid CaseID"
+            }
+        )
+    try:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."Comments"
+            SET Comment = $3
+            WHERE caseid = $1
+            AND username = $2
+            AND commentid = $4
+            RETURNING commentid
+            """,
+            case_uuid,
+            payload.get("username"),
+            update_data.comment,
+            comment_id
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found or user unauthorized."
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Comment edit successfully."
+            }
+        )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
+
+    finally:
+        if connection is not None:
+            await connection.close()
+
+@router.delete("/deleteComment/comment/{comment_id}")
+async def delete_comment(request: Request, comment_id: int):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+    
+    connection = None
+    try:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        row = await connection.fetchrow(
+            """
+            DELETE FROM "Cases_DB"."Comments"
+            WHERE commentid = $1
+            AND username = $2
+            RETURNING commentid
+            """,
+            comment_id,
+            payload.get("username")
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status":"error",
+                    "message": "Comment not found or user unauthorized"
+                }
+            )
+            
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Comment deleted successfully."
+            }
+        )
+    
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
+        
+    finally:
+        if connection is not None:
+            await connection.close()
+
+@router.post("/getComments/{case_id}")
+async def retreive_comments(
+    case_id: str,
+    request: Request
+):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    user_role=payload.get("role")
+    if  user_role is None or user_role== "USER":
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "User unauthorized"}
+        )
+
+    try:
+        case = Case(CaseID=case_id)
+        comments_data= await case.getComments()
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "comments": jsonable_encoder(comments_data)
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+@router.post("/cases/comments", status_code=201)
+async def create_comment(body: CreateCommentRequest, req: Request):
+
+    # Step 1: authenticate via Request.
+    try:
+        payload = verifyJWT(req)
+    except Exception as e:
+        return JSONResponse(status_code=401,
+                            content={"status": "error", "message": str(e)})
+
+    role = payload.get("role")
+    username = payload.get("username")
+
+    # Step 2: validate case_id presence and UUID format
+    if not body.case_id:
+        return JSONResponse(status_code=400,
+                            content={"status": "error", "message": "case_id is needed."})
+
+    try:
+        case_id = UUID(body.case_id)
+    except ValueError:
+        return JSONResponse(status_code=400,
+                            content={"status": "error", "message": "Invalid case_id format"})
+
+    # Step 3: validate comment text
+    if not body.comment or not validate_comment_length(body.comment):
+        return JSONResponse(status_code=400,
+                            content={"status": "error", "message": "Comment must be a non-empty string"})
+
+    connection = await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME
+    )
+
+    try:
+        # Step 4: check case exists and its status
+        case_status = await get_case_status(connection, case_id)
+
+        if case_status == "not_found":
+            return JSONResponse(status_code=404,
+                                content={"status": "error", "message": "Case not found"})
+
+        # Step 5: enforce role-based commenting rules
+        if role == "USER" and case_status != "closed":
+            return JSONResponse(status_code=403,
+                                content={"status": "error", "message": "Users may only comment on closed cases"})
+
+        if role == "INVESTIGATOR" and case_status != "open":
+            return JSONResponse(status_code=403,
+                                content={"status": "error", "message": "Investigators may only comment on open cases"})
+
+        # Step 6: insert the comment
+        new_comment = await insert_comment(connection, case_id, username, body.comment)
+
+        return JSONResponse(status_code=201,
+                            content={"status": "success", "comment": new_comment})
+
+    finally:
+        await connection.close()
+          
 @router.delete("/deleteCase")
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:

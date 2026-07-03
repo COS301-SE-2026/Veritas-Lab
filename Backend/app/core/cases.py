@@ -24,26 +24,90 @@ DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 
-# If the CaseId is None then the case is not in the db. You may call create().
-# When the CaseId is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
+#These three functions were written by Tsephiso and need to be refactored to be object orientated
+def validate_comment_length(comment: str) -> bool:
+    """
+    Returns True if the comment is a non-empty, non-whitespace string.
+    No upper length limit is enforced. the DB column is TEXT.
+    """
+    if not isinstance(comment, str):
+        return False
+    return len(comment.strip()) > 0
 
+async def get_case_status(connection: asyncpg.Connection, case_id: uuid.UUID) -> str:
+    """
+    Looks up a case by id and returns its current status.
+
+    Returns:
+        'not_found' - no case with this id exists
+        'closed'    - the case exists and is closed
+        'open'      - the case exists and is open
+    """
+    row = await connection.fetchrow(
+        """
+        SELECT caseclosed
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        case_id
+    )
+
+    if row is None:
+        return "not_found"
+
+    return "closed" if row["caseclosed"] else "open"
+
+async def insert_comment(connection: asyncpg.Connection, case_id: uuid.UUID, username: str, comment: str) -> dict:
+    """
+    Inserts a new comment into the Comments table and returns the created record.
+    """
+    row = await connection.fetchrow(
+        """
+        INSERT INTO "Cases_DB"."Comments" (caseid, username, comment)
+        VALUES ($1, $2, $3)
+        RETURNING commentid, caseid, username, comment, commenttimestamp
+        """,
+        case_id,
+        username,
+        comment.strip()
+    )
+
+    return {
+        "commentId": row["commentid"],
+        "caseId": str(row["caseid"]),
+        "username": row["username"],
+        "comment": row["comment"],
+        "timestamp": row["commenttimestamp"].isoformat() if row["commenttimestamp"] else None
+    }
+    
+# If the case_id is None then the case is not in the db. You may call create().
+# When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 class Case:
-    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseReviews: dict = None, CaseDescription: str=None):
-        if not CaseCreator or not CaseCreator.strip():
-            raise ValueError("CaseCreator is required")
-        if not CaseName or not CaseName.strip():
-            raise ValueError("CaseName is required")
-        if len(CaseName) > 255:
-            raise ValueError("CaseName must be 255 characters or less")
-        if len(CaseCreator) > 100:
-            raise ValueError("Name is too long. Must be 100 characters or less")
-
-        self.CaseCreator = CaseCreator.strip()
-        self.CaseName = CaseName.strip()
-        self.CaseReviews = CaseReviews
+    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseDescription: str=None, CaseID: str=None):
+        if  not (CaseCreator is None):
+            if not CaseCreator.strip():
+                raise ValueError("CaseCreator is required")
+            if  len(CaseCreator) > 100:
+                raise ValueError("Name is too long. Must be 100 characters or less")
+        if not (CaseName is None):
+            if not CaseName.strip():
+                raise ValueError("CaseName is required")
+            if len(CaseName) > 255:
+                raise ValueError("CaseName must be 255 characters or less")
+        
+        self.CaseCreator = None if CaseCreator is None else CaseCreator.strip()
+        self.CaseName = None if CaseName is None else CaseName.strip()
         self.CaseDescription = CaseDescription
         self.CaseClosed = False
-        self.CaseId = None
+        if CaseID is not None:
+            cleaned_id = CaseID.strip()
+            try:
+                uuid.UUID(cleaned_id)
+                self.CaseId = cleaned_id
+            except ValueError:
+                raise ValueError(f"'{CaseID}' is not a valid UUID format")
+        else:
+            self.CaseId = None
         self.CaseCreationDate = None
 
     async def create(self):
@@ -62,13 +126,12 @@ class Case:
             row = await connection.fetchrow(
                 """
                 INSERT INTO "Cases_DB"."Cases"
-                (casecreator, casename, casereviews, casedescription, caseclosed)
+                (casecreator, casename, casedescription, caseclosed)
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING caseid, casecreationdate
                 """,
                 self.CaseCreator,
                 self.CaseName,
-                json.dumps(self.CaseReviews) if self.CaseReviews is not None else None,
                 self.CaseDescription,
                 self.CaseClosed
             )
@@ -194,7 +257,7 @@ class Case:
                 # Need to reproduce the same db report for this case.
 
                 try:
-                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+                    # Insert into the Reports table allowing the report to have the image's name in the image title column
 
                    await connection.execute(
                         """
@@ -322,12 +385,42 @@ class Case:
             "caseId": str(self.CaseId) if self.CaseId is not None else None,
             "caseName": self.CaseName,
             "caseCreator": self.CaseCreator,
-            "caseReviews": self.CaseReviews,
             "caseDescription": self.CaseDescription,
             "caseClosed": self.CaseClosed,
             "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
         }
-    
+
+    async def getComments(self):
+        if self.CaseId is None:
+            raise HTTPException(status_code=400, detail="Case id is missing")
+
+        connection = None
+        try:
+            connection=await asyncpg.connect(
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME,
+                host=DB_HOST,
+                port=DB_PORT
+            )
+
+            rows = await connection.fetch(
+            """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
+            , self.CaseId
+        )
+
+            return [dict(row) for row in rows]
+
+        except asyncpg.PostgresError:
+            raise HTTPException(
+                status_code=500, 
+                detail="Database connection failure. Internal Server Error."
+            )
+
+        finally:
+            if connection is not None:
+                await connection.close()
+
     @staticmethod
     async def deleteCase(case_id: uuid.UUID, username: str, role: str):
         connection = await asyncpg.connect(
@@ -451,3 +544,4 @@ class Case:
             }
         finally:
             await connection.close()
+

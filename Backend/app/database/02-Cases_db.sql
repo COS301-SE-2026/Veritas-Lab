@@ -12,7 +12,6 @@ Create TABLE IF NOT EXISTS "Cases_DB"."MediaType"(
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    CaseReviews JSONB,
     CaseName varchar(255) NOT NULL,
     CaseCreator varchar(100) NOT NULL, -- A case has to have a creator 
     CaseDescription TEXT,
@@ -37,6 +36,14 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Reports"(
     ReportFindings TEXT,
     ReportComments TEXT,
     ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Comments"(
+    CommentID BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    CaseId UUID NOT NULL REFERENCES "Cases_DB"."Cases"(CaseId) ON DELETE CASCADE ON UPDATE CASCADE,
+    Username varchar(100) NOT NULL,
+    Comment TEXT,
+    CommentTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 create UNIQUE INDEX CaseImage ON "Cases_DB"."Reports"(CaseId, ImageId);
