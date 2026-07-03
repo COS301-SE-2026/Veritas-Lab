@@ -380,6 +380,170 @@ class Case:
             await connection.close()
             await media.close()
 
+    async def deleteEvidence(self, media_id: uuid.UUID, JWT_username: str = None):
+        if self.CaseId is None:
+            raise HTTPException(status_code=400, detail="Case id is missing")
+
+        connection = None
+
+        try:
+            connection=await asyncpg.connect(
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME,
+                host=DB_HOST,
+                port=DB_PORT
+            )
+
+            if JWT_username is not None:
+
+                status=await connection.execute(
+                    """
+                    DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c WHERE r."CaseId" = c."CaseId"
+                    AND r."CaseId" = $1
+                    AND r."ImageId" = $2
+                    AND c."CaseCreator" = $3;
+                    """,
+                    self.CaseId,
+                    media_id,
+                    JWT_username
+                )
+
+                rows_deleted = int(status.split(" ")[1])
+                if rows_deleted == 0:
+                    raise HTTPException(
+                        status_code=403, 
+                        detail="Unauthorized to delete this evidence or record not found."
+                    )
+
+                deleted_media = await connection.fetchrow(
+                        """
+                        DELETE FROM "Cases_DB"."Media" media
+                        USING "Cases_DB"."MediaType" mt
+                        WHERE media.MediaId = $1
+                        AND media.MediaType = mt.MediaTypeId
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM "Cases_DB"."Reports" r
+                            WHERE r.ImageId = media.MediaId
+                        )
+                        RETURNING 
+                            media.MediaId AS "mediaid",
+                            mt.MediaBucket AS "mediabucket",
+                            mt.MediaExtension AS "mediaextension"
+                        """,
+                        media_id
+                    )
+
+                if deleted_media is not None:
+                    
+                    minioEndpointRaw = (
+                        os.getenv("MINIO_ENDPOINT")
+                        or os.getenv("AWS_S3_ENDPOINT_URL")
+                        or "localhost:9000"
+                    )
+
+                    minioSecure = minioEndpointRaw.startswith("https://")
+                    minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
+
+                    minioClient = Minio(
+                        minioEndpoint,
+                        access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+                        secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+                        secure=minioSecure
+                    )
+
+                    object_name = f"{deleted_media["mediaid"]}{deleted_media["mediaextension"]}"
+
+                    try:
+                        minioClient.remove_object(
+                            bucket_name=deleted_media["mediabucket"],
+                            object_name=object_name
+                        )
+                    except Exception as e:
+                        print(f"Failed to delete MinIO object {object_name}: {e}")
+        # Above this is the normal investigator deleting something
+            else:
+                # This block contain the logic for the Admin deleting
+                status=await connection.execute(
+                    """
+                    DELETE FROM "Cases_DB"."Reports" r WHERE
+                    r."CaseId" = $1
+                    AND r."ImageId" = $2;
+                    """,
+                    self.CaseId,
+                    media_id
+                )
+
+                rows_deleted = int(status.split(" ")[1])
+                if rows_deleted == 0:
+                    raise HTTPException(
+                        status_code=404, 
+                        detail="Media not found."
+                    )
+
+                deleted_media = await connection.fetchrow(
+                        """
+                        DELETE FROM "Cases_DB"."Media" media
+                        USING "Cases_DB"."MediaType" mt
+                        WHERE media.MediaId = $1
+                        AND media.MediaType = mt.MediaTypeId
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM "Cases_DB"."Reports" r
+                            WHERE r.ImageId = media.MediaId
+                        )
+                        RETURNING 
+                            media.MediaId AS "mediaid",
+                            mt.MediaBucket AS "mediabucket",
+                            mt.MediaExtension AS "mediaextension"
+                        """,
+                        media_id
+                    )
+
+                if deleted_media is not None:
+                    
+                    minioEndpointRaw = (
+                        os.getenv("MINIO_ENDPOINT")
+                        or os.getenv("AWS_S3_ENDPOINT_URL")
+                        or "localhost:9000"
+                    )
+
+                    minioSecure = minioEndpointRaw.startswith("https://")
+                    minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
+
+                    minioClient = Minio(
+                        minioEndpoint,
+                        access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+                        secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+                        secure=minioSecure
+                    )
+
+                    object_name = f"{deleted_media["mediaid"]}{deleted_media["mediaextension"]}"
+
+                    try:
+                        minioClient.remove_object(
+                            bucket_name=deleted_media["mediabucket"],
+                            object_name=object_name
+                        )
+                    except Exception as e:
+                        print(f"Failed to delete MinIO object {object_name}: {e}")
+        
+            return {
+                "Status" : "success",
+                "Deleted" : media_id
+            }   
+        except asyncpg.PostgresError:
+            raise HTTPException(
+                status_code=500, 
+                detail="Database connection failure. Internal Server Error."
+            )
+
+        finally:
+            if connection is not None:
+                await connection.close()
+        
+
     def toJSON(self):
         return {
             "caseId": str(self.CaseId) if self.CaseId is not None else None,
