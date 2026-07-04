@@ -669,6 +669,60 @@ async def retreive_comments(
             content={"status": "error", "message": str(e)}
         )
 
+@router.post("/delete/case/{case_id}/evidence/{media_id}")
+async def delete_evidence(
+    case_id:str, 
+    media_id:str,
+    request: Request
+):
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": str(e)}
+        )
+
+    user_role=payload.get("role")
+
+    if user_role not in ["INVESTIGATOR", "ADMIN"]:
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "message": "User unauthorized"}
+        )
+
+    try:
+        media_id = uuid.UUID(media_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "Invalid UUID format for media_id."}
+        )
+        
+    try:
+        case = Case(CaseID=case_id)
+        username=payload.get("username") if user_role == "INVESTIGATOR" else None
+        response=await case.deleteEvidence(media_id=media_id, JWT_username=username)
+
+        return JSONResponse(
+            status_code=200,
+            content=response
+        )
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": f"Invalid case_id: {str(e)}"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
 @router.post("/cases/comments", status_code=201)
 async def create_comment(body: CreateCommentRequest, req: Request):
 
