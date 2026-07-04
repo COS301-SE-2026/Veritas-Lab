@@ -23,9 +23,9 @@ export default function Landing() {
 
                     </div>
                     <div>
-                        <div className="flex flex-col items-center justify-center mt-10">
-                            <Button />
-                            <Button />
+                        <div className="flex items-center ml-10 mt-10 gap-5">
+                            <Button text="Sign Up" variant="submit" className="px-20"/>
+                            <Button text="Log In" variant="light" className="px-20"/>
                         </div>
                     </div>
                 </div>

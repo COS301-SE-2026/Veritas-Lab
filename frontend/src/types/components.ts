@@ -75,7 +75,7 @@ export type ButtonProps = {
     onClick?: () => void;
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack';
+    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack' | 'light';
     size?: 'small' | 'medium' | 'large';
     className?: string;
 };
