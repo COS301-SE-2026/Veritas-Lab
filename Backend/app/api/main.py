@@ -21,7 +21,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_origin_regex=os.environ.get(
         "FRONTEND_ORIGIN_REGEX",
-        r"^https://your-app-[a-z0-9-]+-yourteam\.vercel\.app$",
+        r"^https://veritsalab-[a-z0-9-]+\.vercel\.app$"
     ),
     allow_credentials=True,
     allow_methods=["*"],

@@ -23,6 +23,17 @@ DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
+DB_SSL = env.getRequiredEnv("DB_SSL")
+
+async def getConnection() -> asyncpg.Connection:
+    return await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT,
+        ssl="require" if DB_SSL else None,
+    )
 
 #These three functions were written by Tsephiso and need to be refactored to be object orientated
 def validate_comment_length(comment: str) -> bool:
@@ -114,13 +125,7 @@ class Case:
         if self.CaseId is not None:
             raise ValueError("This case already exists")
         
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         try:
             row = await connection.fetchrow(
@@ -195,13 +200,7 @@ class Case:
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid case_id UUID")
 
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         try:
             typeRecord = await connection.fetchrow(
@@ -396,13 +395,7 @@ class Case:
 
         connection = None
         try:
-            connection=await asyncpg.connect(
-                user=DB_USER,
-                password=DB_PASSWORD,
-                database=DB_NAME,
-                host=DB_HOST,
-                port=DB_PORT
-            )
+            connection = await getConnection()
 
             rows = await connection.fetch(
             """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
@@ -423,13 +416,7 @@ class Case:
 
     @staticmethod
     async def deleteCase(case_id: uuid.UUID, username: str, role: str):
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         orphan_media = []
 
