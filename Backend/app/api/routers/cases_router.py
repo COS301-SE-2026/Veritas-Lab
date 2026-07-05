@@ -107,7 +107,7 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
         )
 
     try:
-        case = Case(CaseName=case_request.title, CaseCreator=payload["username"], CaseDescription=case_request.description)
+        case = Case(CaseName=case_request.title, CaseCreator=payload.get("username"), CaseDescription=case_request.description)
     except ValueError as e:
         return JSONResponse(
             status_code=400,

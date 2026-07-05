@@ -127,7 +127,7 @@ class Case:
                 """
                 INSERT INTO "Cases_DB"."Cases"
                 (casecreator, casename, casedescription, caseclosed)
-                VALUES ($1, $2, $3, $4, $5)
+                VALUES ($1, $2, $3, $4)
                 RETURNING caseid, casecreationdate
                 """,
                 self.CaseCreator,
