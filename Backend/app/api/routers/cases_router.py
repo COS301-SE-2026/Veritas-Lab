@@ -327,6 +327,14 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "message":"Database error"
             }
         )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Internal Server Error: {type(e).__name__} - {str(e)}"
+            }
+        )
     finally:
         if connection is not None:
             await connection.close()
