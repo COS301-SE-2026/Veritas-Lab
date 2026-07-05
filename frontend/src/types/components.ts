@@ -81,13 +81,19 @@ export type ButtonProps = {
 };
 
 export type CardProps = {
-    header: string | ReactNode;
-    content: string | ReactNode;
-    footer: string | ReactNode;
+    children?: ReactNode;
+    header?: string | ReactNode;
+    content?: string | ReactNode;
+    footer?: string | ReactNode;
     className?: string;
     headerClassName?: string;
     contentClassName?: string;
     footerClassName?: string;
+};
+
+export type CardSectionProps = {
+    children: ReactNode;
+    className?: string;
 };
 
 export type HeadingProps = {
