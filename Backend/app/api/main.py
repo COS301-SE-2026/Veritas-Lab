@@ -14,6 +14,7 @@ app = FastAPI(
 
 allowed_origins = [
     os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000"),
+    "https://localhost:3000",
 ]
 
 app.add_middleware(
