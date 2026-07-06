@@ -107,7 +107,7 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
         )
 
     try:
-        case = Case(CaseName=case_request.title, CaseCreator=payload["username"], CaseDescription=case_request.description)
+        case = Case(CaseName=case_request.title, CaseCreator=payload.get("username"), CaseDescription=case_request.description)
     except ValueError as e:
         return JSONResponse(
             status_code=400,
@@ -325,6 +325,14 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             content={
                 "status":"error",
                 "message":"Database error"
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Internal Server Error: {type(e).__name__} - {str(e)}"
             }
         )
     finally:
