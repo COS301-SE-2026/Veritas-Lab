@@ -14,12 +14,13 @@ export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension }: Ev
                             className="max-h-16 max-w-16 object-contain"
                         /> 
                         {/* this wil be for the image when we make image there. */}
+                        
                     </div>
-                    <div className="flex h-24 items-center justify-center overflow-hidden rounded-[14px] bg-black/5">
+                    {/* <div className="flex h-24 items-center justify-center overflow-hidden rounded-[14px] bg-black/5">
                         <div className="text-center">
                             
                         </div>
-                    </div>
+                    </div> */}
                 </>
             )}
             contentClassName="text-[16px] text-(--color-light)"
