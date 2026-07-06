@@ -45,8 +45,8 @@ export default function Landing() {
             </div>
             <div className="flex-1 bg-white">
                 <div className="flex flex-col w-full ml-10 mt-5">
-                    <div>
-                        <p>FEATURE HIGHLIGHTS</p>
+                    <div className="text-xl text-(--color-light)">
+                    <p>HIGHLIGHTED FEATURES</p>
                     </div>
                     <div>
                         <LandingHighlights />
