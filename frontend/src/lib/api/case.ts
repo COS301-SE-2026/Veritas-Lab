@@ -1,16 +1,12 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-import { getAuthHeaders } from './authHeaders';
 import type { CaseResponse } from '@/types/api';
 
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/getSingleCase`, {
+        const res = await fetch(`/api/getSingleCase`, {
             method: 'POST',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
- //               ...getAuthHeaders()
             },
             body: JSON.stringify({ CaseID: caseID })
         });
@@ -32,11 +28,10 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
         formData.append('case_id', uuid);
         formData.append('media', evidence);
 
-        const res = await fetch(`${API_BASE_URL}/api/cases/evidence`, {
+        const res = await fetch(`/api/cases/evidence`, {
             method: 'POST',
             credentials: 'include',
             headers: {
- //               ...getAuthHeaders()
             },
             body: formData
         });
