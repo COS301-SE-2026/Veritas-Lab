@@ -30,7 +30,7 @@ export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const token = request.cookies.get(AUTH_TOKEN_KEY)?.value;
     const isAuthenticated = isValidToken(token);
-    
+
     if (token && !isAuthenticated) {
         const response = isProtectedPath(pathname)
             ? NextResponse.redirect(new URL('/login', request.url))
@@ -40,11 +40,11 @@ export function proxy(request: NextRequest) {
     }
 
     if (pathname === '/') {
-        return NextResponse.redirect(new URL(isAuthenticated ? '/dashboard' : '/login', request.url));
+        return NextResponse.redirect(new URL(isAuthenticated ? '/dashboard' : '/landing', request.url));
     }
 
     if (!isAuthenticated && isProtectedPath(pathname)) {
-        return NextResponse.redirect(new URL('/login', request.url));
+        return NextResponse.redirect(new URL('/landing', request.url));
     }
 
     if (isAuthenticated && isAuthRoute(pathname)) {
@@ -55,7 +55,7 @@ export function proxy(request: NextRequest) {
 }
 
 const protectedPrefixes = ['/dashboard', '/case-page'];
-const authRoutes = ['/login', '/register'];
+const authRoutes = ['/login', '/register', '/landing'];
 
 function isProtectedPath(pathname: string): boolean {
     return protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -66,5 +66,5 @@ function isAuthRoute(pathname: string): boolean {
 }
 
 export const config = {
-    matcher: ['/', '/dashboard/:path*', '/case-page/:path*', '/login', '/register'],
+    matcher: ['/', '/dashboard/:path*', '/case-page/:path*', '/login', '/register', '/landing'],
 };

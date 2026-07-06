@@ -1,6 +1,7 @@
 import type { ChangeEvent, ReactNode } from 'react';
 import type { DashboardCase } from '@/types/api';
 import type { SortKey, StatusFilter } from '@/types/hooks';
+import { LucideIcon } from 'lucide-react';
 
 export type CaseCardProps = {
     caseTitle: string;
@@ -133,3 +134,9 @@ export type TextProps = {
     text: string;
     className?: string;
 };
+
+export interface Highlight {
+    title: string;
+    description: string;
+    icon: LucideIcon;
+}

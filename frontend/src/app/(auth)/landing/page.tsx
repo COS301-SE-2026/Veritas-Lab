@@ -1,20 +1,22 @@
-import React from "react";
+'use client';
 import LandingHighlights from "@/components/common/landingHighlights";
 import Button from "@/components/ui/button";
 import Image from 'next/image';
 import CircleShape from "@/assets/Ellipse.svg"
+import { useRouter } from "next/navigation";
 export default function Landing() {
+    const router = useRouter();
     return (
         <>
         <div className="grid h-screen grid-rows-[55%_45%]">
-            <div className="bg-(--color-primary) -z-10">
-                <div className="fixed inset-0 -z-10 overflow-hidden">
-                    <Image src={CircleShape} alt="Circle Shape" className="absolute top-[-60%] left-[-50%] w-[100%] h-[100%] " />   
-                    <Image src={CircleShape} alt="Circle Shape" className="absolute top-[30%] left-[0%] w-[60%] h-[60%] " />  
-                    <Image src={CircleShape} alt="Circle Shape" className="absolute top-[-30%] left-[23%] w-[80%] h-[80%] " /> 
-                    <Image src={CircleShape} alt="Circle Shape" className="absolute top-[30%] left-[65%] w-[60%] h-[60%] " /> 
+            <div className="relative overflow-hidden bg-(--color-primary)">
+                <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
+                    <Image src={CircleShape} alt="" className="absolute top-[-60%] left-[-50%] w-[100%] h-[100%]" />
+                    <Image src={CircleShape} alt="" className="absolute top-[30%] left-[-15%] w-[90%] h-[90%]" />
+                    <Image src={CircleShape} alt="" className="absolute top-[-30%] left-[23%] w-[80%] h-[80%]" />
+                    <Image src={CircleShape} alt="" className="absolute top-[40%] left-[45%] w-[110%] h-[110%]" />
                 </div>
-                <div className="flex flex-col w-full ml-10">
+                <div className="relative z-10 flex flex-col w-full ml-10">
                     <div>
                         <div className="flex items-center gap-2 mt-10">
                             <Image src="/VL_Logo_light.svg" alt="Veritas Lab Logo" width={80} height={80} className="" />
@@ -29,19 +31,19 @@ export default function Landing() {
                         </p>
                     </div>
                     <div>
-                        <p className="text-(--color-light) text-lg mt-5">
+                        <p className="text-(--color-light) text-xl mt-5">
                             Transform your digital forensics workflow with our cutting-edge platform.
                         </p>
                     </div>
                     <div>
                         <div className="flex items-center mt-25 gap-6">
-                            <Button text="Sign Up" variant="submit" className="px-20 py-3 text-lg font-semibold"/>
-                            <Button text="Log In" variant="light" className="px-20 py-3 text-lg font-semibold"/>
+                            <Button text="Sign Up" variant="submit" className="px-20 py-3 text-lg font-semibold" onClick={() => router.push('/register')}/>
+                            <Button text="Log In" variant="light" className="px-20 py-3 text-lg font-semibold" onClick={() => router.push('/login')}/>
                         </div>
                     </div>
                 </div>
             </div>
-            <div className="flex-1 z-20 bg-white">
+            <div className="flex-1 bg-white">
                 <div className="flex flex-col w-full ml-10 mt-5">
                     <div>
                         <p>FEATURE HIGHLIGHTS</p>
