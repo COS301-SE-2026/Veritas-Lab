@@ -18,7 +18,7 @@ DB_NAME = env.getRequiredEnv("DB_NAME")
 class MediaService(ABC):
 
     @abstractmethod
-    async def extract(self, media_id: UUID):
+    async def extract(self, file_path: str, media_record: dict):
         pass
     
     async def get_media_record(self, media_id: UUID):
@@ -34,8 +34,8 @@ class MediaService(ABC):
             row = await connection.fetchrow(
                 """
                 SELECT
-                    media.MediaId AS "mediaid"
-                    mt.MediaBucket AS "mediabucket"
+                    media.MediaId AS "mediaid",
+                    mt.MediaBucket AS "mediabucket",
                     mt.MediaExtension AS "mediaextension"
                 FROM "Cases_DB"."Media" media
                 JOIN "Cases_DB"."MediaType" mt
@@ -49,7 +49,7 @@ class MediaService(ABC):
                 raise ValueError("Media not found")
             
             return {
-                "media_id": row["media_id"],
+                "media_id": row["mediaid"],
                 "bucket": row["mediabucket"],
                 "extension": row["mediaextension"],
                 "object_name": f"{row['mediaid']}{row['mediaextension']}"
@@ -65,5 +65,10 @@ class MediaService(ABC):
             suffix=media_record["extension"],
             delete=True
         ) as temp_file:
-            self.download_media(media_record,ey)
-        await self.extract(media_id)
+            await self.download_media(media_record,temp_file.name)
+
+            metadata = await self.extract(
+                file_path=temp_file.name,
+                media_record=media_record
+            )
+        
