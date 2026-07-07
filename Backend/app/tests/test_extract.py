@@ -25,7 +25,7 @@ async def test_pdf_extract_success(monkeypatch):
             return [fake_metadata]
     
     monkeypatch.setattr(
-        "app.services.pdf_service.exiftool.ExifToolHelper",
+        "app.core.pdf_service.exiftool.ExifToolHelper",
         MockExifToolHelper
     )
 
@@ -71,7 +71,7 @@ async def test_png_extract_success(monkeypatch):
             return [fake_metadata]
         
     monkeypatch.setattr(
-        "app.services.png_service.exiftool.ExifToolHelper",
+        "app.core.png_service.exiftool.ExifToolHelper",
         MockExifToolHelper
     )
 
@@ -118,7 +118,7 @@ async def test_jpg_extract_success(monkeypatch):
             return [fake_metadata]
         
     monkeypatch.setattr(
-        "app.services.jpg_service.exiftool.ExifToolHelper",
+        "app.core.jpg_service.exiftool.ExifToolHelper",
         MockExifToolHelper
     )
 
@@ -154,7 +154,7 @@ async def test_pdf_extract_empty_metadata(monkeypatch):
             return []
     
     monkeypatch.setattr(
-        "app.services.pdf_service.exiftool.ExifToolHelper",
+        "app.core.pdf_service.exiftool.ExifToolHelper",
         MockExifToolHelper
     )
 

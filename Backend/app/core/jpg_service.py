@@ -1,5 +1,5 @@
 import exiftool
-from media_service import MediaService
+from app.core.media_service import MediaService
 
 class JPGService(MediaService):
 
