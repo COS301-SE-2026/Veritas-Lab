@@ -670,10 +670,10 @@ class Case:
 
                     if deleted_media is not None:
                         orphan_media.append({
-                                "mediaid": deleted_media["mediaid"],
-                                "mediabucket": deleted_media["mediabucket"],
-                                "mediaextension": deleted_media["mediaextension"]
-                            })                 
+                            "mediaid": deleted_media["mediaid"],
+                            "mediabucket": deleted_media["mediabucket"],
+                            "mediaextension": deleted_media["mediaextension"]
+                        })                 
                 
             minioEndpointRaw = (
                 os.getenv("MINIO_ENDPOINT")
