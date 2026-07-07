@@ -1,14 +1,18 @@
 import exiftool
-import asyncpg
-import tempfile
-import os
-from cases import Case
-from uuid import UUID
 from media_service import MediaService
-from minio import Minio
 
+class PNGService(MediaService):
 
-# class PNGService(MediaService):
+    async def extract(self, file_path: str, media_record: dict):
+        with exiftool.ExifToolHelper() as et:
+            metadata_list = et.get_metadata(file_path)
 
-#     async def extract(self, media_id: UUID):
-        
+        metadata = metadata_list[0] if metadata_list else {}
+
+        return {
+            "media_id": str(media_record["media_id"]),
+            "file_type": "PNG",
+            "bucket": media_record["bucket"],
+            "object_name": media_record["object_name"],
+            "metadata": metadata
+        }

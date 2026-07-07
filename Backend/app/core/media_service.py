@@ -70,7 +70,7 @@ class MediaService(ABC):
             file_path=file_path
         )
     
-    def creat_minio_client(self):
+    def create_minio_client(self):
         minio_endpoint_raw = (
             os.getenv("MINIO_ENDPOINT")
             or os.getenv("AWS_S3_ENDPOINT_URL")
