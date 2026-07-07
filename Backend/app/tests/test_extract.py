@@ -141,3 +141,33 @@ async def test_jpg_extract_success(monkeypatch):
     assert result["metadata"]["EXIF:Make"] == "Canon"
     assert result["metadata"]["File:MIMEType"] == "image/jpeg"
 
+@pytest.mark.asyncio
+async def test_pdf_extract_empty_metadata(monkeypatch):
+    class MockExifToolHelper:
+        def __enter__(self):
+            return self
+        
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
+        def get_metadata(self, file_path):
+            return []
+    
+    monkeypatch.setattr(
+        "app.services.pdf_service.exiftool.ExifToolHelper",
+        MockExifToolHelper
+    )
+
+    service = PDFService()
+
+    media_record = {
+        "media_id": "12345678-abcd-ef01-2345-6789abcdef01",
+        "bucket": "pdf-bucket",
+        "extension": ".pdf",
+        "object_name": "12345678-abcd-ef01-2345-6789abcdef01.pdf"
+    }
+
+    result = await service.extract("/tmp/test.pdf", media_record)
+
+    assert result["file_type"] == "PDF"
+    assert result["metadata"] == {}
