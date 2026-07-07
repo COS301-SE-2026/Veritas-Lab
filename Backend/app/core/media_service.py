@@ -3,8 +3,10 @@ from uuid import UUID
 import asyncpg
 from dotenv import load_dotenv
 from app.core.env import ENVLoader
+from minio import Minio
 import os
 import tempfile
+from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
 env = ENVLoader()
@@ -57,6 +59,37 @@ class MediaService(ABC):
         
         finally:
             await connection.close()
+
+    async def download_media(self, media_record: dict, file_path: str):
+        minio_client = self.create_minio_client()
+
+        await run_in_threadpool(
+            minio_client.fget_object,
+            bucket_name=media_record["bucket"],
+            object_name=media_record["object_name"],
+            file_path=file_path
+        )
+    
+    def creat_minio_client(self):
+        minio_endpoint_raw = (
+            os.getenv("MINIO_ENDPOINT")
+            or os.getenv("AWS_S3_ENDPOINT_URL")
+            or "localhost:9000"
+        )
+
+        minio_secure = minio_endpoint_raw.startswith("https://")
+        minio_endpoint = (
+            minio_endpoint_raw
+            .removeprefix("http://")
+            .removeprefix("https://")
+        )
+
+        return Minio(
+            minio_endpoint,
+            access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
+            secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+            secure=minio_secure
+        )
 
     async def analyse(self, media_id: UUID):
         media_record = await self.get_media_record(media_id)
