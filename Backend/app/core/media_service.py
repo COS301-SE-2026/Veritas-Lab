@@ -92,14 +92,17 @@ class MediaService(ABC):
         )
 
     async def analyse(self, media_id: UUID):
+        # Get the storage details of the file
         media_record = await self.get_media_record(media_id)
 
         with tempfile.NamedTemporaryFile(
             suffix=media_record["extension"],
             delete=True
         ) as temp_file:
+            # download the MINIO object here
             await self.download_media(media_record,temp_file.name)
 
+            # extract the metadata from the downloaded file
             metadata = await self.extract(
                 file_path=temp_file.name,
                 media_record=media_record
