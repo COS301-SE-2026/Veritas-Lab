@@ -380,11 +380,11 @@ async def register(request: RegisterRequest, response: Response):
         )
 
     hashedPassword = hashPassword(request.password)
-    newUser = await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
+    new_user = await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
 
-    token = createToken(newUser)
+    token = createToken(new_user)
 
-    await updateUserJWTIssued(newUser["email"])
+    await updateUserJWTIssued(new_user["email"])
 
     response.set_cookie(
         key=COOKIE_NAME,

@@ -20,17 +20,17 @@ def test_successful_registration(monkeypatch):
             "role": role
         }
     
-    def mock_createToken(user):
+    def mock_create_token(user):
         return "mockedJWTToken"
     
-    async def mock_updateUserJWTIssued(email): 
+    async def mock_update_user_JWT_issued(email): 
         return None
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
     monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
     monkeypatch.setattr(auth, "insertUser", mock_insertUser)
-    monkeypatch.setattr(auth, "createToken", mock_createToken)
-    monkeypatch.setattr(auth, "updateUserJWTIssued", mock_updateUserJWTIssued)
+    monkeypatch.setattr(auth, "createToken", mock_create_token)
+    monkeypatch.setattr(auth, "updateUserJWTIssued", mock_update_user_JWT_issued)
 
     response = client.post(
         "/api/register",
