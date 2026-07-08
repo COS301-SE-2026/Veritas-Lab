@@ -35,6 +35,7 @@ jobs:
                   DB_PASSWORD: postgres
                   DB_NAME: test_db
                   DB_PORT: 5432
+                  DB_SSL: false
                   JWT_SECRET: test-secret
                   HASH: HS256
                   TOKEN_EXPIRE: 5
@@ -82,6 +83,7 @@ jobs:
                   DB_NAME=veritas_ci
                   DB_PORT=5432
                   DB_HOST=localhost
+                  DB_SSL=false
                   JWT_SECRET=test-secret
                   HASH=HS256
                   TOKEN_EXPIRE=5
