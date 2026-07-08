@@ -32,7 +32,7 @@ export default function AdminDeleteModal({
                         <div className='text-[16px] font-bold'>Cancel</div>
                     </Button>
                     <Button variant='submit' onClick={onConfirm} disabled={isSubmitting}>
-                        <div className='text-[16px] font-bold'>{isSubmitting ? 'Deleting...' : 'Delete user'}</div>
+                        <div className='text-[16px] font-bold'>{isSubmitting ? 'Deleting' : 'Delete user'}</div>
                     </Button>
                 </div>
             </div>
