@@ -14,3 +14,23 @@ const users: AdminUser[] = [
         role: 'USER',
     },
 ];
+
+describe('AdminUsersPanel', () => {
+    it('renders the user table headings and user cards', () => {
+        render(<AdminUsersPanel users={users} onRoleChange={jest.fn()} onDelete={jest.fn()} />);
+        expect(screen.getByText('ID')).toBeInTheDocument();
+        expect(screen.getByText('Name & Surname')).toBeInTheDocument();
+        expect(screen.getByText('Username')).toBeInTheDocument();
+        expect(screen.getByText('Role')).toBeInTheDocument();
+        expect(screen.getByText('Actions')).toBeInTheDocument();
+        expect(screen.getAllByText('alpha.user')).toHaveLength(2);
+        expect(screen.getAllByText('beta.user')).toHaveLength(2);
+        expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2);
+    });
+
+    it('passes busy state to the user cards', () => {
+        render(<AdminUsersPanel users={users} isBusy onRoleChange={jest.fn()} onDelete={jest.fn()} />);
+        expect(screen.getAllByRole('combobox')).toHaveLength(2);
+        expect(screen.getAllByRole('combobox')[0]).toBeDisabled();
+    });
+});
