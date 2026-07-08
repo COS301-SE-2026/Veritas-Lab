@@ -1,6 +1,7 @@
 import type { ChangeEvent, ReactNode } from 'react';
 import type { DashboardCase } from '@/types/api';
 import type { SortKey, StatusFilter } from '@/types/hooks';
+import { LucideIcon } from 'lucide-react';
 
 export type CaseCardProps = {
     caseTitle: string;
@@ -75,19 +76,25 @@ export type ButtonProps = {
     onClick?: () => void;
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack';
+    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack' | 'light';
     size?: 'small' | 'medium' | 'large';
     className?: string;
 };
 
 export type CardProps = {
-    header: string | ReactNode;
-    content: string | ReactNode;
-    footer: string | ReactNode;
+    children?: ReactNode;
+    header?: string | ReactNode;
+    content?: string | ReactNode;
+    footer?: string | ReactNode;
     className?: string;
     headerClassName?: string;
     contentClassName?: string;
     footerClassName?: string;
+};
+
+export type CardSectionProps = {
+    children: ReactNode;
+    className?: string;
 };
 
 export type HeadingProps = {
@@ -127,3 +134,9 @@ export type TextProps = {
     text: string;
     className?: string;
 };
+
+export interface Highlight {
+    title: string;
+    description: string;
+    icon: LucideIcon;
+}

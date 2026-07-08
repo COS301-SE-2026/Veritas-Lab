@@ -9,7 +9,7 @@ services:
         ports:
             - "3000:3000"
         environment:
-            - NEXT_PUBLIC_API_URL=http://localhost:8000
+            - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         depends_on:
             - backend
         networks:
@@ -23,11 +23,13 @@ services:
         ports:
             - "8000:8000"
         environment:
+            - ENVIRONMENT=${ENVIRONMENT}
             - DB_USER=${DB_USER}
             - DB_PASSWORD=${DB_PASSWORD}
             - DB_HOST=postgres
             - DB_PORT=${DB_PORT:-5432}
             - DB_NAME=${DB_NAME}
+            - DB_SSL=${DB_SSL}
             - REDIS_URL=redis://redis:6379/0
             - JWT_SECRET=${JWT_SECRET}
             - HASH=${HASH}

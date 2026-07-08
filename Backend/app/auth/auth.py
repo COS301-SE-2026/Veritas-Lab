@@ -17,11 +17,21 @@ DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
 DB_HOST= env.getRequiredEnv("DB_HOST")
 DB_PORT= env.getRequiredIntEnv("DB_PORT")
 DB_NAME= env.getRequiredEnv("DB_NAME")
+DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
 
+async def getConnection() -> asyncpg.Connection:
+    return await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT,
+        ssl="require" if DB_SSL else None,
+    )
 router = APIRouter(
     prefix="/api",
     tags=["Auth"]
@@ -124,13 +134,7 @@ class ChangeRoleRequest(BaseModel):
     NewRole: str | None = None
 
 async def updateUserJWTIssued(email: str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = await getConnection()
     try:
         await connection.execute(
             """
@@ -144,13 +148,7 @@ async def updateUserJWTIssued(email: str):
         await connection.close()
 
 async def update_user_jwt_issued_via_user(user: dict):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = await getConnection()
     try:
         await connection.execute(
             """
@@ -165,14 +163,7 @@ async def update_user_jwt_issued_via_user(user: dict):
 
 # Once the envs are setup this will need to be updated
 async def searchUsersViaEmail(email:str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
-
+    connection = await getConnection()
     try:
         row = await connection.fetchrow(
             """
@@ -197,13 +188,7 @@ async def searchUsersViaEmail(email:str):
         await connection.close()
     
 async def searchUsersViaUsername(username: str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = await getConnection()
 
     try:
         row = await connection.fetchrow(
@@ -231,13 +216,7 @@ async def searchUsersViaUsername(username: str):
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
 async def deleteUserById(userId: str) -> bool:
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = await getConnection()
 
     try:
         row = await connection.fetchrow(
@@ -254,13 +233,7 @@ async def deleteUserById(userId: str) -> bool:
         await connection.close()
 
 async def insertUser(email: str, username: str, role: str, hashedPassword: str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = await getConnection()
 
     try:
         row = await connection.fetchrow(
@@ -345,7 +318,7 @@ async def login(request: LoginRequest, response: Response):
         value=token,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=1800
     )
 
@@ -433,13 +406,7 @@ async def fetchUsers(request: Request):
                 }
             )
         
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         rows = await connection.fetch(
             """
@@ -544,13 +511,7 @@ async def changeUserRole(
         )
     
     try:
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         result = await connection.execute(
             """
@@ -754,7 +715,7 @@ async def refresh_token(request: Request, response: Response):
         value=new_token,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=1800
     )
     

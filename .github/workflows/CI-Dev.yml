@@ -30,6 +30,7 @@ jobs:
                   DB_PASSWORD: postgres
                   DB_NAME: test_db
                   DB_PORT: 5432
+                  DB_SSL: false
                   JWT_SECRET: test-secret
                   HASH: HS256
                   TOKEN_EXPIRE: 5
