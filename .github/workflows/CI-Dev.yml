@@ -63,3 +63,25 @@ jobs:
               run: |
                   cd frontend
                   npx jest
+    deploy-preview:
+        runs-on: ubuntu-latest
+        timeout-minutes: 1
+        needs: [backend-tests, frontend-tests]
+
+        env:
+            VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+            VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: install Vercel CLI
+              run: npm install -g vercel
+
+            - name: pull Vercel environment
+              run: vercel pull --yes --environment=preview -- token=${{ secrets.VERCEL_TOKEN }}
+            
+            - name: build project
+              run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+            
+            - name: deploy to Vercel (preview)
+              run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
