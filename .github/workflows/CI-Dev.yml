@@ -65,7 +65,7 @@ jobs:
                   npx jest
     deploy-preview:
         runs-on: ubuntu-latest
-        timeout-minutes: 1
+        timeout-minutes: 5
         needs: [backend-tests, frontend-tests]
 
         env:
