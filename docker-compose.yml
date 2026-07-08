@@ -23,6 +23,7 @@ services:
         ports:
             - "8000:8000"
         environment:
+            - ENVIRONMENT=${ENVIRONMENT}
             - DB_USER=${DB_USER}
             - DB_PASSWORD=${DB_PASSWORD}
             - DB_HOST=postgres

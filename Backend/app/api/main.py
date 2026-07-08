@@ -13,9 +13,9 @@ app = FastAPI(
 
 
 allowed_origins = [
-    os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000"),
-    "http://localhost:3000",
+    os.environ.get("FRONTEND_ORIGIN", ""),
 ]
+if os.environ.get("ENVIRONMENT", "development") != "production": allowed_origins.append("http://localhost:3000")
 
 app.add_middleware(
     CORSMiddleware,
