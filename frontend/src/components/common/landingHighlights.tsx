@@ -11,13 +11,13 @@ const highlights: Highlight[] = [
 
 export default function LandingHighlights() {
     return (
-        <div className="grid grid-cols-4 gap-1 mt-5 items-center align-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
             {highlights.map((item) => {
                 const Icon = item.icon;
                 return (
                     <Card
                         key={item.title}
-                        className="w-[80%] min-h-[300px] rounded-2xl bg-(--color-lightest) p-5"
+                        className="w-full min-h-[220px] sm:min-h-[280px] rounded-2xl bg-(--color-lightest) p-5"
                     >
                         <Card.Header>
                             <div
@@ -27,9 +27,9 @@ export default function LandingHighlights() {
                                 <Icon className="size-[40px] text-(--color-secondary)" />
                             </div>
                         </Card.Header>
-                        <Card.Content className="mt-10">
-                            <h3 className="text-(--color-text) text-xl font-bold">{item.title}</h3>
-                            <p className="text-(--color-text) text-lg mt-5">{item.description}</p>
+                        <Card.Content className="mt-6 sm:mt-10">
+                            <h3 className="text-(--color-text) text-lg sm:text-xl font-bold">{item.title}</h3>
+                            <p className="text-(--color-text) text-base sm:text-lg mt-3 sm:mt-5">{item.description}</p>
                         </Card.Content>
                     </Card>
                 );
