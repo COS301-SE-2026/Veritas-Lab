@@ -72,7 +72,7 @@ describe('useRegisterForm', () => {
 		expect(result.current.status.success).toBe('Account created successfully.');
 		expect(result.current.formState.username).toBe('');
 		expect(result.current.formState.email).toBe('');
-		expect(mockReplace).toHaveBeenCalledWith('/login');
+		expect(mockReplace).toHaveBeenCalledWith('/dashboard');
 	});
 
 	it('shows an API error when registration does not succeed', async () => {

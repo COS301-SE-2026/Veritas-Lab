@@ -329,7 +329,7 @@ async def login(request: LoginRequest, response: Response):
 
 # POST /api/register
 @router.post("/register", status_code=201)
-async def register(request: RegisterRequest):
+async def register(request: RegisterRequest, response: Response):
     if not validateEmail(request.email):
         return JSONResponse(
             status_code=400,
@@ -380,15 +380,25 @@ async def register(request: RegisterRequest):
         )
 
     hashedPassword = hashPassword(request.password)
-    await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
+    new_user = await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
 
-    return JSONResponse(
-        status_code=201,
-        content={
+    token = createToken(new_user)
+
+    await updateUserJWTIssued(new_user["email"])
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=1800
+    )
+
+    return {
             "status": "success",
             "message": "Account created successfully"
-        }
-    )
+    }
 
 @router.post("/fetchUsers")
 async def fetchUsers(request: Request):
