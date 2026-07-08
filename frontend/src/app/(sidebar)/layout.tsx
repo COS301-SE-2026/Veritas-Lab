@@ -20,14 +20,14 @@ export default async function SidebarLayout({ children }: { children: React.Reac
 
     return (
         <SidebarWrapper>
-            <div className="flex">
-                <Sidebar />
-                <main className="flex-1 p-4">
-                    <UserRoleProvider role={userRole}>
+            <UserRoleProvider role={userRole}>
+                <div className="flex">
+                    <Sidebar />
+                    <main className="flex-1 p-4">
                         {children}
-                    </UserRoleProvider>
-                </main>
-            </div>
+                    </main>
+                </div>
+            </UserRoleProvider>
         </SidebarWrapper>
     );
 }
