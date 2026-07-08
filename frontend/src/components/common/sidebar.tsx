@@ -4,26 +4,31 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from '@/context/SidebarContext';
 import { useLogOut } from '@/lib/hooks/useLogOut';
+import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
-// Uses Lucide for some nice icons. Pretty cool.
+// Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-    ChevronLeft, Menu, Home, Construction, LogOut,
+  ChevronLeft, Menu, Home, Construction, LogOut, UserStar,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 
 // List of navigation items with their labels, paths, and icons
 const navItems = [
   { label: 'Dashboard', href: '/dashboard',  icon: Home },
-  { label: 'Login', href: '/login',  icon: Construction },
-  { label: 'Register', href: '/register',  icon: Construction },
 ];
 
 export default function Sidebar() {
     // Get the current pathname to determine which nav item is active
     const pathname = usePathname();
+    const userRole = useUserRole();
     // State to manage whether the sidebar is collapsed or expanded
     const { collapsed, toggle } = useSidebar();
   const { logOut } = useLogOut();
+
+    const navItems = [
+      { label: 'Dashboard', href: '/dashboard',  icon: Home },
+      ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
+    ];
 
     return (
       // Sidebar container with dynamic width based on collapsed state
