@@ -15,8 +15,6 @@ import Button from '@/components/ui/button';
 // List of navigation items with their labels, paths, and icons
 const navItems = [
   { label: 'Dashboard', href: '/dashboard',  icon: Home },
-  { label: 'Login', href: '/login',  icon: Construction },
-  { label: 'Register', href: '/register',  icon: Construction },
 ];
 
 export default function Sidebar() {
@@ -30,8 +28,6 @@ export default function Sidebar() {
     const navItems = [
       { label: 'Dashboard', href: '/dashboard',  icon: Home },
       ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
-      { label: 'Login', href: '/login',  icon: Construction },
-      { label: 'Register', href: '/register',  icon: Construction },
     ];
 
     return (
