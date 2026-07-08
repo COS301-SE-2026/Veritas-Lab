@@ -23,7 +23,7 @@ DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
-DB_SSL = env.getRequiredEnv("DB_SSL")
+DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
