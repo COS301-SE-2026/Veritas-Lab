@@ -23,6 +23,7 @@ ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+INVALID_TOKEN= "Invalid token"
 
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -67,7 +68,7 @@ def verifyJWT(request: Request) -> dict:
         raise ValueError("Token has expired")
 
     except JWTError:
-        raise ValueError("Invalid token")
+        raise ValueError(INVALID_TOKEN)
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
@@ -673,7 +674,7 @@ async def refresh_token(request: Request, response: Response):
                 status_code=401,
                 content={
                     "status": "error", 
-                    "message": "Invalid token"
+                    "message": INVALID_TOKEN
                     }
             )
 
@@ -682,7 +683,7 @@ async def refresh_token(request: Request, response: Response):
                 status_code=401,
                 content={
                     "status": "error", 
-                    "message": "Invalid token"
+                    "message": INVALID_TOKEN
                     }
             )
     
