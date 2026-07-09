@@ -19,9 +19,6 @@ DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
-STORAGE_URL = env.getRequiredEnv("STORAGE_URL")
-MINIO_ROOT_USER = env.getRequiredEnv("MINIO_ROOT_USER")
-MINIO_ROOT_PASSWORD = env.getRequiredEnv("MINIO_ROOT_PASSWORD")
 
 class MediaService(ABC):
 
@@ -93,6 +90,10 @@ class MediaService(ABC):
         )
     
     def createMinioClient(self):
+        STORAGE_URL = env.getRequiredEnv("STORAGE_URL")
+        MINIO_ROOT_USER = env.getRequiredEnv("MINIO_ROOT_USER")
+        MINIO_ROOT_PASSWORD = env.getRequiredEnv("MINIO_ROOT_PASSWORD")
+        
         parsed_url = urlparse(STORAGE_URL)
 
         minio_secure = parsed_url.scheme == "https"
