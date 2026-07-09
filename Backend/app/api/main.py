@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import re
+import os
 from pydantic import BaseModel # For JSON
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
@@ -12,13 +13,17 @@ app = FastAPI(
 
 
 allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    os.environ.get("FRONTEND_ORIGIN", ""),
 ]
+if os.environ.get("ENVIRONMENT", "development") != "production": allowed_origins.append("http://localhost:3000")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=os.environ.get(
+        "FRONTEND_ORIGIN_REGEX",
+        r"^https://veritsalab-[a-z0-9-]+\.vercel\.app$"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]

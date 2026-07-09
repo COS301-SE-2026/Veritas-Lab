@@ -30,6 +30,7 @@ jobs:
                   DB_PASSWORD: postgres
                   DB_NAME: test_db
                   DB_PORT: 5432
+                  DB_SSL: false
                   JWT_SECRET: test-secret
                   HASH: HS256
                   TOKEN_EXPIRE: 5
@@ -62,3 +63,19 @@ jobs:
               run: |
                   cd frontend
                   npx jest
+    deploy-preview:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        needs: [backend-tests, frontend-tests]
+
+        env:
+            VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+            VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: install Vercel CLI
+              run: npm install -g vercel
+              
+            - name: deploy to vercel (preview)
+              run: vercel deploy --token=${{ secrets.VERCEL_TOKEN }}

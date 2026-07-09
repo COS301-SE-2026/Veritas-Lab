@@ -18,6 +18,16 @@ export type DashboardCase = {
     caseCreationDate: string;
 };
 
+export type AdminUser = {
+    id: string;
+    username: string;
+    role: 'ADMIN' | 'INVESTIGATOR' | 'USER';
+    displayName?: string;
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+};
+
 export type CaseEvidence = {
     reportId: string;
     mediaId: string;

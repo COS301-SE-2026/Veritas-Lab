@@ -22,6 +22,17 @@ DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
 DB_HOST= env.getRequiredEnv("DB_HOST")
 DB_PORT= env.getRequiredIntEnv("DB_PORT")
 DB_NAME= env.getRequiredEnv("DB_NAME")
+DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
+
+async def getConnection() -> asyncpg.Connection:
+    return await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT,
+        ssl="require" if DB_SSL else None,
+    )
 
 router = APIRouter(
     prefix="/api",
@@ -143,13 +154,7 @@ async def get_cases(request: Request):
     connection = None
 
     try:
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         if payload.get("role") == "USER":
             rows = await connection.fetch(
@@ -240,13 +245,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
     connection = None
 
     try:
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         if payload.get("role") != "USER":
             row= await connection.fetchrow(
@@ -363,13 +362,7 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
     except ValueError as e:
         return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
 
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    connection = await getConnection()
 
     try:
         row = await connection.fetchrow("""
@@ -450,13 +443,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
     try:    
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         row = await connection.fetchrow(
             """
@@ -525,13 +512,7 @@ async def update_comment(
             }
         )
     try:
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         row = await connection.fetchrow(
             """
@@ -588,13 +569,7 @@ async def delete_comment(request: Request, comment_id: int):
     
     connection = None
     try:
-        connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT
-        )
+        connection = await getConnection()
 
         row = await connection.fetchrow(
             """
@@ -760,13 +735,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Comment must be a non-empty string"})
 
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME
-    )
+    connection = await getConnection()
 
     try:
         # Step 4: check case exists and its status

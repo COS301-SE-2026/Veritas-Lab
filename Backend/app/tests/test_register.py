@@ -19,10 +19,18 @@ def test_successful_registration(monkeypatch):
             "username": username,
             "role": role
         }
+    
+    def mock_create_token(user):
+        return "mockedJWTToken"
+    
+    async def mock_update_user_JWT_issued(email): 
+        return None
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
     monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
     monkeypatch.setattr(auth, "insertUser", mock_insertUser)
+    monkeypatch.setattr(auth, "createToken", mock_create_token)
+    monkeypatch.setattr(auth, "updateUserJWTIssued", mock_update_user_JWT_issued)
 
     response = client.post(
         "/api/register",
@@ -39,7 +47,8 @@ def test_successful_registration(monkeypatch):
         "message": "Account created successfully"
     }
 
-    assert auth.COOKIE_NAME not in response.cookies
+    assert auth.COOKIE_NAME in response.cookies
+    assert response.cookies.get(auth.COOKIE_NAME) == "mockedJWTToken"
 
 def test_invalid_email_returns_400():
     client.cookies.clear()

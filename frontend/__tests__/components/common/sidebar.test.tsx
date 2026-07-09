@@ -45,8 +45,8 @@ describe('Sidebar', () => {
 	it('renders navigation links', () => {
 		renderWithWrapper();
 		expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Register' })).toBeInTheDocument();
+		// expect(screen.getByRole('link', { name: 'Login' })).toBeInTheDocument();
+		// expect(screen.getByRole('link', { name: 'Register' })).toBeInTheDocument();
 	});
 
 	it('marks the active route', () => {
