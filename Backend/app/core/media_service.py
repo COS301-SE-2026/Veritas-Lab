@@ -2,9 +2,11 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 import asyncpg
 from dotenv import load_dotenv
+import exiftool
 from app.core.env import ENVLoader
 from minio import Minio
 import os
+import json
 import tempfile
 from starlette.concurrency import run_in_threadpool
 
@@ -19,11 +21,21 @@ DB_NAME = env.getRequiredEnv("DB_NAME")
 
 class MediaService(ABC):
 
-    @abstractmethod
     async def extract(self, file_path: str, media_record: dict):
-        pass
+        with exiftool.ExifToolHelper() as et:
+            metadata_list = et.get_metadata(file_path)
+
+        metadata = metadata_list[0] if metadata_list else {}
+
+        return {
+            "media_id": str(media_record["media_id"]),
+            "file_type": media_record["extension"].replace(".","").upper(),
+            "bucket": media_record["bucket"],
+            "object_name": media_record["object_name"],
+            "metadata": metadata
+        }
     
-    async def get_media_record(self, media_id: UUID):
+    async def getMediaRecord(self, media_id: UUID):
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -60,8 +72,8 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
-    async def download_media(self, media_record: dict, file_path: str):
-        minio_client = self.create_minio_client()
+    async def downloadMedia(self, media_record: dict, file_path: str):
+        minio_client = self.createMinioClient()
 
         await run_in_threadpool(
             minio_client.fget_object,
@@ -70,7 +82,7 @@ class MediaService(ABC):
             file_path=file_path
         )
     
-    def create_minio_client(self):
+    def createMinioClient(self):
         minio_endpoint_raw = (
             os.getenv("MINIO_ENDPOINT")
             or os.getenv("AWS_S3_ENDPOINT_URL")
@@ -91,20 +103,77 @@ class MediaService(ABC):
             secure=minio_secure
         )
 
-    async def analyse(self, media_id: UUID):
-        # Get the storage details of the file
-        media_record = await self.get_media_record(media_id)
+    async def getExistingMetadata(self, media_id: UUID):
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
 
-        with tempfile.NamedTemporaryFile(
-            suffix=media_record["extension"],
-            delete=True
-        ) as temp_file:
-            # download the MINIO object here
-            await self.download_media(media_record,temp_file.name)
-
-            # extract the metadata from the downloaded file
-            metadata = await self.extract(
-                file_path=temp_file.name,
-                media_record=media_record
+        try:
+            row = await connection.fetchrow(
+                """
+                SELECT ReportArtifacts AS "reportartifacts"
+                FROM "Cases_DB"."Reports"
+                WHERE ImageId = $1
+                AND ReportArtifacts IS NOT NULL
+                LIMIT 1
+                """,
+                media_id
             )
+
+            if row is None:
+                return None
+            
+            return row["reportartifacts"]
+        
+        finally:
+            await connection.close()
+
+    async def saveMetadata(self, media_id: UUID, metadata: dict):
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        try:
+            await connection.execute(
+                """
+                UPDATE "Cases_DB"."Reports"
+                SET ReportArtifacts = $1::jsonb
+                WHERE ImageId = $2
+                AND ReportArtifacts IS NULL
+                """,
+                json.dumps(metadata),
+                media_id
+            )
+
+        finally:
+            await connection.close()
+
+    async def analyse(self, media_id: UUID):
+        metadata = await self.getExistingMetadata(media_id)
+
+        if metadata is None:
+            media_record = await self.getMediaRecord(media_id)
+
+            with tempfile.NamedTemporaryFile(
+                suffix=media_record["extension"],
+                delete=True
+            ) as temp_file:
+                # download the MINIO object here
+                await self.downloadMedia(media_record,temp_file.name)
+
+                # extract the metadata from the downloaded file
+                metadata = await self.extract(
+                    file_path=temp_file.name,
+                    media_record=media_record
+                )
+            
+            await self.saveMetadata(media_id, metadata)
         
