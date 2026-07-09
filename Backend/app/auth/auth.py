@@ -22,6 +22,8 @@ SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
+AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+INVALID_TOKEN= "Invalid token"
 
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -66,7 +68,7 @@ def verifyJWT(request: Request) -> dict:
         raise ValueError("Token has expired")
 
     except JWTError:
-        raise ValueError("Invalid token")
+        raise ValueError(INVALID_TOKEN)
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
@@ -109,16 +111,16 @@ def validatePassword(password: str) -> bool:
 # utf-8 encode the input string because bcrypt uses this, generate a salt, use the encoded string and salt to make the hash
 # the hash is also utf-8 encoded so it needs to be decoded before it is returned
 def hashPassword(input: str) -> str:
-    convertedString = input.encode("utf-8")
+    converted_string = input.encode("utf-8")
     salt =bcrypt.gensalt()
-    hashed = bcrypt.hashpw(convertedString, salt)
+    hashed = bcrypt.hashpw(converted_string, salt)
     return hashed.decode("utf-8")
 
 # utf-8 encodes both strings and uses bcrypt.checkpw to see if they are the same
-def verifyPassword(password: str, hashedPassword: str) ->bool:
-    convertedPassword = password.encode("utf-8")
-    convertedHash = hashedPassword.encode("utf-8")
-    return bcrypt.checkpw(convertedPassword,convertedHash)
+def verifyPassword(password: str, hashed_password: str) ->bool:
+    converted_password = password.encode("utf-8")
+    converted_hash = hashed_password.encode("utf-8")
+    return bcrypt.checkpw(converted_password,converted_hash)
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
@@ -225,7 +227,7 @@ async def deleteUserById(userId: str) -> bool:
             WHERE userid = $1::uuid
             RETURNING userid
             """,
-            userId
+            user_id
         )
 
         return row is not None # when the specified user is not found in the Db
@@ -243,7 +245,7 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
             VALUES ($1, $2, $3, $4)
             RETURNING userid, useremail, username, userrole
             """,
-            email, username, role, hashedPassword
+            email, username, role, hashed_password
         )
 
         return {
@@ -256,13 +258,13 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
         await connection.close()
 
 def createToken(user: dict) ->str:
-    expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
         "sub": user["id"],
         "username": user["username"],
         "role": user["role"],
-        "exp": expiryTime
+        "exp": expiry_time
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
@@ -296,7 +298,7 @@ async def login(request: LoginRequest, response: Response):
             status_code=404,
             content={
                 "status": "error",
-                "message": "A User with this email does not exist. Please register"
+                "message": AMBIGUOUS_ERROR
             }
         )
     
@@ -305,7 +307,7 @@ async def login(request: LoginRequest, response: Response):
             status_code=401,
             content={
                 "status": "error",
-                "message": "Invalid email or password"
+                "message": AMBIGUOUS_ERROR
             }
         )
 
@@ -364,7 +366,7 @@ async def register(request: RegisterRequest, response: Response):
             status_code=409,
             content={
                 "status": "error",
-                "message": "An account with this email already exists"
+                "message": AMBIGUOUS_ERROR
             }
         )
     
@@ -375,12 +377,12 @@ async def register(request: RegisterRequest, response: Response):
             status_code=409,
             content={
                 "status": "error",
-                "message": "An account with this username already exists"
+                "message": AMBIGUOUS_ERROR
             }
         )
 
-    hashedPassword = hashPassword(request.password)
-    new_user = await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
+    hashed_password = hashPassword(request.password)
+    new_user = await insertUser(request.email.strip(), request.username.strip(), "USER", hashed_password)
 
     token = createToken(new_user)
 
@@ -537,7 +539,7 @@ async def changeUserRole(
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "No user found with the provided user_id"
+                    "message": "No user found with the provided user ID"
                 }
             )
 
@@ -560,12 +562,12 @@ async def changeUserRole(
         if connection is not None:
             await connection.close()
 
-@router.delete("/users/{userId}")
-async def deleteUser(userId: str, request: Request):
+@router.delete("/users/{user_id}")
+async def deleteUser(user_id: str, request: Request):
     try:
         #Verify the JWT for security
         payload = verifyJWT(request)
-        userId = userId.strip()
+        user_id = user_id.strip()
 
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
@@ -575,7 +577,7 @@ async def deleteUser(userId: str, request: Request):
             )
 
         #Validate input. This rejects improper UUIDs before touching the DB
-        if not validateUUID(userId):
+        if not validateUUID(user_id):
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Invalid User ID format."}
@@ -583,7 +585,7 @@ async def deleteUser(userId: str, request: Request):
 
         #An admin cannot delete themselves
         callerId = payload.get("sub")
-        if callerId == userId:
+        if callerId == user_id:
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
@@ -591,7 +593,7 @@ async def deleteUser(userId: str, request: Request):
 
         #Now delete
         try:
-            deleted = await deleteUserById(userId)
+            deleted = await deleteUserById(user_id)
         except asyncpg.PostgresError:
             return JSONResponse(
                 status_code=500,
@@ -605,12 +607,18 @@ async def deleteUser(userId: str, request: Request):
         if not deleted:
             return JSONResponse(
                 status_code = 404,
-                content = {"status": "error", "message": "No user found with the provided ID."}
+                content = {
+                    "status": "error", 
+                    "message": "No user found with the provided ID."
+                    }
             )
 
         return JSONResponse(
             status_code = 200,
-            content = {"status": "success", "message": "User deleted successfully."}
+            content = {
+                "status": "success", 
+                "message": "User deleted successfully."
+                }
         )
 
         #safety net for unexpected errors
@@ -618,7 +626,10 @@ async def deleteUser(userId: str, request: Request):
         #Errors from Jwt.
         return JSONResponse(
             status_code = 401,
-            content = {"status": "error", "message": str(e)}
+            content = {
+                "status": "error", 
+                "message": str(e)
+                }
         )
 
 @router.post("/refreshToken")
@@ -627,13 +638,19 @@ async def refresh_token(request: Request, response: Response):
     if not token:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Not authenticated"}
+            content={
+                "status": "error", 
+                "message": "Not authenticated"
+                }
         )
 
     if token == "":
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Missing JWT token"}
+            content={
+                "status": "error", 
+                "message": "Missing JWT token"
+                }
         )
 
     try:
@@ -655,13 +672,19 @@ async def refresh_token(request: Request, response: Response):
         except JWTError:
             return JSONResponse(
                 status_code=401,
-                content={"status": "error", "message": "Invalid token"}
+                content={
+                    "status": "error", 
+                    "message": INVALID_TOKEN
+                    }
             )
 
     except JWTError:
         return JSONResponse(
                 status_code=401,
-                content={"status": "error", "message": "Invalid token"}
+                content={
+                    "status": "error", 
+                    "message": INVALID_TOKEN
+                    }
             )
     
     expiry = payload.get("exp")
@@ -669,7 +692,10 @@ async def refresh_token(request: Request, response: Response):
     if expiry is None:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Token missing expiry"}
+            content={
+                "status": "error", 
+                "message": "Token missing expiry"
+                }
         )
 
     current_time = datetime.now(timezone.utc).timestamp()
