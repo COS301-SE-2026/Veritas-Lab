@@ -6,6 +6,7 @@ import exiftool
 from app.core.env import ENVLoader
 from minio import Minio
 import json
+from urllib.parse import urlparse
 from pathlib import Path
 import aiofiles.tempfile
 from starlette.concurrency import run_in_threadpool
@@ -92,14 +93,13 @@ class MediaService(ABC):
         )
     
     def createMinioClient(self):
-        minio_endpoint_raw = STORAGE_URL
+        parsed_url = urlparse(STORAGE_URL)
 
-        minio_secure = minio_endpoint_raw.startswith("https://")
-        minio_endpoint = (
-            minio_endpoint_raw
-            .removeprefix("http://")
-            .removeprefix("https://")
-        )
+        minio_secure = parsed_url.scheme == "https"
+
+        minio_endpoint = parsed_url.netloc
+        if not minio_endpoint:
+            minio_endpoint = parsed_url.path
 
         return Minio(
             minio_endpoint,
