@@ -5,7 +5,7 @@ from app.auth.auth import hashPassword
 
 client = TestClient(app)
 
-AMBIGUOUS_ERROR= "A user with either this password or email already exists"
+AMBIGUOUS_ERROR= "A user with either this password or email already exists or it is invalid"
 
 def test_successful_login(monkeypatch):
     client.cookies.clear()
@@ -73,7 +73,7 @@ def test_login_incorrect_password(monkeypatch):
     assert response.status_code == 401
     assert response.json() == {
         "status": "error",
-        "message": "Invalid email or password"
+        "message": AMBIGUOUS_ERROR
     }
 
     assert auth.COOKIE_NAME not in response.cookies

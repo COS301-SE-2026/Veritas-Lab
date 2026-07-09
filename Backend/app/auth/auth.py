@@ -21,7 +21,7 @@ SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
-AMBIGUOUS_ERROR= "A user with either this password or email already exists"
+AMBIGUOUS_ERROR= "A user with either this password or email already exists or it is invalid"
 
 router = APIRouter(
     prefix="/api",
@@ -106,9 +106,9 @@ def hashPassword(input: str) -> str:
     return hashed.decode("utf-8")
 
 # utf-8 encodes both strings and uses bcrypt.checkpw to see if they are the same
-def verifyPassword(password: str, hashedPassword: str) ->bool:
+def verifyPassword(password: str, hashed_password: str) ->bool:
     converted_password = password.encode("utf-8")
-    converted_hash = hashedPassword.encode("utf-8")
+    converted_hash = hashed_password.encode("utf-8")
     return bcrypt.checkpw(converted_password,converted_hash)
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
@@ -254,7 +254,7 @@ async def deleteUserById(user_id: str) -> bool:
     finally:
         await connection.close()
 
-async def insertUser(email: str, username: str, role: str, hashedPassword: str):
+async def insertUser(email: str, username: str, role: str, hashed_password: str):
     connection = await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -271,7 +271,7 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
             VALUES ($1, $2, $3, $4)
             RETURNING userid, useremail, username, userrole
             """,
-            email, username, role, hashedPassword
+            email, username, role, hashed_password
         )
 
         return {
@@ -284,13 +284,13 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
         await connection.close()
 
 def createToken(user: dict) ->str:
-    expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
         "sub": user["id"],
         "username": user["username"],
         "role": user["role"],
-        "exp": expiryTime
+        "exp": expiry_time
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
@@ -333,7 +333,7 @@ async def login(request: LoginRequest, response: Response):
             status_code=401,
             content={
                 "status": "error",
-                "message": "Invalid email or password"
+                "message": AMBIGUOUS_ERROR
             }
         )
 
@@ -407,8 +407,8 @@ async def register(request: RegisterRequest):
             }
         )
 
-    hashedPassword = hashPassword(request.password)
-    await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
+    hashed_password = hashPassword(request.password)
+    await insertUser(request.email.strip(), request.username.strip(), "USER", hashed_password)
 
     return JSONResponse(
         status_code=201,
@@ -567,7 +567,7 @@ async def changeUserRole(
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "No user found with the provided user_id"
+                    "message": "No user found with the provided user ID"
                 }
             )
 
@@ -635,12 +635,18 @@ async def deleteUser(user_id: str, request: Request):
         if not deleted:
             return JSONResponse(
                 status_code = 404,
-                content = {"status": "error", "message": "No user found with the provided ID."}
+                content = {
+                    "status": "error", 
+                    "message": "No user found with the provided ID."
+                    }
             )
 
         return JSONResponse(
             status_code = 200,
-            content = {"status": "success", "message": "User deleted successfully."}
+            content = {
+                "status": "success", 
+                "message": "User deleted successfully."
+                }
         )
 
         #safety net for unexpected errors
@@ -648,7 +654,10 @@ async def deleteUser(user_id: str, request: Request):
         #Errors from Jwt.
         return JSONResponse(
             status_code = 401,
-            content = {"status": "error", "message": str(e)}
+            content = {
+                "status": "error", 
+                "message": str(e)
+                }
         )
 
 @router.post("/refreshToken")
@@ -657,13 +666,19 @@ async def refresh_token(request: Request, response: Response):
     if not token:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Not authenticated"}
+            content={
+                "status": "error", 
+                "message": "Not authenticated"
+                }
         )
 
     if token == "":
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Missing JWT token"}
+            content={
+                "status": "error", 
+                "message": "Missing JWT token"
+                }
         )
 
     try:
@@ -685,7 +700,10 @@ async def refresh_token(request: Request, response: Response):
         except JWTError:
             return JSONResponse(
                 status_code=401,
-                content={"status": "error", "message": "Invalid token"}
+                content={
+                    "status": "error", 
+                    "message": "Invalid token"
+                    }
             )
 
     except JWTError:
@@ -702,7 +720,10 @@ async def refresh_token(request: Request, response: Response):
     if expiry is None:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": "Token missing expiry"}
+            content={
+                "status": "error", 
+                "message": "Token missing expiry"
+                }
         )
 
     current_time = datetime.now(timezone.utc).timestamp()
