@@ -22,7 +22,7 @@ SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
-AMBIGUOUS_ERROR= "A user with either this password or email already exists or it is invalid"
+AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
 
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(

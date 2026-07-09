@@ -5,7 +5,7 @@ from app.auth.auth import hashPassword
 
 client = TestClient(app)
 
-AMBIGUOUS_ERROR= "A user with either this password or email already exists or it is invalid"
+AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
 
 def test_successful_login(monkeypatch):
     client.cookies.clear()
