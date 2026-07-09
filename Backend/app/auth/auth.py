@@ -21,6 +21,7 @@ SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
+AMBIGUOUS_ERROR= "A user with either this password or email already exists"
 
 router = APIRouter(
     prefix="/api",
@@ -323,7 +324,7 @@ async def login(request: LoginRequest, response: Response):
             status_code=404,
             content={
                 "status": "error",
-                "message": "A User with this email does not exist. Please register"
+                "message": AMBIGUOUS_ERROR
             }
         )
     
@@ -391,7 +392,7 @@ async def register(request: RegisterRequest):
             status_code=409,
             content={
                 "status": "error",
-                "message": "An account with this email already exists"
+                "message": AMBIGUOUS_ERROR
             }
         )
     
@@ -402,7 +403,7 @@ async def register(request: RegisterRequest):
             status_code=409,
             content={
                 "status": "error",
-                "message": "An account with this username already exists"
+                "message": AMBIGUOUS_ERROR
             }
         )
 
@@ -690,7 +691,10 @@ async def refresh_token(request: Request, response: Response):
     except JWTError:
         return JSONResponse(
                 status_code=401,
-                content={"status": "error", "message": "Invalid token"}
+                content={
+                    "status": "error", 
+                    "message": "Invalid token"
+                    }
             )
     
     expiry = payload.get("exp")
