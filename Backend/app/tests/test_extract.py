@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from app.core.jpg_service import JPGService
-from app.core.png_service import PNGService
+from app.core.image_service import ImageService
 from app.core.pdf_service import PDFService
 
 def mock_exiftool(monkeypatch, metadata_result):
@@ -64,7 +63,7 @@ async def test_png_extract_success(monkeypatch):
 
     mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
-    service = PNGService()
+    service = ImageService()
 
     media_record = {
         "media_id": "12345678-abcd-ef01-2345-6789abcdef02",
@@ -98,7 +97,7 @@ async def test_jpg_extract_success(monkeypatch):
 
     mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
-    service = JPGService()
+    service = ImageService()
     
     media_record = {
         "media_id": "12345678-abcd-ef01-2345-6789abcdef03",
