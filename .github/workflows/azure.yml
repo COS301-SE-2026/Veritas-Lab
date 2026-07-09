@@ -32,8 +32,8 @@ jobs:
                   context: ./Backend
                   push: true
                   tags: |
-                      ghcr.io/${{ github.repository_owner }}/veritas-lab-backend:latest
-                      ghcr.io/${{ github.repository_owner }}/veritas-lab-backend:${{ github.sha }}
+                      ${{ steps.image.outputs.name }}:latest
+                      ${{ steps.image.outputs.name }}:${{ github.sha }}
 
     deploy:
         needs: build-and-push
@@ -44,4 +44,4 @@ jobs:
               with:
                   app-name: veritas-lab-api
                   publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-                  images: ghcr.io/${{ github.repository_owner }}/veritas-lab-backend:latest
+                  images: ghcr.io/cos301-se-2026/veritas-lab-backend:latest
