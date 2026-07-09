@@ -1,13 +1,13 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from uuid import UUID
 import asyncpg
 from dotenv import load_dotenv
 import exiftool
 from app.core.env import ENVLoader
 from minio import Minio
-import os
 import json
-import tempfile
+from pathlib import Path
+import aiofiles.tempfile
 from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
@@ -18,13 +18,18 @@ DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
+STORAGE_URL = env.getRequiredEnv("STORAGE_URL")
+MINIO_ROOT_USER = env.getRequiredEnv("MINIO_ROOT_USER")
+MINIO_ROOT_PASSWORD = env.getRequiredEnv("MINIO_ROOT_PASSWORD")
 
 class MediaService(ABC):
 
     async def extract(self, file_path: str, media_record: dict):
-        with exiftool.ExifToolHelper() as et:
-            metadata_list = et.get_metadata(file_path)
+        def run_exiftool():
+            with exiftool.ExifToolHelper() as et:
+                return et.get_metadata(file_path)
 
+        metadata_list = await run_in_threadpool(run_exiftool)
         metadata = metadata_list[0] if metadata_list else {}
         extension = media_record["extension"].replace(".", "").upper()
 
@@ -87,11 +92,7 @@ class MediaService(ABC):
         )
     
     def createMinioClient(self):
-        minio_endpoint_raw = (
-            os.getenv("MINIO_ENDPOINT")
-            or os.getenv("AWS_S3_ENDPOINT_URL")
-            or "localhost:9000"
-        )
+        minio_endpoint_raw = STORAGE_URL
 
         minio_secure = minio_endpoint_raw.startswith("https://")
         minio_endpoint = (
@@ -102,8 +103,8 @@ class MediaService(ABC):
 
         return Minio(
             minio_endpoint,
-            access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-            secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+            access_key=MINIO_ROOT_USER,
+            secret_key=MINIO_ROOT_PASSWORD,
             secure=minio_secure
         )
 
@@ -166,18 +167,17 @@ class MediaService(ABC):
         if metadata is None:
             media_record = await self.getMediaRecord(media_id)
 
-            with tempfile.NamedTemporaryFile(
-                suffix=media_record["extension"],
-                delete=True
-            ) as temp_file:
-                # download the MINIO object here
-                await self.downloadMedia(media_record,temp_file.name)
+            async with aiofiles.tempfile.TemporaryDirectory() as temp_dir:
+                file_path = Path(temp_dir) / f"{media_id}{media_record['extension']}"
+                await self.downloadMedia(media_record, str(file_path))
 
-                # extract the metadata from the downloaded file
                 metadata = await self.extract(
-                    file_path=temp_file.name,
+                    file_path=str(file_path),
                     media_record=media_record
                 )
-            
+
             await self.saveMetadata(media_id, metadata)
-        
+
+        return metadata
+                
+            

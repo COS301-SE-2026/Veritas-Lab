@@ -1,7 +1,23 @@
 import pytest
+from unittest.mock import MagicMock
 from app.core.jpg_service import JPGService
 from app.core.png_service import PNGService
 from app.core.pdf_service import PDFService
+
+def mock_exiftool(monkeypatch, metadata_result):
+    mock_context = MagicMock()
+    mock_context.get_metadata.return_value = metadata_result
+
+    mock_helper = MagicMock()
+    mock_helper.__enter__.return_value = mock_context
+    mock_helper.__exit__.return_value = False
+
+    monkeypatch.setattr(
+        "app.core.media_service.exiftool.ExifToolHelper",
+        lambda: mock_helper
+    )
+
+    return mock_context
 
 @pytest.mark.asyncio
 async def test_pdf_extract_success(monkeypatch):
@@ -13,21 +29,7 @@ async def test_pdf_extract_success(monkeypatch):
         "PDF:Producer": "Microsoft: Print To PDF"
     }
 
-    class MockExifToolHelper:
-        def __enter__(self):
-            return self
-        
-        def __exit__(self, exc_type, exc_value, traceback):
-            pass
-
-        def get_metadata(self, file_path):
-            assert file_path == "/tmp/test.pdf"
-            return [fake_metadata]
-    
-    monkeypatch.setattr(
-        "app.core.pdf_service.exiftool.ExifToolHelper",
-        MockExifToolHelper
-    )
+    mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
     service = PDFService()
 
@@ -38,8 +40,9 @@ async def test_pdf_extract_success(monkeypatch):
         "object_name": "12345678-abcd-ef01-2345-6789abcdef01.pdf"
     }
 
-    result = await service.extract("/tmp/test.pdf", media_record)
+    result = await service.extract("test.pdf", media_record)
 
+    mock_context.get_metadata.assert_called_once_with("test.pdf")
     assert result["media_id"] == "12345678-abcd-ef01-2345-6789abcdef01"
     assert result["file_type"] == "PDF"
     assert result["bucket"] == "pdf-bucket"
@@ -59,21 +62,7 @@ async def test_png_extract_success(monkeypatch):
         "PNG:Compression": "Deflate/Inflate"
     }
 
-    class MockExifToolHelper:
-        def __enter__(self):
-            return self
-        
-        def __exit__(self, exc_type, exc_value, traceback):
-            pass
-
-        def get_metadata(self, file_path):
-            assert file_path == "/tmp/test.png"
-            return [fake_metadata]
-        
-    monkeypatch.setattr(
-        "app.core.png_service.exiftool.ExifToolHelper",
-        MockExifToolHelper
-    )
+    mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
     service = PNGService()
 
@@ -84,8 +73,9 @@ async def test_png_extract_success(monkeypatch):
         "object_name": "12345678-abcd-ef01-2345-6789abcdef02.png"
     }
 
-    result = await service.extract("/tmp/test.png", media_record)
+    result = await service.extract("test.png", media_record)
 
+    mock_context.get_metadata.assert_called_once_with("test.png")
     assert result["media_id"] == "12345678-abcd-ef01-2345-6789abcdef02"
     assert result["file_type"] == "PNG"
     assert result["bucket"] == "png-bucket"
@@ -106,21 +96,7 @@ async def test_jpg_extract_success(monkeypatch):
         "Composite:ImageSize": "4032x3024"
     }
 
-    class MockExifToolHelper:
-        def __enter__(self):
-            return self
-        
-        def __exit__(self, exc_type, exc_value, traceback):
-            pass
-
-        def get_metadata(self, file_path):
-            assert file_path == "/tmp/test.jpg"
-            return [fake_metadata]
-        
-    monkeypatch.setattr(
-        "app.core.jpg_service.exiftool.ExifToolHelper",
-        MockExifToolHelper
-    )
+    mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
     service = JPGService()
     
@@ -131,8 +107,9 @@ async def test_jpg_extract_success(monkeypatch):
         "object_name": "12345678-abcd-ef01-2345-6789abcdef03.jpg"
     }
 
-    result = await service.extract("/tmp/test.jpg", media_record)
+    result = await service.extract("test.jpg", media_record)
 
+    mock_context.get_metadata.assert_called_once_with("test.jpg")
     assert result["media_id"] == "12345678-abcd-ef01-2345-6789abcdef03"
     assert result["file_type"] == "JPEG"
     assert result["bucket"] == "jpg-bucket"
@@ -143,20 +120,7 @@ async def test_jpg_extract_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pdf_extract_empty_metadata(monkeypatch):
-    class MockExifToolHelper:
-        def __enter__(self):
-            return self
-        
-        def __exit__(self, exc_type, exc_value, traceback):
-            pass
-
-        def get_metadata(self, file_path):
-            return []
-    
-    monkeypatch.setattr(
-        "app.core.pdf_service.exiftool.ExifToolHelper",
-        MockExifToolHelper
-    )
+    mock_context = mock_exiftool(monkeypatch, [])
 
     service = PDFService()
 
@@ -167,7 +131,8 @@ async def test_pdf_extract_empty_metadata(monkeypatch):
         "object_name": "12345678-abcd-ef01-2345-6789abcdef01.pdf"
     }
 
-    result = await service.extract("/tmp/test.pdf", media_record)
+    result = await service.extract("test.pdf", media_record)
 
+    mock_context.get_metadata.assert_called_once_with("test.pdf")
     assert result["file_type"] == "PDF"
     assert result["metadata"] == {}
