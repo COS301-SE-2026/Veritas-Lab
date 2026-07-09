@@ -49,10 +49,10 @@ def _mock_connection(row=None):
 # Auth tests
 
 def test_create_comment_missing_jwt(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         raise Exception("Missing Authorization header")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post("/api/cases/comments", json={})
 
@@ -61,10 +61,10 @@ def test_create_comment_missing_jwt(monkeypatch):
 
 
 def test_create_comment_invalid_jwt(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/cases/comments",
@@ -79,10 +79,10 @@ def test_create_comment_invalid_jwt(monkeypatch):
 # Input validation tests
 
 def test_create_comment_missing_case_id(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/cases/comments",
@@ -95,10 +95,10 @@ def test_create_comment_missing_case_id(monkeypatch):
 
 
 def test_create_comment_invalid_case_id_format(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/cases/comments",
@@ -111,10 +111,10 @@ def test_create_comment_invalid_case_id_format(monkeypatch):
 
 
 def test_create_comment_missing_comment(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/cases/comments",
@@ -127,10 +127,10 @@ def test_create_comment_missing_comment(monkeypatch):
 
 
 def test_create_comment_blank_comment(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/cases/comments",
@@ -145,10 +145,10 @@ def test_create_comment_blank_comment(monkeypatch):
 # Case existence and role-based access tests
 
 def test_create_comment_case_not_found(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=None)))
 
     response = client.post(
@@ -162,10 +162,10 @@ def test_create_comment_case_not_found(monkeypatch):
 
 
 def test_create_comment_user_on_open_case(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "normal_user", "role": "USER"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=OPEN_CASE_ROW)))
 
     response = client.post(
@@ -179,10 +179,10 @@ def test_create_comment_user_on_open_case(monkeypatch):
 
 
 def test_create_comment_investigator_on_closed_case(monkeypatch):
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=CLOSED_CASE_ROW)))
 
     response = client.post(
@@ -199,15 +199,12 @@ def test_create_comment_investigator_on_closed_case(monkeypatch):
 
 def test_create_comment_user_on_closed_case(monkeypatch):
     """A USER commenting on a closed case should succeed with 201."""
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "normal_user", "role": "USER"}
 
-    async def mock_add_comment(self, connection, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=CLOSED_CASE_ROW)))
-    monkeypatch.setattr(Case, "add_comment", mock_add_comment)
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "normal_user", "comment": VALID_COMMENT}))
 
     response = client.post(
         "/api/cases/comments",
@@ -225,15 +222,12 @@ def test_create_comment_user_on_closed_case(monkeypatch):
 
 def test_create_comment_investigator_on_open_case(monkeypatch):
     """An INVESTIGATOR commenting on an open case should succeed with 201."""
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
-    async def mock_add_comment(self, connection, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=OPEN_CASE_ROW)))
-    monkeypatch.setattr(Case, "add_comment", mock_add_comment)
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "investigator_user", "comment": VALID_COMMENT}))
 
     response = client.post(
         "/api/cases/comments",
@@ -250,15 +244,12 @@ def test_create_comment_investigator_on_open_case(monkeypatch):
 
 def test_create_comment_admin_on_open_case(monkeypatch):
     """An ADMIN can comment on an open case."""
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
 
-    async def mock_add_comment(self, connection, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=OPEN_CASE_ROW)))
-    monkeypatch.setattr(Case, "add_comment", mock_add_comment)
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "admin_user"}))
 
     response = client.post(
         "/api/cases/comments",
@@ -272,15 +263,12 @@ def test_create_comment_admin_on_open_case(monkeypatch):
 
 def test_create_comment_admin_on_closed_case(monkeypatch):
     """An ADMIN can also comment on a closed case."""
-    def mock_verifyJWT(req):
+    def mock_verify_jwt(req):
         return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
 
-    async def mock_add_comment(self, connection, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=CLOSED_CASE_ROW)))
-    monkeypatch.setattr(Case, "add_comment", mock_add_comment)
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "admin_user"}))
 
     response = client.post(
         "/api/cases/comments",

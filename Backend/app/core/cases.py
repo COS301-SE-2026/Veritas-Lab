@@ -25,6 +25,8 @@ DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 
+_MISSING_CASE_ID = "Case id is missing"
+
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=DB_USER,
@@ -325,7 +327,7 @@ class Case:
 
     async def deleteEvidence(self, media_id: uuid.UUID, JWT_username: str = None):
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail="Case id is missing")
+            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
 
         connection = None
 
@@ -396,7 +398,7 @@ class Case:
                         secure=minioSecure
                     )
 
-                    object_name = f"{deleted_media["mediaid"]}{deleted_media["mediaextension"]}"
+                    object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
                     try:
                         minioClient.remove_object(
@@ -462,7 +464,7 @@ class Case:
                         secure=minioSecure
                     )
 
-                    object_name = f"{deleted_media["mediaid"]}{deleted_media["mediaextension"]}"
+                    object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
                     try:
                         minioClient.remove_object(
@@ -499,7 +501,7 @@ class Case:
 
     async def getComments(self):
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail="Case id is missing")
+            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
 
         connection = None
         try:
@@ -530,7 +532,7 @@ class Case:
 
     async def add_comment(self, connection: asyncpg.Connection, username: str, comment: str) -> dict:
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail="Case id is missing")
+            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
 
         row = await connection.fetchrow(
             self.CaseId,
