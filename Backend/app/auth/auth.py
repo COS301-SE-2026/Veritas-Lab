@@ -100,16 +100,16 @@ def validatePassword(password: str) -> bool:
 # utf-8 encode the input string because bcrypt uses this, generate a salt, use the encoded string and salt to make the hash
 # the hash is also utf-8 encoded so it needs to be decoded before it is returned
 def hashPassword(input: str) -> str:
-    convertedString = input.encode("utf-8")
+    converted_string = input.encode("utf-8")
     salt =bcrypt.gensalt()
-    hashed = bcrypt.hashpw(convertedString, salt)
+    hashed = bcrypt.hashpw(converted_string, salt)
     return hashed.decode("utf-8")
 
 # utf-8 encodes both strings and uses bcrypt.checkpw to see if they are the same
 def verifyPassword(password: str, hashedPassword: str) ->bool:
-    convertedPassword = password.encode("utf-8")
-    convertedHash = hashedPassword.encode("utf-8")
-    return bcrypt.checkpw(convertedPassword,convertedHash)
+    converted_password = password.encode("utf-8")
+    converted_hash = hashedPassword.encode("utf-8")
+    return bcrypt.checkpw(converted_password,converted_hash)
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
@@ -231,7 +231,7 @@ async def searchUsersViaUsername(username: str):
 
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
-async def deleteUserById(userId: str) -> bool:
+async def deleteUserById(user_id: str) -> bool:
     connection = await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -247,7 +247,7 @@ async def deleteUserById(userId: str) -> bool:
             WHERE userid = $1::uuid
             RETURNING userid
             """,
-            userId
+            user_id
         )
 
         return row is not None # when the specified user is not found in the Db
@@ -590,12 +590,12 @@ async def changeUserRole(
         if connection is not None:
             await connection.close()
 
-@router.delete("/users/{userId}")
-async def deleteUser(userId: str, request: Request):
+@router.delete("/users/{user_id}")
+async def deleteUser(user_id: str, request: Request):
     try:
         #Verify the JWT for security
         payload = verifyJWT(request)
-        userId = userId.strip()
+        user_id = user_id.strip()
 
         #Authorization. Only Admins can delete
         if payload.get("role") != "ADMIN":
@@ -605,7 +605,7 @@ async def deleteUser(userId: str, request: Request):
             )
 
         #Validate input. This rejects improper UUIDs before touching the DB
-        if not validateUUID(userId):
+        if not validateUUID(user_id):
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Invalid User ID format."}
@@ -613,7 +613,7 @@ async def deleteUser(userId: str, request: Request):
 
         #An admin cannot delete themselves
         callerId = payload.get("sub")
-        if callerId == userId:
+        if callerId == user_id:
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
@@ -621,7 +621,7 @@ async def deleteUser(userId: str, request: Request):
 
         #Now delete
         try:
-            deleted = await deleteUserById(userId)
+            deleted = await deleteUserById(user_id)
         except asyncpg.PostgresError:
             return JSONResponse(
                 status_code=500,
