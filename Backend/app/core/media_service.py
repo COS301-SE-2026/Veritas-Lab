@@ -26,10 +26,14 @@ class MediaService(ABC):
             metadata_list = et.get_metadata(file_path)
 
         metadata = metadata_list[0] if metadata_list else {}
+        extension = media_record["extension"].replace(".", "").upper()
+
+        if extension == "JPG":
+            extension = "JPEG"
 
         return {
             "media_id": str(media_record["media_id"]),
-            "file_type": media_record["extension"].replace(".","").upper(),
+            "file_type": extension,
             "bucket": media_record["bucket"],
             "object_name": media_record["object_name"],
             "metadata": metadata
