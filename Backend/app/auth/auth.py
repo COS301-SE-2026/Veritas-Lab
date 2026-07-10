@@ -234,7 +234,7 @@ async def deleteUserById(userId: str) -> bool:
     finally:
         await connection.close()
 
-async def insertUser(email: str, username: str, role: str, hashedPassword: str):
+async def insertUser(email : str, username : str, role : str, hashed_password : str):
     connection = await getConnection()
 
     try:
@@ -359,9 +359,9 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
 
-    existingUser = await searchUsersViaEmail(request.email.strip())
+    existing_user = await searchUsersViaEmail(request.email.strip())
 
-    if existingUser is not None:
+    if existing_user is not None:
         return JSONResponse(
             status_code=409,
             content={
@@ -370,9 +370,9 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
     
-    existingUsername = await searchUsersViaUsername(request.username.strip())
+    existing_username = await searchUsersViaUsername(request.username.strip())
     
-    if existingUsername is not None:
+    if existing_username is not None:
         return JSONResponse(
             status_code=409,
             content={
@@ -482,9 +482,9 @@ async def changeUserRole(
         )
 
     user_id = changeRoleRequest.userId
-    newRole = changeRoleRequest.NewRole
+    new_role = changeRoleRequest.NewRole
 
-    if not user_id or not newRole:
+    if not user_id or not new_role:
         return JSONResponse(
             status_code=400,
             content={
@@ -513,7 +513,7 @@ async def changeUserRole(
             }
         )
 
-    if newRole not in ["USER", "ADMIN", "INVESTIGATOR"]:
+    if new_role not in ["USER", "ADMIN", "INVESTIGATOR"]:
         return JSONResponse(
             status_code=400,
             content={
@@ -531,7 +531,7 @@ async def changeUserRole(
             SET userrole = $1
             WHERE userid = $2
             """,
-            newRole, user_id
+            new_role, user_id
         )
 
         if result == "UPDATE 0":
@@ -584,8 +584,8 @@ async def deleteUser(user_id: str, request: Request):
             )
 
         #An admin cannot delete themselves
-        callerId = payload.get("sub")
-        if callerId == user_id:
+        caller_id = payload.get("sub")
+        if caller_id == user_id:
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Admins cannot delete themselves."}
