@@ -6,6 +6,7 @@ All DB and auth calls are mocked. No real db here.
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
+from fastapi import HTTPException
 
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
@@ -24,24 +25,8 @@ FAKE_COMMENT_RESPONSE = {
     "timestamp": "2026-06-27T12:00:00"
 }
 
-# Fake DB rows returned by connection.fetchrow for the Cases table lookup
-OPEN_CASE_ROW = {
-    "casecreator": "creator_user",
-    "casename": "Test Case",
-    "casedescription": "A test case",
-    "caseclosed": False
-}
-
-CLOSED_CASE_ROW = {
-    "casecreator": "creator_user",
-    "casename": "Test Case",
-    "casedescription": "A test case",
-    "caseclosed": True
-}
-
-def _mock_connection(row=None):
+def _mock_connection():
     conn = AsyncMock()
-    conn.fetchrow = AsyncMock(return_value=row)
     conn.close = AsyncMock(return_value=None)
     return conn
 
@@ -149,7 +134,8 @@ def test_create_comment_case_not_found(monkeypatch):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=None)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(side_effect=HTTPException(status_code=404, detail="Case not found")))
 
     response = client.post(
         "/api/cases/comments",
@@ -166,7 +152,8 @@ def test_create_comment_user_on_open_case(monkeypatch):
         return {"sub": "id", "username": "normal_user", "role": "USER"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=OPEN_CASE_ROW)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(side_effect=HTTPException(status_code=403, detail="Users may only comment on closed cases")))
 
     response = client.post(
         "/api/cases/comments",
@@ -183,7 +170,8 @@ def test_create_comment_investigator_on_closed_case(monkeypatch):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=CLOSED_CASE_ROW)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(Case, "add_comment", AsyncMock(side_effect=HTTPException(status_code=403, detail="Investigators may only comment on open cases")))
 
     response = client.post(
         "/api/cases/comments",
@@ -203,7 +191,7 @@ def test_create_comment_user_on_closed_case(monkeypatch):
         return {"sub": "id", "username": "normal_user", "role": "USER"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=CLOSED_CASE_ROW)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
     monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "normal_user", "comment": VALID_COMMENT}))
 
     response = client.post(
@@ -226,7 +214,7 @@ def test_create_comment_investigator_on_open_case(monkeypatch):
         return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=OPEN_CASE_ROW)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
     monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "investigator_user", "comment": VALID_COMMENT}))
 
     response = client.post(
@@ -248,7 +236,7 @@ def test_create_comment_admin_on_open_case(monkeypatch):
         return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=OPEN_CASE_ROW)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
     monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "admin_user"}))
 
     response = client.post(
@@ -267,7 +255,7 @@ def test_create_comment_admin_on_closed_case(monkeypatch):
         return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection(row=CLOSED_CASE_ROW)))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
     monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value={**FAKE_COMMENT_RESPONSE, "username": "admin_user"}))
 
     response = client.post(

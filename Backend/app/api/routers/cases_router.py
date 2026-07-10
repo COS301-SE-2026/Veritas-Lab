@@ -734,39 +734,17 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     connection = await getConnection()
 
     try:
-        row = await connection.fetchrow(
-            """
-            SELECT casecreator, casename, casedescription, caseclosed
-            FROM "Cases_DB"."Cases"
-            WHERE caseid = $1
-            """,
-            case_id
-        )
-
-        if row is None:
-            return JSONResponse(status_code=404,
-                                content={"status": "error", "message": "Case not found"})
-
-        case = Case(
-            CaseCreator=row["casecreator"],
-            CaseName=row["casename"],
-            CaseDescription=row["casedescription"]
-        )
+        case = Case()
         case.CaseId = case_id
-        case.CaseClosed = row["caseclosed"]
 
-        if role == "USER" and not case.CaseClosed:
-            return JSONResponse(status_code=403,
-                                content={"status": "error", "message": "Users may only comment on closed cases"})
-
-        if role == "INVESTIGATOR" and case.CaseClosed:
-            return JSONResponse(status_code=403,
-                                content={"status": "error", "message": "Investigators may only comment on open cases"})
-
-        new_comment = await case.add_comment(connection, username, body.comment)
+        new_comment = await case.add_comment(connection, username, body.comment, role)
 
         return JSONResponse(status_code=201,
                             content={"status": "success", "comment": new_comment})
+
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code,
+                            content={"status": "error", "message": e.detail})
 
     finally:
         await connection.close()
