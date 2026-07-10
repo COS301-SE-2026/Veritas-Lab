@@ -123,7 +123,7 @@ class MediaService(ABC):
                 """
                 SELECT ReportArtifacts AS "reportartifacts"
                 FROM "Cases_DB"."Reports"
-                WHERE ImageId = $1
+                WHERE MediaId = $1
                 AND ReportArtifacts IS NOT NULL
                 LIMIT 1
                 """,
@@ -152,7 +152,7 @@ class MediaService(ABC):
                 """
                 UPDATE "Cases_DB"."Reports"
                 SET ReportArtifacts = $1::jsonb
-                WHERE ImageId = $2
+                WHERE MediaId = $2
                 AND ReportArtifacts IS NULL
                 """,
                 json.dumps(metadata),

@@ -262,7 +262,7 @@ class Case:
                         """
                         INSERT INTO "Cases_DB"."Reports" (
                             CaseId, 
-                            ImageId, 
+                            MediaId, 
                             ImageTitle, 
                             ReportArtifacts, 
                             ReportFindings, 
@@ -276,7 +276,7 @@ class Case:
                             ReportFindings, 
                             ReportComments
                         FROM "Cases_DB"."Reports"
-                        WHERE ImageId = $2
+                        WHERE MediaId = $2
                         LIMIT 1;
                         """,
                         case_uuid,
@@ -322,7 +322,7 @@ class Case:
 
                     await connection.execute(
                         """
-                        INSERT INTO "Cases_DB"."Reports" (CaseId, ImageId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
+                        INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
                         VALUES ($1, $2, $3, $4, $5, $6)
                         """,
                         case_uuid,
@@ -400,7 +400,7 @@ class Case:
                     """
                     DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c WHERE r."CaseId" = c."CaseId"
                     AND r."CaseId" = $1
-                    AND r."ImageId" = $2
+                    AND r."MediaId" = $2
                     AND c."CaseCreator" = $3;
                     """,
                     self.CaseId,
@@ -424,7 +424,7 @@ class Case:
                         AND NOT EXISTS (
                             SELECT 1
                             FROM "Cases_DB"."Reports" r
-                            WHERE r.ImageId = media.MediaId
+                            WHERE r.MediaId = media.MediaId
                         )
                         RETURNING 
                             media.MediaId AS "mediaid",
@@ -468,7 +468,7 @@ class Case:
                     """
                     DELETE FROM "Cases_DB"."Reports" r WHERE
                     r."CaseId" = $1
-                    AND r."ImageId" = $2;
+                    AND r."MediaId" = $2;
                     """,
                     self.CaseId,
                     media_id
@@ -490,7 +490,7 @@ class Case:
                         AND NOT EXISTS (
                             SELECT 1
                             FROM "Cases_DB"."Reports" r
-                            WHERE r.ImageId = media.MediaId
+                            WHERE r.MediaId = media.MediaId
                         )
                         RETURNING 
                             media.MediaId AS "mediaid",
@@ -611,7 +611,7 @@ class Case:
 
                 media_rows = await connection.fetch(
                     """
-                    SELECT DISTINCT ImageId AS "mediaid"
+                    SELECT DISTINCT MediaId AS "mediaid"
                     FROM "Cases_DB"."Reports"
                     WHERE CaseId = $1
                     """,
@@ -645,7 +645,7 @@ class Case:
                         AND NOT EXISTS (
                             SELECT 1
                             FROM "Cases_DB"."Reports" r
-                            WHERE r.ImageId = media.MediaId
+                            WHERE r.MediaId = media.MediaId
                         )
                         RETURNING 
                             media.MediaId AS "mediaid",

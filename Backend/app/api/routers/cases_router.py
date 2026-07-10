@@ -291,7 +291,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             SELECT
                 r.ReportId AS "reportid",
                 r.CaseId AS "caseid",
-                r.ImageId AS "mediaid",
+                r.MediaId AS "mediaid",
                 r.ReportArtifacts AS "reportartifacts",
                 r.imagetitle AS "mediatitle",
                 r.ReportFindings AS "reportfindings",
@@ -301,7 +301,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 m.MediaBucket AS "mediabucket",
                 m.MediaExtension AS "mediaextension"
             FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" media ON r.ImageId = media.MediaId
+            JOIN "Cases_DB"."Media" media ON r.MediaId = media.MediaId
             JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
             WHERE r.CaseId = $1
             ORDER BY r.ReportDateCreation DESC
