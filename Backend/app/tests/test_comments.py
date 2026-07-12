@@ -48,7 +48,7 @@ def _post_comment(body):
 def _setup(monkeypatch, role, username, *, result=None, exc=None):
     monkeypatch.setattr(cases_router, "verifyJWT", _jwt_mock(role, username))
     monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
-    monkeypatch.setattr(Case, "add_comment", AsyncMock(return_value=result, side_effect=exc))
+    monkeypatch.setattr(Case, "addComment", AsyncMock(return_value=result, side_effect=exc))
 
 
 def _edit_comment_connection(fetchrow_result):

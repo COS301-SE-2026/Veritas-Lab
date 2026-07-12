@@ -727,7 +727,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Invalid case_id format"})
 
-    if not body.comment or not Case.validate_comment_length(body.comment):
+    if not body.comment or not Case.validateCommentLength(body.comment):
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Comment must be a non-empty string"})
 
@@ -737,7 +737,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
         case = Case()
         case.CaseId = case_id
 
-        new_comment = await case.add_comment(connection, username, body.comment, role)
+        new_comment = await case.addComment(connection, username, body.comment, role)
 
         return JSONResponse(status_code=201,
                             content={"status": "success", "comment": new_comment})

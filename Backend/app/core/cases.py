@@ -525,12 +525,12 @@ class Case:
                 await connection.close()
 
     @staticmethod
-    def validate_comment_length(comment: str) -> bool:
+    def validateCommentLength(comment: str) -> bool:
         if not isinstance(comment, str):
             return False
         return len(comment.strip()) > 0
 
-    async def add_comment(self, connection: asyncpg.Connection, username: str, comment: str, role: str) -> dict:
+    async def addComment(self, connection: asyncpg.Connection, username: str, comment: str, role: str) -> dict:
         if self.CaseId is None:
             raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
 
