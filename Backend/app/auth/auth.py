@@ -217,7 +217,7 @@ async def searchUsersViaUsername(username: str):
 
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
-async def deleteUserById(userId: str) -> bool:
+async def deleteUserById(user_id: str) -> bool:
     connection = await getConnection()
 
     try:
@@ -547,7 +547,7 @@ async def changeUserRole(
             status_code=200,
             content={
                 "status":"success",
-                "message": f"User role updated to {newRole} successfully"
+                "message": f"User role updated to {new_role} successfully"
             }
         )
     except asyncpg.PostgresError:
