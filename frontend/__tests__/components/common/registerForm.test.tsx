@@ -45,7 +45,7 @@ describe('RegisterForm', () => {
 		expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
 	});
 
-	it('navigates to login when clicking Sign In', () => {
+	it('navigates to dashboard when clicking Sign In', () => {
 		render(<RegisterForm />);
 		fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
 		expect(mockPush).toHaveBeenCalledWith('/login');
@@ -113,7 +113,7 @@ describe('RegisterForm', () => {
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'Create Account' })).toBeEnabled();
 		});
-		expect(mockReplace).toHaveBeenCalledWith('/login');
+		expect(mockReplace).toHaveBeenCalledWith('/dashboard');
 		expect(screen.getByRole('status')).toHaveTextContent('Account created successfully.');
 	});
 });

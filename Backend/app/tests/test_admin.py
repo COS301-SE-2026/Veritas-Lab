@@ -246,7 +246,7 @@ def test_change_user_role_no_user(monkeypatch):
     
     assert data == {
         "status": "error",
-        "message": "No user found with the provided user_id"
+        "message": "No user found with the provided user ID"
     }
 
 def test_change_user_role_invalid_role(monkeypatch):
