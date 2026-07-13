@@ -67,5 +67,5 @@ jobs:
     deploy-preview:
         needs: [backend-tests, frontend-tests]
         if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'preview')
-        uses: ./.github/workflows/cd-preview.yml
+        uses: ./.github/workflows/CD-Dev.yml
         secrets: inherit
