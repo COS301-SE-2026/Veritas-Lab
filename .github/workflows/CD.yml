@@ -56,7 +56,9 @@ jobs:
  
             - name: deploy to vercel (production)
               id: deploy
+              env:
+                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
               run: |
-                  url="$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }})"
+                  url="$(vercel deploy --prod --token="$VERCEL_TOKEN")"
                   echo "url=$url" >> "$GITHUB_OUTPUT"
                   echo "production frontend deployed to $url"
