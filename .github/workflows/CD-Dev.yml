@@ -1,0 +1,28 @@
+name: CD Preview
+#deploys a preview of the current branch to vercel.
+on:
+    workflow_call:
+    workflow_dispatch:
+
+jobs:
+    deploy-preview:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        environment:
+            name: Preview - veritas-lab
+            url: ${{ steps.deploy.outputs.url }}
+        env:
+            VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+            VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.head_ref || github.ref_name }}
+            - name: install Vercel CLI
+              run: npm install -g vercel
+            - name: deploy to vercel (preview)
+              id: deploy
+              run: |
+                  url="$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }})"
+                  echo "url=$url" >> "$GITHUB_OUTPUT"
+                  echo "preview deployed to $url"
