@@ -5,10 +5,15 @@ name: CI
 on:
     pull_request:
         branches: ["main"]
+    workflow_dispatch:
+    
+permissions:
+    contents: read
 #the backend testing, frontend testing and the integration testing y
 jobs:
     backend-tests:
         runs-on: ubuntu-latest
+        timeout-minutes: 15
         steps:
             - uses: actions/checkout@v4
 
@@ -50,6 +55,7 @@ jobs:
 
     frontend-tests:
         runs-on: ubuntu-latest
+        timeout-minutes: 15
         steps:
             - uses: actions/checkout@v4
 
@@ -70,6 +76,7 @@ jobs:
 
     e2e-tests:
         runs-on: ubuntu-latest
+        timeout-minutes: 30
         needs: [backend-tests, frontend-tests]
         steps:
             - uses: actions/checkout@v4
@@ -147,3 +154,8 @@ jobs:
             - name: Remover
               if: always()
               run: docker compose --env-file .env.ci down -v
+              
+    deploy-production:
+        needs: [backend-tests, frontend-tests, e2e-tests]
+        uses: ./.github/workflows/CD.yml
+        secrets: inherit
