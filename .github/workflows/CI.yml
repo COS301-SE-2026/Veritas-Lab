@@ -9,7 +9,6 @@ on:
     
 permissions:
     contents: read
-    packages: write
 #the backend testing, frontend testing and the integration testing y
 jobs:
     backend-tests:
