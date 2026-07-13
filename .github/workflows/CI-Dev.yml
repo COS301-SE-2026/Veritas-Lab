@@ -4,6 +4,7 @@ name: CI Dev
 on:
     pull_request:
         branches: ["dev"]
+        types: [opened, synchronize, reopened, labeled]
     workflow_dispatch:
 #similar to main but added timeout.
 jobs:
@@ -65,5 +66,6 @@ jobs:
                   npx jest
     deploy-preview:
         needs: [backend-tests, frontend-tests]
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'preview')
         uses: ./.github/workflows/cd-preview.yml
         secrets: inherit
