@@ -70,7 +70,7 @@ def test_create_comment_missing_jwt(monkeypatch):
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
-    response = client.post("/api/cases/comments", json={})
+    response = client.post("/api/cases/comments", json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 401
     assert response.json() == {"status": "error", "message": "Missing Authorization header"}
@@ -95,8 +95,7 @@ def test_create_comment_missing_case_id(monkeypatch):
 
     response = _post_comment({"comment": VALID_COMMENT})
 
-    assert response.status_code == 400
-    assert response.json() == {"status": "error", "message": "case_id is needed."}
+    assert response.status_code == 422
 
 
 def test_create_comment_invalid_case_id_format(monkeypatch):
@@ -104,8 +103,7 @@ def test_create_comment_invalid_case_id_format(monkeypatch):
 
     response = _post_comment({"case_id": "not-a-uuid", "comment": VALID_COMMENT})
 
-    assert response.status_code == 400
-    assert response.json() == {"status": "error", "message": "Invalid case_id format"}
+    assert response.status_code == 422
 
 
 def test_create_comment_missing_comment(monkeypatch):

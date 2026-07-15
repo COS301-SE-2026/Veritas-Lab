@@ -49,8 +49,7 @@ class UpdateCommentRequest(BaseModel):
     comment: str
 
 class CreateCommentRequest(BaseModel):
-    # None is allowed so FastAPI does not reject the request before our validation runs.
-    case_id: str | None = None
+    case_id: UUID
     comment: str | None = None
 
 def _format_case_evidence(row: dict) -> dict:
@@ -717,16 +716,6 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     role = payload.get("role")
     username = payload.get("username")
 
-    if not body.case_id:
-        return JSONResponse(status_code=400,
-                            content={"status": "error", "message": "case_id is needed."})
-
-    try:
-        case_id = UUID(body.case_id)
-    except ValueError:
-        return JSONResponse(status_code=400,
-                            content={"status": "error", "message": "Invalid case_id format"})
-
     if not body.comment or not Case.validateCommentLength(body.comment):
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Comment must be a non-empty string"})
@@ -735,7 +724,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
 
     try:
         case = Case()
-        case.CaseId = case_id
+        case.CaseId = body.case_id
 
         new_comment = await case.addComment(connection, username, body.comment, role)
 
