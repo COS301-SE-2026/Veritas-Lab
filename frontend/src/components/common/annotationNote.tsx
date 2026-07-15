@@ -4,7 +4,7 @@ import { Check, MessageSquare, X } from 'lucide-react';
 import type { AnnotationNoteProps } from '@/types/workbench';
 
 
-export default function AnnotationNote({ position, text, isDraft = false, isSelected = false, onSelect, onSubmit, onCancel }: AnnotationNoteProps) {
+export default function AnnotationNote({ position, text, isDraft = false, isSelected = false, onSelect, onSubmit, onCancel }: Readonly<AnnotationNoteProps>) {
     const [draftText, setDraftText] = useState('');
     const pinStyle = { left: `${position.x}%`, top: `${position.y}%`, transform: 'translate(-50%, -50%)' };
 

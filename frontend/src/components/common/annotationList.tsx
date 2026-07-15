@@ -2,7 +2,7 @@
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import type { AnnotationListProps } from '@/types/workbench';
 
-export default function AnnotationList({ annotations, selectedId, onSelect, onRemove }: AnnotationListProps) {
+export default function AnnotationList({ annotations, selectedId, onSelect, onRemove }: Readonly<AnnotationListProps>) {
     return (
         <div className="shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-[21px] p-4">
             <h2 className="text-xl font-bold text-(--color-text)">Annotations</h2>

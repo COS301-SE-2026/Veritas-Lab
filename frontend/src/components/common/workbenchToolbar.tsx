@@ -7,7 +7,7 @@ import type { AnnotationTool, WorkbenchToolbarProps } from '@/types/workbench';
 // More tools (e.g. shapes, highlighting) may be added here later.
 const TOOLS: readonly AnnotationTool[] = ['Select', 'Draw', 'Comment'];
 
-export default function WorkbenchToolbar({ activeTool, onToolChange, onClearAll, hasAnnotations }: WorkbenchToolbarProps) {
+export default function WorkbenchToolbar({ activeTool, onToolChange, onClearAll, hasAnnotations }: Readonly<WorkbenchToolbarProps>) {
     return (
         <div className="flex items-center gap-4">
             <div className="w-full max-w-sm">

@@ -13,6 +13,12 @@ const TOOL_HINTS: Record<WorkbenchCanvasProps['activeTool'], string> = {
     Comment: 'Click anywhere on the media to drop a note.',
 };
 
+const CURSOR_BY_TOOL: Record<WorkbenchCanvasProps['activeTool'], string> = {
+    Select: 'cursor-default',
+    Draw: 'cursor-crosshair',
+    Comment: 'cursor-copy',
+};
+
 function toRelativePoint(event: { clientX: number; clientY: number }, bounds: DOMRect): AnnotationPoint {
     const x = ((event.clientX - bounds.left) / bounds.width) * 100;
     const y = ((event.clientY - bounds.top) / bounds.height) * 100;
@@ -33,7 +39,7 @@ export default function WorkbenchCanvas({
     onSelectAnnotation,
     onAddShape,
     onAddNote,
-}: WorkbenchCanvasProps) {
+}: Readonly<WorkbenchCanvasProps>) {
     const overlayRef = useRef<HTMLDivElement>(null);
     const [drawingPoints, setDrawingPoints] = useState<AnnotationPoint[] | null>(null);
     const [draftNotePosition, setDraftNotePosition] = useState<AnnotationPoint | null>(null);
@@ -73,7 +79,7 @@ export default function WorkbenchCanvas({
         }
     };
 
-    const cursorClass = activeTool === 'Draw' ? 'cursor-crosshair' : activeTool === 'Comment' ? 'cursor-copy' : 'cursor-default';
+    const cursorClass = CURSOR_BY_TOOL[activeTool];
 
     return (
         <div className="flex flex-col gap-2">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Card from "../ui/card";
 import type { EvidenceCardProps } from "@/types/components";
-export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension, href }: EvidenceCardProps) {
+export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension, href }: Readonly<EvidenceCardProps>) {
     const card = (
         <Card
             header={mediaName}
