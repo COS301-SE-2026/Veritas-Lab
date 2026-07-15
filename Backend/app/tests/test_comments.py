@@ -3,12 +3,13 @@ Integration tests for POST /api/cases/comments.
 All DB and auth calls are mocked. No real db here.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
+from fastapi import HTTPException
 
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
+from app.core.cases import Case
 
 client = TestClient(app)
 
@@ -20,191 +21,148 @@ FAKE_COMMENT_RESPONSE = {
     "caseId": VALID_CASE_ID,
     "username": "test_user",
     "comment": VALID_COMMENT,
-    "timestamp": "2026-06-27T12:00:00"
+    "timestamp": "2026-06-27T12:00:00",
 }
 
+INVESTIGATOR_JWT = {"userId": "user-1", "username": "investigator_one", "role": "INVESTIGATOR"}
+
+
+def _jwt_mock(role="INVESTIGATOR", username="investigator_user"):
+    return lambda req: {"sub": "id", "username": username, "role": role}
+
+
 def _mock_connection():
-    """Returns a mock asyncpg connection with a no-op close."""
     conn = AsyncMock()
     conn.close = AsyncMock(return_value=None)
     return conn
 
-#Auth tests here.
-#Verifying that the endpoint handles auth well.
+
+def _post_comment(body):
+    return client.post(
+        "/api/cases/comments",
+        json=body,
+        headers={"Authorization": "Bearer fake"},
+    )
+
+
+def _setup(monkeypatch, role, username, *, result=None, exc=None):
+    monkeypatch.setattr(cases_router, "verifyJWT", _jwt_mock(role, username))
+    monkeypatch.setattr(cases_router, "getConnection", AsyncMock(return_value=_mock_connection()))
+    monkeypatch.setattr(Case, "addComment", AsyncMock(return_value=result, side_effect=exc))
+
+
+def _edit_comment_connection(fetchrow_result):
+    class MockConnection:
+        async def fetchrow(self, query, *args):
+            return fetchrow_result
+        async def close(self):
+            pass
+    async def mock_connect(*args, **kwargs):
+        return MockConnection()
+    return mock_connect
+
+
+# Auth tests
 
 def test_create_comment_missing_jwt(monkeypatch):
-    def mock_verifyJWT(authorization):
+    def mock_verify_jwt(req):
         raise Exception("Missing Authorization header")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
-    response = client.post("/api/cases/comments", json={})
+    response = client.post("/api/cases/comments", json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 401
     assert response.json() == {"status": "error", "message": "Missing Authorization header"}
 
+
 def test_create_comment_invalid_jwt(monkeypatch):
-    def mock_verifyJWT(auth):
+    def mock_verify_jwt(req):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 401
     assert response.json() == {"status": "error", "message": "Invalid token"}
 
-#input validation tests
+
+# Input validation tests
 
 def test_create_comment_missing_case_id(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    monkeypatch.setattr(cases_router, "verifyJWT", _jwt_mock())
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    response = _post_comment({"comment": VALID_COMMENT})
 
-    response = client.post(
-        "/api/cases/comments",
-        json={"comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    assert response.status_code == 422
 
-    assert response.status_code == 400
-    assert response.json() == {"status": "error", "message": "case_id is needed."}
 
 def test_create_comment_invalid_case_id_format(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    monkeypatch.setattr(cases_router, "verifyJWT", _jwt_mock())
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    response = _post_comment({"case_id": "not-a-uuid", "comment": VALID_COMMENT})
 
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": "not-a-uuid", "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    assert response.status_code == 422
 
-    assert response.status_code == 400
-    assert response.json() == {"status": "error", "message": "Invalid case_id format"}
 
 def test_create_comment_missing_comment(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    monkeypatch.setattr(cases_router, "verifyJWT", _jwt_mock())
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID})
 
     assert response.status_code == 400
     assert response.json()["status"] == "error"
+
 
 def test_create_comment_blank_comment(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    monkeypatch.setattr(cases_router, "verifyJWT", _jwt_mock())
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": "   "},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": "   "})
 
     assert response.status_code == 400
     assert response.json()["status"] == "error"
 
-    #case status tests to be able to make a comment.
+
+# Case existence and role-based access tests
 
 def test_create_comment_case_not_found(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    _setup(monkeypatch, "INVESTIGATOR", "investigator_user",
+           exc=HTTPException(status_code=404, detail="Case not found"))
 
-    async def mock_get_case_status(conn, case_id):
-        return "not_found"
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 404
     assert response.json() == {"status": "error", "message": "Case not found"}
 
+
 def test_create_comment_user_on_open_case(monkeypatch):
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "normal_user", "role": "USER"}
+    _setup(monkeypatch, "USER", "normal_user",
+           exc=HTTPException(status_code=403, detail="Users may only comment on closed cases"))
 
-    async def mock_get_case_status(conn, case_id):
-        return "open"
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 403
     assert response.json() == {"status": "error", "message": "Users may only comment on closed cases"}
 
+
 def test_create_comment_investigator_on_closed_case(monkeypatch):
-    """An INVESTIGATOR must not be able to comment on a case that is already closed."""
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    _setup(monkeypatch, "INVESTIGATOR", "investigator_user",
+           exc=HTTPException(status_code=403, detail="Investigators may only comment on open cases"))
 
-    async def mock_get_case_status(conn, case_id):
-        return "closed"
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 403
     assert response.json() == {"status": "error", "message": "Investigators may only comment on open cases"}
 
-#Success tests
+
+# Success tests
+
 def test_create_comment_user_on_closed_case(monkeypatch):
-    """A USER commenting on a closed case should succeed with 201."""
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "normal_user", "role": "USER"}
+    _setup(monkeypatch, "USER", "normal_user",
+           result={**FAKE_COMMENT_RESPONSE, "username": "normal_user", "comment": VALID_COMMENT})
 
-    async def mock_get_case_status(conn, case_id):
-        return "closed"
-
-    async def mock_insert_comment(conn, case_id, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 201
     data = response.json()
@@ -213,27 +171,12 @@ def test_create_comment_user_on_closed_case(monkeypatch):
     assert data["comment"]["comment"] == VALID_COMMENT
     assert isinstance(data["comment"]["commentId"], int)
 
+
 def test_create_comment_investigator_on_open_case(monkeypatch):
-    """An INVESTIGATOR commenting on an open case should succeed with 201."""
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "investigator_user", "role": "INVESTIGATOR"}
+    _setup(monkeypatch, "INVESTIGATOR", "investigator_user",
+           result={**FAKE_COMMENT_RESPONSE, "username": "investigator_user", "comment": VALID_COMMENT})
 
-    async def mock_get_case_status(conn, case_id):
-        return "open"
-
-    async def mock_insert_comment(conn, case_id, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username, "comment": comment}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 201
     data = response.json()
@@ -241,93 +184,34 @@ def test_create_comment_investigator_on_open_case(monkeypatch):
     assert data["comment"]["username"] == "investigator_user"
     assert isinstance(data["comment"]["commentId"], int)
 
-def test_create_comment_admin_on_open_case(monkeypatch):
-    """An ADMIN can comment on an open case."""
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
 
-    async def mock_get_case_status(conn, case_id):
-        return "open"
+def test_create_comment_admin(monkeypatch):
+    _setup(monkeypatch, "ADMIN", "admin_user",
+           result={**FAKE_COMMENT_RESPONSE, "username": "admin_user"})
 
-    async def mock_insert_comment(conn, case_id, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
+    response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 201
     assert response.json()["status"] == "success"
 
 
-def test_create_comment_admin_on_closed_case(monkeypatch):
-    """An ADMIN can also comment on a closed case."""
-    def mock_verifyJWT(auth):
-        return {"sub": "id", "username": "admin_user", "role": "ADMIN"}
-
-    async def mock_get_case_status(conn, case_id):
-        return "closed"
-
-    async def mock_insert_comment(conn, case_id, username, comment):
-        return {**FAKE_COMMENT_RESPONSE, "username": username}
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router, "get_case_status", mock_get_case_status)
-    monkeypatch.setattr(cases_router, "insert_comment", mock_insert_comment)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", AsyncMock(return_value=_mock_connection()))
-
-    response = client.post(
-        "/api/cases/comments",
-        json={"case_id": VALID_CASE_ID, "comment": VALID_COMMENT},
-        headers={"Authorization": "Bearer fake"}
-    )
-
-    assert response.status_code == 201
-    assert response.json()["status"] == "success"
-
+# Edit comment tests
 
 def test_update_comment_success(monkeypatch):
-    class MockConnection:
-        async def fetchrow(self, query, case_id, username, comment_text, comment_id):
-            return {"commentid": comment_id}
+    monkeypatch.setattr(cases_router, "verifyJWT", lambda _: INVESTIGATOR_JWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", _edit_comment_connection({"commentid": 7}))
 
-        async def close(self):
-            pass
-
-    async def mock_connect(*args, **kwargs):
-        return MockConnection()
-
-    def mock_verify_jwt(_authorization):
-        return {
-            "userId": "user-1",
-            "username": "investigator_one",
-            "role": "INVESTIGATOR"
-        }
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
-    
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/7",
         json={"comment": "Updated findings after verification"},
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "success",
-        "message": "Comment edit successfully."
-    }
+    assert response.json() == {"status": "success", "message": "Comment edit successfully."}
 
 
 def test_update_comment_invalid_token_returns_401(monkeypatch):
-    def mock_verify_jwt(_authorization):
+    def mock_verify_jwt(_):
         raise ValueError("Invalid token")
 
     monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
@@ -338,21 +222,11 @@ def test_update_comment_invalid_token_returns_401(monkeypatch):
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
-    }
+    assert response.json() == {"status": "error", "message": "Invalid token"}
 
 
 def test_update_comment_invalid_case_id_returns_400(monkeypatch):
-    def mock_verify_jwt(_authorization):
-        return {
-            "userId": "user-1",
-            "username": "investigator_one",
-            "role": "INVESTIGATOR"
-        }
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verifyJWT", lambda _: INVESTIGATOR_JWT)
 
     response = client.post(
         "/api/editComment/case/not-a-valid-uuid/comment/7",
@@ -360,32 +234,12 @@ def test_update_comment_invalid_case_id_returns_400(monkeypatch):
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "status": "error",
-        "message": "Invalid CaseID"
-    }
+    assert response.json() == {"status": "error", "message": "Invalid CaseID"}
 
 
 def test_update_comment_not_found_returns_404(monkeypatch):
-    class MockConnection:
-        async def fetchrow(self, query, case_id, username, comment_text, comment_id):
-            return None
-
-        async def close(self):
-            pass
-
-    async def mock_connect(*args, **kwargs):
-        return MockConnection()
-
-    def mock_verify_jwt(_authorization):
-        return {
-            "userId": "user-1",
-            "username": "investigator_one",
-            "role": "INVESTIGATOR"
-        }
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+    monkeypatch.setattr(cases_router, "verifyJWT", lambda _: INVESTIGATOR_JWT)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", _edit_comment_connection(None))
 
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/404",
@@ -393,7 +247,4 @@ def test_update_comment_not_found_returns_404(monkeypatch):
     )
 
     assert response.status_code == 404
-    assert response.json() == {
-        "status": "error",
-        "message": "Case not found or user unauthorized."
-    }
+    assert response.json() == {"status": "error", "message": "Case not found or user unauthorized."}

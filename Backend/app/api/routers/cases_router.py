@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from app.core.cases import Case
-from app.core.cases import validate_comment_length, get_case_status, insert_comment
 from app.auth.auth import verifyJWT
 from app.core.env import ENVLoader
 import asyncpg
@@ -50,8 +49,7 @@ class UpdateCommentRequest(BaseModel):
     comment: str
 
 class CreateCommentRequest(BaseModel):
-    # None is allowed so FastAPI does not reject the request before our validation runs.
-    case_id: str | None = None
+    case_id: UUID
     comment: str | None = None
 
 def _format_case_evidence(row: dict) -> dict:
@@ -709,7 +707,6 @@ async def delete_evidence(
 @router.post("/cases/comments", status_code=201)
 async def create_comment(body: CreateCommentRequest, req: Request):
 
-    # Step 1: authenticate via Request.
     try:
         payload = verifyJWT(req)
     except Exception as e:
@@ -719,46 +716,24 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     role = payload.get("role")
     username = payload.get("username")
 
-    # Step 2: validate case_id presence and UUID format
-    if not body.case_id:
-        return JSONResponse(status_code=400,
-                            content={"status": "error", "message": "case_id is needed."})
-
-    try:
-        case_id = UUID(body.case_id)
-    except ValueError:
-        return JSONResponse(status_code=400,
-                            content={"status": "error", "message": "Invalid case_id format"})
-
-    # Step 3: validate comment text
-    if not body.comment or not validate_comment_length(body.comment):
+    if not body.comment or not Case.validateCommentLength(body.comment):
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": "Comment must be a non-empty string"})
 
     connection = await getConnection()
 
     try:
-        # Step 4: check case exists and its status
-        case_status = await get_case_status(connection, case_id)
+        case = Case()
+        case.CaseId = body.case_id
 
-        if case_status == "not_found":
-            return JSONResponse(status_code=404,
-                                content={"status": "error", "message": "Case not found"})
-
-        # Step 5: enforce role-based commenting rules
-        if role == "USER" and case_status != "closed":
-            return JSONResponse(status_code=403,
-                                content={"status": "error", "message": "Users may only comment on closed cases"})
-
-        if role == "INVESTIGATOR" and case_status != "open":
-            return JSONResponse(status_code=403,
-                                content={"status": "error", "message": "Investigators may only comment on open cases"})
-
-        # Step 6: insert the comment
-        new_comment = await insert_comment(connection, case_id, username, body.comment)
+        new_comment = await case.addComment(connection, username, body.comment, role)
 
         return JSONResponse(status_code=201,
                             content={"status": "success", "comment": new_comment})
+
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code,
+                            content={"status": "error", "message": e.detail})
 
     finally:
         await connection.close()

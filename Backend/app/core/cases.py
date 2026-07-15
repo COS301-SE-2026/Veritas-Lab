@@ -25,6 +25,8 @@ DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 
+_MISSING_CASE_ID = "Case id is missing"
+
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=DB_USER,
@@ -35,62 +37,6 @@ async def getConnection() -> asyncpg.Connection:
         ssl="require" if DB_SSL else None,
     )
 
-#These three functions were written by Tsephiso and need to be refactored to be object orientated
-def validate_comment_length(comment: str) -> bool:
-    """
-    Returns True if the comment is a non-empty, non-whitespace string.
-    No upper length limit is enforced. the DB column is TEXT.
-    """
-    if not isinstance(comment, str):
-        return False
-    return len(comment.strip()) > 0
-
-async def get_case_status(connection: asyncpg.Connection, case_id: uuid.UUID) -> str:
-    """
-    Looks up a case by id and returns its current status.
-
-    Returns:
-        'not_found' - no case with this id exists
-        'closed'    - the case exists and is closed
-        'open'      - the case exists and is open
-    """
-    row = await connection.fetchrow(
-        """
-        SELECT caseclosed
-        FROM "Cases_DB"."Cases"
-        WHERE caseid = $1
-        """,
-        case_id
-    )
-
-    if row is None:
-        return "not_found"
-
-    return "closed" if row["caseclosed"] else "open"
-
-async def insert_comment(connection: asyncpg.Connection, case_id: uuid.UUID, username: str, comment: str) -> dict:
-    """
-    Inserts a new comment into the Comments table and returns the created record.
-    """
-    row = await connection.fetchrow(
-        """
-        INSERT INTO "Cases_DB"."Comments" (caseid, username, comment)
-        VALUES ($1, $2, $3)
-        RETURNING commentid, caseid, username, comment, commenttimestamp
-        """,
-        case_id,
-        username,
-        comment.strip()
-    )
-
-    return {
-        "commentId": row["commentid"],
-        "caseId": str(row["caseid"]),
-        "username": row["username"],
-        "comment": row["comment"],
-        "timestamp": row["commenttimestamp"].isoformat() if row["commenttimestamp"] else None
-    }
-    
 # If the case_id is None then the case is not in the db. You may call create().
 # When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 class Case:
@@ -381,7 +327,7 @@ class Case:
 
     async def deleteEvidence(self, media_id: uuid.UUID, JWT_username: str = None):
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail="Case id is missing")
+            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
 
         connection = None
 
@@ -452,7 +398,7 @@ class Case:
                         secure=minioSecure
                     )
 
-                    object_name = f"{deleted_media["mediaid"]}{deleted_media["mediaextension"]}"
+                    object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
                     try:
                         minioClient.remove_object(
@@ -518,7 +464,7 @@ class Case:
                         secure=minioSecure
                     )
 
-                    object_name = f"{deleted_media["mediaid"]}{deleted_media["mediaextension"]}"
+                    object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
                     try:
                         minioClient.remove_object(
@@ -555,7 +501,7 @@ class Case:
 
     async def getComments(self):
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail="Case id is missing")
+            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
 
         connection = None
         try:
@@ -577,6 +523,70 @@ class Case:
         finally:
             if connection is not None:
                 await connection.close()
+
+    @staticmethod
+    def validateCommentLength(comment: str) -> bool:
+        if not isinstance(comment, str):
+            return False
+        return len(comment.strip()) > 0
+
+    async def addComment(self, connection: asyncpg.Connection, username: str, comment: str, role: str) -> dict:
+        if self.CaseId is None:
+            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
+
+        row = await connection.fetchrow(
+            """
+            WITH case_check AS (
+                SELECT caseid, caseclosed
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+            ),
+            inserted AS (
+                INSERT INTO "Cases_DB"."Comments" (caseid, username, comment)
+                SELECT $1, $2, $3
+                FROM case_check
+                WHERE (
+                    $4 = 'ADMIN'
+                    OR ($4 = 'USER' AND caseclosed = TRUE)
+                    OR ($4 = 'INVESTIGATOR' AND caseclosed = FALSE)
+                )
+                RETURNING commentid, caseid, username, comment, commenttimestamp
+            )
+            SELECT
+                i.commentid,
+                i.caseid,
+                i.username,
+                i.comment,
+                i.commenttimestamp,
+                c.caseclosed,
+                (c.caseid IS NOT NULL) AS case_exists,
+                (i.commentid IS NOT NULL) AS comment_inserted
+            FROM case_check c
+            LEFT JOIN inserted i ON true
+            """,
+            self.CaseId,
+            username,
+            comment.strip(),
+            role,
+        )
+
+        if row is None or not row["case_exists"]:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        if not row["comment_inserted"]:
+            if role == "USER":
+                raise HTTPException(status_code=403, detail="Users may only comment on closed cases")
+            if role == "INVESTIGATOR":
+                raise HTTPException(status_code=403, detail="Investigators may only comment on open cases")
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+        return {
+            "commentId": row["commentid"],
+            "caseId": str(row["caseid"]),
+            "username": row["username"],
+            "comment": row["comment"],
+            "timestamp": row["commenttimestamp"].isoformat() if row["commenttimestamp"] else None,
+        }
 
     @staticmethod
     async def deleteCase(case_id: uuid.UUID, username: str, role: str):
