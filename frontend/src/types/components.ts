@@ -18,6 +18,7 @@ export type EvidenceCardProps = {
     mediaName: string;
     mediaUrl: string;
     mediaExtension: string;
+    href?: string;
 };
 
 export type DashboardModalProps = {
