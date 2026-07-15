@@ -2,7 +2,6 @@
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import type { AnnotationListProps } from '@/types/workbench';
 
-/** Sidebar panel listing every annotation on the current media, mirrors the "Case Details" card style. */
 export default function AnnotationList({ annotations, selectedId, onSelect, onRemove }: AnnotationListProps) {
     return (
         <div className="shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-[21px] p-4">
