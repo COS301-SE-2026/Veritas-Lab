@@ -10,7 +10,7 @@ export default function AnnotationNote({ position, text, isDraft = false, isSele
 
     if (isDraft) {
         return (
-            <div className="absolute z-20" style={pinStyle} onClick={(event) => event.stopPropagation()}>
+            <div className="absolute z-20" style={pinStyle}>
                 <div className="absolute bottom-full left-1/2 mb-2 w-56 -translate-x-1/2 rounded-xl border border-(--color-light) bg-white p-3 shadow-lg">
                     <textarea
                         autoFocus

@@ -66,6 +66,9 @@ export default function WorkbenchCanvas({
     };
 
     const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        // Ignore clicks that bubbled up from a child (a note pin, its popup, etc.) 
+        if (event.target !== event.currentTarget) return;
+
         const bounds = overlayRef.current?.getBoundingClientRect();
         if (!bounds) return;
 
@@ -79,16 +82,26 @@ export default function WorkbenchCanvas({
         }
     };
 
+    const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Escape' && activeTool === 'Select') {
+            onSelectAnnotation(null);
+        }
+    };
+
     const cursorClass = CURSOR_BY_TOOL[activeTool];
 
     return (
         <div className="flex flex-col gap-2">
             <div
                 ref={overlayRef}
+                role="application"
+                aria-label={`${mediaName} annotation canvas`}
+                tabIndex={0}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onClick={handleOverlayClick}
+                onKeyDown={handleOverlayKeyDown}
                 className={`relative aspect-video w-full overflow-hidden rounded-2xl border border-(--color-light) bg-black/5 select-none ${cursorClass}`}
             >
                 {mediaUrl ? (
