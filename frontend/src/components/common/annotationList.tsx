@@ -20,32 +20,27 @@ export default function AnnotationList({ annotations, selectedId, onSelect, onRe
                         return (
                             <li key={annotation.id}>
                                 <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => onSelect(annotation.id)}
-                                    onKeyDown={(event) => {
-                                        if (event.key === 'Enter' || event.key === ' ') {
-                                            onSelect(annotation.id);
-                                        }
-                                    }}
-                                    className={`flex w-full cursor-pointer items-start gap-2 rounded-xl p-2 text-left text-sm transition-colors ${
+                                    className={`flex w-full items-start gap-2 rounded-xl p-2 text-sm transition-colors ${
                                         isSelected
                                             ? 'bg-(--color-secondary)/20 text-(--color-text)'
                                             : 'text-(--color-text) hover:bg-(--color-lightest)'
                                     }`}
                                 >
-                                    {annotation.kind === 'shape' ? (
-                                        <Pencil size={16} className="mt-0.5 shrink-0" />
-                                    ) : (
-                                        <MessageSquare size={16} className="mt-0.5 shrink-0" />
-                                    )}
-                                    <span className="line-clamp-2 flex-1">{label}</span>
                                     <button
                                         type="button"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onRemove(annotation.id);
-                                        }}
+                                        onClick={() => onSelect(annotation.id)}
+                                        className="flex flex-1 items-start gap-2 text-left"
+                                    >
+                                        {annotation.kind === 'shape' ? (
+                                            <Pencil size={16} className="mt-0.5 shrink-0" />
+                                        ) : (
+                                            <MessageSquare size={16} className="mt-0.5 shrink-0" />
+                                        )}
+                                        <span className="line-clamp-2 flex-1">{label}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => onRemove(annotation.id)}
                                         aria-label="Remove annotation"
                                         className="shrink-0 rounded-full p-1 text-(--color-light) hover:bg-(--color-lightest) hover:text-(--color-error)"
                                     >
