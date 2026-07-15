@@ -2,16 +2,20 @@
 import { useCallback, useState } from 'react';
 import type { Annotation, AnnotationPoint, AnnotationTool } from '@/types/workbench';
 
+let fallbackIdCounter = 0;
+
 /**
  * Generates a reasonably unique id for a new annotation.
- * Falls back to Math.random when crypto.randomUUID isn't available (older browsers).
+ * Falls back to a counter when crypto.randomUUID isn't available (older browsers);
+ * these ids are only ever used to key local state, not for anything security-sensitive.
  */
 function createAnnotationId(): string {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
     }
 
-    return `annotation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    fallbackIdCounter += 1;
+    return `annotation-${Date.now()}-${fallbackIdCounter}`;
 }
 
 /**
