@@ -9,7 +9,7 @@ TRACES_FOUND_MESSAGE="[+] Traces of editing software found:"
 HIGH_FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/creaated by software"
 # The metadata within this tests are real for the analyseMetadata tests
 @pytest.mark.asyncio
-async def test_analyseMetadata_detects_ms_paint():
+async def test_analysemetadata_detects_ms_paint():
     """
     This tests the "XMP:About": check for the Microsofts signature 
     """
@@ -77,7 +77,7 @@ async def test_analyseMetadata_detects_ms_paint():
     assert "* XMP:About (Confirmed Editor): Microsoft Paint / Windows Photo tool signature detected" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_detects_drawing_software():
+async def test_analysemetadata_detects_drawing_software():
     """
     This is artwork png that the method needs to detect the software.
     """
@@ -202,7 +202,7 @@ async def test_analyseMetadata_detects_drawing_software():
     assert "Adobe Photoshop 25.0 (Macintosh)" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_detects_AI_chatgpt():
+async def test_analysemetadata_detects_AI_chatgpt():
     """
     It needs to flag this as highly suspicious since it is AI and is not a camera (Chatgpt)
     """
@@ -292,7 +292,7 @@ async def test_analyseMetadata_detects_AI_chatgpt():
     assert "* JUMBF:Claim_Generator_InfoName: OpenAI Media Service API" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_detects_AI_gemini():
+async def test_analysemetadata_detects_AI_gemini():
     """
     It needs to flag this as highly suspicious since it is AI and is not a camera (Gemini)
     """
@@ -395,7 +395,7 @@ async def test_analyseMetadata_detects_AI_gemini():
     assert "* JUMBF:Claim_Generator_InfoName: Google C2PA Core Generator Library" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_detects_screenshot():
+async def test_analysemetadata_detects_screenshot():
     """
     It needs to flag the screenshot as low so the investigator can tell the client to send the actual image
     """
@@ -431,7 +431,7 @@ async def test_analyseMetadata_detects_screenshot():
     assert NO_CAMERA_MESSAGE in result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_detects_social_media_stripping():
+async def test_analyse_metadata_detects_social_media_stripping():
     """
     It needs to flag an image that was stripped by social media as low so the investigator can tell the client to send the actual image as a document
     """
@@ -490,7 +490,7 @@ async def test_analyseMetadata_detects_social_media_stripping():
     assert NO_CAMERA_MESSAGE in result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_finds_nothing_with_normal_phone_picture():
+async def test_analyse_metadata_finds_nothing_with_normal_phone_picture():
     """
     It should not flag a picture if the phone puts the operating system details within the software tag
     """
@@ -607,7 +607,7 @@ async def test_analyseMetadata_finds_nothing_with_normal_phone_picture():
     assert not result.Findings
 
 @pytest.mark.asyncio
-async def test_analyseMetadata_find_nothing_with_a_perfect_rule_obeying_phone_picture():
+async def test_analyse_metadata_find_nothing_with_a_perfect_rule_obeying_phone_picture():
     """
     It should not flag a picture that has nothing wrong with it
     """
