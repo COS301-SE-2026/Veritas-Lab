@@ -242,7 +242,6 @@ async def test_analysemetadata_detects_ai_chatgpt():
         ],
         "JUMBF:ActionsSoftwareAgentName": "gpt-image",
         "JUMBF:ActionsSoftwareAgentVersion": 2.0,
-        "JUMBF:ActionsDigitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
         "JUMBF:C2PACertificate-statusSalt": "bc90f1c0220b73dcb9a783289d22ae49",
         "JUMBF:OcspVals": [
             "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",
@@ -350,10 +349,6 @@ async def test_analysemetadata_detects_ai_gemini():
         "JUMBF:ActionsDescription": [
             "Created by Google Generative AI.",
             "Applied imperceptible SynthID watermark."
-        ],
-        "JUMBF:ActionsDigitalSourceType": [
-            "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia",
-            "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
         ],
         "JUMBF:ActionsParametersIngredientsUrl": "self#jumbf=c2pa.assertions/c2pa.ingredient.v3",
         "JUMBF:ActionsParametersIngredientsHash": "(Binary data 32 bytes, use -b option to extract)",

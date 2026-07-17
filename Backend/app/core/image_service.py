@@ -32,7 +32,7 @@ class ImageService(MediaService):
                 val_str = ", ".join(str(v) for v in val) if isinstance(val, list) else str(val)
                 val_lower = val_str.lower()
                 
-                is_firmware = check_firmware(val_lower,dev_model,dev_make)
+                is_firmware = self.check_firmware(val_lower,dev_model,dev_make)
                 is_known_editor = any(editor in val_lower for editor in known_editors)
                 
                 if is_known_editor:
@@ -49,7 +49,7 @@ class ImageService(MediaService):
         if metadata.get("EXIF:HostComputer", "") == "Mac OS X":
             # Safely check firmware without relying on loop variables
             host_val = str(metadata.get("EXIF:HostComputer", "")).lower()
-            if not check_firmware(host_val):
+            if not self.check_firmware(host_val):
                 found.append("  * EXIF:HostComputer (Unverified Software): Image was processed by a Mac/iOS device post-capture")
 
         return found

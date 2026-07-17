@@ -194,6 +194,10 @@ class MediaService(ABC):
             await self.saveMetadata(media_id, metadata)
             
             report_findings = await self.analyseMetadata(metadata)
+            print(json.dumps(report_findings, indent=4))
+
+            # use this when you want to upload to the database
+
 
         return metadata
     
