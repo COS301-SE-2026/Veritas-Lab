@@ -8,7 +8,7 @@ class ImageService(MediaService):
     def _is_stripped(self, metadata: dict) -> bool:
         return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
 
-    def check_firmware(val_lower: str, dev_model:str, dev_make:str ) -> bool:
+    def check_firmware(self,val_lower: str, dev_model:str, dev_make:str ) -> bool:
         return (
             (dev_model and dev_model[:4] in val_lower) or 
             (dev_make and dev_make in val_lower) or
