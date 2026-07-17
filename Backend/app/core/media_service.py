@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod #abstractmethod is to override methods
 from uuid import UUID
 import asyncpg
 from dotenv import load_dotenv
@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from pathlib import Path
 import aiofiles.tempfile
 from starlette.concurrency import run_in_threadpool
+from pydantic import BaseModel
 
 load_dotenv()
 env = ENVLoader()
@@ -19,6 +20,10 @@ DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
+
+class AnalysisFindings(BaseModel):
+    Certainty: int
+    Findings: str
 
 class MediaService(ABC):
 
@@ -176,9 +181,24 @@ class MediaService(ABC):
                     file_path=str(file_path),
                     media_record=media_record
                 )
+                
+            #This is to remove information about the system that does not 
+            #affect the analysis
+            if "SourceFile" in metadata:
+                del metadata["SourceFile"]
+            if "ExifTool:ExifToolVersion" in metadata:
+                del metadata["ExifTool:ExifToolVersion"]
+            if "File:Directory" in metadata:
+                del metadata["File:Directory"]
 
             await self.saveMetadata(media_id, metadata)
+            
+            report_findings = await self.analyseMetadata(metadata)
 
         return metadata
-                
+    
+    @abstractmethod
+    async def analyseMetadata(self,metadata: dict)-> AnalysisFindings:
+        pass
+
             
