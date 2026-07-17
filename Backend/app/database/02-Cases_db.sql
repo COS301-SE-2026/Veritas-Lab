@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Reports"(
     ReportArtifacts JSONB,
     ReportFindings TEXT,
     ReportComments TEXT,
+    ReportCertainty SMALLINT CHECK (ReportCertainty <=3),
     ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
