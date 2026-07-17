@@ -145,7 +145,8 @@ def analyse_metadata(metadata: dict[str, Any]) -> list[dict[str, str]]:
             {
                 "type": "metadata",
                 "message": f"Camera metadata was found: {camera}.",
-                "importance": "low"
+                "importance": "low",
+                "supports": "AUTHENTIC"
             }
         )
     else:
@@ -153,7 +154,8 @@ def analyse_metadata(metadata: dict[str, Any]) -> list[dict[str, str]]:
             {
                 "type": "metadata",
                 "message": "No camera make or model was found. This is only a weak indicator because websites and messaging apps often remove metadata.",
-                "importance": "low"
+                "importance": "low",
+                "supports": "INCONCLUSIVE"
             }
         )
     
@@ -162,31 +164,41 @@ def analyse_metadata(metadata: dict[str, Any]) -> list[dict[str, str]]:
             {
                 "type": "metadata",
                 "message": "The metadata records image-processing software: " f"{software}.",
-                "importance": "medium"
+                "importance": "medium",
+                "supports": "INCONCLUSIVE"
             }
         )
     
     return reasons
 
-def generate_probability_reason(probability: float) -> dict[str, str]:
-    if probability >= 0.7:
+def generate_probability_reason(probability: float, low_threshold: float = 0.4, high_threshold: float = 0.7) -> dict[str, str]:
+    if not 0.0 <= probability <= 1:
+        raise ValueError("Probability must be between 0.0 and 1.0.")
+    
+    if not 0.0 < low_threshold < high_threshold < 1.0:
+        raise ValueError("Thresholds must satisfy 0 < low_threshold < high_threshold < 1.")
+    
+    if probability >= high_threshold:
         return {
             "type": "model",
             "message": "The classifier detected strong visual patterns associated with the AI-generated or AI-modified class.",
-            "importance": "high"
+            "importance": "high",
+            "supports": "AI"
         }
     
-    if probability >= 0.4:
+    if probability >= low_threshold:
         return {
             "type": "model",
             "message": "The classifier found mixed evidence and could not clearly distinguish between the authentic and AI classes.",
-            "importance": "medium"
+            "importance": "medium",
+            "supports": "INCONCLUSIVE"
         }
     
     return {
         "type": "model",
         "message": "The classifier detected stronger visual patterns associated with the authentic-image class.",
-        "importance": "high"
+        "importance": "high",
+        "supports": "AUTHENTIC"
     }
 
 def generate_statistical_reasons(edge_variance: float, noise_level: float, colour_statistics: dict[str, float]) -> list[dict[str, str]]:
@@ -197,7 +209,8 @@ def generate_statistical_reasons(edge_variance: float, noise_level: float, colou
             {
                 "type": "visual",
                 "message": "The image contains very smooth regions with limited high-frequency noise. This may occur in synthetic or heavily denoised images.",
-                "importance": "medium"
+                "importance": "medium",
+                "supports": "AI"
             }
         )
     elif noise_level > 25.0:
@@ -205,7 +218,8 @@ def generate_statistical_reasons(edge_variance: float, noise_level: float, colou
             {
                 "type": "visual",
                 "message": "The image contains a high level of fine-grained noise or compression artefacts.",
-                "importance": "low"
+                "importance": "low",
+                "supports": "INCONCLUSIVE"
             }
         )
     else:
@@ -213,7 +227,8 @@ def generate_statistical_reasons(edge_variance: float, noise_level: float, colou
             {
                 "type": "visual",
                 "message": "The image contains a moderate level of fine detail and noise.",
-                "importance": "low"
+                "importance": "low",
+                "supports": "AUTHENTIC"
             }
         )
     
@@ -222,7 +237,8 @@ def generate_statistical_reasons(edge_variance: float, noise_level: float, colou
             {
                 "type": "visual",
                 "message": "The image contains unusually strong edge patterns. This can result from artificial sharpening, editing, or generation artefacts.",
-                "importance": "medium"
+                "importance": "medium",
+                "supports": "AI"
             }
         )
     elif edge_variance < 40.0:
@@ -230,15 +246,17 @@ def generate_statistical_reasons(edge_variance: float, noise_level: float, colou
             {
                 "type": "visual",
                 "message": "The image contains very little fine edge detail. This can result from blur, smoothing, or compression.",
-                "importance": "low"
+                "importance": "low",
+                "supports": "INCONCLUSIVE"
             }
         )
     if colour_statistics["mean_saturation_range"] > 100.0:
         reasons.append(
             {
                 "type": "visual",
-                "message": "The image contains unusually strong colour separation or saturation",
-                "importance": "low"
+                "message": "The image contains unusually strong colour separation or saturation.",
+                "importance": "low",
+                "supports": "AI"
             }
         )
     
@@ -256,7 +274,7 @@ def validate_heatmap(heatmap: np.ndarray) -> None:
 
 def calculate_attention_statistics(heatmap: np.ndarray) -> dict[str, float]:
     validate_heatmap(heatmap)
-    
+
     return {
         "strong_attention_ratio": float((heatmap >= 0.70).mean()),
         "moderate_attention_ratio": float((heatmap >= 0.40).mean()),
@@ -277,10 +295,16 @@ def generate_attention_reason(attention_statistics: dict[str, float]) -> dict[st
     return {
         "type": "model_attention",
         "message": message,
-        "importance": "medium"
+        "importance": "medium",
+        "supports": "INCONCLUSIVE"
     }
 
 def create_heatmap_overlay(original_image: Image.Image, heatmap: np.ndarray, output_path: str| Path, opacity: float = 0.45) -> Path:
+    validate_heatmap(heatmap)
+    
+    if not 0.0 <= opacity <= 1.0:
+        raise ValueError("Opacity must be between 0.0 and 1.0.")
+    
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
