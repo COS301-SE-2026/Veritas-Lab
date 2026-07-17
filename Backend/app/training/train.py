@@ -32,4 +32,27 @@ def parse_arguments() -> argparse.Namespace:
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
-        
+
+        train_loader, validation_loader, _ = create_data_loaders(
+            data_directory = args.data_dir,
+            batch_size = args.batch_size,
+            num_workers = args.num_workers,
+        )
+
+        model = AIImageDetector(
+            freeze_features = True,
+            use_pretrained_weights = True,
+        ).to(device) # move the model to the device that we chose
+
+        loss_function = nn.BCEWithLogitsLoss()
+        optimizer = Adam(
+            filter(lambda paramter: parameter.requires_grad, model.parameters()),
+            lr = args.learning_rate,
+            #Here we say which parts of the model that's allowed to learn to updtae
+        )
+
+        best_validation_loss = float ("inf")
+        model_path = Path(args.model_path)
+        model_path.parent.mkdir(parents = True, exist_ok = True)
+
+       
