@@ -6,7 +6,14 @@ FRAUD_MESSAGE=" Lacks camera data therefore highly suspicious as it is stripped 
 class ImageService(MediaService):
 
     def _is_stripped(self, metadata: dict) -> bool:
-        return not any(k.startswith("EXIF:Model") or k.startswith("EXIF:DateTimeOriginal") for k in metadata.keys())
+        return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
+
+    def check_firmware(val_lower: str, dev_model:str, dev_make:str ) -> bool:
+        return (
+            (dev_model and dev_model[:4] in val_lower) or 
+            (dev_make and dev_make in val_lower) or
+            any(char in val_lower for char in ["emui", "magicos", "android", "ios"])
+        )
 
     def _find_software_traces(self, metadata: dict) -> list[str]:
         found = []
@@ -19,20 +26,13 @@ class ImageService(MediaService):
         dev_model = str(metadata.get("EXIF:Model", "")).lower()
         dev_make = str(metadata.get("EXIF:Make", "")).lower()
 
-        def check_firmware(val_lower: str) -> bool:
-            return (
-                (dev_model and dev_model[:4] in val_lower) or 
-                (dev_make and dev_make in val_lower) or
-                any(char in val_lower for char in ["emui", "magicos", "android", "ios"])
-            )
-
         for key in software_keys:
             if key in metadata:
                 val = metadata[key]
                 val_str = ", ".join(str(v) for v in val) if isinstance(val, list) else str(val)
                 val_lower = val_str.lower()
                 
-                is_firmware = check_firmware(val_lower)
+                is_firmware = check_firmware(val_lower,dev_model,dev_make)
                 is_known_editor = any(editor in val_lower for editor in known_editors)
                 
                 if is_known_editor:
@@ -56,7 +56,7 @@ class ImageService(MediaService):
 
     def _process_c2pa(self, metadata: dict) -> tuple[list[str], bool, bool]:
         report_lines = []
-        c2pa_keys = [k for k in metadata.keys() if k.startswith("C2PA:") or k.startswith("JUMBF:")]
+        c2pa_keys = [k for k in metadata.keys() if k.startswith(("C2PA:", "JUMBF:"))]
         
         if not c2pa_keys:
             return report_lines, False, False

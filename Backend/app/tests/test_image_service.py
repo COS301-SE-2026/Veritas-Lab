@@ -202,7 +202,7 @@ async def test_analysemetadata_detects_drawing_software():
     assert "Adobe Photoshop 25.0 (Macintosh)" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_AI_chatgpt():
+async def test_analysemetadata_detects_ai_chatgpt():
     """
     It needs to flag this as highly suspicious since it is AI and is not a camera (Chatgpt)
     """
@@ -292,7 +292,7 @@ async def test_analysemetadata_detects_AI_chatgpt():
     assert "* JUMBF:Claim_Generator_InfoName: OpenAI Media Service API" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_AI_gemini():
+async def test_analysemetadata_detects_ai_gemini():
     """
     It needs to flag this as highly suspicious since it is AI and is not a camera (Gemini)
     """
