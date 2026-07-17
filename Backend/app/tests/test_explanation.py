@@ -67,7 +67,7 @@ class MultipleOutputModel(nn.Module):
 
         return self.classifier(flattened)
 
-def create_rgb_image(size: tuple[int, int] = (100, 100), colour: tuple[int, int, int] = (100, 150, 200)) -> Image:
+def create_rgb_image(size: tuple[int, int] = (100, 100), colour: tuple[int, int, int] = (100, 150, 200)) -> Image.Image:
     return Image.new(
         mode="RGB",
         size=size,
@@ -217,11 +217,12 @@ def test_statistical_reasons_for_moderate_noise() -> None:
     assert reasons[0]["importance"] == "low"
 
 def test_statistical_reasons_for_high_noise() -> None:
-    reasons = generate_statistical_reasons(edge_variance=500.0, noise_level=10.0, colour_statistics={"mean_saturation_range": 50.0})
+    reasons = generate_statistical_reasons(edge_variance=500.0, noise_level=30.0, colour_statistics={"mean_saturation_range": 50.0})
+    assert len(reasons) == 1
+    noise_reason = reasons[0]
 
-    edge_reason = reasons[1]
-    assert edge_reason["supports"] == "AI"
-    assert edge_reason["importance"] == "medium"
+    assert noise_reason["supports"] == "INCONCLUSIVE"
+    assert noise_reason["importance"] == "low"
 
 def test_statistical_reasons_for_low_edge_variance() -> None:
     reasons = generate_statistical_reasons(edge_variance=20.0, noise_level=10.0, colour_statistics={"mean_saturation_range": 50.0})
@@ -308,7 +309,7 @@ def test_calculate_attention_statistics() -> None:
     ]
 )
 def test_generate_attention_reason(ratio: float, expected_text: str) -> None:
-    reason = test_generate_attention_reason(
+    reason = generate_attention_reason(
         {
             "strong_attention_ratio": ratio
         }
@@ -363,4 +364,67 @@ def test_create_heatmap_overlay_rejects_invalid_opacity(tmp_path: Path, opacity:
             opacity=opacity
         )
 
+def test_gradcam_generates_heatmap_and_probability() -> None:
+    model = SmallBinaryModel()
+    target_layer = model.features[0]
+
+    grad_cam = GradCAM(model=model, target_layer=target_layer)
+
+    image_tensor = torch.rand(1,3,32,32,requires_grad=True)
+
+    try:
+        heatmap, probability = grad_cam.generate(image_tensor)
+    finally:
+        grad_cam.remove_hooks()
+    
+    assert isinstance(heatmap, np.ndarray)
+    assert heatmap.shape == (32, 32)
+    assert isinstance(probability, float)
+    assert 0.0 <= probability <= 1.0
+    assert np.isfinite(heatmap).all()
+    assert heatmap.min() >= 0.0
+    assert heatmap.max() <= 1.0
+
+def test_gradcam_rejects_tensor_without_batch_dimension() -> None:
+    model = SmallBinaryModel()
+
+    grad_cam = GradCAM(model=model, target_layer=model.features[0])
+    image_tensor = torch.rand(3,32,32, requires_grad=True)
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="must have shape"
+        ):
+            grad_cam.generate(image_tensor)
+    finally:
+        grad_cam.remove_hooks()
+    
+def test_gradcam_rejects_multiple_logits() -> None:
+    model = MultipleOutputModel()
+
+    grad_cam = GradCAM(model=model, target_layer=model.features)
+    image_tensor = torch.rand(1,3,32,32, requires_grad=True)
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="one binary-classification logit"
+        ):
+            grad_cam.generate(image_tensor)
+    finally:
+        grad_cam.remove_hooks()
+
+def test_gradcam_remove_hooks() -> None:
+    model = SmallBinaryModel()
+
+    grad_cam = GradCAM(
+        model=model,
+        target_layer=model.features[0]
+    )
+
+    grad_cam.remove_hooks()
+
+    assert grad_cam.forward_handle.id not in model.features[0]._forward_hooks
+    assert grad_cam.backward_handle.id not in model.features[0]._backward_hooks
 
