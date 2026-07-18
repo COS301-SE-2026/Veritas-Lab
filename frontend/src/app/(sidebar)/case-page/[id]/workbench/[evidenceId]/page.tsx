@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
 import useAnnotations from '@/lib/hooks/useAnnotations';
-import { saveAnnotations } from '@/lib/api/workbench';
+import { fetchAnnotations, saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { getMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
@@ -17,7 +17,7 @@ export default function WorkbenchPage() {
     const caseId = params.id;
     const evidenceId = params.evidenceId;
 
-    const {
+     const {
         annotations,
         activeTool,
         setActiveTool,
@@ -27,6 +27,7 @@ export default function WorkbenchPage() {
         addNote,
         removeAnnotation,
         clearAll,
+        loadAnnotations,
     } = useAnnotations();
 
     // Which workbench tool is open. By default none are open
@@ -50,6 +51,20 @@ export default function WorkbenchPage() {
         };
     }, [caseId, evidenceId]);
 
+     useEffect(() => {
+        let cancelled = false;
+
+        fetchAnnotations({ caseId, evidenceId })
+            .then((loaded) => {
+                if (!cancelled) loadAnnotations(loaded);
+            })
+            .catch((error) => console.error('Failed to load annotations:', error));
+
+        return () => {
+            cancelled = true;
+        };
+    }, [caseId, evidenceId, loadAnnotations]);
+    
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);

@@ -94,5 +94,10 @@ export type SaveAnnotationsPayload = {
     annotations: Annotation[];
 };
 
+export type LoadAnnotationsParams = {
+    caseId: string;
+    evidenceId: string;
+};
+
 // How a piece of evidence should be previewed on the canvas
 export type MediaKind = 'image' | 'pdf' | 'unsupported';
