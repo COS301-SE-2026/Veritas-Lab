@@ -28,38 +28,38 @@ export default function useAnnotations() {
     const [activeTool, setActiveTool] = useState<AnnotationTool>('Select');
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
-    const addShape = useCallback((points: AnnotationPoint[]) => {
-        if (points.length < 2) {
-            // A single point isn't a meaningful shape, ignore accidental clicks.
-            return;
-        }
+    const addShape = (points: AnnotationPoint[], page: number) => {
+        // A single point isn't a meaningful shape, ignore accidental clicks.
+        if (points.length < 2) return;
 
-        const shape: Annotation = { id: createAnnotationId(), kind: 'shape', points };
+        const shape: Annotation = { id: createAnnotationId(), kind: 'shape', page, points };
         setAnnotations((current) => [...current, shape]);
         setSelectedId(shape.id);
-    }, []);
+    };
 
-    const addNote = useCallback((position: AnnotationPoint, text: string) => {
+    const addNote = (position: AnnotationPoint, text: string, page: number) => {
         const trimmedText = text.trim();
+        if (!trimmedText) return;
 
-        if (!trimmedText) {
-            return;
-        }
-
-        const note: Annotation = { id: createAnnotationId(), kind: 'note', position, text: trimmedText };
+        const note: Annotation = { id: createAnnotationId(), kind: 'note', page, position, text: trimmedText };
         setAnnotations((current) => [...current, note]);
         setSelectedId(note.id);
-    }, []);
+    };
 
-    const removeAnnotation = useCallback((id: string) => {
+    const removeAnnotation = (id: string) => {
         setAnnotations((current) => current.filter((annotation) => annotation.id !== id));
         setSelectedId((current) => (current === id ? null : current));
-    }, []);
+    };
 
-    const clearAll = useCallback(() => {
+    const clearAll = () => {
         setAnnotations([]);
         setSelectedId(null);
-    }, []);
+    };
+
+    const loadAnnotations = (loaded: Annotation[]) => {
+        setAnnotations(loaded);
+        setSelectedId(null);
+    };
 
     return {
         annotations,
@@ -71,5 +71,6 @@ export default function useAnnotations() {
         addNote,
         removeAnnotation,
         clearAll,
+        loadAnnotations,
     };
 }

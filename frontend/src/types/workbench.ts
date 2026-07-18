@@ -20,6 +20,7 @@ export type AnnotationTool = 'Select' | 'Draw' | 'Comment';
 export type ShapeAnnotation = {
     id: string;
     kind: 'shape';
+    page: number;
     points: AnnotationPoint[];
 };
 
@@ -27,6 +28,7 @@ export type ShapeAnnotation = {
 export type NoteAnnotation = {
     id: string;
     kind: 'note';
+    page: number;
     position: AnnotationPoint;
     text: string;
 };
@@ -41,16 +43,16 @@ export type WorkbenchToolbarProps = {
 };
 
 export type WorkbenchCanvasProps = {
-    /** Optional, no backend link yet, falls back to a placeholder when absent. */
     mediaUrl?: string;
+    mediaKind?: MediaKind;
     mediaName: string;
     active?: boolean;
     activeTool: AnnotationTool;
     annotations: Annotation[];
     selectedId: string | null;
     onSelectAnnotation: (id: string | null) => void;
-    onAddShape: (points: AnnotationPoint[]) => void;
-    onAddNote: (position: AnnotationPoint, text: string) => void;
+    onAddShape: (points: AnnotationPoint[], page: number) => void;
+    onAddNote: (position: AnnotationPoint, text: string, page: number) => void;
 };
 
 export type AnnotationNoteProps = {
@@ -85,3 +87,12 @@ export type WorkbenchPanelProps = {
     onClearAll: () => void;
     onSave: () => Promise<void>;
 };
+
+export type SaveAnnotationsPayload = {
+    caseId: string;
+    evidenceId: string;
+    annotations: Annotation[];
+};
+
+// How a piece of evidence should be previewed on the canvas
+export type MediaKind = 'image' | 'pdf' | 'unsupported';
