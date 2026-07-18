@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -7,6 +7,9 @@ import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
 import useAnnotations from '@/lib/hooks/useAnnotations';
 import { saveAnnotations } from '@/lib/api/workbench';
+import { fetchCase } from '@/lib/api/case';
+import { getMediaKind } from '@/lib/media';
+import type { CaseEvidence } from '@/types/api';
 import type { WorkbenchTool } from '@/types/workbench';
 
 export default function WorkbenchPage() {
@@ -29,11 +32,30 @@ export default function WorkbenchPage() {
     // Which workbench tool is open. By default none are open
     const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool | null>(null);
 
-    const mediaName = `Evidence ${evidenceId}`;
+    const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        fetchCase(caseId)
+            .then((data) => {
+                if (cancelled) return;
+                const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
+                setEvidence(match);
+            })
+            .catch((error) => console.error('Failed to load evidence media:', error));
+
+        return () => {
+            cancelled = true;
+        };
+    }, [caseId, evidenceId]);
+
+    const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
+    const mediaUrl = evidence?.mediaUrl;
+    const mediaKind = getMediaKind(evidence?.mediaExtension);
     const annotationsActive = activeWorkbenchTool === 'Annotations';
 
     const handleSave = () => saveAnnotations({ caseId, evidenceId, annotations });
-
 
     return (
         <div className="mt-8 ml-16 mr-16">
@@ -55,6 +77,8 @@ export default function WorkbenchPage() {
             <div className="mt-6 flex gap-6">
                 <div className="flex-1">
                     <WorkbenchCanvas
+                        mediaUrl={mediaUrl}
+                        mediaKind={mediaKind}
                         mediaName={mediaName}
                         active={annotationsActive}
                         activeTool={activeTool}
