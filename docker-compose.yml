@@ -39,7 +39,11 @@ services:
             - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}      
             - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
             - AWS_S3_ENDPOINT_URL=http://minio:9000     
-            - AWS_DEFAULT_REGION=${AWS_REGION}        
+            - AWS_DEFAULT_REGION=${AWS_REGION}
+            - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+            - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+            - MINIO_EXTERNAL_URL=${MINIO_EXTERNAL_URL}
+            - AWS_REGION=${AWS_REGION}        
         depends_on:
             - postgres
             - redis
