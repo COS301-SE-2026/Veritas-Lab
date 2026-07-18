@@ -44,6 +44,7 @@ export type WorkbenchCanvasProps = {
     /** Optional, no backend link yet, falls back to a placeholder when absent. */
     mediaUrl?: string;
     mediaName: string;
+    active?: boolean;
     activeTool: AnnotationTool;
     annotations: Annotation[];
     selectedId: string | null;
@@ -67,4 +68,20 @@ export type AnnotationListProps = {
     selectedId: string | null;
     onSelect: (id: string) => void;
     onRemove: (id: string) => void;
+};
+
+// Workbench tools currently there is only annotations.
+export type WorkbenchTool = 'Annotations';
+
+export type WorkbenchPanelProps = {
+    activeWorkbenchTool: WorkbenchTool | null;
+    onSelectWorkbenchTool: (tool: WorkbenchTool | null) => void;
+    activeTool: AnnotationTool;
+    onToolChange: (tool: AnnotationTool) => void;
+    annotations: Annotation[];
+    selectedId: string | null;
+    onSelectAnnotation: (id: string) => void;
+    onRemoveAnnotation: (id: string) => void;
+    onClearAll: () => void;
+    onSave: () => Promise<void>;
 };

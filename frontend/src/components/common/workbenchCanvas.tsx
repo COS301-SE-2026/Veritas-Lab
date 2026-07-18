@@ -33,6 +33,7 @@ function toRelativePoint(event: { clientX: number; clientY: number }, bounds: DO
 export default function WorkbenchCanvas({
     mediaUrl,
     mediaName,
+    active = true,
     activeTool,
     annotations,
     selectedId,
@@ -46,28 +47,27 @@ export default function WorkbenchCanvas({
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         const bounds = overlayRef.current?.getBoundingClientRect();
-        if (!bounds || activeTool !== 'Draw') return;
+        if (!active || !bounds || activeTool !== 'Draw') return;
 
         setDrawingPoints([toRelativePoint(event, bounds)]);
     };
 
     const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
         const bounds = overlayRef.current?.getBoundingClientRect();
-        if (!bounds || activeTool !== 'Draw' || !drawingPoints) return;
+        if (!active || !bounds || activeTool !== 'Draw' || !drawingPoints) return;
 
         setDrawingPoints((current) => (current ? [...current, toRelativePoint(event, bounds)] : current));
     };
 
     const handlePointerUp = () => {
-        if (activeTool !== 'Draw' || !drawingPoints) return;
+        if (!active || activeTool !== 'Draw' || !drawingPoints) return;
 
         onAddShape(drawingPoints);
         setDrawingPoints(null);
     };
 
     const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
-        // Ignore clicks that bubbled up from a child (a note pin, its popup, etc.) 
-        if (event.target !== event.currentTarget) return;
+        if (!active || event.target !== event.currentTarget) return;
 
         const bounds = overlayRef.current?.getBoundingClientRect();
         if (!bounds) return;
@@ -83,12 +83,12 @@ export default function WorkbenchCanvas({
     };
 
     const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-        if (event.key === 'Escape' && activeTool === 'Select') {
+        if (active && event.key === 'Escape' && activeTool === 'Select') {
             onSelectAnnotation(null);
         }
     };
 
-    const cursorClass = CURSOR_BY_TOOL[activeTool];
+    const cursorClass = active ? CURSOR_BY_TOOL[activeTool] : 'cursor-default';
 
     return (
         <div className="flex flex-col gap-2">
@@ -119,43 +119,47 @@ export default function WorkbenchCanvas({
                     </div>
                 )}
 
-                <svg className="pointer-events-none absolute inset-0 size-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    {annotations.filter(isShape).map((shape) => (
-                        <polyline
-                            key={shape.id}
-                            points={shape.points.map((point) => `${point.x},${point.y}`).join(' ')}
-                            fill="none"
-                            stroke={shape.id === selectedId ? 'var(--color-secondary)' : 'var(--color-primary)'}
-                            strokeWidth={0.6}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            vectorEffect="non-scaling-stroke"
-                        />
-                    ))}
-                    {drawingPoints ? (
-                        <polyline
-                            points={drawingPoints.map((point) => `${point.x},${point.y}`).join(' ')}
-                            fill="none"
-                            stroke="var(--color-secondary)"
-                            strokeWidth={0.6}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            vectorEffect="non-scaling-stroke"
-                        />
-                    ) : null}
-                </svg>
+                {active ? (
+                    <svg className="pointer-events-none absolute inset-0 size-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        {annotations.filter(isShape).map((shape) => (
+                            <polyline
+                                key={shape.id}
+                                points={shape.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                                fill="none"
+                                stroke={shape.id === selectedId ? 'var(--color-secondary)' : 'var(--color-primary)'}
+                                strokeWidth={0.6}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                vectorEffect="non-scaling-stroke"
+                            />
+                        ))}
+                        {drawingPoints ? (
+                            <polyline
+                                points={drawingPoints.map((point) => `${point.x},${point.y}`).join(' ')}
+                                fill="none"
+                                stroke="var(--color-secondary)"
+                                strokeWidth={0.6}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                vectorEffect="non-scaling-stroke"
+                            />
+                        ) : null}
+                    </svg>
+                ) : null}
 
-                {annotations.filter(isNote).map((note) => (
-                    <AnnotationNote
-                        key={note.id}
-                        position={note.position}
-                        text={note.text}
-                        isSelected={note.id === selectedId}
-                        onSelect={() => onSelectAnnotation(note.id)}
-                    />
-                ))}
+                {active
+                    ? annotations.filter(isNote).map((note) => (
+                          <AnnotationNote
+                              key={note.id}
+                              position={note.position}
+                              text={note.text}
+                              isSelected={note.id === selectedId}
+                              onSelect={() => onSelectAnnotation(note.id)}
+                          />
+                      ))
+                    : null}
 
-                {draftNotePosition ? (
+                {active && draftNotePosition ? (
                     <AnnotationNote
                         position={draftNotePosition}
                         isDraft
@@ -167,7 +171,7 @@ export default function WorkbenchCanvas({
                     />
                 ) : null}
             </div>
-            <p className="text-xs text-(--color-light)">{TOOL_HINTS[activeTool]}</p>
+            {active ? <p className="text-xs text-(--color-light)">{TOOL_HINTS[activeTool]}</p> : null}
         </div>
     );
 }
