@@ -157,12 +157,6 @@ def test_main_prints_json_result(predict_mocks, capsys) -> None:
     printed_json = json.loads(captured)
     assert printed_json == predict_mocks["mock_result"]
 
-def test_main_output_is_valid_json(predict_mocks, capsys) -> None:
-    with patch("sys.argv", ["predict.py", "img.jpg"]):
-        main()
-    captured = capsys.readouterr().out
-    json.loads(captured)
-
 def test_main_passes_model_to_predict_and_explain(predict_mocks) -> None:
     with patch("sys.argv", ["predict.py", "img.jpg"]):
         main()
