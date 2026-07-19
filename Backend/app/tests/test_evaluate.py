@@ -117,3 +117,40 @@ def test_main_loads_checkpoint_from_model_path(evaluate_mocks, tmp_path) -> None
         main()
     evaluate_mocks["mock_torch_load"].assert_called_once()
     assert evaluate_mocks["mock_torch_load"].call_args.args[0] == "my_model.pth"
+
+def test_main_loads_model_state_dict_from_checkpoint(evaluate_mocks, tmp_path) -> None:
+    mock_state = evaluate_mocks["mock_torch_load"].return_value["model_state_dict"]
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "my_model.pth"]):
+        main()
+    evaluate_mocks["mock_model"].load_state_dict.assert_called_once_with(mock_state)
+
+def test_main_creates_model_with_pretrained_weights_disabled(evaluate_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "my_model.pth"]):
+        main()
+    evaluate_mocks["mock_model_class"].assert_called_once_with(
+        freeze_features = False,
+        use_pretrained_weights = False,
+    )
+
+def test_main_passes_batch_size_to_create_data_loaders(evaluate_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "model.pth", "--batch-size", "32"]):
+        main()
+    call_kwargs = evaluate_mocks["mock_loaders"].call_args.kwargs
+    assert call_kwargs["batch_size"] == 32
+
+def test_main_passes_num_workers_to_create_data_loaders(evaluate_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "model.pth", "--num-workers", "4"]):
+        main()
+    call_kwargs = evaluate_mocks["mock_loaders"].call_args.kwargs
+    assert call_kwargs["num_workers"] == 4
+
+def test_main_prints_metrics(evaluate_mocks, tmp_path, capsys) -> None:
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "model.pth"]):
+        main()
+    captured = capsys.readouterr().out
+    assert "Loss" in captured
+    assert "Accuracy" in captured
+    assert "Precision" in captured
+    assert "Recall" in captured
+    assert "F1" in captured
+
