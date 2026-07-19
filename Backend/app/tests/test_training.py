@@ -1,10 +1,12 @@
 from pathlib import Path
 import pytest
 import torch
+from torch import nn
 from PIL import Image
-from torch.utils.data import RandomSampler, SequentialSampler
+from torch.utils.data import RandomSampler, SequentialSampler, DataLoader, TensorDataset
 from torchvision.datasets import ImageFolder
 from unittest.mock import MagicMock
+from app.training.training import train_one_epoch
 
 from app.training.data import (
     EXPECTED_CLASS_MAPPING,
@@ -321,3 +323,64 @@ def test_invalid_dataset_directory_raises_error(tmp_path: Path) -> None:
             batch_size=2,
             num_workers=0
         )
+
+def create_loader() -> DataLoader:
+    images = torch.tensor(
+        [
+            [0.0, 0.0],
+            [1.0, 1.0],
+            [2.0, 2.0],
+            [3.0, 3.0]
+        ],
+        dtype=torch.float32
+    )
+
+    labels = torch.tensor([0, 0, 1, 1], dtype=torch.long)
+
+    return DataLoader(
+        TensorDataset(images, labels),
+        batch_size=2,
+        shuffle=False,
+    )
+
+def test_train_one_epoch_returns_average_loss():
+    model = nn.Linear(2,1)
+    loader = create_loader()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+
+    loss = train_one_epoch(
+        model=model,
+        data_loader=loader,
+        loss_function=nn.BCEWithLogitsLoss(),
+        optimizer=optimizer,
+        device=torch.device("cpu")
+    )
+
+    assert isinstance(loss, float)
+    assert loss >= 0.0
+    assert model.training is True
+
+def test_train_one_epoch_updates_model_parameters():
+    model = nn.Linear(2,1)
+    loader = create_loader()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+
+    parameters_before = [
+        parameter.detach().clone()
+        for parameter in model.parameters()
+    ]
+
+    train_one_epoch(
+        model=model,
+        data_loader=loader,
+        loss_function=nn.BCEWithLogitsLoss(),
+        optimizer=optimizer,
+        device=torch.device("cpu")
+    )
+
+    parameters_after = list(model.parameters())
+
+    assert any(
+        not torch.equal(before,after)
+        for before, after in zip(parameters_before, parameters_after)
+    )
