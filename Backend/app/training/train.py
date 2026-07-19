@@ -57,7 +57,7 @@ def main() -> None:
 
     # Training repetition for each epoch
     for epoch in range(1, args.epochs + 1):
-        if epoch == args.unfreeze_afte + 1:
+        if epoch == args.unfreeze_after + 1:
             print("Unfreezing feature extractor for fine-tuning.")
             model.unfreeze_features()
             optimizer = Adam (
