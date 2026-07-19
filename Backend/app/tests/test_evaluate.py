@@ -154,3 +154,13 @@ def test_main_prints_metrics(evaluate_mocks, tmp_path, capsys) -> None:
     assert "Recall" in captured
     assert "F1" in captured
 
+def test_main_prints_confusion_matrix(evaluate_mocks, tmp_path, capsys) -> None:
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "model.pth"]):
+        main()
+    captured = capsys.readouterr().out
+    assert "Confusion matrix:" in captured
+
+def test_main_prints_classification_report(evaluate_mocks, tmp_path, capsys) -> None:
+    with patch("sys.argv", ["evaluate.py", "--data-dir", str(tmp_path), "--model-path", "model.pth"]):
+        main()
+    assert "Classification report:" in capsys.readouterr().out
