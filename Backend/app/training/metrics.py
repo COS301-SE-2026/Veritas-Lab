@@ -55,10 +55,10 @@ def evaluate_model(
         for probability in probabilities
     ]
 
-    try:
-        roc_auc = float(roc_auc_score(targets, probabilities))
-    except ValueError:
-        roc_auc = None
+    if len(set(targets)) < 2:
+        roc_auc: float|None = None
+    else:
+        roc_auc = float(roc_auc_score(targets,probabilities))
 
     return EvaluationResult(
         loss=total_loss / max(len(data_loader), 1),
