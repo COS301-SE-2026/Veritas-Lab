@@ -143,3 +143,79 @@ def train_mocks():
             "mock_val_loader": mock_val_loader,
             "mock_validation_result": mock_validation_result,
         }
+
+def test_main_creates_model_with_frozen_features_enabled(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1"]):
+        main()
+    train_mocks["mock_model_class"].assert_called_once_with(
+        freeze_features=True,
+        use_pretrained_weights=True,
+    )
+
+def test_main_calls_train_one_epoch_each_epoch(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "3", "--unfreeze-after", "10"]):
+        main()
+    assert train_mocks["mock_train_epoch"].call_count == 3
+
+def test_main_calls_evaluate_model_each_epoch(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "3", "--unfreeze-after", "10"]):
+        main()
+    assert train_mocks["mock_evaluate_model"].call_count == 3
+
+def test_main_passes_train_loader_to_train_one_epoch(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1", "--unfreeze-after", "10"]):
+        main()
+    call_kwargs = train_mocks["mock_train_epoch"].call_args.kwargs
+    assert call_kwargs["data_loader"] is train_mocks["mock_train_loader"]
+
+
+def test_main_passes_val_loader_to_evaluate_model(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1", "--unfreeze-after", "10"]):
+        main()
+    call_kwargs = train_mocks["mock_evaluate_model"].call_args.kwargs
+    assert call_kwargs["data_loader"] is train_mocks["mock_val_loader"]
+
+def test_main_saves_model_when_validation_loss_improves(train_mocks, tmp_path) -> None:
+    train_mocks["mock_validation_result"].loss = 0.25
+    model_path = tmp_path / "model.pth"
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1", "--unfreeze-after", "10"]):
+        main()
+    train_mocks["mock_torch_save"].assert_called_once()
+
+def test_main_saves_model_state_dict_in_checkout(train_mocks, tmp_path) -> None:
+    model_path = tmp_path / "model.pth"
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1", "--unfreeze-after", "10"]):
+        main()
+    saved_state_dict = train_mocks["mock_torch_save"].call_args.args[0]
+    assert "model_state_dict" in saved_state_dict
+    
+def test_main_unfreezes_features_after_specified_epoch(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "4", "--unfreeze-after", "2"]):
+        main()
+    train_mocks["mock_model"].unfreeze_features.assert_called_once()
+
+
+def test_main_does_not_unfreeze_features_before_specified_epoch(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "2", "--unfreeze-after", "5"]):
+        main()
+    train_mocks["mock_model"].unfreeze_features.assert_not_called()
+
+def test_main_passes_batch_size_to_create_data_loaders(train_mocks, tmp_path) -> None:
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1", "--unfreeze-after", "5"]):
+        main()
+    call_kwargs = train_mocks["mock_loaders"].call_args.kwargs
+    assert call_kwargs["batch_size"] == 16
+
+def test_main_checkout_includes_epoch_number(train_mocks, tmp_path) -> None:
+    model_path = tmp_path / "model.pth"
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(model_path), "--epochs", "1", "--unfreeze-after", "10"]):
+        main()
+    saved_state_dict = train_mocks["mock_torch_save"].call_args.args[0]
+    assert "epoch" in saved_state_dict
+
+def test_main_checkout_includes_class_mapping(train_mocks, tmp_path) -> None:
+    model_path = tmp_path / "model.pth"
+    with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(model_path), "--epochs", "1", "--unfreeze-after", "10"]):
+        main()
+    saved_state_dict = train_mocks["mock_torch_save"].call_args.args[0]
+    assert saved_state_dict["class_mapping"] == {"0_authentic": 0, "1_ai": 1}
