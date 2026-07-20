@@ -17,7 +17,7 @@ const users: AdminUser[] = [
 
 describe('AdminUsersPanel', () => {
     it('renders the user table headings and user cards', () => {
-        render(<AdminUsersPanel users={users} onRoleChange={jest.fn()} onDelete={jest.fn()} />);
+        render(<AdminUsersPanel users={users} currentUserId='no-match' onRoleChange={jest.fn()} onDelete={jest.fn()} />);
         expect(screen.getByText('ID')).toBeInTheDocument();
         expect(screen.getByText('Name & Surname')).toBeInTheDocument();
         expect(screen.getByText('Username')).toBeInTheDocument();
@@ -29,8 +29,21 @@ describe('AdminUsersPanel', () => {
     });
 
     it('passes busy state to the user cards', () => {
-        render(<AdminUsersPanel users={users} isBusy onRoleChange={jest.fn()} onDelete={jest.fn()} />);
+        render(<AdminUsersPanel users={users} isBusy currentUserId='no-match' onRoleChange={jest.fn()} onDelete={jest.fn()} />);
         expect(screen.getAllByRole('combobox')).toHaveLength(2);
         expect(screen.getAllByRole('combobox')[0]).toBeDisabled();
+    });
+
+    it('hides current admin row actions', () => {
+        render(
+            <AdminUsersPanel
+                users={users}
+                currentUserId={users[0].id}
+                onRoleChange={jest.fn()}
+                onDelete={jest.fn()}
+            />
+        );
+        expect(screen.getAllByRole('combobox')).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
     });
 });
