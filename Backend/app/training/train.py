@@ -46,7 +46,7 @@ def main() -> None:
 
     loss_function = nn.BCEWithLogitsLoss()
     optimizer = Adam(
-        filter(lambda paramter: parameter.requires_grad, model.parameters()),
+        filter(lambda parameter: parameter.requires_grad, model.parameters()),
         lr = args.learning_rate,
         #Here we say which parts of the model that's allowed to learn to updtae
     )
@@ -65,20 +65,27 @@ def main() -> None:
                 lr = args.learning_rate / 10,
             )
 
-            training_loss = train_one_epoch(
-                model = model,
-                data_loader = train_loader,
-                loss_function = loss_function,
-                optimizer = optimizer,
-                device = device,
-            )
-            
+        training_loss = train_one_epoch(
+            model = model,
+            data_loader = train_loader,
+            loss_function = loss_function,
+            optimizer = optimizer,
+            device = device,
+        )
+
+        validation = evaluate_model(
+            model = model,
+            data_loader = validation_loader,
+            loss_function = loss_function,
+            device = device,
+        )
+
         print(
             f"Epoch{epoch}/{args.epochs} | "
             f"train_loss = {training_loss:.4f} | "
-            f"val_loss = {validation_loss:.4f} | "
+            f"val_loss = {validation.loss:.4f} | "
             f"val_accuracy = {validation.accuracy:.4f} | "
-            f"cal_f1 = {validation.f1:.4f}"
+            f"val_f1 = {validation.f1:.4f}"
         )
 
         if validation.loss < best_validation_loss:
@@ -95,12 +102,12 @@ def main() -> None:
                         "1_ai": 1,
                     },
                 },
-                model_path
+                model_path,
             )
 
             print(f"Saved best model to {model_path}")
 
-        print("Training complete.")
+    print("Training complete.")
 
 if __name__ == "__main__":
     main()

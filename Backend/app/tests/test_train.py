@@ -84,3 +84,62 @@ def test_parse_arguments_epochs_is_an_integer() -> None:
         args = parse_arguments()
     assert isinstance(args.epochs, int)
 
+def test_parse_arguments_batch_size_is_an_integer() -> None:
+    with patch("sys.argv", ["train.py", "--batch-size", "8"]):
+        args = parse_arguments()
+    assert isinstance(args.batch_size, int)
+
+def test_parse_arguments_learning_rate_is_a_float() -> None:
+    with patch("sys.argv", ["train.py", "--learning-rate", "0.0001"]):
+        args = parse_arguments()
+    assert isinstance(args.learning_rate, float)
+
+def test_parse_arguments_num_workers_is_an_integer() -> None:
+    with patch("sys.argv", ["train.py", "--num-workers", "4"]):
+        args = parse_arguments()
+    assert isinstance(args.num_workers, int)
+
+def test_parse_arguments_unfreeze_after_is_an_integer() -> None:
+    with patch("sys.argv", ["train.py", "--unfreeze-after", "3"]):
+        args = parse_arguments()
+    assert isinstance(args.unfreeze_after, int)
+
+def _make_mock_validation_result(loss: float = 0.30) -> MagicMock:
+    result = MagicMock()
+    result.loss = loss
+    result.accuracy = 0.88
+    result.f1 = 0.87
+    return result
+
+@pytest.fixture()
+def train_mocks():
+    mock_train_loader = MagicMock()
+    mock_val_loader = MagicMock()
+    mock_validation_result = _make_mock_validation_result()
+
+    with (
+        patch("app.training.train.create_data_loaders") as mock_loaders,
+        patch("app.training.train.AIImageDetector") as mock_model_class,
+        patch("app.training.train.Adam") as mock_adam,
+        patch("app.training.train.train_one_epoch") as mock_train_epoch,
+        patch("app.training.train.evaluate_model") as mock_evaluate_model,
+        patch("app.training.train.torch.save") as mock_torch_save,
+    ):
+        mock_loaders.return_value = (mock_train_loader, mock_val_loader, MagicMock())
+        mock_model = MagicMock()
+        mock_model_class.return_value.to.return_value = mock_model
+        mock_train_epoch.return_value = 0.35
+        mock_evaluate_model.return_value = mock_validation_result
+
+        yield {
+            "mock_loaders": mock_loaders,
+            "mock_model_class": mock_model_class,
+            "mock_adam": mock_adam,
+            "mock_model": mock_model,
+            "mock_train_epoch": mock_train_epoch,
+            "mock_evaluate_model": mock_evaluate_model,
+            "mock_torch_save": mock_torch_save,
+            "mock_train_loader": mock_train_loader,
+            "mock_val_loader": mock_val_loader,
+            "mock_validation_result": mock_validation_result,
+        }
