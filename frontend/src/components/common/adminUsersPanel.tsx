@@ -6,11 +6,12 @@ import AdminUserCard from '@/components/common/adminUserCard';
 type AdminUsersPanelProps = {
     users: AdminUser[];
     isBusy?: boolean;
+    currentUserId?: string; //added to ensure admin cant delete itself or role change
     onRoleChange: (userId: string, role: AdminUser['role']) => void;
     onDelete: (user: AdminUser) => void;
 };
 //panel for the users
-export default function AdminUsersPanel({ users, isBusy = false, onRoleChange, onDelete }: AdminUsersPanelProps) {
+export default function AdminUsersPanel({ users, isBusy = false, currentUserId, onRoleChange, onDelete }: AdminUsersPanelProps) {
     return (
         <Card
             header={(
@@ -29,6 +30,7 @@ export default function AdminUsersPanel({ users, isBusy = false, onRoleChange, o
                             key={user.id}
                             user={user}
                             isBusy={isBusy}
+                            currentUserId={currentUserId} //also for admin role/delete
                             onRoleChange={onRoleChange}
                             onDelete={onDelete}
                         />

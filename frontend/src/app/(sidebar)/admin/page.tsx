@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUserRole } from '@/context/UserRoleContext';
+import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import AdminUserSearchBar from '@/components/common/adminUserSearchBar';
 import AdminUsersPanel from '@/components/common/adminUsersPanel';
 import AdminDeleteModal from '@/components/common/adminDeleteModal';
@@ -11,6 +11,7 @@ import type { AdminUser } from '@/types/api';
 export default function AdminPage() {
     const router = useRouter();
     const userRole = useUserRole();
+    const currentUser = useCurrentUser(); //added to ensure admin cant delete itself or role change
     const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
 
     const {
@@ -78,10 +79,21 @@ export default function AdminPage() {
                     <AdminUsersPanel
                         users={visibleUsers}
                         isBusy={pendingUserId !== null}
+                        currentUserId={currentUser?.id ?? ''}
                         onRoleChange={(userId, nextRole) => {
+                            if(userId === currentUser?.id)
+                            {
+                                return;
+                            }
                             void updateUserRole(userId, nextRole);
                         }}
-                        onDelete={(user) => setDeleteTarget(user)}
+                        onDelete={(user) => {
+                            if(user.id === currentUser?.id)
+                            {
+                                return;
+                            }
+                            setDeleteTarget(user);
+                        }}
                     />
                 )}
             </div>
