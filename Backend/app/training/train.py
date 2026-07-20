@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import torch
 from torch import nn
-import torch optim import Adam
+from torch.optim import Adam
 
 from src.data import create_data_loaders
 from src.metrics import evaluate_model
@@ -61,7 +61,7 @@ def main() -> None:
             print("Unfreezing feature extractor for fine-tuning.")
             model.unfreeze_features()
             optimizer = Adam (
-                model.parameters()
+                model.parameters(),
                 lr = args.learning_rate / 10,
             )
 
@@ -87,9 +87,9 @@ def main() -> None:
                 {
                     "model_state_dict": model.state_dict(),
                     "epoch": epoch,
-                    "validation_loss": validation.loss
-                    "validation_accuracy": validation.accuracy
-                    "validation_f1": validation.f1
+                    "validation_loss": validation.loss,
+                    "validation_accuracy": validation.accuracy,
+                    "validation_f1": validation.f1,
                     "class_mapping": {
                         "0_authentic": 0,
                         "1_ai": 1,
