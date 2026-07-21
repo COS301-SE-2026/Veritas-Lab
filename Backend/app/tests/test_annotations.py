@@ -30,7 +30,7 @@ async def test_save_annotations_success(valid_payload):
          patch.object(cases_router, "_save_annotations", new_callable=AsyncMock) as mock_save:
 
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="https://test"
         ) as ac:
             response = await ac.post("/api/saveAnnotations", json=valid_payload)
 
@@ -44,7 +44,7 @@ async def test_save_annotations_unauthorized(valid_payload):
          patch.object(cases_router, "verify_not_user", side_effect=HTTPException(status_code=403, detail="Forbidden")):
 
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="https://test"
         ) as ac:
             response = await ac.post("/api/saveAnnotations", json=valid_payload)
 
@@ -57,7 +57,7 @@ async def test_save_annotations_invalid_payload():
     }
 
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app), base_url="https://test"
     ) as ac:
         response = await ac.post("/api/saveAnnotations", json=invalid_payload)
 
@@ -74,7 +74,7 @@ async def test_save_annotations_db_error(valid_payload):
          patch.object(cases_router, "getConnection", return_value=mock_conn):
 
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app), base_url="https://test"
         ) as ac:
             response = await ac.post("/api/saveAnnotations", json=valid_payload)
 

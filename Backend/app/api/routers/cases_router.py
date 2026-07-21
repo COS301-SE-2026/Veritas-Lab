@@ -139,7 +139,12 @@ def _format_case_evidence(row: dict) -> dict:
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
     }
 
-@router.post("/createCase")
+@router.post(
+    "/createCase",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def create_case(case_request: CreateCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -251,7 +256,12 @@ async def get_cases(request: Request):
         if connection is not None:
             await connection.close()
     
-@router.post("/getSingleCase")
+@router.post(
+    "/getSingleCase",
+    responses={
+        500: {"model": ErrorResponse, "description": "Database Error"},
+    }
+)
 async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -381,7 +391,8 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             await connection.close()
 
 
-@router.post("/cases/evidence",
+@router.post(
+    "/cases/evidence",
     responses={
         401: {
             "model": ErrorResponse,
@@ -453,7 +464,11 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
     finally:
         await connection.close()
 
-@router.post("/closeCase")
+@router.post("/closeCase",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     connection = None
     try:
@@ -656,7 +671,12 @@ async def delete_comment(request: Request, comment_id: int):
         if connection is not None:
             await connection.close()
 
-@router.post("/getComments/{case_id}")
+@router.post(
+    "/getComments/{case_id}",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def retreive_comments(
     case_id: str,
     request: Request
@@ -692,7 +712,12 @@ async def retreive_comments(
             content={"status": "error", "message": str(e)}
         )
 
-@router.post("/delete/case/{case_id}/evidence/{media_id}")
+@router.post(
+    "/delete/case/{case_id}/evidence/{media_id}",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def delete_evidence(
     case_id:str, 
     media_id:str,
@@ -771,7 +796,12 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     finally:
         await connection.close()
           
-@router.delete("/deleteCase")
+@router.delete(
+    "/deleteCase",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -862,7 +892,7 @@ async def _save_annotations(report_id:UUID,annotations:str):
     con = None
     try:
         con=await getConnection()
-        result = await con.execute(query, annotations, report_id)
+        await con.execute(query, annotations, report_id)
     except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
