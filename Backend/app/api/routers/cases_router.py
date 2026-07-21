@@ -488,6 +488,83 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         if connection is not None:
             await connection.close()
 
+@router.post("/updateCase")
+async def update_case(case_request: UpdateCaseRequest, request: Request):
+    connection = None
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
+
+    if payload.get("role") == "USER":
+        return JSONResponse(status_code=400, content={"status": "error", "message": "User unauthorized"})
+
+    if not case_request.CaseID:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "CaseID required"})
+
+    try:
+        case_uuid = UUID(case_request.CaseID)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid CaseID"})
+
+    if case_request.CaseName is None and case_request.CaseDescription is None:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "At least one of Casename or CaseDescription must be provided"})
+
+        validated_name = None
+        if case_request.CaseName is not None:
+            try:
+                validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+
+    try:
+        connection = await getConnection()
+
+        row = await getConnection().fetchrow(
+            """
+            UPDATE "Cases_DB"."Cases"
+            set casename = COALESCE($3, casename),
+                casedescription = COALESCE($4, casedescription)
+            WHERE caseid = $1
+            AND casecreator = $2
+            RETURNING caseid
+            """,
+            case_uuid,
+            payload.get("username"),
+            validated_name,
+            case_request.CaseDescription
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "Case not found or user unauthorized."
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Case updated successfully."
+            }
+        )
+
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Database error"
+            }
+        )
+    
+    finally:
+        if connection is not None:
+            await connection.close()
+
 @router.post("/editComment/case/{case_id}/comment/{comment_id}")
 async def update_comment(
     case_id: str,
