@@ -658,8 +658,10 @@ def test_close_case_user_unauthorized(monkeypatch):
 
     assert response.status_code == 403
     assert response.json() == {
-        "status" :"error",
-        "message": "User unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
     }
 
 def test_close_case_invalid_case_id(monkeypatch):
@@ -1086,8 +1088,10 @@ def test_delete_case_user_forbidden(monkeypatch):
 
     assert response.status_code == 403
     assert response.json() == {
-        "status": "error",
-        "message": "User unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
     }
 
 def test_delete_case_missing_case_id(monkeypatch):
