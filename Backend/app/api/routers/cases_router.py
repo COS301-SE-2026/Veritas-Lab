@@ -48,6 +48,11 @@ class CreateSingleCaseRequest(BaseModel):
 class UpdateCommentRequest(BaseModel):
     comment: str
 
+Class UpdateCaseRequest(BaseModel):
+    CaseID: str | None = None
+    Casename: str | None = None
+    CaseDescription: str | None = None
+
 class CreateCommentRequest(BaseModel):
     case_id: UUID
     comment: str | None = None
