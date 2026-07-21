@@ -548,7 +548,7 @@ class Case:
                 WHERE (
                     $4 = 'ADMIN'
                     OR ($4 = 'USER' AND caseclosed = TRUE)
-                    OR ($4 = 'INVESTIGATOR' AND caseclosed = FALSE)
+                    OR ($4 = 'INVESTIGATOR')
                 )
                 RETURNING commentid, caseid, username, comment, commenttimestamp
             )
@@ -576,8 +576,8 @@ class Case:
         if not row["comment_inserted"]:
             if role == "USER":
                 raise HTTPException(status_code=403, detail="Users may only comment on closed cases")
-            if role == "INVESTIGATOR":
-                raise HTTPException(status_code=403, detail="Investigators may only comment on open cases")
+            # if role == "INVESTIGATOR":
+            #     raise HTTPException(status_code=403, detail="Investigators may only comment on open cases")
             raise HTTPException(status_code=403, detail="Permission denied")
 
         return {

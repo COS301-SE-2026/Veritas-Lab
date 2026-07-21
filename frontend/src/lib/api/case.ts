@@ -1,4 +1,14 @@
 import type { CaseResponse } from '@/types/api';
+function normalizeComment(comment: Record<string, unknown>)
+{
+    return {
+        commentId: Number(comment.commentId ?? comment.commentid ?? 0),
+        caseId: String(comment.caseId ?? comment.caseid ?? ''),
+        username: String(comment.username ?? ''),
+        comment: String(comment.comment ?? ''),
+        timestamp: (comment.timestamp ?? comment.commenttimestamp ?? null) as string | null,
+    };
+}
 
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {
@@ -14,7 +24,10 @@ export async function fetchCase(caseID: string): Promise<CaseResponse> {
             throw new Error(`Failed to fetch case with ID ${caseID}`);
         }
         const data = await res.json();
-        return data;
+        return {
+            ...data,
+            comments: Array.isArray(data.comments) ? data.comments.map(normalizeComment) : [],
+        };
     }
     catch (error) {
         console.error(`Error fetching case with ID ${caseID}:`, error);
@@ -45,5 +58,29 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
         throw error;
     }
 }
+export async function addComment(caseId: string, comment: string)
+{
+    try
+    {
+        const res = await fetch(`/api/cases/comments`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ case_id: caseId, comment }),
+        });
 
-
+        const data = await res.json().catch(() => null);
+        if(!res.ok)
+        {
+            throw new Error(data?.message ?? 'Failed to add comment');
+        }
+        return normalizeComment(data.comment ?? {});
+    }
+    catch(error)
+    {
+        console.error('Error adding comment:', error);
+        throw error;
+    }
+}
