@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Media"(
     MediaId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     MediaType UUID NOT NULL REFERENCES "Cases_DB"."MediaType"(MediaTypeId) ON DELETE RESTRICT ON UPDATE CASCADE,
     MediaHash TEXT UNIQUE,
+    MediaAnnotations JSONB,
     MediaUploadDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -35,7 +36,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Reports"(
     ReportArtifacts JSONB,
     ReportFindings TEXT,
     ReportComments TEXT,
-    ReportCertainty SMALLINT CHECK (ReportCertainty <=3),
+    ReportCertainty SMALLINT CHECK (ReportCertainty <=3), -- 0=Nothing, 1=low, 2=moderately , 3=high
     ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

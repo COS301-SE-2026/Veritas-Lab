@@ -1,7 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response
+import json
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List
 from app.core.cases import Case
 from app.auth.auth import verifyJWT
 from app.core.env import ENVLoader
@@ -22,6 +24,8 @@ DB_HOST= env.getRequiredEnv("DB_HOST")
 DB_PORT= env.getRequiredIntEnv("DB_PORT")
 DB_NAME= env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
+NOT_USER= ["INVESTIGATOR", "ADMIN"]
+DATABASE_ERROR_MESSAGE="Database error"
 
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -51,6 +55,48 @@ class UpdateCommentRequest(BaseModel):
 class CreateCommentRequest(BaseModel):
     case_id: UUID
     comment: str | None = None
+
+class SaveAnnotationsPayload(BaseModel):
+    #Mapping from CamelCase to SnakeCase for Sonar to be Happy
+    report_id: str = Field(..., alias="reportId")
+    #since the format of the annotations was not specified by frontend we will be accepting any valid JSON
+    annotations: List[Dict[str, Any]]
+    model_config = ConfigDict(populate_by_name=True)
+
+class SuccessResponse(BaseModel):
+    status: str = Field(..., examples="success")
+
+class ErrorResponse(BaseModel):
+    status: str = Field(..., examples="error")
+    message: str = Field(..., examples="Invalid token or database failure")
+
+#A mask until the veriftJWT gets fixed to raise HTTPException so the try-excepts can be removed so FastApi can handle it 
+def verify_jwt(request:Request):
+    try:
+        return verifyJWT(request)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=401,
+            detail={"status": "error", "message": str(e)}
+        )
+
+def verify_not_user(user_role:str):
+    if  user_role not in NOT_USER: #This solves for it being blank and non sense roles.
+        raise HTTPException(
+            status_code=403,
+            detail={"status": "error", "message": "User unauthorized"}
+        )
+
+def transform_to_uuid(changer:str)->UUID:
+    try:
+        return UUID(changer)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=401,
+            detail={"status": "error", "message": str(e)}
+        )
+    
 
 def _format_case_evidence(row: dict) -> dict:
     media_id = row["mediaid"]
@@ -93,7 +139,12 @@ def _format_case_evidence(row: dict) -> dict:
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
     }
 
-@router.post("/createCase")
+@router.post(
+    "/createCase",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def create_case(case_request: CreateCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -105,15 +156,7 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
                 "message": str(e)
             }
         )
-    
-    if payload.get("role") == "USER":
-        return JSONResponse(
-            status_code=403,
-            content={
-                "status": "error",
-                "message": "User unauthorized"
-            }
-        )
+    verify_not_user(payload.get("role"))
 
     try:
         case = Case(CaseName=case_request.title, CaseCreator=payload.get("username"), CaseDescription=case_request.description)
@@ -136,7 +179,13 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
         }
     )
 
-@router.post("/getCases")
+@router.post(
+    "/getCases",
+    responses={
+        401: {"model": ErrorResponse, "description": "Unauthorized - Invalid or missing token"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error - Database error"},
+    }
+)
 async def get_cases(request: Request):
     try:
         payload = verifyJWT(request)
@@ -200,14 +249,19 @@ async def get_cases(request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
     finally:
         if connection is not None:
             await connection.close()
     
-@router.post("/getSingleCase")
+@router.post(
+    "/getSingleCase",
+    responses={
+        500: {"model": ErrorResponse, "description": "Database Error"},
+    }
+)
 async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -317,11 +371,11 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             })
         )
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status":"error",
-                "message":"Database error"
+                "message":DATABASE_ERROR_MESSAGE
             }
         )
     except Exception as e:
@@ -337,28 +391,42 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             await connection.close()
 
 
-@router.post("/cases/evidence")
+@router.post(
+    "/cases/evidence",
+    responses={
+        401: {
+            "model": ErrorResponse,
+            "description": "Unauthorized - Missing or invalid JWT token",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "Forbidden - User lacks required investigator/admin permissions",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "Case not found or user lacks permission",
+        },
+    },
+)
 async def upload_evidence(request: Request, case_id: str = Form(...), media: UploadFile = File(...)):
-    try:
-        payload = verifyJWT(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={"status": "error", "message": str(e)}
-        )
 
-    if payload.get("role") == "USER":
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
-        )
+    payload = verify_jwt(request)
+
+
+    verify_not_user(payload.get("role"))
 
     CaseCreator=payload["username"]
 
     try:
         case_uuid = UUID(case_id)
     except ValueError as e:
-        return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
+        )
 
     connection = await getConnection()
 
@@ -391,19 +459,16 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
 
     except HTTPException as e:
-        # Handle 409 Conflict when image already associated with case
-        if e.status_code == 409:
-            return JSONResponse(status_code=409, content={"status": "error", "message": e.detail})
-        # Handle 400 Bad Request for unsupported file types and malformed or scripted   
-        elif e.status_code == 400:
-            return JSONResponse(status_code=400, content={"status": "error", "message": e.detail})
-        else:
-            raise
+        raise
 
     finally:
         await connection.close()
 
-@router.post("/closeCase")
+@router.post("/closeCase",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     connection = None
     try:
@@ -414,11 +479,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             content={"status": "error", "message": str(e)}
         )
 
-    if payload.get("role") == "USER":
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
-        )
+    verify_not_user(payload.get("role"))
     
     if not case_request.CaseID:
         return JSONResponse(
@@ -476,7 +537,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
     finally:
@@ -547,7 +608,7 @@ async def update_comment(
         return JSONResponse(
             status_code=500,content={
                 "status": "error",
-                "message": "Database error"
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
 
@@ -602,7 +663,7 @@ async def delete_comment(request: Request, comment_id: int):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
         
@@ -610,7 +671,12 @@ async def delete_comment(request: Request, comment_id: int):
         if connection is not None:
             await connection.close()
 
-@router.post("/getComments/{case_id}")
+@router.post(
+    "/getComments/{case_id}",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def retreive_comments(
     case_id: str,
     request: Request
@@ -624,11 +690,7 @@ async def retreive_comments(
         )
 
     user_role=payload.get("role")
-    if  user_role is None or user_role== "USER":
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
-        )
+    verify_not_user(user_role) 
 
     try:
         case = Case(CaseID=case_id)
@@ -650,7 +712,12 @@ async def retreive_comments(
             content={"status": "error", "message": str(e)}
         )
 
-@router.post("/delete/case/{case_id}/evidence/{media_id}")
+@router.post(
+    "/delete/case/{case_id}/evidence/{media_id}",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def delete_evidence(
     case_id:str, 
     media_id:str,
@@ -666,11 +733,7 @@ async def delete_evidence(
 
     user_role=payload.get("role")
 
-    if user_role not in ["INVESTIGATOR", "ADMIN"]:
-        return JSONResponse(
-            status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
-        )
+    verify_not_user(user_role)
 
     try:
         media_id = uuid.UUID(media_id)
@@ -723,22 +786,22 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     connection = await getConnection()
 
     try:
-        case = Case()
-        case.CaseId = body.case_id
+        case = Case(CaseID=str(body.case_id))
 
         new_comment = await case.addComment(connection, username, body.comment, role)
 
         return JSONResponse(status_code=201,
                             content={"status": "success", "comment": new_comment})
 
-    except HTTPException as e:
-        return JSONResponse(status_code=e.status_code,
-                            content={"status": "error", "message": e.detail})
-
     finally:
         await connection.close()
           
-@router.delete("/deleteCase")
+@router.delete(
+    "/deleteCase",
+    responses={
+        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+    }
+)
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
         payload = verifyJWT(request)
@@ -751,14 +814,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             }
         )
     
-    if payload.get("role") == "USER":
-        return JSONResponse(
-            status_code=403,
-            content={
-                "status": "error",
-                "message": "User unauthorized"
-            }
-        )
+    verify_not_user(payload.get("role"))
     
     if not case_request.CaseID:
         return JSONResponse(
@@ -818,6 +874,124 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+async def _save_annotations(report_id:UUID,annotations:str):
+    #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
+    query = """
+        UPDATE "Cases_DB"."Media" m
+        SET "MediaAnnotations" = $1::jsonb
+        FROM "Cases_DB"."Reports" r 
+        INNER JOIN "Cases_DB"."Cases" c ON r."CaseId" = c."CaseId"
+        WHERE m."MediaId" = r."MediaId"
+          AND c."CaseCreator" = 'InvestAdmin' 
+          AND r."ReportId" = $2;
+    """
+    con = None
+    try:
+        con=await getConnection()
+        await con.execute(query, annotations, report_id)
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+    finally:
+        if con:
+            await con.close()
+
+@router.post("/saveAnnotations", 
+    status_code=status.HTTP_200_OK,
+    summary="Save Report Annotations",
+    description="Updates the JSONB media annotations for a specific report/evidence item in PostgreSQL.",
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "Annotations successfully saved.",
+            "model": SuccessResponse,
+            "content": {
+                "application/json": {
+                    "example": {"status": "success"}
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized - Missing/Invalid JWT cookie or non-UUID report ID format.",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Invalid JWT": {
+                            "summary": "Invalid JWT Token",
+                            "value": {"status": "error", "message": "Signature has expired."}
+                        },
+                        "Invalid UUID": {
+                            "summary": "Invalid Report UUID",
+                            "value": {"status": "error", "message": "badly formed hexadecimal UUID string"}
+                        }
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden - User does not have permission (e.g. Standard 'USER' role).",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "example": {"status": "error", "message": "User unauthorized"}
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error - Database failure or unhandled exception.",
+            "model": ErrorResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {"detail": {"status": "error", "message": "Database error"}}
+                        },
+                        "Server Exception": {
+                            "summary": "Unexpected Error",
+                            "value": {"detail": {"status": "error", "message": "An unexpected error occurred"}}
+                        }
+                    }
+                }
+            },
+        },
+    }
+)
+async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
+    cookie=verify_jwt(request)
+    user_role=cookie.get("role")
+    # Checking authorization
+    verify_not_user(user_role)
+
+    try:
+        report_id=transform_to_uuid(payload.report_id)
+        annotations_json_str = json.dumps(payload.annotations)
+        await _save_annotations(report_id,annotations_json_str)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "message": str(e)}
+        ) 
+
+    

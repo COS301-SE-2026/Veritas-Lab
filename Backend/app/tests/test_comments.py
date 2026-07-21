@@ -133,7 +133,7 @@ def test_create_comment_case_not_found(monkeypatch):
     response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 404
-    assert response.json() == {"status": "error", "message": "Case not found"}
+    assert response.json() == {"detail": "Case not found"}
 
 
 def test_create_comment_user_on_open_case(monkeypatch):
@@ -143,7 +143,7 @@ def test_create_comment_user_on_open_case(monkeypatch):
     response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 403
-    assert response.json() == {"status": "error", "message": "Users may only comment on closed cases"}
+    assert response.json() == {"detail": "Users may only comment on closed cases"}
 
 
 def test_create_comment_investigator_on_closed_case(monkeypatch):
@@ -153,7 +153,7 @@ def test_create_comment_investigator_on_closed_case(monkeypatch):
     response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 403
-    assert response.json() == {"status": "error", "message": "Investigators may only comment on open cases"}
+    assert response.json() == {"detail": "Investigators may only comment on open cases"}
 
 
 # Success tests
