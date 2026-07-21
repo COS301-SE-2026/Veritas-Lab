@@ -174,7 +174,13 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
         }
     )
 
-@router.post("/getCases")
+@router.post(
+    "/getCases",
+    responses={
+        401: {"model": ErrorResponse, "description": "Unauthorized - Invalid or missing token"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error - Database error"},
+    }
+)
 async def get_cases(request: Request):
     try:
         payload = verifyJWT(request)
@@ -375,7 +381,22 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             await connection.close()
 
 
-@router.post("/cases/evidence")
+@router.post("/cases/evidence",
+    responses={
+        401: {
+            "model": ErrorResponse,
+            "description": "Unauthorized - Missing or invalid JWT token",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "Forbidden - User lacks required investigator/admin permissions",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "Case not found or user lacks permission",
+        },
+    },
+)
 async def upload_evidence(request: Request, case_id: str = Form(...), media: UploadFile = File(...)):
 
     payload = verify_jwt(request)
@@ -746,9 +767,6 @@ async def create_comment(body: CreateCommentRequest, req: Request):
 
         return JSONResponse(status_code=201,
                             content={"status": "success", "comment": new_comment})
-
-    except HTTPException as e:
-        raise
 
     finally:
         await connection.close()
