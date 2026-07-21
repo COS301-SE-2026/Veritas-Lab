@@ -50,7 +50,7 @@ class UpdateCommentRequest(BaseModel):
 
 class UpdateCaseRequest(BaseModel):
     CaseID: str | None = None
-    Casename: str | None = None
+    CaseName: str | None = None
     CaseDescription: str | None = None
 
 class CreateCommentRequest(BaseModel):
