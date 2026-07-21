@@ -48,7 +48,7 @@ class CreateSingleCaseRequest(BaseModel):
 class UpdateCommentRequest(BaseModel):
     comment: str
 
-Class UpdateCaseRequest(BaseModel):
+class UpdateCaseRequest(BaseModel):
     CaseID: str | None = None
     Casename: str | None = None
     CaseDescription: str | None = None
@@ -514,8 +514,8 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         if case_request.CaseName is not None:
             try:
                 validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
-    except ValueError as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+            except ValueError as e:
+                return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
 
     try:
         connection = await getConnection()
