@@ -497,7 +497,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
 
     if payload.get("role") == "USER":
-        return JSONResponse(status_code=400, content={"status": "error", "message": "User unauthorized"})
+        return JSONResponse(status_code=403, content={"status": "error", "message": "User unauthorized"})
 
     if not case_request.CaseID:
         return JSONResponse(status_code=400, content={"status": "error", "message": "CaseID required"})
@@ -508,19 +508,19 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid CaseID"})
 
     if case_request.CaseName is None and case_request.CaseDescription is None:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "At least one of Casename or CaseDescription must be provided"})
+        return JSONResponse(status_code=400, content={"status": "error", "message": "At least one of CaseName or CaseDescription must be provided"})
 
-        validated_name = None
-        if case_request.CaseName is not None:
-            try:
-                validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
-            except ValueError as e:
-                return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+    validated_name = None
+    if case_request.CaseName is not None:
+        try:
+            validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
+        except ValueError as e:
+            return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
 
     try:
         connection = await getConnection()
 
-        row = await getConnection().fetchrow(
+        row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
             set casename = COALESCE($3, casename),
