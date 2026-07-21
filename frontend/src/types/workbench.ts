@@ -35,13 +35,6 @@ export type NoteAnnotation = {
 
 export type Annotation = ShapeAnnotation | NoteAnnotation;
 
-export type WorkbenchToolbarProps = {
-    activeTool: AnnotationTool;
-    onToolChange: (tool: AnnotationTool) => void;
-    onClearAll: () => void;
-    hasAnnotations: boolean;
-};
-
 export type WorkbenchCanvasProps = {
     mediaUrl?: string;
     mediaKind?: MediaKind;
