@@ -103,7 +103,6 @@ def _format_case_evidence(row: dict) -> dict:
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
     media_name = row["mediatitle"]
-    
 
     minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
     parsedUrl = urlparse(minioDomain)
@@ -133,6 +132,7 @@ def _format_case_evidence(row: dict) -> dict:
         "mediaExtension": media_extension,
         "mediaTypeId": str(row["mediatypeid"]),
         "mediaUrl": fileUrl,
+        "annotations": row["annotations"],
         "reportArtifacts": row["reportartifacts"],
         "reportFindings": row["reportfindings"],
         "reportComments": row["reportcomments"],
@@ -351,7 +351,8 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 r.ReportDateCreation AS "reportdatecreation",
                 m.MediaTypeId AS "mediatypeid",
                 m.MediaBucket AS "mediabucket",
-                m.MediaExtension AS "mediaextension"
+                m.MediaExtension AS "mediaextension",
+                m.MediaAnnotations AS "annotations"
             FROM "Cases_DB"."Reports" r
             JOIN "Cases_DB"."Media" media ON r.MediaId = media.MediaId
             JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
