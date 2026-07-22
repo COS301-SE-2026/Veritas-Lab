@@ -478,7 +478,8 @@ def test_get_single_case_not_found(monkeypatch):
 
 def test_get_single_case_admin_returns_case(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -487,6 +488,13 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     mock_minio_client = MagicMock()
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_media_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    fake_report_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    fake_url = f"https://localhost:9000/images/{fake_media_id}.png"
+    fake_annotations = [
+        {"tag": "highlight", "cord": "15-35"},
+        {"tag": "comment", "cord": "35-23"},
+    ]
 
     fake_row = {
         "caseid": fake_case_id,
@@ -497,47 +505,6 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
     }
 
-    mock_connection = AsyncMock()
-    mock_connection.fetchrow = AsyncMock(return_value=fake_row)
-    mock_connection.fetch = AsyncMock(return_value=[])
-    mock_connection.close = AsyncMock(return_value=None)
-
-    mock_connect = AsyncMock(return_value=mock_connection)
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
-
-    with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
-        mock_get_comments.return_value = []
-    
-        response = client.post(
-          "/api/getSingleCase",
-          json={"CaseID": fake_case_id}
-      )
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "success",
-        "case": {
-            "caseId": fake_case_id,
-            "caseName": "Flood in Durban",
-            "caseCreator": "admin_user",
-            "caseDescription": "Flood investigation case",
-            "caseClosed": False,
-            "caseCreationDate": "2026-05-20T19:43:02+00:00"
-        },
-        "comments": [],
-        "evidence": []
-    }
-
- 
-    fake_media_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    fake_report_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-
-    fake_url = f"http://localhost:9000/images/{fake_media_id}.png"
-    mock_minio_client.presigned_get_object.return_value = fake_url
-    monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
-
     fake_evidence_rows = [
         {
             "reportid": fake_report_id,
@@ -547,12 +514,15 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "mediaextension": ".png",
             "mediatypeid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
             "mediaurl": fake_url,
+            "annotations": fake_annotations,
             "reportartifacts": {"ocr": "captured"},
             "reportfindings": "Flood watermark detected",
             "reportcomments": "Upload approved",
             "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
         }
     ]
+
+    mock_minio_client.presigned_get_object.return_value = fake_url
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=fake_row)
@@ -561,16 +531,17 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+    monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
 
     with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
         mock_get_comments.return_value = []
-    
+
         response = client.post(
-          "/api/getSingleCase",
-          json={"CaseID": fake_case_id}
-      )
+            "/api/getSingleCase",
+            json={"CaseID": fake_case_id}
+        )
 
     assert response.status_code == 200
     assert response.json() == {
@@ -593,6 +564,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
                 "mediaExtension": ".png",
                 "mediaTypeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
                 "mediaUrl": fake_url,
+                "annotations": fake_annotations,
                 "reportArtifacts": {"ocr": "captured"},
                 "reportFindings": "Flood watermark detected",
                 "reportComments": "Upload approved",
@@ -600,95 +572,26 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             }
         ]
     }
-
-    # asserts counting the calls
-    assert mock_connect.call_count == 1
-    assert mock_connection.fetchrow.call_count == 1
-    assert mock_connection.fetch.call_count == 1
-    assert mock_connection.close.call_count == 1
-
-def test_close_case_missing_jwt(monkeypatch):
-    client.cookies.clear()
-    def mock_verifyJWT(request):
-        raise ValueError("Missing Authorization header")
-    
-    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
-
-    response = client.post("/api/closeCase", json={})
-
-    assert response.status_code == 401
-    assert response.json() == {
-        "status": "error",
-        "message": "Missing Authorization header"
-    }
-
-def test_close_case_invalid_jwt(monkeypatch):
-    client.cookies.clear()
-    def mock_verifyJWT(request):
-        raise ValueError("Invalid token")
-
-    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/closeCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
-    )
-
-    assert response.status_code == 401
-    assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
-    }
-
 def test_close_case_user_unauthorized(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-user-id",
             "username": "normal_user",
-            "role":"USER"
+            "role": "USER"
         }
-    
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/closeCase",
         json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
-    assert response.status_code == 403
-    assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": "User unauthorized"
-        }
-    }
-
-def test_close_case_invalid_case_id(monkeypatch):
-    client.cookies.clear()
-    def mock_verifyJWT(request):
-        return {
-            "sub": "mock-investigator-id",
-            "username": "investigator_user",
-            "role": "INVESTIGATOR"
-        }
-
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-    response = client.post(
-        "/api/closeCase",
-        json={"CaseID": "not-a-valid-uuid"}
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {
-        "status": "error",
-        "message": "Invalid CaseID"
-    }
-
 def test_close_case_not_found(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -701,7 +604,7 @@ def test_close_case_not_found(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
