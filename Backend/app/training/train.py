@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import torch
 from torch import nn
 from torch.optim import Adam
 
 from app.training.paths import validate_model_path
-from src.data import create_data_loaders
-from src.metrics import evaluate_model
-from src.model import AIImageDetector
-from src.training import train_one_epoch
+from app.training.data import create_data_loaders
+from app.training.metrics import evaluate_model
+from app.training.model import AIImageDetector
+from app.training.training import train_one_epoch
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description = "Train the AI image detector.")
@@ -53,11 +52,10 @@ def main() -> None:
         #Here we say which parts of the model that's allowed to learn to updtae
     )
 
-    validate_model_path(args.model_path)
     model_path = validate_model_path(args.model_path)
     model_path.parent.mkdir(parents = True, exist_ok = True)
 
-    best_validation_loss = float ("inf")
+    best_validation_loss = float("inf")
 
     # Training repetition for each epoch
     for epoch in range(1, args.epochs + 1):
@@ -86,7 +84,7 @@ def main() -> None:
         )
 
         print(
-            f"Epoch{epoch}/{args.epochs} | "
+            f"Epoch {epoch}/{args.epochs} | "
             f"train_loss = {training_loss:.4f} | "
             f"val_loss = {validation.loss:.4f} | "
             f"val_accuracy = {validation.accuracy:.4f} | "

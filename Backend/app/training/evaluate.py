@@ -39,6 +39,8 @@ def main() ->None:
     )
     model.load_state_dict(checkpoint["model_state_dict"])
 
+    model.eval()
+
     result = evaluate_model(
         model = model,
         data_loader = test_loader,
