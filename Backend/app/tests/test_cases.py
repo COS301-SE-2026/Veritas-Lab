@@ -890,6 +890,239 @@ def test_close_case_admin_not_case_creator(monkeypatch):
     assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
     assert fetchrow_args[2] == "admin_user"
 
+def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="investigator_user", role="INVESTIGATOR"):
+    def mock_verify_jwt(request):
+        return {"sub": sub, "username": username, "role": role}
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+
+def _mock_jwt_failure(monkeypatch, message):
+    def mock_verify_jwt(request):
+        raise ValueError(message)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+
+def _mock_db_connect(monkeypatch, *, fetchrow_return=None):
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=fetchrow_return)
+    mock_connection.close = AsyncMock(return_value=None)
+    mock_connect = AsyncMock(return_value=mock_connection)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+    return mock_connection, mock_connect
+
+def test_update_case_missing_jwt(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_failure(monkeypatch, "Missing Authorization header")
+
+    response = client.post("/api/updateCase", json={})
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing Authorization header"
+    }
+
+def test_update_case_invalid_jwt(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_failure(monkeypatch, "Invalid token")
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid token"
+    }
+
+def test_update_case_user_unauthorized(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch, sub="mock-user-id", username="normal_user", role="USER")
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
+    }
+
+def test_update_case_missing_case_id(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    response = client.post(
+        "/api/updateCase",
+        json={}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "CaseID required"
+    }
+
+def test_update_case_invalid_case_id(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "not-a-valid-uuid"}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid CaseID"
+    }
+
+def test_update_case_no_fields_provided(monkeypatch):
+    #Here we are testing for errors when CaseName and CaseDescription are None
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "At least one of CaseName or CaseDescription must be provided"
+    }
+
+#when case name is CaseName" ""
+def test_update_case_invalid_name_blank(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    response = client.post(
+        "/api/updateCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01",
+            "CaseName": ""
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "CaseName is required"
+    }
+
+def test_update_case_name_too_long(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    long_name = "A" * 256
+
+    response = client.post(
+        "/api/updateCase",
+        json={
+            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01",
+            "CaseName": long_name
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "CaseName must be 255 characters or less"
+    }
+
+def test_update_case_not_found(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+    mock_connection, mock_connect = _mock_db_connect(monkeypatch, fetchrow_return=None)
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01", "CaseName": "Updated Case Name"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found or user unauthorized."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+def test_update_case_not_case_creator(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch, username="different_user")
+    mock_connection, mock_connect = _mock_db_connect(monkeypatch, fetchrow_return=None)
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01", "CaseName": "Updated Case Name"}
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "status": "error",
+        "message": "Case not found or user unauthorized."
+    }
+
+    mock_connect.assert_called_once()
+    mock_connection.fetchrow.assert_called_once()
+    mock_connection.close.assert_called_once()
+
+def test_update_case_success_name_only(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_row = {"caseid": fake_case_id}
+
+    mock_connection, mock_connect = _mock_db_connect(monkeypatch, fetchrow_return=fake_row)
+
+    response = client.post(
+        "/api/updateCase",
+        json={
+            "CaseID": fake_case_id,
+            "CaseName": "Updated Case Name"
+        }
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Case updated successfully."
+    }
+
+def test_update_case_success_description_only(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_row = {"caseid": fake_case_id}
+
+    mock_connection, mock_connect = _mock_db_connect(monkeypatch, fetchrow_return=fake_row)
+
+    response = client.post(
+        "/api/updateCase",
+        json={
+            "CaseID": fake_case_id,
+            "CaseDescription": "Updated Case Description"
+        }
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Case updated successfully."
+    }
+
 @pytest.mark.asyncio
 async def test_get_comment_missing_case_id():
     """

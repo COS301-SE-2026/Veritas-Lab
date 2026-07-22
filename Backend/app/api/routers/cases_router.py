@@ -42,6 +42,10 @@ router = APIRouter(
     tags=["Cases"]
 )
 
+_CASE_ID_REQUIRED = "CaseID required"
+_INVALID_CASE_ID = "Invalid CaseID"
+_CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
+
 class CreateCaseRequest(BaseModel):
     title: str | None = None
     description: str | None = None
@@ -51,6 +55,11 @@ class CreateSingleCaseRequest(BaseModel):
 
 class UpdateCommentRequest(BaseModel):
     comment: str
+
+class UpdateCaseRequest(BaseModel):
+    CaseID: str | None = None
+    CaseName: str | None = None
+    CaseDescription: str | None = None
 
 class CreateCommentRequest(BaseModel):
     case_id: UUID
@@ -279,7 +288,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             status_code=400,
             content={
                 "status": "error",
-                "message": "CaseID required"
+                "message": _CASE_ID_REQUIRED
             }
         )
 
@@ -486,7 +495,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": "CaseID required"
+                "message": _CASE_ID_REQUIRED
             }
         )
     
@@ -497,7 +506,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400, 
             content={
                 "status": "error", 
-                "message": "Invalid CaseID"
+                "message": _INVALID_CASE_ID
             }
         )
 
@@ -521,7 +530,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "Case not found or user unauthorized."
+                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -540,6 +549,82 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+    finally:
+        if connection is not None:
+            await connection.close()
+
+@router.post("/updateCase")
+async def update_case(case_request: UpdateCaseRequest, request: Request):
+    connection = None
+    try:
+        payload = verifyJWT(request)
+    except ValueError as e:
+        return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
+
+    verify_not_user(payload.get("role"))
+
+    if not case_request.CaseID:
+        return JSONResponse(status_code=400, content={"status": "error", "message": _CASE_ID_REQUIRED})
+
+    try:
+        case_uuid = UUID(case_request.CaseID)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"status": "error", "message": _INVALID_CASE_ID})
+
+    if case_request.CaseName is None and case_request.CaseDescription is None:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "At least one of CaseName or CaseDescription must be provided"})
+
+    validated_name = None
+    if case_request.CaseName is not None:
+        try:
+            validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
+        except ValueError as e:
+            return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+
+    try:
+        connection = await getConnection()
+
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."Cases"
+            set casename = COALESCE($3, casename),
+                casedescription = COALESCE($4, casedescription)
+            WHERE caseid = $1
+            AND casecreator = $2
+            RETURNING caseid
+            """,
+            case_uuid,
+            payload.get("username"),
+            validated_name,
+            case_request.CaseDescription
+        )
+
+        if row is None:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Case updated successfully."
+            }
+        )
+
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
     finally:
         if connection is not None:
             await connection.close()
@@ -567,7 +652,7 @@ async def update_comment(
             status_code=400, 
             content={
                 "status": "error", 
-                "message": "Invalid CaseID"
+                "message": _INVALID_CASE_ID
             }
         )
     try:
@@ -593,7 +678,7 @@ async def update_comment(
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "Case not found or user unauthorized."
+                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -821,7 +906,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": "CaseID required"
+                "message": _CASE_ID_REQUIRED
             }
         )
     
