@@ -946,8 +946,10 @@ def test_update_case_user_unauthorized(monkeypatch):
 
     assert response.status_code == 403
     assert response.json() == {
-        "status" :"error",
-        "message": "User unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
     }
 
 def test_update_case_missing_case_id(monkeypatch):

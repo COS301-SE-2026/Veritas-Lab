@@ -42,8 +42,6 @@ router = APIRouter(
     tags=["Cases"]
 )
 
-_USER_UNAUTHORIZED = "User unauthorized"
-_DATABASE_ERROR = "Database error"
 _CASE_ID_REQUIRED = "CaseID required"
 _INVALID_CASE_ID = "Invalid CaseID"
 _CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
@@ -563,8 +561,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
     except ValueError as e:
         return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
 
-    if payload.get("role") == "USER":
-        return JSONResponse(status_code=403, content={"status": "error", "message": _USER_UNAUTHORIZED})
+    verify_not_user(payload.get("role"))
 
     if not case_request.CaseID:
         return JSONResponse(status_code=400, content={"status": "error", "message": _CASE_ID_REQUIRED})
@@ -624,10 +621,10 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": _DATABASE_ERROR
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
-    
+
     finally:
         if connection is not None:
             await connection.close()
