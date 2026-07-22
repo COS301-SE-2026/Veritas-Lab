@@ -91,6 +91,7 @@ export default function CasePage() {
                                     mediaName={evidence.mediaName}
                                     mediaUrl={evidence.mediaUrl}
                                     mediaExtension={evidence.mediaExtension}
+                                    href={`/case-page/${id}/workbench/${evidence.reportId}`}
                                 />
                             )) : (
                                 <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>

@@ -1,5 +1,4 @@
 -- Seed cases for development/testing
--- Requires extension uuid-ossp (created in 02-Cases_db.sql)
 
 INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
 VALUES
