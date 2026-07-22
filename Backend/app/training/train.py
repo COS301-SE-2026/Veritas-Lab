@@ -13,8 +13,8 @@ from app.training.training import train_one_epoch
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description = "Train the AI image detector.")
-    parser.add_argument("--data-dir", default = "data")
-    parser.add_argument("--model-path", default = "models/best_model.pth")
+    parser.add_argument("--data-dir", default = "../dataset")
+    parser.add_argument("--model-path", default = "app/ai/best_model.pth")
     parser.add_argument("--epochs", type = int, default = 10)
     parser.add_argument("--batch-size", type = int, default = 16)
     parser.add_argument("--learning-rate", type = float, default = 0.001)
