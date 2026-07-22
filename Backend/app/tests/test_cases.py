@@ -890,10 +890,10 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 
 def test_update_case_missing_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing Authorization header")
-    
-    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
+
+    monkeypatch.setattr(cases_router,"verifyJWT", mock_verify_jwt)
 
     response = client.post("/api/updateCase", json={})
 
@@ -905,10 +905,10 @@ def test_update_case_missing_jwt(monkeypatch):
 
 def test_update_case_invalid_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(cases_router,"verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router,"verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/updateCase",
@@ -921,38 +921,38 @@ def test_update_case_invalid_jwt(monkeypatch):
         "message": "Invalid token"
     }
 
-    def test_update_case_user_unauthorized(monkeypatch):
-        client.cookies.clear()
-        def mock_verifyJWT(request):
-            return {
-                "sub": "mock-user-id",
-                "username": "normal_user",
-                "role":"USER"
-            }
-        
-        monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-
-        response = client.post(
-            "/api/updateCase",
-            json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
-        )
-
-        assert response.status_code == 403
-        assert response.json() == {
-            "status" :"error",
-            "message": "User unauthorized"
+def test_update_case_user_unauthorized(monkeypatch):
+    client.cookies.clear()
+    def mock_verify_jwt(request):
+        return {
+            "sub": "mock-user-id",
+            "username": "normal_user",
+            "role": "USER"
         }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "status" :"error",
+        "message": "User unauthorized"
+    }
 
 def test_update_case_missing_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
-    
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/updateCase",
@@ -967,14 +967,14 @@ def test_update_case_missing_case_id(monkeypatch):
 
 def test_update_case_invalid_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
-    
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/updateCase",
@@ -990,14 +990,14 @@ def test_update_case_invalid_case_id(monkeypatch):
 def test_update_case_no_fields_provided(monkeypatch):
     #Here we are testing for errors when CaseName and CaseDescription are None
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/updateCase",
@@ -1013,14 +1013,14 @@ def test_update_case_no_fields_provided(monkeypatch):
 #when case name is CaseName" ""
 def test_update_case_invalid_name_blank(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     response = client.post(
         "/api/updateCase",
@@ -1038,14 +1038,14 @@ def test_update_case_invalid_name_blank(monkeypatch):
 
 def test_update_case_name_too_long(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
 
     long_name = "A" * 256
 
@@ -1065,7 +1065,7 @@ def test_update_case_name_too_long(monkeypatch):
 
 def test_update_case_not_found(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -1078,11 +1078,11 @@ def test_update_case_not_found(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
-        "/api/closeCase",
+        "/api/updateCase",
         json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
@@ -1098,7 +1098,7 @@ def test_update_case_not_found(monkeypatch):
 
 def test_update_case_not_case_creator(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "different_user",
@@ -1112,11 +1112,11 @@ def test_update_case_not_case_creator(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
-        "/api/closeCase",
+        "/api/updateCase",
         json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
 
@@ -1132,13 +1132,13 @@ def test_update_case_not_case_creator(monkeypatch):
 
 def test_update_case_success_name_only(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
-    
+
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
@@ -1151,7 +1151,7 @@ def test_update_case_success_name_only(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -1170,13 +1170,13 @@ def test_update_case_success_name_only(monkeypatch):
 
 def test_update_case_success_description_only(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
-    
+
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     fake_row = {
@@ -1189,7 +1189,7 @@ def test_update_case_success_description_only(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(

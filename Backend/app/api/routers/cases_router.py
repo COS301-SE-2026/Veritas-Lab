@@ -38,6 +38,12 @@ router = APIRouter(
     tags=["Cases"]
 )
 
+_USER_UNAUTHORIZED = "User unauthorized"
+_DATABASE_ERROR = "Database error"
+_CASE_ID_REQUIRED = "CaseID required"
+_INVALID_CASE_ID = "Invalid CaseID"
+_CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
+
 class CreateCaseRequest(BaseModel):
     title: str | None = None
     description: str | None = None
@@ -116,7 +122,7 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
             status_code=403,
             content={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": _USER_UNAUTHORIZED
             }
         )
 
@@ -205,7 +211,7 @@ async def get_cases(request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": _DATABASE_ERROR
             }
         )
     finally:
@@ -230,7 +236,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             status_code=400,
             content={
                 "status": "error",
-                "message": "CaseID required"
+                "message": _CASE_ID_REQUIRED
             }
         )
 
@@ -326,7 +332,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             status_code=500,
             content={
                 "status":"error",
-                "message":"Database error"
+                "message":_DATABASE_ERROR
             }
         )
     except Exception as e:
@@ -355,7 +361,7 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
     if payload.get("role") == "USER":
         return JSONResponse(
             status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
+            content={"status": "error", "message": _USER_UNAUTHORIZED}
         )
 
     CaseCreator=payload["username"]
@@ -422,7 +428,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     if payload.get("role") == "USER":
         return JSONResponse(
             status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
+            content={"status": "error", "message": _USER_UNAUTHORIZED}
         )
     
     if not case_request.CaseID:
@@ -430,7 +436,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": "CaseID required"
+                "message": _CASE_ID_REQUIRED
             }
         )
     
@@ -441,7 +447,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400, 
             content={
                 "status": "error", 
-                "message": "Invalid CaseID"
+                "message": _INVALID_CASE_ID
             }
         )
 
@@ -465,7 +471,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "Case not found or user unauthorized."
+                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -481,7 +487,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": _DATABASE_ERROR
             }
         )
     finally:
@@ -497,15 +503,15 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
 
     if payload.get("role") == "USER":
-        return JSONResponse(status_code=403, content={"status": "error", "message": "User unauthorized"})
+        return JSONResponse(status_code=403, content={"status": "error", "message": _USER_UNAUTHORIZED})
 
     if not case_request.CaseID:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "CaseID required"})
+        return JSONResponse(status_code=400, content={"status": "error", "message": _CASE_ID_REQUIRED})
 
     try:
         case_uuid = UUID(case_request.CaseID)
     except ValueError:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid CaseID"})
+        return JSONResponse(status_code=400, content={"status": "error", "message": _INVALID_CASE_ID})
 
     if case_request.CaseName is None and case_request.CaseDescription is None:
         return JSONResponse(status_code=400, content={"status": "error", "message": "At least one of CaseName or CaseDescription must be provided"})
@@ -540,7 +546,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "Case not found or user unauthorized."
+                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -557,7 +563,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": _DATABASE_ERROR
             }
         )
     
@@ -588,7 +594,7 @@ async def update_comment(
             status_code=400, 
             content={
                 "status": "error", 
-                "message": "Invalid CaseID"
+                "message": _INVALID_CASE_ID
             }
         )
     try:
@@ -614,7 +620,7 @@ async def update_comment(
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": "Case not found or user unauthorized."
+                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -629,7 +635,7 @@ async def update_comment(
         return JSONResponse(
             status_code=500,content={
                 "status": "error",
-                "message": "Database error"
+                "message": _DATABASE_ERROR
             }
         )
 
@@ -684,7 +690,7 @@ async def delete_comment(request: Request, comment_id: int):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": _DATABASE_ERROR
             }
         )
         
@@ -709,7 +715,7 @@ async def retreive_comments(
     if  user_role is None or user_role== "USER":
         return JSONResponse(
             status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
+            content={"status": "error", "message": _USER_UNAUTHORIZED}
         )
 
     try:
@@ -751,7 +757,7 @@ async def delete_evidence(
     if user_role not in ["INVESTIGATOR", "ADMIN"]:
         return JSONResponse(
             status_code=403,
-            content={"status": "error", "message": "User unauthorized"}
+            content={"status": "error", "message": _USER_UNAUTHORIZED}
         )
 
     try:
@@ -838,7 +844,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=403,
             content={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": _USER_UNAUTHORIZED
             }
         )
     
@@ -847,7 +853,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": "CaseID required"
+                "message": _CASE_ID_REQUIRED
             }
         )
     
@@ -900,6 +906,6 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=500,
             content={
                 "status": "error",
-                "message": "Database error"
+                "message": _DATABASE_ERROR
             }
         )
