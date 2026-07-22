@@ -134,7 +134,8 @@ def test_main_loads_checkpoint_from_model_path(predict_mocks) -> None:
     with patch("sys.argv", ["predict.py", "img.jpg", "--model-path", "my_model.pth"]):
         main()
     predict_mocks["mock_torch_load"].assert_called_once()
-    assert predict_mocks["mock_torch_load"].call_args.args[0] == "my_model.pth"
+    assert str(predict_mocks["mock_torch_load"].call_args.args[0]) == "my_model.pth"
+
 
 def test_main_loads_model_state_dict_from_checkpoint(predict_mocks) -> None:
     mock_state = predict_mocks["mock_torch_load"].return_value["model_state_dict"]

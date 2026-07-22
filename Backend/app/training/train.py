@@ -54,12 +54,10 @@ def main() -> None:
     )
 
     validate_model_path(args.model_path)
-    model_path = Path(args.model_path)
+    model_path = validate_model_path(args.model_path)
     model_path.parent.mkdir(parents = True, exist_ok = True)
 
     best_validation_loss = float ("inf")
-    model_path = Path(args.model_path)
-    model_path.parent.mkdir(parents = True, exist_ok = True)
 
     # Training repetition for each epoch
     for epoch in range(1, args.epochs + 1):
