@@ -5,6 +5,7 @@ import json
 import torch
 
 from src.model import AIImageDetector
+from app.training.paths import validate_model_path
 from src.prediction import predict_and_explain
 
 def parse_arguments() -> argparse.Namespace:
@@ -27,10 +28,11 @@ def main() -> None:
         use_pretrained_weights = False,
     )
 
+    validate_model_path(args.model_path)
     checkpoint = torch.load(
         args.model_path,
         map_location = device,
-        weights_only = False,
+        weights_only = True,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
 
