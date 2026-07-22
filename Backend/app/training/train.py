@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.optim import Adam
 
+from app.training.paths import validate_model_path
 from src.data import create_data_loaders
 from src.metrics import evaluate_model
 from src.model import AIImageDetector
@@ -48,8 +49,13 @@ def main() -> None:
     optimizer = Adam(
         filter(lambda parameter: parameter.requires_grad, model.parameters()),
         lr = args.learning_rate,
+        weight_decay = 1e-4,  # Add the missing hyperparameter weight_decay
         #Here we say which parts of the model that's allowed to learn to updtae
     )
+
+    validate_model_path(args.model_path)
+    model_path = Path(args.model_path)
+    model_path.parent.mkdir(parents = True, exist_ok = True)
 
     best_validation_loss = float ("inf")
     model_path = Path(args.model_path)
@@ -63,6 +69,7 @@ def main() -> None:
             optimizer = Adam (
                 model.parameters(),
                 lr = args.learning_rate / 10,
+                weight_decay = 1e-4,  # Add the missing hyperparameter weight_decay
             )
 
         training_loss = train_one_epoch(

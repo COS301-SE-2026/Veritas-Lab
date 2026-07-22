@@ -177,7 +177,6 @@ def test_main_passes_val_loader_to_evaluate_model(train_mocks, tmp_path) -> None
 
 def test_main_saves_model_when_validation_loss_improves(train_mocks, tmp_path) -> None:
     train_mocks["mock_validation_result"].loss = 0.25
-    model_path = tmp_path / "model.pth"
     with patch("sys.argv", ["train.py", "--data-dir", str(tmp_path), "--model-path", str(tmp_path / "model.pth"), "--epochs", "1", "--unfreeze-after", "10"]):
         main()
     train_mocks["mock_torch_save"].assert_called_once()
