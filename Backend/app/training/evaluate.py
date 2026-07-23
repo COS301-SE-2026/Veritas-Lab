@@ -5,9 +5,9 @@ import argparse
 import torch
 from torch import nn
 
-from src.data import create_data_loaders
-from src.metrics import evaluate_model
-from src.model import AIImageDetector
+from app.training.data import create_data_loaders
+from app.training.metrics import evaluate_model
+from app.training.model import AIImageDetector
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate the AI detector.")
@@ -38,6 +38,8 @@ def main() ->None:
         weights_only=False,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
+
+    model.eval()
 
     result = evaluate_model(
         model = model,
