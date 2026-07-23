@@ -534,7 +534,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
     monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
 
@@ -575,6 +575,66 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             }
         ]
     }
+
+def test_get_single_case_success_for_a_normal_user(monkeypatch):
+    client.cookies.clear()
+    def mock_verify_jwt(request):
+        return {
+            "sub": "mock-user-id",
+            "username": "standard_user",
+            "role": "USER"
+        }
+
+    case_uuid = uuid4()
+    report_uuid = uuid4()
+    media_uuid = uuid4()
+    media_type_uuid = uuid4()
+
+    mock_case_row = {
+        "casecreator": "investigator1",
+        "casename": "Public Closed Case",
+        "casedescription": "Visible to standard users",
+        "caseid": case_uuid,
+        "caseclosed": True,
+        "casecreationdate": datetime.now(timezone.utc),
+    }
+
+    mock_evidence_row = {
+        "reportid": report_uuid,
+        "caseid": case_uuid,
+        "mediaid": media_uuid,
+        "reportartifacts": [],
+        "mediatitle": "Sample Evidence",
+        "reportfindings": "Sample Findings",
+        "reportcomments": "Sample Comments",
+        "reportdatecreation": datetime.now(timezone.utc),
+        "mediatypeid": media_type_uuid,
+        "mediabucket": "evidence-bucket",
+        "mediaextension": ".jpg",
+        "annotations": [],
+    }
+
+    mock_connection = AsyncMock()
+    mock_connection.fetchrow = AsyncMock(return_value=mock_case_row)
+    mock_connection.fetch = AsyncMock(return_value=[mock_evidence_row])
+    mock_connection.close = AsyncMock(return_value=None)
+    mock_connect = AsyncMock(return_value=mock_connection)
+
+    monkeypatch.setattr("app.core.cases.Case.getComments", AsyncMock(return_value=[]))
+    monkeypatch.setattr(cases_router,"verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
+
+    response = client.post(
+        "/api/getSingleCase",
+        json={"CaseID": str(case_uuid)}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+
+    assert data["evidence"][0]["mediaUrl"] == ""
+
 def test_close_case_user_unauthorized(monkeypatch):
     client.cookies.clear()
 
