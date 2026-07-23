@@ -26,6 +26,9 @@ DB_NAME= env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 NOT_USER= ["INVESTIGATOR", "ADMIN"]
 DATABASE_ERROR_MESSAGE="Database error"
+_CASE_ID_REQUIRED = "CaseID required"
+_INVALID_CASE_ID = "Invalid CaseID"
+_CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 
 async def getConnection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -42,9 +45,6 @@ router = APIRouter(
     tags=["Cases"]
 )
 
-_CASE_ID_REQUIRED = "CaseID required"
-_INVALID_CASE_ID = "Invalid CaseID"
-_CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 
 class CreateCaseRequest(BaseModel):
     title: str | None = None
@@ -86,14 +86,20 @@ def verify_jwt(request:Request):
     except ValueError as e:
         raise HTTPException(
             status_code=401,
-            detail={"status": "error", "message": str(e)}
+            detail={
+                "status": "error",
+                "message": str(e)
+            }
         )
 
 def verify_not_user(user_role:str):
     if  user_role not in NOT_USER: #This solves for it being blank and non sense roles.
         raise HTTPException(
             status_code=403,
-            detail={"status": "error", "message": "User unauthorized"}
+            detail={
+                "status": "error", 
+                "message": "User unauthorized"
+            }
         )
 
 def transform_to_uuid(changer:str)->UUID:
@@ -107,31 +113,35 @@ def transform_to_uuid(changer:str)->UUID:
         )
     
 
-def _format_case_evidence(row: dict) -> dict:
+def _format_case_evidence(row: dict, user : bool) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
     media_name = row["mediatitle"]
 
-    minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
-    parsedUrl = urlparse(minioDomain)
-    minioEndpoint = parsedUrl.netloc if parsedUrl.netloc else minioDomain
-    isSecure = parsedUrl.scheme == "https"
+    minio_domain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
+    parsed_url = urlparse(minio_domain)
+    minio_endpoint = parsed_url.netloc if parsed_url.netloc else minio_domain
+    is_secure = parsed_url.scheme == "https"
             #Creation of presigned URL below
-    presign_client = Minio(
-        minioEndpoint, # External domain the browser uses
-        access_key=os.getenv("MINIO_ROOT_USER"),
-        secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
-        region=os.getenv("AWS_REGION"),
-        secure=isSecure
-    )
-    targetFilename = f"{media_id}{media_extension}"
+    target_filename = f"{media_id}{media_extension}"
+    if user: # so none user log in block
+        presign_client = Minio(
+            minio_endpoint, # External domain the browser uses
+            access_key=os.getenv("MINIO_ROOT_USER"),
+            secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
+            region=os.getenv("AWS_REGION"),
+            secure=is_secure
+        )
 
-    fileUrl = presign_client.presigned_get_object(
-        bucket_name=media_bucket,
-        object_name=targetFilename,
-        expires=timedelta(hours=1)
-    )
+        file_url = presign_client.presigned_get_object(
+            bucket_name=media_bucket,
+            object_name=target_filename,
+            expires=timedelta(hours=1)
+        )
+    else:
+        # user block: It needs the  url to be empty to hide the actual image since it could be sensitive info.
+        file_url= ""
 
     return {
         "reportId": str(row["reportid"]),
@@ -140,7 +150,7 @@ def _format_case_evidence(row: dict) -> dict:
         "mediaBucket": media_bucket,
         "mediaExtension": media_extension,
         "mediaTypeId": str(row["mediatypeid"]),
-        "mediaUrl": fileUrl,
+        "mediaUrl": file_url,
         "annotations": row["annotations"],
         "reportArtifacts": row["reportartifacts"],
         "reportFindings": row["reportfindings"],
@@ -268,12 +278,28 @@ async def get_cases(request: Request):
 @router.post(
     "/getSingleCase",
     responses={
-        500: {"model": ErrorResponse, "description": "Database Error"},
+        500: {
+            "model": ErrorResponse,
+            "description": DATABASE_ERROR_MESSAGE
+        },
+        401: {
+            "model": ErrorResponse,
+            "description": "Unauthorized - Missing or invalid JWT token",
+        },
+        404:{
+            "model": ErrorResponse,
+            "description": " Case not found"
+        },
+        400:{
+            "model": ErrorResponse,
+            "description": _CASE_ID_REQUIRED
+        }
+
     }
 )
-async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request):
+async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -284,9 +310,9 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
         )
     
     if not case_request.CaseID:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": _CASE_ID_REQUIRED
             }
@@ -295,20 +321,20 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
     try:
         case_id = UUID(case_request.CaseID)
     except ValueError as e:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error",
                 "message": str(e)
             }
         )
 
     connection = None
-
+    is_user= None
     try:
         connection = await getConnection()
-
-        if payload.get("role") != "USER":
+        is_user = payload.get("role") != "USER"
+        if is_user:
             row= await connection.fetchrow(
                 """
                 SELECT *
@@ -329,9 +355,9 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
             )
     
         if row is None:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": "Case not found"
                 }
@@ -361,7 +387,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 m.MediaTypeId AS "mediatypeid",
                 m.MediaBucket AS "mediabucket",
                 m.MediaExtension AS "mediaextension",
-                m.MediaAnnotations AS "annotations"
+                media.MediaAnnotations AS "annotations"
             FROM "Cases_DB"."Reports" r
             JOIN "Cases_DB"."Media" media ON r.MediaId = media.MediaId
             JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
@@ -377,7 +403,7 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "status": "success",
                 "case": case.toJSON(),
                 "comments": await case.getComments(),
-                "evidence": [_format_case_evidence(row) for row in evidence_rows]
+                "evidence": [_format_case_evidence(row,is_user) for row in evidence_rows]
             })
         )
     except asyncpg.PostgresError:
@@ -388,6 +414,8 @@ async def getSingleCase(case_request: CreateSingleCaseRequest, request: Request)
                 "message":DATABASE_ERROR_MESSAGE
             }
         )
+    except HTTPException:
+        raise #so the dumb Exception doesn't override the error message
     except Exception as e:
         return JSONResponse(
             status_code=500,

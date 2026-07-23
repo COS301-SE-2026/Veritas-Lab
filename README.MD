@@ -11,15 +11,30 @@ Veritas Lab is a platform designed to analyze and verify the authenticity of dig
 <h2 align="center"> Documentation and Resources </h2>
 
 <div align="center">
+<div align="center">
+
+[GitHub Project Board](https://github.com/orgs/COS301-SE-2026/projects/71/views/1)
+
+</div>
+<div align="center">
+Demo 1
 
 | Resources | Description |
 |-----------|-------------|
-| [SRS Document](Docs/Veritas-Labs_SRS.pdf) | System Requirement Specification |
-| [Style Guide](Docs/Veritas-Labs_BrandStyleGuide.pdf) | Brand Style Guide |
-| [Wireframes Doc](Docs/Veritas-Labs_WireframesDoc.pdf) | Wireframes Design Document |
-| [Wireframes Figma](Docs/Veritas-Labs_WireframesDemo1.fig) | Wireframes Figma File |
+| [SRS Document](Docs/Demo_1/Veritas-Labs_SRS.pdf) | System Requirement Specification |
+| [Style Guide](Docs/Demo_1/Veritas-Labs_BrandStyleGuide.pdf) | Brand Style Guide |
+| [Wireframes Doc](Docs/Demo_1/Veritas-Labs_WireframesDoc.pdf) | Wireframes Design Document |
+| [Wireframes Figma](Docs/Demo_1/Veritas-Labs_WireframesDemo1.fig) | Wireframes Figma File |
 
+</div>
+<div align="center">
+Demo 2
 
+| Resources | Description |
+|-----------|-------------|
+|||
+
+</div>
 </div>
 <br/>
 
