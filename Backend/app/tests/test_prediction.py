@@ -215,14 +215,18 @@ def test_predict_and_explain_success(tmp_path: Path, mock_dependencies) -> None:
     assert DummyGradCAM.last_instance.hooks_removed is True
 
 def test_predict_and_explain_missing_image(tmp_path: Path) -> None:
+    model=DummyModel()
+    image_path= tmp_path / "missing.png"
+    device = torch.device("cpu")
+
     with pytest.raises(
         FileNotFoundError,
         match="Image does not exist"
     ):
         prediction.predict_and_explain(
-            model=DummyModel(),
-            image_path=tmp_path / "missing.png",
-            device=torch.device("cpu")
+            model=model,
+            image_path=image_path,
+            device=device
         )
 
 def test_predict_and_explain_invalid_image(tmp_path: Path) -> None:
@@ -269,7 +273,7 @@ def test_gradcam_hooks_removed_when_generation_fails(tmp_path: Path, mock_depend
         match="Grad-CAM failed"
     ):
         prediction.predict_and_explain(
-            model=DummyModel(),
+            model=model,
             image_path=image_path,
             device=device,
             output_directory=output_directory
