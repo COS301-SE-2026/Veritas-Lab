@@ -383,7 +383,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 m.MediaTypeId AS "mediatypeid",
                 m.MediaBucket AS "mediabucket",
                 m.MediaExtension AS "mediaextension",
-                m.MediaAnnotations AS "annotations"
+                media.MediaAnnotations AS "annotations"
             FROM "Cases_DB"."Reports" r
             JOIN "Cases_DB"."Media" media ON r.MediaId = media.MediaId
             JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
