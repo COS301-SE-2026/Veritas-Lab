@@ -119,29 +119,29 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
     media_bucket = row["mediabucket"]
     media_name = row["mediatitle"]
 
-    minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
-    parsedUrl = urlparse(minioDomain)
-    minioEndpoint = parsedUrl.netloc if parsedUrl.netloc else minioDomain
-    isSecure = parsedUrl.scheme == "https"
+    minio_domain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
+    parsed_url = urlparse(minio_domain)
+    minio_endpoint = parsed_url.netloc if parsed_url.netloc else minio_domain
+    is_secure = parsed_url.scheme == "https"
             #Creation of presigned URL below
-    targetFilename = f"{media_id}{media_extension}"
+    target_filename = f"{media_id}{media_extension}"
     if user: # so none user log in block
         presign_client = Minio(
-            minioEndpoint, # External domain the browser uses
+            minio_endpoint, # External domain the browser uses
             access_key=os.getenv("MINIO_ROOT_USER"),
             secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
             region=os.getenv("AWS_REGION"),
-            secure=isSecure
+            secure=is_secure
         )
 
-        fileUrl = presign_client.presigned_get_object(
+        file_url = presign_client.presigned_get_object(
             bucket_name=media_bucket,
-            object_name=targetFilename,
+            object_name=target_filename,
             expires=timedelta(hours=1)
         )
     else:
         # user block: It needs the  url to be empty to hide the actual image since it could be sensitive info.
-        fileUrl= ""
+        file_url= ""
 
     return {
         "reportId": str(row["reportid"]),
@@ -150,7 +150,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         "mediaBucket": media_bucket,
         "mediaExtension": media_extension,
         "mediaTypeId": str(row["mediatypeid"]),
-        "mediaUrl": fileUrl,
+        "mediaUrl": file_url,
         "annotations": row["annotations"],
         "reportArtifacts": row["reportartifacts"],
         "reportFindings": row["reportfindings"],
@@ -288,7 +288,11 @@ async def get_cases(request: Request):
         },
         404:{
             "model": ErrorResponse,
-            "desription": " Case not found"
+            "description": " Case not found"
+        },
+        400:{
+            "model": ErrorResponse,
+            "description": _CASE_ID_REQUIRED
         }
 
     }
