@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
 import type { Annotation, WorkbenchPanelProps } from '@/types/workbench';
 import '@testing-library/jest-dom';
@@ -113,6 +113,6 @@ describe('WorkbenchPanel', () => {
  
         fireEvent.click(screen.getByText('Save'));
  
-        await waitFor(() => expect(screen.getByText('Couldn’t save. Try again.')).toBeInTheDocument());
+        expect(await screen.findByText('Couldn’t save. Try again.')).toBeInTheDocument();
     });
 });
