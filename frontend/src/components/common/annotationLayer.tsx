@@ -75,15 +75,25 @@ export default function AnnotationLayer({
         if (activeTool === 'Select') onSelectAnnotation(null);
     };
 
+    const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!active) return;
+        if (event.key === 'Escape') {
+            setDraftNotePosition(null);
+            onSelectAnnotation(null);
+        }
+    };
+
     return (
         <div
             ref={overlayRef}
-            role="application"
+            role="button"
+            tabIndex={active ? 0 : -1}
             aria-label={`Annotation layer, page ${page}`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onClick={handleOverlayClick}
+            onKeyDown={handleOverlayKeyDown}
             className={`absolute inset-0 select-none ${active ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
         >
             {active ? (
