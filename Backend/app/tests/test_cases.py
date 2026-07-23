@@ -371,10 +371,10 @@ def test_get_cases_investigator_returns_empty_list(monkeypatch):
 
 def test_get_single_case_missing_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing Authorization header")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post("/api/getSingleCase", json={})
 
@@ -386,10 +386,10 @@ def test_get_single_case_missing_jwt(monkeypatch):
 
 def test_get_single_case_invalid_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post(
         "/api/getSingleCase",
@@ -404,14 +404,14 @@ def test_get_single_case_invalid_jwt(monkeypatch):
 
 def test_get_single_case_missing_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
             "role": "ADMIN"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post(
         "/api/getSingleCase",
@@ -420,20 +420,22 @@ def test_get_single_case_missing_case_id(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "CaseID required"
+        'detail':{
+            "status": "error",
+            "message": "CaseID required"
+        }
     }
 
 def test_get_single_case_invalid_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
             "role": "ADMIN"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post(
         "/api/getSingleCase",
@@ -441,11 +443,12 @@ def test_get_single_case_invalid_case_id(monkeypatch):
     )
 
     assert response.status_code == 401
-    assert response.json()["status"] == "error"
+    #assert response.json()==""
+    assert response.json()["detail"]["status"] == "error"
 
 def test_get_single_case_not_found(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -458,7 +461,7 @@ def test_get_single_case_not_found(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -467,10 +470,10 @@ def test_get_single_case_not_found(monkeypatch):
     )
 
     assert response.status_code == 404
-    assert response.json() == {
+    assert response.json()["detail"] == {
         "status": "error",
         "message": "Case not found"
-    }
+    }# Needed adjustment to properly assert HTTPException
 
     mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
