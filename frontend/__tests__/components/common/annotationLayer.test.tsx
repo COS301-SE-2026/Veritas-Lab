@@ -21,7 +21,7 @@ const baseProps = {
 describe('AnnotationLayer', () => {
     it('renders without crashing', () => {
         render(<AnnotationLayer {...baseProps} />);
-        expect(screen.getByRole('application')).toBeInTheDocument();
+        expect(screen.getByRole('button')).toBeInTheDocument();
     });
 
     it('renders the aria-label for the given page', () => {
@@ -31,6 +31,6 @@ describe('AnnotationLayer', () => {
 
     it('renders when inactive without crashing', () => {
         render(<AnnotationLayer {...baseProps} active={false} />);
-        expect(screen.getByRole('application')).toBeInTheDocument();
+        expect(screen.getByRole('button')).toBeInTheDocument();
     });
 });
