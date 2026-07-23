@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import sys
 import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-
-for _mod in ["torch", "torch.nn", "src", "src.data","src.model", "src.prediction"]:
-    sys.modules.setdefault(_mod, MagicMock())
 
 from app.training.predict import parse_arguments, main
 
@@ -34,7 +30,7 @@ def test_parse_arguments_returns_default_output_dir() -> None:
 def test_parse_arguments_returns_default_low_threshold() -> None:
     with patch("sys.argv", ["predict.py", "img.jpg"]):
         args = parse_arguments()
-    assert args.low_threshold == pytest.approx(0.48)
+    assert args.low_threshold == pytest.approx(0.4)
 
 def test_parse_arguments_returns_default_high_threshold() -> None:
     with patch("sys.argv", ["predict.py", "img.jpg"]):
@@ -89,6 +85,7 @@ def predict_mocks():
         patch("app.training.predict.predict_and_explain") as mock_predict,
     ):
         mock_model = MagicMock()
+        mock_model.to.return_value = mock_model
         mock_model_class.return_value = mock_model
         mock_torch_load.return_value = {"model_state_dict": MagicMock()}
         mock_predict.return_value = mock_result

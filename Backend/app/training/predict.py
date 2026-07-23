@@ -4,9 +4,9 @@ import argparse
 import json
 import torch
 
-from src.model import AIImageDetector
+from app.training.model import AIImageDetector
 from app.training.paths import validate_model_path
-from src.prediction import predict_and_explain
+from app.training.prediction import predict_and_explain
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -15,8 +15,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("image_path")
     parser.add_argument("--model-path", default = "models/best_model.pth")
     parser.add_argument("--output-dir", default = "outputs")
-    parser.add_argument("--low-threshold", type = float, default = 0.48)
-    parser.add_argument("--high-threshold", type = float, default = 0.70)
+    parser.add_argument("--low-threshold", type = float, default = 0.4)
+    parser.add_argument("--high-threshold", type = float, default = 0.7)
     return parser.parse_args()
 
 def main() -> None:
@@ -28,13 +28,17 @@ def main() -> None:
         use_pretrained_weights = False,
     )
 
-    validate_model_path(args.model_path)
+    model_path = validate_model_path(args.model_path)
+
     checkpoint = torch.load(
-        args.model_path,
+        model_path,
         map_location = device,
-        weights_only = True,
+        weights_only = False,
     )
+
     model.load_state_dict(checkpoint["model_state_dict"])
+    model = model.to(device)
+    model.eval()
 
     result = predict_and_explain(
         model = model,
@@ -47,5 +51,5 @@ def main() -> None:
 
     print(json.dumps(result, indent = 2))
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()

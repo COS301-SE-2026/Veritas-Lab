@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import sys
 import pytest
 from unittest.mock import MagicMock, patch
-
-for _mod in ["torch", "torch.nn", "src", "src.data","src.model", "src.metrics"]:
-    sys.modules.setdefault(_mod, MagicMock())
 
 from app.training.evaluate import parse_arguments, main
 
