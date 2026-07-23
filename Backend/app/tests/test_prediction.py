@@ -227,19 +227,23 @@ def test_predict_and_explain_missing_image(tmp_path: Path) -> None:
 
 def test_predict_and_explain_invalid_image(tmp_path: Path) -> None:
     image_path = tmp_path / "invalid.png"
+
     image_path.write_text(
         "not an image",
         encoding="utf-8"
     )
+
+    model = DummyModel()
+    device = torch.device("cpu")
 
     with pytest.raises(
         ValueError,
         match="Could not read image"
     ):
         prediction.predict_and_explain(
-            model=DummyModel(),
+            model=model,
             image_path=image_path,
-            device=torch.device("cpu")
+            device=device
         )
 
 def test_gradcam_hooks_removed_when_generation_fails(tmp_path: Path, mock_dependencies, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -256,6 +260,10 @@ def test_gradcam_hooks_removed_when_generation_fails(tmp_path: Path, mock_depend
         
     monkeypatch.setattr(prediction, "GradCAM", FailingGradCAM)
 
+    model = DummyModel()
+    device=torch.device("cpu")
+    output_directory = tmp_path / "outputs"
+
     with pytest.raises(
         RuntimeError,
         match="Grad-CAM failed"
@@ -263,8 +271,8 @@ def test_gradcam_hooks_removed_when_generation_fails(tmp_path: Path, mock_depend
         prediction.predict_and_explain(
             model=DummyModel(),
             image_path=image_path,
-            device=torch.device("cpu"),
-            output_directory=tmp_path / "outputs"
+            device=device,
+            output_directory=output_directory
         )
 
     assert DummyGradCAM.last_instance is not None

@@ -34,7 +34,7 @@ def main()-> None:
     checkpoint = torch.load(
         MODEL_PATH,
         map_location=device,
-        weights_only=False
+        weights_only=True
     )
 
     model.load_state_dict(
