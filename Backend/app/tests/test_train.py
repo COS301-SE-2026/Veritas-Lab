@@ -8,12 +8,12 @@ from app.training.train import parse_arguments, main
 def test_parse_arguments_returns_default_data_dir() -> None:
     with patch("sys.argv", ["train.py"]):
         args = parse_arguments()
-    assert args.data_dir == "data"
+    assert args.data_dir == "../dataset"
 
 def test_parse_arguments_returns_default_model_path() -> None:
     with patch("sys.argv", ["train.py"]):
         args = parse_arguments()
-    assert args.model_path == "models/best_model.pth"
+    assert args.model_path == "app/ai/best_model.pth"
 
 def test_parse_arguments_returns_default_epochs() -> None:
     with patch("sys.argv", ["train.py"]):
