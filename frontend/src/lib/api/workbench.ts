@@ -3,8 +3,8 @@ import type { SaveAnnotationsPayload } from '@/types/workbench';
 
 export async function saveAnnotations({ evidenceId, annotations }: SaveAnnotationsPayload): Promise<void> {
     try {
-        const reportId = evidenceId; // Assuming reportId is the same as evidenceId for this example
-        const res = await fetch(`/saveAnnotations`, {
+        const reportId = evidenceId;
+        const res = await fetch(`/api/saveAnnotations`, {
             method: 'POST',
             credentials: 'include',
             headers: {

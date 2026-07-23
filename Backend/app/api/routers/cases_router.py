@@ -996,12 +996,12 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
     #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
     query = """
         UPDATE "Cases_DB"."Media" m
-        SET "MediaAnnotations" = $1::jsonb
+        SET MediaAnnotations = $1::jsonb
         FROM "Cases_DB"."Reports" r 
-        INNER JOIN "Cases_DB"."Cases" c ON r."CaseId" = c."CaseId"
-        WHERE m."MediaId" = r."MediaId"
-          AND c."CaseCreator" = $3 
-          AND r."ReportId" = $2;
+        INNER JOIN "Cases_DB"."Cases" c ON r.CaseId = c.CaseId
+        WHERE m.MediaId = r.MediaId
+          AND c.CaseCreator = $3 
+          AND r.ReportId = $2;
     """
     con = None
     try:
