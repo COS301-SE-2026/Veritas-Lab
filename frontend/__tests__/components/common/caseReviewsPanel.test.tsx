@@ -34,3 +34,46 @@ jest.mock('@/components/common/caseReviewMessage', () => ({
         </div>
     ),
 }));
+//test the panel info renders correctl
+describe('CaseReviewsPanel', () => {
+    const initialComments: CaseComment[] = [
+        {
+            commentId: 10,
+            caseId: 'case-1',
+            username: 'jane.doe',
+            comment: 'First review comment',
+            timestamp: '2026-05-01T09:00:00.000Z',
+        },
+    ];
+
+    beforeEach(() => {
+        mockUseCaseReviews.mockReturnValue({
+            comments: initialComments,
+            draft: 'Draft text',
+            setDraft: jest.fn(),
+            error: 'Failed to add comment',
+            isSubmitting: false,
+            submitComment: jest.fn(),
+        });
+    });
+
+    it('renders the review count, comments, error and composer', () => {
+        render(<CaseReviewsPanel caseId="case-1" initialComments={initialComments} currentUsername="jane.doe"/>);
+        expect(screen.getByText('Reviews')).toBeInTheDocument();
+        expect(screen.getByText('1 comment')).toBeInTheDocument();
+        expect(screen.getByText('First review comment')).toBeInTheDocument();
+        expect(screen.getByText('Failed to add comment')).toBeInTheDocument();
+        expect(screen.getByTestId('composer')).toBeInTheDocument();
+    });
+    //test the creation of the ismine bool
+    it('marks current user comments as mine', () => {
+        render(
+            <CaseReviewsPanel
+                caseId="case-1"
+                initialComments={initialComments}
+                currentUsername="jane.doe"
+            />
+        );
+        expect(screen.getByText('true')).toBeInTheDocument();
+    });
+});
