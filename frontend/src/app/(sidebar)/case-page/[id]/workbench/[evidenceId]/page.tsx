@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
 import useAnnotations from '@/lib/hooks/useAnnotations';
-import { fetchAnnotations, saveAnnotations } from '@/lib/api/workbench';
+import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { getMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
@@ -43,22 +43,9 @@ export default function WorkbenchPage() {
                 if (cancelled) return;
                 const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
                 setEvidence(match);
+                loadAnnotations(match?.annotations ?? []);
             })
             .catch((error) => console.error('Failed to load evidence media:', error));
-
-        return () => {
-            cancelled = true;
-        };
-    }, [caseId, evidenceId]);
-
-     useEffect(() => {
-        let cancelled = false;
-
-        fetchAnnotations({ caseId, evidenceId })
-            .then((loaded) => {
-                if (!cancelled) loadAnnotations(loaded);
-            })
-            .catch((error) => console.error('Failed to load annotations:', error));
 
         return () => {
             cancelled = true;
@@ -70,7 +57,7 @@ export default function WorkbenchPage() {
     const mediaKind = getMediaKind(evidence?.mediaExtension);
     const annotationsActive = activeWorkbenchTool === 'Annotations';
 
-    const handleSave = () => saveAnnotations({ caseId, evidenceId, annotations });
+    const handleSave = () => saveAnnotations({ evidenceId, annotations });
 
     return (
         <div className="mt-8 ml-16 mr-16">

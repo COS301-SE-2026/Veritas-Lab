@@ -36,6 +36,7 @@ export type CaseEvidence = {
     mediaExtension: string;
     mediaTypeId: string;
     mediaUrl: string;
+    annotations: [] | null;
     reportArtifacts: Record<string, unknown> | null;
     reportFindings: string | null;
     reportComments: string | null;
