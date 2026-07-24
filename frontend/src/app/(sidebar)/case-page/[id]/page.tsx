@@ -7,15 +7,20 @@ import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
 import useCase from "@/lib/hooks/useCase";
-import { useUserRole } from '@/context/UserRoleContext';
+import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
+import CaseReviewsPanel from '@/components/common/caseReviewsPanel';
+
+const TABS = ['Evidence', 'Reviews'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const userRole = useUserRole();
+    const currentUser = useCurrentUser();
     const params = useParams<{ id: string }>();
     const id = params.id;
+    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
 
     useEffect(() => {
         let isActive = true;
@@ -51,6 +56,7 @@ export default function CasePage() {
 
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
+    const caseComments = caseData?.comments ?? [];
     const canUploadEvidence = userRole === 'INVESTIGATOR';
 
     function formatCaseDate(dateValue?: string | null) {
@@ -80,23 +86,40 @@ export default function CasePage() {
                     ) : null}
                 </div>
                 <div className="mt-8">
-                    <SliderBar filters={['Evidence', 'Analysis', 'Provenance', 'Activity']}  className='w-full'/>
+                    <SliderBar //changed sliderbar to fetch TABS and actively change page layout
+                        filters={TABS}
+                        defaultFilter={activeTab}
+                        onChange={(tab) => setActiveTab(tab)}
+                        className='w-full'
+                    />
                 </div>
                 <div className="flex flex-cols-2 mt-8">
                     <div className="w-4/5">
-                        <div className="flex gap-2 flex-wrap">
-                            {evidenceList.length > 0 ? evidenceList.map((evidence) => (
-                                <EvidenceCard
-                                    key={evidence.reportId}
-                                    mediaName={evidence.mediaName}
-                                    mediaUrl={evidence.mediaUrl}
-                                    mediaExtension={evidence.mediaExtension}
-                                    href={`/case-page/${id}/workbench/${evidence.reportId}`}
-                                />
-                            )) : (
-                                <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
-                            )}
-                        </div>
+                        {activeTab === 'Evidence' ? (
+                            <div className="flex gap-2 flex-wrap">
+                                {evidenceList.length > 0 ? evidenceList.map((evidence) => (
+                                    <EvidenceCard
+                                        key={evidence.reportId}
+                                        mediaName={evidence.mediaName}
+                                        mediaUrl={evidence.mediaUrl}
+                                        mediaExtension={evidence.mediaExtension}
+                                        href={`/case-page/${id}/workbench/${evidence.reportId}`}
+                                    />
+                                )) : (
+                                    <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
+                                )}
+                            </div>
+                        ) : activeTab === 'Reviews' ? (
+                            <CaseReviewsPanel
+                                caseId={id}
+                                initialComments={caseComments}
+                                currentUsername={currentUser?.username ?? ''}
+                            />
+                        ) : (
+                            <div className="rounded-[28px] border border-dashed border-[var(--color-light)]/30 bg-white p-10 text-center text-sm text-[var(--color-light)]">
+                                {activeTab} is not available yet.
+                            </div>
+                        )}
                     </div>
                     <div className="w-1/5">
                         <div className="shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-[21px] p-4">

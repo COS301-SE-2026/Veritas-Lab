@@ -1,0 +1,114 @@
+import { act, renderHook, waitFor } from '@testing-library/react';
+import useCaseReviews from '@/lib/hooks/useCaseReviews';
+import { addComment } from '@/lib/api/case';
+import type { CaseComment } from '@/types/api';
+jest.mock('@/lib/api/case', () => ({
+    addComment: jest.fn(),
+}));
+//hook tests (these will need to be reviewed when i add the edit and delete functionality to frontend)
+describe('useCaseReviews', () => {
+    const initialComments: CaseComment[] = [
+        {
+            commentId: 1,
+            caseId: 'case-1',
+            username: 'alpha.user',
+            comment: 'Existing comment',
+            timestamp: '2026-05-01T09:00:00.000Z',
+        },
+    ];
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('renders existing comments and draft state', () => {
+        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        expect(result.current.comments).toEqual(initialComments);
+        expect(result.current.draft).toBe('');
+        expect(result.current.error).toBeNull();
+        expect(result.current.isSubmitting).toBe(false);
+    });
+    //ensure that ws before and after the text is removed/trimmed
+    it('adds a trimmed comment and clears the draft on success', async () => {
+        const mockedAddComment = addComment as jest.MockedFunction<typeof addComment>;
+        mockedAddComment.mockResolvedValue({
+            commentId: 2,
+            caseId: 'case-1',
+            username: 'alpha.user',
+            comment: 'New review note',
+            timestamp: '2026-05-02T10:30:00.000Z',
+        });
+        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        act(() => {
+            result.current.setDraft('  New review note  ');
+        });
+        await act(async () => {
+            await result.current.submitComment();
+        });
+        expect(mockedAddComment).toHaveBeenCalledWith('case-1', 'New review note');
+        await waitFor(() => {
+            expect(result.current.comments).toHaveLength(2);
+        });
+
+        expect(result.current.draft).toBe('');
+        expect(result.current.error).toBeNull();
+    });
+
+    it('ignore blank drafts and block duplicates', async () => {
+        const mockedAddComment = addComment as jest.MockedFunction<typeof addComment>;
+        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        await act(async () => {
+            await result.current.submitComment();
+        });
+        expect(mockedAddComment).not.toHaveBeenCalled();
+        let resolveComment!: (value: Awaited<ReturnType<typeof addComment>>) => void;
+        const pendingComment = new Promise<Awaited<ReturnType<typeof addComment>>>((resolve) => {
+            resolveComment = resolve;
+        });
+        mockedAddComment.mockResolvedValue({
+            commentId: 2,
+            caseId: 'case-1',
+            username: 'alpha.user',
+            comment: 'New review note',
+            timestamp: '2026-05-02T10:30:00.000Z',
+        });
+        act(() => {
+            result.current.setDraft('New review note');
+        });
+
+        mockedAddComment.mockReturnValueOnce(pendingComment as Promise<Awaited<ReturnType<typeof addComment>>>);
+        const firstSubmit = result.current.submitComment();
+        await waitFor(() => {
+            expect(result.current.isSubmitting).toBe(true);
+        });
+        await act(async () => {
+            await result.current.submitComment();
+        });
+        resolveComment({
+            commentId: 2,
+            caseId: 'case-1',
+            username: 'alpha.user',
+            comment: 'New review note',
+            timestamp: '2026-05-02T10:30:00.000Z',
+        });
+        await act(async () => {
+            await firstSubmit;
+        });
+
+        expect(mockedAddComment).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores an error when adding a comment fails', async () => {
+        const mockedAddComment = addComment as jest.MockedFunction<typeof addComment>;
+        mockedAddComment.mockRejectedValue(new Error('Unable to save comment'));
+        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        act(() => {
+            result.current.setDraft('Needs review');
+        });
+        await act(async () => {
+            await result.current.submitComment();
+        });
+
+        expect(result.current.error).toBe('Unable to save comment');
+        expect(result.current.isSubmitting).toBe(false);
+    });
+});

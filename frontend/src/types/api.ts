@@ -43,6 +43,14 @@ export type CaseEvidence = {
     reportDateCreation: string | null;
 };
 
+export type CaseComment = {
+    commentId: number;
+    caseId: string;
+    username: string;
+    comment: string;
+    timestamp: string | null;
+};
+
 export type CaseResponse = {
     status: string;
     case: {
@@ -54,5 +62,6 @@ export type CaseResponse = {
         caseClosed: boolean;
         caseCreationDate: string | null;
     };
+    comments: CaseComment[];
     evidence: CaseEvidence[];
 };

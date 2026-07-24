@@ -39,4 +39,17 @@ describe('AdminUserCard', () => {
         expect(screen.getByRole('combobox')).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
     });
+
+    it('hides controls for the signed-in admin', () => {
+        render(
+            <AdminUserCard
+                user={sampleUser}
+                currentUserId={sampleUser.id}
+                onRoleChange={jest.fn()}
+                onDelete={jest.fn()}
+            />
+        );
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    });
 });

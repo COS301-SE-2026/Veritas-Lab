@@ -6,6 +6,7 @@ import type { AdminUser } from '@/types/api';
 type AdminUserCardProps = {
     user: AdminUser;
     isBusy?: boolean;
+    currentUserId?: string;
     onRoleChange: (userId: string, role: AdminUser['role']) => void;
     onDelete: (user: AdminUser) => void;
 };
@@ -21,7 +22,8 @@ const getDisplayName = (user: AdminUser) => {
     return user.displayName ?? user.fullName ?? (fallbackName || user.username);
 };
 
-export default function AdminUserCard({ user, isBusy = false, onRoleChange, onDelete }: AdminUserCardProps) {
+export default function AdminUserCard({ user, isBusy = false, currentUserId, onRoleChange, onDelete }: AdminUserCardProps) {
+    const isCurrentUser = currentUserId === user.id;
     const displayName = getDisplayName(user);
 
     return(
@@ -30,18 +32,26 @@ export default function AdminUserCard({ user, isBusy = false, onRoleChange, onDe
             <div className='text-sm text-[var(--color-text)]'>{displayName}</div>
             <div className='text-sm text-[var(--color-text)]'>{user.username}</div>
             <div>
-                <Dropdown
-                    options={roleOptions}
-                    defaultValue={user.role}
-                    disabled={isBusy}
-                    onChange={(event) => onRoleChange(user.id, event.target.value as AdminUser['role'])}
-                    className='w-full rounded-full border border-[var(--color-light)]/40 px-4 py-2 text-sm text-[var(--color-text)]'
-                />
+                {isCurrentUser ? (
+                    <div aria-hidden='true' className='min-h-10' />
+                ) : (
+                    <Dropdown
+                        options={roleOptions}
+                        defaultValue={user.role}
+                        disabled={isBusy}
+                        onChange={(event) => onRoleChange(user.id, event.target.value as AdminUser['role'])}
+                        className='w-full rounded-full border border-[var(--color-light)]/40 px-4 py-2 text-sm text-[var(--color-text)]'
+                    />
+                )}
             </div>
             <div className='flex justify-start md:justify-end'>
-                <Button variant='sadSack' onClick={() => onDelete(user)} disabled={isBusy}>
-                    <div className='text-sm font-semibold text-[var(--color-error)]'>Delete</div>
-                </Button>
+                {isCurrentUser ? (
+                    <div aria-hidden='true' className='min-h-10' />
+                ) : (
+                    <Button variant='sadSack' onClick={() => onDelete(user)} disabled={isBusy}>
+                        <div className='text-sm font-semibold text-[var(--color-error)]'>Delete</div>
+                    </Button>
+                )}
             </div>
         </div>
     );
