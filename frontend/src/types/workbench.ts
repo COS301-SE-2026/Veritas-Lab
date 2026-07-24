@@ -20,6 +20,7 @@ export type AnnotationTool = 'Select' | 'Draw' | 'Comment';
 export type ShapeAnnotation = {
     id: string;
     kind: 'shape';
+    page: number;
     points: AnnotationPoint[];
 };
 
@@ -27,29 +28,24 @@ export type ShapeAnnotation = {
 export type NoteAnnotation = {
     id: string;
     kind: 'note';
+    page: number;
     position: AnnotationPoint;
     text: string;
 };
 
 export type Annotation = ShapeAnnotation | NoteAnnotation;
 
-export type WorkbenchToolbarProps = {
-    activeTool: AnnotationTool;
-    onToolChange: (tool: AnnotationTool) => void;
-    onClearAll: () => void;
-    hasAnnotations: boolean;
-};
-
 export type WorkbenchCanvasProps = {
-    /** Optional, no backend link yet, falls back to a placeholder when absent. */
     mediaUrl?: string;
+    mediaKind?: MediaKind;
     mediaName: string;
+    active?: boolean;
     activeTool: AnnotationTool;
     annotations: Annotation[];
     selectedId: string | null;
     onSelectAnnotation: (id: string | null) => void;
-    onAddShape: (points: AnnotationPoint[]) => void;
-    onAddNote: (position: AnnotationPoint, text: string) => void;
+    onAddShape: (points: AnnotationPoint[], page: number) => void;
+    onAddNote: (position: AnnotationPoint, text: string, page: number) => void;
 };
 
 export type AnnotationNoteProps = {
@@ -68,3 +64,32 @@ export type AnnotationListProps = {
     onSelect: (id: string) => void;
     onRemove: (id: string) => void;
 };
+
+// Workbench tools currently there is only annotations.
+export type WorkbenchTool = 'Annotations';
+
+export type WorkbenchPanelProps = {
+    activeWorkbenchTool: WorkbenchTool | null;
+    onSelectWorkbenchTool: (tool: WorkbenchTool | null) => void;
+    activeTool: AnnotationTool;
+    onToolChange: (tool: AnnotationTool) => void;
+    annotations: Annotation[];
+    selectedId: string | null;
+    onSelectAnnotation: (id: string) => void;
+    onRemoveAnnotation: (id: string) => void;
+    onClearAll: () => void;
+    onSave: () => Promise<void>;
+};
+
+export type SaveAnnotationsPayload = {
+    evidenceId: string;
+    annotations: Annotation[];
+};
+
+export type LoadAnnotationsParams = {
+    caseId: string;
+    evidenceId: string;
+};
+
+// How a piece of evidence should be previewed on the canvas
+export type MediaKind = 'image' | 'pdf' | 'unsupported';

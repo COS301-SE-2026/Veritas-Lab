@@ -73,11 +73,11 @@ class SaveAnnotationsPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 class SuccessResponse(BaseModel):
-    status: str = Field(..., examples="success")
+    status: str = Field(..., examples=["success"])
 
 class ErrorResponse(BaseModel):
-    status: str = Field(..., examples="error")
-    message: str = Field(..., examples="Invalid token or database failure")
+    status: str = Field(..., examples=["error"])
+    message: str = Field(..., examples=["Invalid token or database failure"])
 
 #A mask until the veriftJWT gets fixed to raise HTTPException so the try-excepts can be removed so FastApi can handle it 
 def verify_jwt(request:Request):
@@ -151,8 +151,8 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         "mediaExtension": media_extension,
         "mediaTypeId": str(row["mediatypeid"]),
         "mediaUrl": file_url,
-        "annotations": row["annotations"],
-        "reportArtifacts": row["reportartifacts"],
+        "annotations": json.loads(row["annotations"]) if isinstance(row["annotations"], str) else (row["annotations"] or []),
+        "reportArtifacts": json.loads(row["reportartifacts"]) if isinstance(row["reportartifacts"], str) else row["reportartifacts"],
         "reportFindings": row["reportfindings"],
         "reportComments": row["reportcomments"],
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
@@ -992,21 +992,21 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             }
         )
 
-async def _save_annotations(report_id:UUID,annotations:str):
+async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
     #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
     query = """
         UPDATE "Cases_DB"."Media" m
-        SET "MediaAnnotations" = $1::jsonb
+        SET MediaAnnotations = $1::jsonb
         FROM "Cases_DB"."Reports" r 
-        INNER JOIN "Cases_DB"."Cases" c ON r."CaseId" = c."CaseId"
-        WHERE m."MediaId" = r."MediaId"
-          AND c."CaseCreator" = 'InvestAdmin' 
-          AND r."ReportId" = $2;
+        INNER JOIN "Cases_DB"."Cases" c ON r.CaseId = c.CaseId
+        WHERE m.MediaId = r.MediaId
+          AND c.CaseCreator = $3 
+          AND r.ReportId = $2;
     """
     con = None
     try:
         con=await getConnection()
-        await con.execute(query, annotations, report_id)
+        await con.execute(query, annotations, report_id, user_name)
     except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
@@ -1087,11 +1087,12 @@ async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
     user_role=cookie.get("role")
     # Checking authorization
     verify_not_user(user_role)
+    user_name=cookie.get("username")
 
     try:
         report_id=transform_to_uuid(payload.report_id)
         annotations_json_str = json.dumps(payload.annotations)
-        await _save_annotations(report_id,annotations_json_str)
+        await _save_annotations(report_id,annotations_json_str,user_name)
 
         return JSONResponse(
             status_code=200,

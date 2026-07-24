@@ -1,6 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import EvidenceCard from '@/components/common/evidenceCard';
 
+jest.mock('next/dynamic', () => ({
+    __esModule: true,
+    default: () => {
+        const PdfThumbnailStub = ({ url }: { url?: string }) => (
+            <div data-testid="pdf-thumbnail" data-url={url} />
+        );
+        return PdfThumbnailStub;
+    },
+}));
+
 describe('EvidenceCard', () => {
     it('renders file details', () => {
         render(
