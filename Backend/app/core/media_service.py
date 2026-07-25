@@ -181,6 +181,8 @@ class MediaService(ABC):
                     file_path=str(file_path),
                     media_record=media_record
                 )
+
+                ai_analysis = await self.AIAnalysis(file_path)
                 
             #This is to remove information about the system that does not 
             #affect the analysis
@@ -194,15 +196,29 @@ class MediaService(ABC):
             await self.saveMetadata(media_id, metadata)
             
             report_findings = await self.analyseMetadata(metadata)
-            print(json.dumps(report_findings, indent=4))
+
+            final_risk_level = max(
+                int(ai_analysis["risk_level"]),
+                report_findings.Certainty
+            )
+
+            combined_findings = {
+                **ai_analysis,
+                "risk_level": final_risk_level,
+                "findings": report_findings.Findings
+            }
+            print(json.dumps(combined_findings, indent=4))
 
             # use this when you want to upload to the database
 
-
-        return metadata
+        return combined_findings
     
     @abstractmethod
     async def analyseMetadata(self,metadata: dict)-> AnalysisFindings:
+        pass
+
+    @abstractmethod
+    async def AIAnalysis(self, path : str|Path) ->dict:
         pass
 
             

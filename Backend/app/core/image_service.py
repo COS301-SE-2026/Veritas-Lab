@@ -1,10 +1,15 @@
-import exiftool
+from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
+from app.ai.detector import AIImageDetector
+from starlette.concurrency import run_in_threadpool
 
-FRAUD_MESSAGE=" Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
+FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
 class ImageService(MediaService):
 
+    def __init__(self) -> None:
+        self.detector = AIImageDetector()
+    
     def _is_stripped(self, metadata: dict) -> bool:
         return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
 
@@ -110,3 +115,8 @@ class ImageService(MediaService):
 
         analysis_findings.Findings = "\n".join(report_lines)
         return analysis_findings
+
+    async def AIAnalysis(self, path: str| Path) ->dict:
+        return await run_in_threadpool(
+            self.detector.analyse_image(path)
+        )
