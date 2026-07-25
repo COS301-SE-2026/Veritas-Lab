@@ -1,12 +1,18 @@
 import pytest 
 from app.core.image_service import ImageService
+from unittest.mock import MagicMock, patch
+from pathlib import Path
 
+with patch(
+    "app.core.image_service.AIImageDetector"
+) as mock_detector_class:
+    mock_detector_class.return_value = MagicMock()
+    CONSTANT_IMAGE_SERVICE =ImageService()
 
-CONSTANT_IMAGE_SERVICE=ImageService()
 NO_CAMERA_MESSAGE="This image contains no camera metadata. It has likely been stripped by an external application or messaging platform or it is a screenshot."
 CREDENTIALS_FOUND_MESSAGE="[+] Content Credentials (C2PA) Found:"
 TRACES_FOUND_MESSAGE="[+] Traces of editing software found:"
-HIGH_FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/creaated by software"
+HIGH_FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 # The metadata within this tests are real for the analyseMetadata tests
 @pytest.mark.asyncio
 async def test_analysemetadata_detects_ms_paint():
@@ -711,3 +717,75 @@ async def test_analyse_metadata_find_nothing_with_a_perfect_rule_obeying_phone_p
     result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
     assert result.Certainty == 0
     assert not result.Findings
+
+def test_service_initialises_ai_detector() -> None:
+    mock_detector = MagicMock()
+
+    with patch(
+        "app.core.image_service.AIImageDetector",
+        return_value=mock_detector
+    ) as mock_detector_class:
+        service = ImageService()
+
+    mock_detector_class.assert_called_once_with()
+    assert service.detector is mock_detector
+
+@pytest.mark.asyncio
+async def test_ai_analysis_calls_detector() -> None:
+    mock_detector = MagicMock()
+
+    expected_result = {
+        "risk_level": 3,
+        "ai_probability": 91.5,
+        "classification": "Likely AI-generated or modified",
+        "reasons": []
+    }
+
+    mock_detector.analyse_image.return_value = expected_result
+
+    with patch(
+        "app.core.image_service.AIImageDetector",
+        return_value=mock_detector
+    ):
+        service = ImageService()
+
+    image_path = Path("test_image.jpg")
+
+    result = await service.AIAnalysis(
+        image_path
+    )
+
+    mock_detector.analyse_image.assert_called_once_with(
+        image_path
+    )
+    assert result == expected_result
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("risk_level", "expected"),
+    [
+        (1, 1),
+        (2,2),
+        (3,3)
+    ]
+)
+async def test_ai_analysis_returns_risk_level(risk_level: int, expected: int) -> None:
+    mock_detector = MagicMock()
+
+    mock_detector.analyse_image.return_value = {
+        "risk_level": risk_level,
+        "ai_probability": 50,
+        "classification": "Test",
+        "reasons": []
+    }
+
+    with patch(
+        "app.core.image_service.AIImageDetector",
+        return_value=mock_detector
+    ):
+        service = ImageService()
+
+    result = await service.AIAnalysis(Path("test_image.jpg"))
+
+    assert result["risk_level"] == expected
+
