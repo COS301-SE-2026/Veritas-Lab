@@ -5,10 +5,16 @@ import os
 from pydantic import BaseModel # For JSON
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
+from app.core.env import ENVLoader
+
+IS_PROD = os.environ.get("ENVIRONMENT", "development").strip().lower() == "production"
 
 app = FastAPI(
     title="Veritas Lab API",
-    description="This is the backend REST API for Veritas Lab"
+    description="This is the backend REST API for Veritas Lab",
+    docs_url=None if IS_PROD else "/docs",
+    redoc_url=None if IS_PROD else "/redoc",
+    openapi_url=None if IS_PROD else "/openapi.json",
 )
 
 
