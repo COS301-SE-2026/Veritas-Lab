@@ -1,12 +1,12 @@
 from __future__ import annotations
 from pathlib import Path
 import torch
-from app.training.model import AIImageDetector
+from app.training.model import AIImageDetector as TrainedAIImageDetector
 from app.training.prediction import predict_and_explain
 
 MODEL_PATH = Path("app/ai/best_model.pth")
 
-class AIDetector:
+class AIImageDetector:
     def __init__(self) -> None:
         self.device = torch.device(
             "cuda"
@@ -14,7 +14,7 @@ class AIDetector:
             else "cpu"
         )
 
-        self.model = AIImageDetector(
+        self.model = TrainedAIImageDetector(
             freeze_features=False,
             use_pretrained_weights=False
         )
@@ -33,8 +33,18 @@ class AIDetector:
         self.model.eval()
 
     def analyse_image(self, image_path: str | Path) -> dict:
-        return predict_and_explain(
+
+        result = predict_and_explain(
             model=self.model,
             image_path=image_path,
             device=self.device
         )
+
+        risk_mapping = {
+            "LOW": 1,
+            "MEDIUM": 2,
+            "HIGH": 3
+        }
+
+        result["risk_level"] = risk_mapping[result["risk_level"]]
+        return result
