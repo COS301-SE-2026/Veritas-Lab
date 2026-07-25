@@ -40,9 +40,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 #copy app code
 COPY . .
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
-#uvicorn runs the fastapi app
-#0.0.0.0 means it can be accessed outside the container
-CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# run bootstrap first, then start uvicorn
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -110,7 +110,7 @@ def validatePassword(password: str) -> bool:
 
 # utf-8 encode the input string because bcrypt uses this, generate a salt, use the encoded string and salt to make the hash
 # the hash is also utf-8 encoded so it needs to be decoded before it is returned
-def hashPassword(input: str) -> str:
+def hash_password(input: str) -> str:
     converted_string = input.encode("utf-8")
     salt =bcrypt.gensalt()
     hashed = bcrypt.hashpw(converted_string, salt)
@@ -234,7 +234,7 @@ async def deleteUserById(user_id: str) -> bool:
     finally:
         await connection.close()
 
-async def insertUser(email : str, username : str, role : str, hashed_password : str):
+async def insert_user(email : str, username : str, role : str, hashed_password : str):
     connection = await getConnection()
 
     try:
@@ -381,8 +381,8 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
 
-    hashed_password = hashPassword(request.password)
-    new_user = await insertUser(request.email.strip(), request.username.strip(), "USER", hashed_password)
+    hashed_password = hash_password(request.password)
+    new_user = await insert_user(request.email.strip(), request.username.strip(), "USER", hashed_password)
 
     token = createToken(new_user)
 
