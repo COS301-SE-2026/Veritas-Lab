@@ -118,5 +118,6 @@ class ImageService(MediaService):
 
     async def AIAnalysis(self, path: str| Path) ->dict:
         return await run_in_threadpool(
-            self.detector.analyse_image(path)
+            self.detector.analyse_image,
+            path
         )
