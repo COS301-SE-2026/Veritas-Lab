@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from app.api.main import app
 import app.auth.auth as auth
-from app.auth.auth import hashPassword
+from app.auth.auth import hash_password
 
 client = TestClient(app)
 
@@ -11,13 +11,13 @@ def test_successful_login(monkeypatch):
     client.cookies.clear()
     
     async def mock_searchUsersViaEmail(email):
-        hashedPassword= hashPassword("StrongP@ssword12334567")
+        hashed_password= hash_password("StrongP@ssword12334567")
         return {
             "id": "mock-user-id",
             "email": "u12345678@tuks.co.za",
             "username": "Test User",
             "role": "USER",
-            "password": hashedPassword
+            "password": hashed_password
         }
     
     def mock_createToken(user):
@@ -51,13 +51,13 @@ def test_successful_login(monkeypatch):
 def test_login_incorrect_password(monkeypatch):
     client.cookies.clear()
     async def mock_searchUsersViaEmail(email):
-        hashedPassword = hashPassword("CorrectP@ssword1234567")
+        hashed_password= hash_password("CorrectP@ssword1234567")
         return {
             "id": "mock-user-id",
             "email": "u12345678@tuks.co.za",
             "username": "Test User",
             "role": "USER",
-            "password": hashedPassword
+            "password": hashed_password
         }
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)

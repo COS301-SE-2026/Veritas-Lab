@@ -44,6 +44,15 @@ services:
             - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
             - MINIO_EXTERNAL_URL=${MINIO_EXTERNAL_URL}
             - AWS_REGION=${AWS_REGION}        
+            - ADMIN_NAME=${ADMIN_NAME}
+            - ADMIN_EMAIL=${ADMIN_EMAIL}
+            - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+            - E2E_INVESTIGATOR_NAME=${E2E_INVESTIGATOR_NAME}
+            - E2E_INVESTIGATOR_EMAIL=${E2E_INVESTIGATOR_EMAIL}
+            - E2E_INVESTIGATOR_PASSWORD=${E2E_INVESTIGATOR_PASSWORD}
+            - E2E_USER_NAME=${E2E_USER_NAME}
+            - E2E_USER_EMAIL=${E2E_USER_EMAIL}
+            - E2E_USER_PASSWORD=${E2E_USER_PASSWORD}
         depends_on:
             - postgres
             - redis

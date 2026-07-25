@@ -1,27 +1,27 @@
-from app.auth.auth import hashPassword,verifyPassword
+from app.auth.auth import hash_password,verifyPassword
 
-def testHashPasswordReturnsString():
-    hashedPassword =hashPassword("StrongP@ssword1234567")
-    assert isinstance(hashedPassword, str)
+def test_hash_password_returns_string():
+    hashed_password =hash_password("StrongP@ssword1234567")
+    assert isinstance(hashed_password, str)
 
-def testHashPasswordDoesNotReturnPlainPassword():
+def test_hash_password_does_not_return_plain_password():
     password = "StrongP@ssword1234567"
-    hashedPassword = hashPassword(password)
-    assert hashedPassword!= password
+    hashed_password = hash_password(password)
+    assert hashed_password!= password
 
-def testHashPasswordProducesDifferentHashes():
+def test_hash_password_produces_different_hashes():
     password = "StrongP@ssword1234567"
-    hashedPassword1= hashPassword(password)
-    hashedPassword2 = hashPassword(password)
-    assert hashedPassword1 != hashedPassword2
+    hashed_password1= hash_password(password)
+    hashed_password2 = hash_password(password)
+    assert hashed_password1 != hashed_password2
 
-def testVerifyPasswordReturnsTrueForCorrectPassword():
+def test_verify_password_returns_true_for_correct_password():
     password= "StrongP@ssword1234567"
-    hashedPassword = hashPassword(password)
-    assert verifyPassword(password, hashedPassword) == True
+    hashed_password = hash_password(password)
+    assert verifyPassword(password, hashed_password) == True
 
-def testVerifyPasswordReturnsFalseForIncorrectPassword():
+def test_verify_password_returns_false_for_incorrect_pssword():
     password = "StrongP@ssword1234567"
-    wrongPassword ="WrongP@ssword1234567890"
-    hashedPassword = hashPassword(password)
-    assert verifyPassword(wrongPassword, hashedPassword) == False
+    wrong_password ="WrongP@ssword1234567890"
+    hashed_password = hash_password(password)
+    assert verifyPassword(wrong_password, hashed_password) == False

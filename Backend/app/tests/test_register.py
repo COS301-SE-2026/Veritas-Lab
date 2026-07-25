@@ -9,10 +9,10 @@ def test_successful_registration(monkeypatch):
     async def mock_searchUsersViaEmail(email):
         return None
 
-    async def mock_searchUsersViaUsername(username):
+    async def mock_search_users_via_username(username):
         return None
 
-    async def mock_insertUser(email, username, role, hashedPassword):
+    async def mock_insert_user(email, username, role, hashedPassword):
         return {
             "id": "mock-user-id",
             "email": email,
@@ -27,8 +27,8 @@ def test_successful_registration(monkeypatch):
         return None
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
-    monkeypatch.setattr(auth, "insertUser", mock_insertUser)
+    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_search_users_via_username)
+    monkeypatch.setattr(auth, "insert_user", mock_insert_user)
     monkeypatch.setattr(auth, "createToken", mock_create_token)
     monkeypatch.setattr(auth, "updateUserJWTIssued", mock_update_user_JWT_issued)
 
@@ -132,11 +132,11 @@ def test_duplicate_email_returns_409(monkeypatch):
             "role": "USER"
         }
 
-    async def mock_searchUsersViaUsername(username):
+    async def mock_search_users_via_username(username):
         return None
 
     monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
+    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_search_users_via_username)
 
     response = client.post(
         "/api/register",
