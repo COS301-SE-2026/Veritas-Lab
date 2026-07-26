@@ -789,3 +789,84 @@ async def test_ai_analysis_returns_risk_level(risk_level: int, expected: int) ->
 
     assert result["risk_level"] == expected
 
+def test_create_findings_string_returns_no_findings_for_none():
+    service = ImageService()
+
+    result = service.createFindingsString(None)
+
+    assert result == "No findings"
+
+def test_create_findings_string_returns_no_findings_for_empty_dict():
+    service = ImageService()
+
+    result = service.createFindingsString({})
+    assert result == "No findings"
+
+def test_create_findings_string_with_no_metadata_findings():
+    service = ImageService()
+
+    input_data = {
+        "findings": "",
+        "ai_probability": 80,
+        "confidence_percentage": 90,
+        "classification": "Likely AI-generated or modified",
+        "reasons": []
+    }
+
+    result = service.createFindingsString(input_data)
+
+    assert "Metadata:" in result
+    assert "No metadata findings." in result
+    assert "Binary Classifier:" in result
+    assert ("The binary classifier found an AI probability of 80% with a confidence of 90%.") in result
+
+def test_create_findings_string_with_metadata_findings():
+    service = ImageService()
+
+    input_data = {
+        "findings": "Editing software detected.",
+        "ai_probability": 75,
+        "confidence_percentage": 85,
+        "classification": "Likely AI-generated or modified",
+        "reasons": []
+    }
+
+    result = service.createFindingsString(input_data)
+
+    assert "Metadata:" in result
+    assert "Editing software detected." in result
+    assert "Binary Classifier:" in result
+
+def test_create_findings_string_when_ai_analysis_unavailable():
+    service = ImageService()
+
+    input_data = {
+        "findings": "Metadata findings",
+        "ai_probability": None,
+        "confidence_percentage": None,
+        "classification": None,
+        "reasons": []
+    }
+
+    result = service.createFindingsString(input_data)
+
+    assert "Metadata findings" in result
+    assert "Binary classifier analysis unavailable." in result
+    assert "Classification:" not in result
+    assert "Reasons:" not in result
+
+def test_create_findings_string_includes_classification():
+    service = ImageService()
+
+    input_data = {
+        "findings": "",
+        "ai_probability": 65,
+        "confidence_percentage": 70,
+        "classification": "Inconclusive",
+        "reasons": []
+    }
+
+    result = service.createFindingsString(input_data)
+
+    assert "Classification: Inconclusive" in result
+
