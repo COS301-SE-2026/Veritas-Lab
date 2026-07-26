@@ -211,3 +211,84 @@ def mock_env(monkeypatch, values):
     )
 
 
+def test_create_minio_client_https(monkeypatch):
+    mock_env(monkeypatch, {
+        "STORAGE_URL": "https://minio.example.com",
+        "MINIO_ROOT_USER": "root",
+        "MINIO_ROOT_PASSWORD": "password"
+    })
+
+    fake_minio_class = MagicMock()
+    monkeypatch.setattr("app.core.media_service.Minio", fake_minio_class)
+
+    service = ImageService()
+    service.createMinioClient()
+
+    fake_minio_class.assert_called_once_with(
+        "minio.example.com",
+        access_key="root",
+        secret_key="password",
+        secure=True
+    )
+
+
+def test_create_minio_client_no_netloc(monkeypatch):
+    mock_env(monkeypatch, {
+        "STORAGE_URL": "localhost:9000",
+        "MINIO_ROOT_USER": "root",
+        "MINIO_ROOT_PASSWORD": "password"
+    })
+
+    fake_minio_class = MagicMock()
+    monkeypatch.setattr("app.core.media_service.Minio", fake_minio_class)
+
+    service = ImageService()
+    service.createMinioClient()
+
+    fake_minio_class.assert_called_once_with(
+        "9000",
+        access_key="root",
+        secret_key="password",
+        secure=False
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_existing_metadata_found(monkeypatch):
+    row = {"reportartifacts": {"File:FileType": "JPEG"}}
+    connection = mock_connection(monkeypatch, fetchrow_result=row)
+
+    service = ImageService()
+    result = await service.getExistingMetadata("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result == {"File:FileType": "JPEG"}
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_existing_metadata_not_found(monkeypatch):
+    connection = mock_connection(monkeypatch, fetchrow_result=None)
+
+    service = ImageService()
+    result = await service.getExistingMetadata("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result is None
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_save_metadata(monkeypatch):
+    connection = mock_connection(monkeypatch)
+
+    service = ImageService()
+    metadata = {"File:FileType": "JPEG"}
+
+    await service.saveMetadata("12345678-abcd-ef01-2345-6789abcdef01", metadata)
+
+    connection.execute.assert_awaited_once()
+    args = connection.execute.call_args.args
+    assert args[1] == json.dumps(metadata)
+    assert args[2] == "12345678-abcd-ef01-2345-6789abcdef01"
+    connection.close.assert_awaited_once()
+
+
