@@ -121,3 +121,41 @@ class ImageService(MediaService):
             self.detector.analyse_image,
             path
         )
+
+    def createFindingsString(self, input: dict) -> str:
+        if input is None or input == {}:
+            return "No findings"
+
+        output: str = "Metadata:\n"
+
+        if input.get("findings") is None or input.get("findings") == "":
+            output += "No metadata findings.\n"
+        else:
+            output += f"{input['findings']}\n"
+
+        output += "Binary Classifier:\n"
+
+        ai_probability = input.get("ai_probability")
+        confidence = input.get("confidence_percentage")
+        classification = input.get("classification")
+        reasons = input.get("reasons", [])
+
+        if ai_probability is not None and confidence is not None:
+            output += (f"The binary classifier found an AI probability of {ai_probability}% with a confidence of {confidence}%.\n")
+        else:
+            output += "Binary classifier analysis unavailable.\n"
+            return output
+
+        if classification:
+            output += f"Classification: {classification}\n"
+
+        if reasons:
+            output += "Reasons:\n"
+
+            for reason in reasons:
+                message = reason.get("message")
+
+                if message:
+                    output += f" - {message}\n"
+
+        return output

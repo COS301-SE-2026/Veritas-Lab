@@ -221,4 +221,5 @@ class MediaService(ABC):
     async def AIAnalysis(self, path : str|Path) ->dict:
         pass
 
-            
+    def createFindingsString(self, input: dict) ->str:
+        pass

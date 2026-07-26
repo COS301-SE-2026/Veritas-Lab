@@ -14,3 +14,6 @@ class PDFService(MediaService):
             "classification": "AI analysis not available for PDF",
             "reasons": []
         }
+
+    def createFindingsString(self, input: dict) -> str:
+        return "No findings as PDFs are currently not supported."
