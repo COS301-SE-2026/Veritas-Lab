@@ -870,3 +870,49 @@ def test_create_findings_string_includes_classification():
 
     assert "Classification: Inconclusive" in result
 
+def test_create_findings_string_includes_reasons():
+    service = ImageService()
+
+    input_data = {
+        "findings": "",
+        "ai_probability": 90,
+        "confidence_percentage": 95,
+        "classification": "Likely AI-generated or modified",
+        "reasons": [
+            {
+                "message": "Unusual texture patterns detected."
+            },
+            {
+                "message": "Attention concentrated in suspicious regions."
+            }
+        ]
+    }
+
+    result = service.createFindingsString(input_data)
+
+    assert "Reasons" in result
+    assert " - Unusual texture patterns detected." in result
+    assert " - Attention concentrated in suspicious regions." in result
+
+def test_create_findings_string_ignores_reason_without_message():
+    service = ImageService()
+
+    input_data = {
+        "findings": "",
+        "ai_probability": 90,
+        "confidence_percentage": 95,
+        "classification": "Likely AI-generated or modified",
+        "reasons": [
+            {},
+            {
+                "message": ""
+            },
+            {
+                "message": "Valid reason"
+            }
+        ]
+    }
+
+    result = service.createFindingsString(input_data)
+
+    assert result.count(" - ") == 1
