@@ -292,3 +292,57 @@ async def test_save_metadata(monkeypatch):
     connection.close.assert_awaited_once()
 
 
+@pytest.mark.asyncio
+async def test_analyse_uses_cached_metadata(monkeypatch):
+    service = ImageService()
+
+    cached_metadata = {"File:FileType": "JPEG"}
+    monkeypatch.setattr(service, "getExistingMetadata", AsyncMock(return_value=cached_metadata))
+
+    for method in ("getMediaRecord", "downloadMedia", "extract", "saveMetadata", "analyseMetadata"):
+        monkeypatch.setattr(service, method, AsyncMock())
+
+    result = await service.analyse("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result == cached_metadata
+    service.getMediaRecord.assert_not_called()
+    service.downloadMedia.assert_not_called()
+    service.extract.assert_not_called()
+    service.saveMetadata.assert_not_called()
+    service.analyseMetadata.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_analyse_full_path_strips_noise_keys(monkeypatch):
+    service = ImageService()
+
+    media_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    media_record = {
+        "media_id": media_id,
+        "bucket": "jpg-bucket",
+        "extension": ".jpg",
+        "object_name": f"{media_id}.jpg"
+    }
+    extracted_metadata = {
+        "SourceFile": "test.jpg",
+        "ExifTool:ExifToolVersion": "12.0",
+        "File:Directory": "/tmp",
+        "EXIF:Make": "Canon"
+    }
+
+    monkeypatch.setattr(service, "getExistingMetadata", AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "getMediaRecord", AsyncMock(return_value=media_record))
+    monkeypatch.setattr(service, "downloadMedia", AsyncMock())
+    monkeypatch.setattr(service, "extract", AsyncMock(return_value=extracted_metadata))
+    monkeypatch.setattr(service, "saveMetadata", AsyncMock())
+    monkeypatch.setattr(service, "analyseMetadata", AsyncMock(return_value={"Certainty": 0, "Findings": ""}))
+
+    result = await service.analyse(media_id)
+
+    assert "SourceFile" not in result
+    assert "ExifTool:ExifToolVersion" not in result
+    assert "File:Directory" not in result
+    assert result["EXIF:Make"] == "Canon"
+
+    service.saveMetadata.assert_awaited_once_with(media_id, result)
+    service.analyseMetadata.assert_awaited_once_with(result)
