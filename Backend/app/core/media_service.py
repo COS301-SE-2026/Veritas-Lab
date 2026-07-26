@@ -167,8 +167,34 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
+    async def updateFindingsAndCertainty(self, media_id: UUID, findings: str, certainty: int) -> None:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        try:
+            await connection.execute(
+                """
+                UPDATE "Cases_DB"."Reports"
+                SET
+                    ReportFindings = $1,
+                    ReportCertainty = $2
+                WHERE MediaId = $3
+                """,
+                findings,
+                certainty,
+                media_id
+            )
+        finally:
+            await connection.close()
+
     async def analyse(self, media_id: UUID):
         metadata = await self.getExistingMetadata(media_id)
+        combined_findings = None
 
         if metadata is None:
             media_record = await self.getMediaRecord(media_id)
@@ -210,7 +236,12 @@ class MediaService(ABC):
             print(json.dumps(combined_findings, indent=4))
 
             # use this when you want to upload to the database
+            final_findings = self.createFindingsString(combined_findings)
+            await self.updateFindingsAndCertainty(media_id=media_id, findings=final_findings, certainty=final_risk_level)
 
+        if combined_findings is None:
+           return None
+        
         return combined_findings
     
     @abstractmethod
