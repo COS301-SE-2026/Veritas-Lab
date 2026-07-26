@@ -167,8 +167,34 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
+    async def updateAnalysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
+        connection = await asyncpg.connect(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+
+        try:
+            await connection.execute(
+                """
+                UPDATE "Cases_DB"."Reports"
+                SET
+                    ReportFindings = $1,
+                    ReportCertainty = $2
+                WHERE MediaId = $3
+                """,
+                analysis.Findings,
+                analysis.Certainty,
+                media_id
+            )
+        finally:
+            await connection.close()
+
     async def analyse(self, media_id: UUID):
         metadata = await self.getExistingMetadata(media_id)
+        combined_findings = None
 
         if metadata is None:
             media_record = await self.getMediaRecord(media_id)
@@ -181,6 +207,8 @@ class MediaService(ABC):
                     file_path=str(file_path),
                     media_record=media_record
                 )
+
+                ai_analysis = await self.AIAnalysis(file_path)
                 
             #This is to remove information about the system that does not 
             #affect the analysis
@@ -194,15 +222,37 @@ class MediaService(ABC):
             await self.saveMetadata(media_id, metadata)
             
             report_findings = await self.analyseMetadata(metadata)
-            print(json.dumps(report_findings, indent=4))
+
+            final_risk_level = max(
+                int(ai_analysis["risk_level"]),
+                report_findings.Certainty
+            )
+
+            combined_findings = {
+                **ai_analysis,
+                "risk_level": final_risk_level,
+                "findings": report_findings.Findings
+            }
+            print(json.dumps(combined_findings, indent=4))
 
             # use this when you want to upload to the database
+            final_findings = self.createFindingsString(combined_findings)
+            final_analysis = AnalysisFindings(Certainty=final_risk_level, Findings=final_findings)
+            await self.updateAnalysis(media_id=media_id, analysis=final_analysis)
 
-
-        return metadata
+        if combined_findings is None:
+           return None
+        
+        return combined_findings
     
     @abstractmethod
     async def analyseMetadata(self,metadata: dict)-> AnalysisFindings:
         pass
 
-            
+    @abstractmethod
+    async def AIAnalysis(self, path : str|Path) ->dict:
+        pass
+
+    @abstractmethod
+    def createFindingsString(self, input: dict) ->str:
+        pass
