@@ -252,5 +252,6 @@ class MediaService(ABC):
     async def AIAnalysis(self, path : str|Path) ->dict:
         pass
 
+    @abstractmethod
     def createFindingsString(self, input: dict) ->str:
         pass
