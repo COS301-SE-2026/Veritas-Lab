@@ -1,5 +1,6 @@
+import json
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from app.core.image_service import ImageService
 from app.core.pdf_service import PDFService
 
@@ -135,3 +136,78 @@ async def test_pdf_extract_empty_metadata(monkeypatch):
     mock_context.get_metadata.assert_called_once_with("test.pdf")
     assert result["file_type"] == "PDF"
     assert result["metadata"] == {}
+
+
+def mock_connection(monkeypatch, fetchrow_result=None, execute_result=None):
+    connection = MagicMock()
+    connection.fetchrow = AsyncMock(return_value=fetchrow_result)
+    connection.execute = AsyncMock(return_value=execute_result)
+    connection.close = AsyncMock()
+
+    monkeypatch.setattr(
+        "app.core.media_service.asyncpg.connect",
+        AsyncMock(return_value=connection)
+    )
+
+    return connection
+
+
+@pytest.mark.asyncio
+async def test_get_media_record_success(monkeypatch):
+    row = {
+        "mediaid": "12345678-abcd-ef01-2345-6789abcdef01",
+        "mediabucket": "jpg-bucket",
+        "mediaextension": ".jpg"
+    }
+    connection = mock_connection(monkeypatch, fetchrow_result=row)
+
+    service = ImageService()
+    result = await service.getMediaRecord("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result["media_id"] == "12345678-abcd-ef01-2345-6789abcdef01"
+    assert result["bucket"] == "jpg-bucket"
+    assert result["extension"] == ".jpg"
+    assert result["object_name"] == "12345678-abcd-ef01-2345-6789abcdef01.jpg"
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_media_record_not_found(monkeypatch):
+    connection = mock_connection(monkeypatch, fetchrow_result=None)
+
+    service = ImageService()
+
+    with pytest.raises(ValueError, match="Media not found"):
+        await service.getMediaRecord("12345678-abcd-ef01-2345-6789abcdef01")
+
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_download_media(monkeypatch):
+    service = ImageService()
+
+    fake_minio_client = MagicMock()
+    monkeypatch.setattr(service, "createMinioClient", lambda: fake_minio_client)
+
+    media_record = {
+        "bucket": "jpg-bucket",
+        "object_name": "12345678-abcd-ef01-2345-6789abcdef01.jpg"
+    }
+
+    await service.downloadMedia(media_record, "/tmp/test.jpg")
+
+    fake_minio_client.fget_object.assert_called_once_with(
+        bucket_name="jpg-bucket",
+        object_name="12345678-abcd-ef01-2345-6789abcdef01.jpg",
+        file_path="/tmp/test.jpg"
+    )
+
+
+def mock_env(monkeypatch, values):
+    monkeypatch.setattr(
+        "app.core.media_service.env.getRequiredEnv",
+        lambda name: values[name]
+    )
+
+
