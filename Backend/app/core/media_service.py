@@ -167,7 +167,7 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
-    async def updateFindingsAndCertainty(self, media_id: UUID, findings: str, certainty: int) -> None:
+    async def updateAnalysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -185,8 +185,8 @@ class MediaService(ABC):
                     ReportCertainty = $2
                 WHERE MediaId = $3
                 """,
-                findings,
-                certainty,
+                analysis.Findings,
+                analysis.Certainty,
                 media_id
             )
         finally:
@@ -237,7 +237,8 @@ class MediaService(ABC):
 
             # use this when you want to upload to the database
             final_findings = self.createFindingsString(combined_findings)
-            await self.updateFindingsAndCertainty(media_id=media_id, findings=final_findings, certainty=final_risk_level)
+            final_analysis = AnalysisFindings(Certainty=final_risk_level, Findings=final_findings)
+            await self.updateAnalysis(media_id=media_id, analysis=final_analysis)
 
         if combined_findings is None:
            return None
