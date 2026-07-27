@@ -15,6 +15,8 @@ from minio import Minio
 from datetime import datetime, timedelta, timezone
 import uuid
 from uuid import uuid4
+from app.core.media_relay import MediaRelay
+from pathlib import Path
 
 env = ENVLoader()
 
@@ -493,6 +495,13 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         case.CaseCreationDate = row["casecreationdate"]
 
         result = await case.addEvidence(media, case_uuid)
+
+        # start pipeline here
+        extension = Path(result["Filename"]).suffix.lower()
+        media_id = UUID(result["MediaId"])
+
+        media_relay = MediaRelay(media_id=media_id, extension=extension)
+        media_relay.relayToService()
 
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
 
