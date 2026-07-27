@@ -8,7 +8,7 @@ import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-  ChevronLeft, Menu, Home, Construction, LogOut, UserStar,
+  ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 
@@ -28,6 +28,7 @@ export default function Sidebar() {
     const navItems = [
       { label: 'Dashboard', href: '/dashboard',  icon: Home },
       ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
+      { label: 'Help', href: '/help', icon: HelpCircle },
     ];
 
     return (
@@ -81,21 +82,21 @@ export default function Sidebar() {
             </Link>
           );
         })}
-        <footer className="absolute bottom-0 w-full p-4 text-center text-xs text-gray-400">
-            <Button variant="sidebar" onClick={logOut} className="">
-              <div className="flex items-center gap-2 justify-center pr-15 rounded-full text-sm text-white hover:bg-(--color-dark) transition-colors">
-                {!collapsed && (
-                  <div>
-                    Log Out
-                  </div>
-                )}
-                <div>
-                  <LogOut size={18} />
-                </div>
-              </div>
-                
-            </Button>
-        </footer>
+        <footer className="absolute bottom-0 w-full p-4 space-y-1 text-center text-xs text-gray-400">
+
+    <Button variant="sidebar" onClick={logOut} className="">
+      <div className="flex items-center gap-2 justify-center pr-15 rounded-full text-sm text-white hover:bg-(--color-dark) transition-colors">
+        {!collapsed && (
+          <div>
+            Log Out
+          </div>
+        )}
+        <div>
+          <LogOut size={18} />
+        </div>
+      </div>
+    </Button>
+</footer>
       </nav>
         </div>
   );
