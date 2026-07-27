@@ -1,10 +1,15 @@
-import exiftool
+from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
+from app.ai.detector import AIImageDetector
+from starlette.concurrency import run_in_threadpool
 
-FRAUD_MESSAGE=" Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/creaated by software"
+FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
 class ImageService(MediaService):
 
+    def __init__(self) -> None:
+        self.detector = AIImageDetector()
+    
     def _is_stripped(self, metadata: dict) -> bool:
         return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
 
@@ -110,3 +115,47 @@ class ImageService(MediaService):
 
         analysis_findings.Findings = "\n".join(report_lines)
         return analysis_findings
+
+    async def AIAnalysis(self, path: str| Path) ->dict:
+        return await run_in_threadpool(
+            self.detector.analyse_image,
+            path
+        )
+
+    def createFindingsString(self, input: dict) -> str:
+        if input is None or input == {}:
+            return "No findings"
+
+        output: str = "Metadata:\n"
+
+        if input.get("findings") is None or input.get("findings") == "":
+            output += "No metadata findings.\n"
+        else:
+            output += f"{input['findings']}\n"
+
+        output += "Binary Classifier:\n"
+
+        ai_probability = input.get("ai_probability")
+        confidence = input.get("confidence_percentage")
+        classification = input.get("classification")
+        reasons = input.get("reasons", [])
+
+        if ai_probability is not None and confidence is not None:
+            output += (f"The binary classifier found an AI probability of {ai_probability}% with a confidence of {confidence}%.\n")
+        else:
+            output += "Binary classifier analysis unavailable.\n"
+            return output
+
+        if classification:
+            output += f"Classification: {classification}\n"
+
+        if reasons:
+            output += "Reasons:\n"
+
+            for reason in reasons:
+                message = reason.get("message")
+
+                if message:
+                    output += f" - {message}\n"
+
+        return output
