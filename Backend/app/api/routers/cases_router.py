@@ -501,7 +501,7 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         media_id = UUID(result["MediaId"])
 
         media_relay = MediaRelay(media_id=media_id, extension=extension)
-        media_relay.relayToService()
+        await media_relay.relayToService()
 
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
 
