@@ -70,6 +70,7 @@ jobs:
                   cd frontend
                   npx jest
     deploy-azure:
+        needs: [backend-tests, frontend-tests]
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
