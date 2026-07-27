@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 from app.core.image_service import ImageService
 from app.core.pdf_service import PDFService
+from app.core.media_service import AnalysisFindings
 
 def mock_exiftool(monkeypatch, metadata_result):
     mock_context = MagicMock()
@@ -299,17 +300,22 @@ async def test_analyse_uses_cached_metadata(monkeypatch):
     cached_metadata = {"File:FileType": "JPEG"}
     monkeypatch.setattr(service, "getExistingMetadata", AsyncMock(return_value=cached_metadata))
 
-    for method in ("getMediaRecord", "downloadMedia", "extract", "saveMetadata", "analyseMetadata"):
+    for method in ("getMediaRecord", "downloadMedia", "extract", "AIAnalysis", "saveMetadata", "analyseMetadata", "updateAnalysis"):
         monkeypatch.setattr(service, method, AsyncMock())
+
+    monkeypatch.setattr(service, "createFindingsString", MagicMock())
 
     result = await service.analyse("12345678-abcd-ef01-2345-6789abcdef01")
 
-    assert result == cached_metadata
+    assert result is None
     service.getMediaRecord.assert_not_called()
     service.downloadMedia.assert_not_called()
     service.extract.assert_not_called()
+    service.AIAnalysis.assert_not_called()
     service.saveMetadata.assert_not_called()
     service.analyseMetadata.assert_not_called()
+    service.updateAnalysis.assert_not_called()
+    service.createFindingsString.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -330,19 +336,39 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
         "EXIF:Make": "Canon"
     }
 
+    ai_analysis_result = {
+        "risk_level": 1,
+        "ai_probability": 80,
+        "classification": "AI-generated"
+    }
+
+    metadata_findings = AnalysisFindings(Certainty=2, Findings="Traces of editing software found")
+
+
     monkeypatch.setattr(service, "getExistingMetadata", AsyncMock(return_value=None))
     monkeypatch.setattr(service, "getMediaRecord", AsyncMock(return_value=media_record))
     monkeypatch.setattr(service, "downloadMedia", AsyncMock())
     monkeypatch.setattr(service, "extract", AsyncMock(return_value=extracted_metadata))
+    monkeypatch.setattr(service, "AIAnalysis", AsyncMock(return_value=ai_analysis_result))
     monkeypatch.setattr(service, "saveMetadata", AsyncMock())
-    monkeypatch.setattr(service, "analyseMetadata", AsyncMock(return_value={"Certainty": 0, "Findings": ""}))
+    monkeypatch.setattr(service, "analyseMetadata", AsyncMock(return_value=metadata_findings))
+    monkeypatch.setattr(service, "updateAnalysis", AsyncMock())
+    monkeypatch.setattr(service, "createFindingsString", MagicMock(return_value = "combined findings string"))
 
     result = await service.analyse(media_id)
 
-    assert "SourceFile" not in result
-    assert "ExifTool:ExifToolVersion" not in result
-    assert "File:Directory" not in result
-    assert result["EXIF:Make"] == "Canon"
+    saved_metadata = service.saveMetadata.call_args.args[1]
+    assert "SourceFile" not in saved_metadata
+    assert "ExifTool:ExifToolVersion" not in saved_metadata
+    assert "File:Directory" not in saved_metadata
+    assert saved_metadata["EXIF:Make"] == "Canon"
 
-    service.saveMetadata.assert_awaited_once_with(media_id, result)
-    service.analyseMetadata.assert_awaited_once_with(result)
+    assert result["risk_level"] == 2
+    assert result["ai_probability"] == 80
+    assert result["classification"] == "AI-generated"
+
+    service.updateAnalysis.assert_awaited_once()
+    persisted_analysis = service.updateAnalysis.call_args.kwargs["analysis"]
+    
+    assert persisted_analysis.Certainty == 2
+    assert persisted_analysis.Findings == "combined findings string"
