@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, ConfigDict
@@ -15,6 +15,8 @@ from minio import Minio
 from datetime import datetime, timedelta, timezone
 import uuid
 from uuid import uuid4
+from app.core.media_relay import MediaRelay
+from pathlib import Path
 
 env = ENVLoader()
 
@@ -446,7 +448,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         },
     },
 )
-async def upload_evidence(request: Request, case_id: str = Form(...), media: UploadFile = File(...)):
+async def upload_evidence(request: Request, background_task: BackgroundTasks, case_id: str = Form(...), media: UploadFile = File(...)):
 
     payload = verify_jwt(request)
 
@@ -493,6 +495,14 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         case.CaseCreationDate = row["casecreationdate"]
 
         result = await case.addEvidence(media, case_uuid)
+
+        # start pipeline here
+        extension = Path(result["Filename"]).suffix.lower()
+        media_id = UUID(result["MediaId"])
+
+        media_relay = MediaRelay(media_id=media_id, extension=extension)
+
+        background_task.add_task(media_relay.relay_to_service())
 
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
 

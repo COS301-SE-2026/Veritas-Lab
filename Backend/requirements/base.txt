@@ -87,8 +87,6 @@ six==1.17.0
 sortedcontainers==2.4.0
 SQLAlchemy==2.0.49
 starlette==1.0.0
-torch==2.13.0
-torchvision==0.28.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2026.2
