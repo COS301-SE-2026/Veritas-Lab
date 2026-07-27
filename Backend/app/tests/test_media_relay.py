@@ -18,7 +18,7 @@ async def test_relay_to_image_service():
     ):
         relay = MediaRelay(media_id=media_id, extension=".jpg")
 
-        result = await relay.relayToService()
+        result = await relay.relay_to_service()
 
         mock_service.analyse.assert_awaited_once_with(media_id)
 
@@ -37,7 +37,7 @@ async def test_relay_to_pdf_service():
     ):
         relay = MediaRelay(media_id=media_id, extension=".pdf")
 
-        result = await relay.relayToService()
+        result = await relay.relay_to_service()
 
         mock_service.analyse.assert_awaited_once_with(media_id)
 
@@ -53,4 +53,4 @@ async def test_relay_raises_for_unsupported_extension():
         ValueError,
         match="Unsupported media extension"
     ):
-        await relay.relayToService()
+        await relay.relay_to_service()

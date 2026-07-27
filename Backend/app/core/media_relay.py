@@ -7,7 +7,7 @@ class MediaRelay:
         self.media_id = media_id
         self.extension = extension
 
-    async def relayToService(self):
+    async def relay_to_service(self):
         if self.extension in [".jpg", ".jpeg", ".png"]:
             service = ImageService()
 
