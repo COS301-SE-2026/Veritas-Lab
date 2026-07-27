@@ -83,11 +83,12 @@ def test_analyse_image_maps_risk_level(mock_detector_dependencies, risk_level: s
         result = detector.analyse_image(Path("image.jpg"))
 
         assert result["risk_level"] == expected
-
+        image_path = Path("image.jpg")
         mock_predict.assert_called_once_with(
             model=detector.model,
-            image_path=Path("image.jpg"),
-            device=detector.device
+            image_path=image_path,
+            device=detector.device,
+            output_directory=image_path.parent / "outputs"
         )
 
 def test_analyse_image_preserves_other_result_fields(mock_detector_dependencies) -> None:
@@ -105,11 +106,13 @@ def test_analyse_image_preserves_other_result_fields(mock_detector_dependencies)
         ]
     }
 
+    image_path = Path("image.jpg")
+
     with patch(
         "app.ai.detector.predict_and_explain",
         return_value=prediction_result
     ):
-        result = detector.analyse_image("image.jpg")
+        result = detector.analyse_image(image_path)
 
     assert result["risk_level"] == 3
     assert result["ai_probability"] == 92.5

@@ -32,12 +32,15 @@ class AIImageDetector:
         self.model = self.model.to(self.device)
         self.model.eval()
 
-    def analyse_image(self, image_path: str | Path) -> dict:
+    def analyse_image(self, image_path: str | Path, output_directory: str | Path | None = None) -> dict:
+        if output_directory is None:
+            output_directory = image_path.parent / "outputs"
 
         result = predict_and_explain(
             model=self.model,
             image_path=image_path,
-            device=self.device
+            device=self.device,
+            output_directory=output_directory
         )
 
         risk_mapping = {
