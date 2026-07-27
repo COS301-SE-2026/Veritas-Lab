@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, ConfigDict
@@ -448,7 +448,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         },
     },
 )
-async def upload_evidence(request: Request, case_id: str = Form(...), media: UploadFile = File(...)):
+async def upload_evidence(request: Request, background_task: BackgroundTasks, case_id: str = Form(...), media: UploadFile = File(...)):
 
     payload = verify_jwt(request)
 
@@ -501,7 +501,8 @@ async def upload_evidence(request: Request, case_id: str = Form(...), media: Upl
         media_id = UUID(result["MediaId"])
 
         media_relay = MediaRelay(media_id=media_id, extension=extension)
-        await media_relay.relayToService()
+
+        background_task.add_task(media_relay.relayToService)
 
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
 
