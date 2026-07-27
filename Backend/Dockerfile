@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
 
 # Install CPU-only PyTorch
 RUN pip install --no-cache-dir \
-    --only-binary=:all: \
-    torch torchvision \
+    torch==2.7.1 \
+    torchvision==0.22.1 \
     --index-url https://download.pytorch.org/whl/cpu
 
 # Install remaining Python dependencies
