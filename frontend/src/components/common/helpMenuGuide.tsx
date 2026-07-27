@@ -53,7 +53,7 @@ export function filterGuides(query: string): Guide[] {
   return GUIDES.filter((g) => `${g.title} ${g.body}`.toLowerCase().includes(q));
 }
 
-export default function HelpMenuGuide({ items }: { items: Guide[] }) {
+export default function HelpMenuGuide({ items }: Readonly<{ items: Guide[] }>) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {items.map((g) => {

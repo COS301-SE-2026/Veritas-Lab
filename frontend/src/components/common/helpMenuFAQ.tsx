@@ -60,7 +60,7 @@ type FaqProps = {
   onToggle: (index: number | null) => void;
 };
 
-export default function HelpMenuFAQ({ items, openIndex, onToggle }: FaqProps) {
+export default function HelpMenuFAQ({ items, openIndex, onToggle }: Readonly<FaqProps>) {
   return (
     <div className="divide-y divide-(--color-lightest) overflow-hidden rounded-2xl border border-(--color-lightest)">
       {items.map((f, i) => {

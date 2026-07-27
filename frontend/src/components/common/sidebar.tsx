@@ -8,7 +8,7 @@ import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-  ChevronLeft, Menu, Home, Construction, LogOut, UserStar, HelpCircle,
+  ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 

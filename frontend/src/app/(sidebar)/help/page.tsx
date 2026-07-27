@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   HelpCircle, GraduationCap, BookOpen, MessageCircleQuestion,
@@ -27,9 +27,9 @@ export default function HelpPage() {
 
   const q = search.trim().toLowerCase();
 
-  const tutorials = useMemo(() => filterTutorials(search), [search]);
-  const guides = useMemo(() => filterGuides(search), [search]);
-  const faqs = useMemo(() => filterFaqs(search), [search]);
+  const tutorials = filterTutorials(search);
+  const guides = filterGuides(search);
+  const faqs = filterFaqs(search);
 
   const counts: Record<Tab, number> = {
     tutorials: tutorials.length,
@@ -139,7 +139,7 @@ export default function HelpPage() {
   );
 }
 // The empty search result
-function Empty({ query }: { query: string }) {
+function Empty({ query }: Readonly<{ query: string }>) {
   return (
     <div className="rounded-2xl border border-dashed border-(--color-light) p-10 text-center">
       <Search className="mx-auto size-8 text-(--color-light)" />

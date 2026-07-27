@@ -96,7 +96,7 @@ type TutorialProps = {
   onToggle: (index: number | null) => void;
 };
 
-export default function HelpMenuTutorial({ items, openIndex, onToggle }: TutorialProps) {
+export default function HelpMenuTutorial({ items, openIndex, onToggle }: Readonly<TutorialProps>) {
   return (
     <div className="space-y-3">
       {items.map((t, i) => {
