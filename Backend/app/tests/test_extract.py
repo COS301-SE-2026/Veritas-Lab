@@ -1,7 +1,9 @@
+import json
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from app.core.image_service import ImageService
 from app.core.pdf_service import PDFService
+from app.core.media_service import AnalysisFindings
 
 def mock_exiftool(monkeypatch, metadata_result):
     mock_context = MagicMock()
@@ -135,3 +137,238 @@ async def test_pdf_extract_empty_metadata(monkeypatch):
     mock_context.get_metadata.assert_called_once_with("test.pdf")
     assert result["file_type"] == "PDF"
     assert result["metadata"] == {}
+
+
+def mock_connection(monkeypatch, fetchrow_result=None, execute_result=None):
+    connection = MagicMock()
+    connection.fetchrow = AsyncMock(return_value=fetchrow_result)
+    connection.execute = AsyncMock(return_value=execute_result)
+    connection.close = AsyncMock()
+
+    monkeypatch.setattr(
+        "app.core.media_service.asyncpg.connect",
+        AsyncMock(return_value=connection)
+    )
+
+    return connection
+
+
+@pytest.mark.asyncio
+async def test_get_media_record_success(monkeypatch):
+    row = {
+        "mediaid": "12345678-abcd-ef01-2345-6789abcdef01",
+        "mediabucket": "jpg-bucket",
+        "mediaextension": ".jpg"
+    }
+    connection = mock_connection(monkeypatch, fetchrow_result=row)
+
+    service = ImageService()
+    result = await service.getMediaRecord("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result["media_id"] == "12345678-abcd-ef01-2345-6789abcdef01"
+    assert result["bucket"] == "jpg-bucket"
+    assert result["extension"] == ".jpg"
+    assert result["object_name"] == "12345678-abcd-ef01-2345-6789abcdef01.jpg"
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_media_record_not_found(monkeypatch):
+    connection = mock_connection(monkeypatch, fetchrow_result=None)
+
+    service = ImageService()
+
+    with pytest.raises(ValueError, match="Media not found"):
+        await service.getMediaRecord("12345678-abcd-ef01-2345-6789abcdef01")
+
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_download_media(monkeypatch):
+    service = ImageService()
+
+    fake_minio_client = MagicMock()
+    monkeypatch.setattr(service, "createMinioClient", lambda: fake_minio_client)
+
+    media_record = {
+        "bucket": "jpg-bucket",
+        "object_name": "12345678-abcd-ef01-2345-6789abcdef01.jpg"
+    }
+
+    await service.downloadMedia(media_record, "/tmp/test.jpg")
+
+    fake_minio_client.fget_object.assert_called_once_with(
+        bucket_name="jpg-bucket",
+        object_name="12345678-abcd-ef01-2345-6789abcdef01.jpg",
+        file_path="/tmp/test.jpg"
+    )
+
+
+def mock_env(monkeypatch, values):
+    monkeypatch.setattr(
+        "app.core.media_service.env.getRequiredEnv",
+        lambda name: values[name]
+    )
+
+
+def test_create_minio_client_https(monkeypatch):
+    mock_env(monkeypatch, {
+        "STORAGE_URL": "https://minio.example.com",
+        "MINIO_ROOT_USER": "root",
+        "MINIO_ROOT_PASSWORD": "password"
+    })
+
+    fake_minio_class = MagicMock()
+    monkeypatch.setattr("app.core.media_service.Minio", fake_minio_class)
+
+    service = ImageService()
+    service.createMinioClient()
+
+    fake_minio_class.assert_called_once_with(
+        "minio.example.com",
+        access_key="root",
+        secret_key="password",
+        secure=True
+    )
+
+
+def test_create_minio_client_no_netloc(monkeypatch):
+    mock_env(monkeypatch, {
+        "STORAGE_URL": "localhost:9000",
+        "MINIO_ROOT_USER": "root",
+        "MINIO_ROOT_PASSWORD": "password"
+    })
+
+    fake_minio_class = MagicMock()
+    monkeypatch.setattr("app.core.media_service.Minio", fake_minio_class)
+
+    service = ImageService()
+    service.createMinioClient()
+
+    fake_minio_class.assert_called_once_with(
+        "9000",
+        access_key="root",
+        secret_key="password",
+        secure=False
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_existing_metadata_found(monkeypatch):
+    row = {"reportartifacts": {"File:FileType": "JPEG"}}
+    connection = mock_connection(monkeypatch, fetchrow_result=row)
+
+    service = ImageService()
+    result = await service.getExistingMetadata("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result == {"File:FileType": "JPEG"}
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_existing_metadata_not_found(monkeypatch):
+    connection = mock_connection(monkeypatch, fetchrow_result=None)
+
+    service = ImageService()
+    result = await service.getExistingMetadata("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result is None
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_save_metadata(monkeypatch):
+    connection = mock_connection(monkeypatch)
+
+    service = ImageService()
+    metadata = {"File:FileType": "JPEG"}
+
+    await service.saveMetadata("12345678-abcd-ef01-2345-6789abcdef01", metadata)
+
+    connection.execute.assert_awaited_once()
+    args = connection.execute.call_args.args
+    assert args[1] == json.dumps(metadata)
+    assert args[2] == "12345678-abcd-ef01-2345-6789abcdef01"
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_analyse_uses_cached_metadata(monkeypatch):
+    service = ImageService()
+
+    cached_metadata = {"File:FileType": "JPEG"}
+    monkeypatch.setattr(service, "getExistingMetadata", AsyncMock(return_value=cached_metadata))
+
+    for method in ("getMediaRecord", "downloadMedia", "extract", "AIAnalysis", "saveMetadata", "analyseMetadata", "updateAnalysis"):
+        monkeypatch.setattr(service, method, AsyncMock())
+
+    monkeypatch.setattr(service, "createFindingsString", MagicMock())
+
+    result = await service.analyse("12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert result is None
+    service.getMediaRecord.assert_not_called()
+    service.downloadMedia.assert_not_called()
+    service.extract.assert_not_called()
+    service.AIAnalysis.assert_not_called()
+    service.saveMetadata.assert_not_called()
+    service.analyseMetadata.assert_not_called()
+    service.updateAnalysis.assert_not_called()
+    service.createFindingsString.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_analyse_full_path_strips_noise_keys(monkeypatch):
+    service = ImageService()
+
+    media_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    media_record = {
+        "media_id": media_id,
+        "bucket": "jpg-bucket",
+        "extension": ".jpg",
+        "object_name": f"{media_id}.jpg"
+    }
+    extracted_metadata = {
+        "SourceFile": "test.jpg",
+        "ExifTool:ExifToolVersion": "12.0",
+        "File:Directory": "/tmp",
+        "EXIF:Make": "Canon"
+    }
+
+    ai_analysis_result = {
+        "risk_level": 1,
+        "ai_probability": 80,
+        "classification": "AI-generated"
+    }
+
+    metadata_findings = AnalysisFindings(Certainty=2, Findings="Traces of editing software found")
+
+
+    monkeypatch.setattr(service, "getExistingMetadata", AsyncMock(return_value=None))
+    monkeypatch.setattr(service, "getMediaRecord", AsyncMock(return_value=media_record))
+    monkeypatch.setattr(service, "downloadMedia", AsyncMock())
+    monkeypatch.setattr(service, "extract", AsyncMock(return_value=extracted_metadata))
+    monkeypatch.setattr(service, "AIAnalysis", AsyncMock(return_value=ai_analysis_result))
+    monkeypatch.setattr(service, "saveMetadata", AsyncMock())
+    monkeypatch.setattr(service, "analyseMetadata", AsyncMock(return_value=metadata_findings))
+    monkeypatch.setattr(service, "updateAnalysis", AsyncMock())
+    monkeypatch.setattr(service, "createFindingsString", MagicMock(return_value = "combined findings string"))
+
+    result = await service.analyse(media_id)
+
+    saved_metadata = service.saveMetadata.call_args.args[1]
+    assert "SourceFile" not in saved_metadata
+    assert "ExifTool:ExifToolVersion" not in saved_metadata
+    assert "File:Directory" not in saved_metadata
+    assert saved_metadata["EXIF:Make"] == "Canon"
+
+    assert result["risk_level"] == 2
+    assert result["ai_probability"] == 80
+    assert result["classification"] == "AI-generated"
+
+    service.updateAnalysis.assert_awaited_once()
+    persisted_analysis = service.updateAnalysis.call_args.kwargs["analysis"]
+    
+    assert persisted_analysis.Certainty == 2
+    assert persisted_analysis.Findings == "combined findings string"
