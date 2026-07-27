@@ -502,7 +502,7 @@ async def upload_evidence(request: Request, background_task: BackgroundTasks, ca
 
         media_relay = MediaRelay(media_id=media_id, extension=extension)
 
-        background_task.add_task(media_relay.relay_to_service())
+        background_task.add_task(media_relay.relay_to_service)
 
         return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
 
