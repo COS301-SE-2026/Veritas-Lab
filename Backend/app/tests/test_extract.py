@@ -372,3 +372,25 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
     
     assert persisted_analysis.Certainty == 2
     assert persisted_analysis.Findings == "combined findings string"
+
+@pytest.mark.asyncio
+async def test_pdf_service_ai_analysis_stub():
+    service = PDFService() 
+
+    result = await service.AIAnalysis("some/path.pdf")
+
+    assert result == {
+        "risk_level": 0,
+        "ai_probability": None,
+        "classification": "AI analysis not available for PDF",
+        "reasons": []
+    }
+
+@pytest.mark.asyncio
+async def test_pdf_service_analse_metadata_stub():
+    service = PDFService() 
+
+    result = await service.analyseMetadata({"some:" "metadata"})
+
+    assert result.certainty == "0"
+    assert result.Findings == "NOT implemented yet"
