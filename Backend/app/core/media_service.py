@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod #abstractmethod is to override methods
 from uuid import UUID
 import asyncpg
+import os
 from dotenv import load_dotenv
 import exiftool
 from app.core.env import ENVLoader
@@ -11,6 +12,10 @@ from pathlib import Path
 import aiofiles.tempfile
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
+import boto3
+from botocore.client import Config
+from app.core.env import ENVLoader,IS_PROD
+from mypy_boto3_s3 import S3Client
 
 load_dotenv()
 env = ENVLoader()
@@ -20,6 +25,47 @@ DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
 DB_HOST = env.getRequiredEnv("DB_HOST")
 DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
+DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
+
+def getObject() -> S3Client:
+    if not IS_PROD:
+        minio_domain = os.getenv("STORAGE_URL", "http://localhost:9000")
+        
+        if not minio_domain.startswith(("http://", "https://")):
+            minio_domain = f"http://{minio_domain}"
+
+        return boto3.client(
+            "s3",
+            endpoint_url=minio_domain,
+            aws_access_key_id=os.getenv("MINIO_ROOT_USER"),
+            aws_secret_access_key=os.getenv("MINIO_ROOT_PASSWORD"),
+            region_name=os.getenv("AWS_REGION", "us-east-1"),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
+
+    else:
+        cloud_url = os.getenv("R2_URL", "")
+        
+        if not cloud_url.startswith(("http://", "https://")):
+            cloud_url = f"https://{cloud_url}"
+
+        key_id=os.getenv("R2_ACCESS_KEY_ID")
+        secret=os.getenv("R2_SECRET_ACCESS_KEY")
+
+        return boto3.client(
+            "s3",
+            endpoint_url=cloud_url,
+            aws_access_key_id=key_id,
+            aws_secret_access_key=secret,
+            region_name="auto",
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
 
 class AnalysisFindings(BaseModel):
     Certainty: int
@@ -53,7 +99,8 @@ class MediaService(ABC):
             password=DB_PASSWORD,
             database=DB_NAME,
             host=DB_HOST,
-            port=DB_PORT
+            port=DB_PORT,
+            ssl="require" if DB_SSL else None,
         )
 
         try:
@@ -85,34 +132,21 @@ class MediaService(ABC):
             await connection.close()
 
     async def downloadMedia(self, media_record: dict, file_path: str):
-        minio_client = self.createMinioClient()
+        storage_client = getObject()
 
-        await run_in_threadpool(
-            minio_client.fget_object,
-            bucket_name=media_record["bucket"],
-            object_name=media_record["object_name"],
-            file_path=file_path
-        )
+        def _download_from_s3() -> None:
+            with open(file_path, "wb") as file_obj:
+                storage_client.download_fileobj(
+                    Bucket=media_record["bucket"],
+                    Key=media_record["object_name"],
+                    Fileobj=file_obj,
+                )
+
+        await run_in_threadpool(_download_from_s3)
+
+
     
-    def createMinioClient(self):
-        STORAGE_URL = env.getRequiredEnv("STORAGE_URL")
-        MINIO_ROOT_USER = env.getRequiredEnv("MINIO_ROOT_USER")
-        MINIO_ROOT_PASSWORD = env.getRequiredEnv("MINIO_ROOT_PASSWORD")
-        
-        parsed_url = urlparse(STORAGE_URL)
-
-        minio_secure = parsed_url.scheme == "https"
-
-        minio_endpoint = parsed_url.netloc
-        if not minio_endpoint:
-            minio_endpoint = parsed_url.path
-
-        return Minio(
-            minio_endpoint,
-            access_key=MINIO_ROOT_USER,
-            secret_key=MINIO_ROOT_PASSWORD,
-            secure=minio_secure
-        )
+    
 
     async def getExistingMetadata(self, media_id: UUID):
         connection = await asyncpg.connect(
@@ -120,7 +154,8 @@ class MediaService(ABC):
             password=DB_PASSWORD,
             database=DB_NAME,
             host=DB_HOST,
-            port=DB_PORT
+            port=DB_PORT,
+            ssl="require" if DB_SSL else None,
         )
 
         try:
@@ -149,7 +184,8 @@ class MediaService(ABC):
             password=DB_PASSWORD,
             database=DB_NAME,
             host=DB_HOST,
-            port=DB_PORT
+            port=DB_PORT,
+            ssl="require" if DB_SSL else None,
         )
 
         try:
@@ -173,7 +209,8 @@ class MediaService(ABC):
             password=DB_PASSWORD,
             database=DB_NAME,
             host=DB_HOST,
-            port=DB_PORT
+            port=DB_PORT,
+            ssl="require" if DB_SSL else None,
         )
 
         try:
