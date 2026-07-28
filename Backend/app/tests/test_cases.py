@@ -1446,3 +1446,65 @@ async def test_add_comment_user_blocked_on_open_case():
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == "Users may only comment on closed cases"
 
+def make_mock_connection_with_transaction():
+    connection = AsyncMock()
+    transaction_cm = MagicMock()
+    transaction_cm.__aenter__ = AsyncMock(return_value=None)
+    transaction_cm.__aexit__ = AsyncMock(return_value=False)
+    connection.transaction = MagicMock(return_value=transaction_cm)
+    return connection
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_delete_case_not_found(mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    connection.fetchrow = AsyncMock(return_value=None)
+
+    result = await Case.deleteCase(uuid4(), "someone", "USER")
+
+    assert result == {"deleted": False, "reason": "not_found"}
+    connection.close.assert_called_once()
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_delete_case_unauthorized(mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    connection.fetchrow = AsyncMock(return_value={"casecreator": "tha_real_creator"})
+
+    result = await Case.deleteCase(uuid4(), "someone_eklse", "USER")
+
+    assert result == {"deleted": False, "reason": "unauthorized"}
+    #connection.close.assert_called_once()
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+async def test_delete_case_success_with_orphan_media_cleanup(mockMinioClass, mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    case_id = uuid4()
+
+    connection.fetchrow = AsyncMock(side_effect=[
+        {"casecreator": "tha_real_creator"},
+        {"caseid": case_id},
+        {"mediaid": "media-1", "mediabucket": "evidence-bucket", "mediaextension": ".jpg" },
+        ])
+
+    connection.fetch = AsyncMock(return_value=[{"mediaid": "media-1"}])
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+
+    result = await Case.deleteCase(case_id, "tha_real_creator", "USER")
+
+    assert result == {"deleted": True, "reason": "deleted"}
+    mockMinioClient.remove_object.assert_called_once_with(
+        bucket_name="evidence-bucket",
+        object_name="media-1.jpg"
+    )
+    connection.close.assert_called_once()
