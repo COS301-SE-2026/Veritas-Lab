@@ -25,6 +25,8 @@ jobs:
             - name: install dependencies
               run: |
                   cd Backend
+                  python -m pip install --upgrade pip==24.2
+                  python -m pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cpu
                   python -m pip install -r requirements/base.txt
                   
             - name: debug env
