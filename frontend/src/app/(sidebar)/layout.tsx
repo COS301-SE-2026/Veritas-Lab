@@ -36,12 +36,14 @@ export default async function SidebarLayout({ children }: { children: React.Reac
     const token = await getCookie();
     const currentUser = getUserFromToken(token);
 
-    return(
+    return (
         <SidebarWrapper>
             <UserRoleProvider user={currentUser}>
-                <div className="flex">
+                <div className="flex min-h-screen bg-[var(--color-primary)]">
                     <Sidebar />
-                    <main className="flex-1 p-4">
+                    <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden
+                                    bg-[var(--color-lightest)] rounded-l-3xl
+                                    shadow-[-8px_0_24px_var(--color-dark)]/50">
                         {children}
                     </main>
                 </div>
