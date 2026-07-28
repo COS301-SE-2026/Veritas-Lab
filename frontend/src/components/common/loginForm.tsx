@@ -21,7 +21,7 @@ export default function LoginForm() {
 
             <form className="mt-8 flex w-full flex-col gap-5" onSubmit={handleSubmit} noValidate>
                 <div className="flex flex-col gap-1.5">
-                    <Label text="Email" htmlFor="email" className="font-medium" />
+                    <Label text="Email" htmlFor="email" className="font-medium text-[var(--color-text)]" />
                     <Input
                         id="email"
                         type="email"
@@ -35,12 +35,12 @@ export default function LoginForm() {
 
                 <div className="flex flex-col gap-1.5">
                     <div className="flex items-baseline justify-between">
-                        <Label text="Password" htmlFor="password" className="font-medium" />
+                        <Label text="Password" htmlFor="password" className="font-medium text-[var(--color-text)]" />
                     </div>
                     <Input
                         id="password"
                         type="password"
-                        placeholder="••••••••"
+                        placeholder="•••••••••••"
                         
                         value={formState.password}
                         onChange={(value) => updateField('password', value)}
@@ -68,7 +68,7 @@ export default function LoginForm() {
                 </div>
 
                 <Button
-                    text={status.isSubmitting ? 'Logging in…' : 'Login'}
+                    text={status.isSubmitting ? 'Logging in...' : 'Login'}
                     type="submit"
                     variant="submit"
                     disabled={status.isSubmitting}
