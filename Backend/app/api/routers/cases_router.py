@@ -6,18 +6,20 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List
 from app.core.cases import Case
 from app.auth.auth import verifyJWT
-from app.core.env import ENVLoader
+from app.core.env import ENVLoader, IS_PROD
 import asyncpg
 from uuid import UUID
 import os
-from urllib.parse import urlparse
-from minio import Minio
 from datetime import datetime, timedelta, timezone
 import uuid
 from uuid import uuid4
 from app.core.media_relay import MediaRelay
 from pathlib import Path
 
+
+import boto3
+from botocore.client import Config
+from mypy_boto3_s3 import S3Client
 env = ENVLoader()
 
 DB_USER= env.getRequiredEnv("DB_USER")
@@ -41,6 +43,54 @@ async def getConnection() -> asyncpg.Connection:
         port=DB_PORT,
         ssl="require" if DB_SSL else None,
     )
+
+def getObject(for_presign: bool = False) -> S3Client:
+    if not IS_PROD:
+
+        if for_presign:
+            minio_domain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
+        else:
+            minio_domain = os.getenv("STORAGE_URL", "http://localhost:9000")
+        
+        
+        if not minio_domain.startswith(("http://", "https://")):
+            minio_domain = f"http://{minio_domain}"
+
+        return boto3.client(
+            "s3",
+            endpoint_url=minio_domain,
+            aws_access_key_id=os.getenv("MINIO_ROOT_USER"),
+            aws_secret_access_key=os.getenv("MINIO_ROOT_PASSWORD"),
+            region_name=os.getenv("AWS_REGION", "us-east-1"),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
+
+    else:
+        cloud_url = os.getenv("R2_URL", "")
+        
+        if not cloud_url.startswith(("http://", "https://")):
+            cloud_url = f"https://{cloud_url}"
+
+        key_id=os.getenv("R2_ACCESS_KEY_ID")
+        secret=os.getenv("R2_SECRET_ACCESS_KEY")
+        print(f"Key ID: {repr(key_id)}")
+        print(f"Secret Length: {len(secret) if secret else 'None'}")
+
+        return boto3.client(
+            "s3",
+            endpoint_url=cloud_url,
+            aws_access_key_id=key_id,
+            aws_secret_access_key=secret,
+            region_name="auto",
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
+
 
 router = APIRouter(
     prefix="/api",
@@ -121,25 +171,19 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
     media_bucket = row["mediabucket"]
     media_name = row["mediatitle"]
 
-    minio_domain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
-    parsed_url = urlparse(minio_domain)
-    minio_endpoint = parsed_url.netloc if parsed_url.netloc else minio_domain
-    is_secure = parsed_url.scheme == "https"
+    
             #Creation of presigned URL below
     target_filename = f"{media_id}{media_extension}"
     if user: # so none user log in block
-        presign_client = Minio(
-            minio_endpoint, # External domain the browser uses
-            access_key=os.getenv("MINIO_ROOT_USER"),
-            secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
-            region=os.getenv("AWS_REGION"),
-            secure=is_secure
-        )
+        presign_client =  getObject(for_presign=True)
 
-        file_url = presign_client.presigned_get_object(
-            bucket_name=media_bucket,
-            object_name=target_filename,
-            expires=timedelta(hours=1)
+        file_url = presign_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket':media_bucket,
+                'Key': target_filename
+            },
+            ExpiresIn=3600 # An hour 
         )
     else:
         # user block: It needs the  url to be empty to hide the actual image since it could be sensitive info.
@@ -163,7 +207,10 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 @router.post(
     "/createCase",
     responses={
-        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+        403: {
+            "model": ErrorResponse,
+            "description": "Forbidden - User unauthorized"
+        },
     }
 )
 async def create_case(case_request: CreateCaseRequest, request: Request):

@@ -11,9 +11,9 @@ from starlette.datastructures import UploadFile
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
+@patch("app.core.cases.getObject")
 @patch("uuid.uuid4")
-async def test_images_Upload_Success(mockUuid, mockMinioClass, mockDbConnect):
+async def test_images_Upload_Success(mockUuid, mockGetObject, mockDbConnect):
     """
     Test successful evidence processing and extension identification
     """
@@ -45,8 +45,10 @@ async def test_images_Upload_Success(mockUuid, mockMinioClass, mockDbConnect):
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockStorageClient.put_object = MagicMock()
+    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id = uuid.uuid4()
@@ -91,9 +93,9 @@ async def test_InvalidFileType(mockDbConnect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
+@patch("app.core.cases.getObject")
 @patch("uuid.uuid4")
-async def test_sameImageDifferentName(mockUuid, mockMinioClass, mockDbConnect):
+async def test_sameImageDifferentName(mockUuid, mockGetObject, mockDbConnect):
     """
     Testing the image hash for dupe  prevention
     """
@@ -138,8 +140,10 @@ async def test_sameImageDifferentName(mockUuid, mockMinioClass, mockDbConnect):
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockStorageClient.put_object = MagicMock()
+    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id_1 = uuid.uuid4()
@@ -166,9 +170,9 @@ async def test_sameImageDifferentName(mockUuid, mockMinioClass, mockDbConnect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
+@patch("app.core.cases.getObject")
 @patch("uuid.uuid4")
-async def test_duplicateReportViolatesConstraint(mockUuid, mockMinioClass, mockDbConnect):
+async def test_duplicateReportViolatesConstraint(mockUuid, mockGetObject, mockDbConnect):
     """
     Test uniqueness error handling when dupes in same case appear
     """
@@ -220,8 +224,10 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockMinioClass, mockD
     )
     mockDbConnection.close = AsyncMock()
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockStorageClient.put_object = MagicMock()
+    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id = uuid.uuid4()
@@ -241,8 +247,8 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockMinioClass, mockD
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-async def test_deleteEvidence_investigator_duplicate_entry(mockMinioClass, mockDbConnect):
+@patch("app.core.cases.getObject")
+async def test_deleteEvidence_investigator_duplicate_entry(mockGetObject, mockDbConnect):
     """
 An investigator deletes a duplicate. Only the report is deleted.
     """
@@ -253,8 +259,8 @@ An investigator deletes a duplicate. Only the report is deleted.
     mockDbConnection.fetchrow = AsyncMock(return_value=None)
     mockDbConnection.close = AsyncMock()
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -264,15 +270,15 @@ An investigator deletes a duplicate. Only the report is deleted.
     result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
 
     mockDbConnection.execute.assert_called_once()
-    mockMinioClient.remove_object.assert_not_called()
+    mockStorageClient.delete_object.assert_not_called()
     assert result["Status"] == "success"
     assert result["Deleted"] == test_media_id
 
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-async def test_deleteEvidence_investigator_only_entry(mockMinioClass, mockDbConnect):
+@patch("app.core.cases.getObject")
+async def test_deleteEvidence_investigator_only_entry(mockGetObject, mockDbConnect):
     """
 An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
     """
@@ -289,8 +295,8 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
     mockDbConnection.close = AsyncMock()
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -299,17 +305,17 @@ An investigator deletes the only entry for that evidence.The report is deleted a
 
     result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
 
-    mockMinioClient.remove_object.assert_called_once_with(
-        bucket_name="evidence-bucket",
-        object_name="mocked-uuid.jpg"
+    mockStorageClient.delete_object.assert_called_once_with(
+        Bucket="evidence-bucket",
+        Key="mocked-uuid.jpg"
     )
     assert result["Status"] == "success"
 
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-async def test_deleteEvidence_admin_duplicate_entry(mockMinioClass, mockDbConnect):
+@patch("app.core.cases.getObject")
+async def test_deleteEvidence_admin_duplicate_entry(mockGetObject, mockDbConnect):
     """
 An admin deletes a duplicate. Therefore only the report is deleted
     """
@@ -319,8 +325,8 @@ An admin deletes a duplicate. Therefore only the report is deleted
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
     mockDbConnection.fetchrow = AsyncMock(return_value=None)
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -329,14 +335,14 @@ An admin deletes a duplicate. Therefore only the report is deleted
     result = await case.deleteEvidence(media_id=test_media_id)
 
     mockDbConnection.execute.assert_called_once()
-    mockMinioClient.remove_object.assert_not_called()
+    mockStorageClient.delete_object.assert_not_called()
     assert result["Status"] == "success"
 
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-async def test_deleteEvidence_admin_only_entry(mockMinioClass, mockDbConnect):
+@patch("app.core.cases.getObject")
+async def test_deleteEvidence_admin_only_entry(mockGetObject, mockDbConnect):
     """
 An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
     """
@@ -352,8 +358,8 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mockStorageClient = MagicMock()
+    mockGetObject.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -361,9 +367,9 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     
     result = await case.deleteEvidence(media_id=test_media_id)
 
-    mockMinioClient.remove_object.assert_called_once_with(
-        bucket_name="evidence-bucket",
-        object_name="admin-mocked-uuid.png"
+    mockStorageClient.delete_object.assert_called_once_with(
+        Bucket="evidence-bucket",
+        Key="admin-mocked-uuid.png"
     )
     assert result["Status"] == "success"
 

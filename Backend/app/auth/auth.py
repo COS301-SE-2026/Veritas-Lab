@@ -40,16 +40,7 @@ router = APIRouter(
 )
 
 def verifyJWT(request: Request) -> dict:
-    #if authorizationHeader is None or authorizationHeader.strip() == "":
-    #    raise ValueError("Missing Authorization header")
 
-    #if not authorizationHeader.startswith("Bearer "):
-    #    raise ValueError("Invalid Authorization header format")
-
-    ## token = authorizationHeader.replace("Bearer ", "", 1).strip()
-    #token = 
-    #if token == "":
-    #    raise ValueError("Missing JWT token")
 
     token = request.cookies.get(COOKIE_NAME)
     if not token:
