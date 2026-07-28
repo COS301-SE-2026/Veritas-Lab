@@ -446,3 +446,113 @@ async def tes_addEvidence_invalid_case_id_uuid():
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail == "Invalid case_id UUID"
+
+@pytest.mark.asyncio
+@patch("app.core.cases.PdfReader")
+async def test_addEvidence_pdf_open_action_rejected(mockPdfReaderClass):
+    fileContent = b"fake pdf bytes"
+    testContent = io.BytesIO(fileContent)
+
+    mockMedia = UploadFile(
+        file=testContent,
+        filename="system_danger.pdf",
+        headers={"content-type": "application/pdf"}
+    )
+
+    mockRootIndirect = MagicMock()
+    mockRootIndirect.get_object.return_value = {"/OpenAction": MagicMock()}
+
+    mockReader = MagicMock()
+    mockReader.trailer = {"/Root": mockRootIndirect}
+    mockPdfReaderClass.return_value = mockReader
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    test_case_id = uuid.uuid4()
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+
+    assert excInfo.value.status_code == 400
+    assert "security concern" in excInfo.value.detail
+
+@pytest.mark.asyncio
+@patch("app.core.cases.PdfReader")
+async def test_addEvidence_pdf_javascript_rejected(mockPdfReaderClass):
+    fileContent = b"fake pdf bytes"
+    testContent = io.BytesIO(fileContent)
+
+    mockMedia = UploadFile(
+        file=testContent,
+        filename="scripted.pdf",
+        headers={"content-type": "application/pdf"}
+    )
+
+    mockNamesIndirect = MagicMock()
+    mockNamesIndirect.get_object.return_value = {"/JavaScript": MagicMock()}
+
+    mockRootIndirect = MagicMock()
+    mockRootIndirect.get_object.return_value = {"/Names": mockNamesIndirect}
+
+    mockReader = MagicMock()
+    mockReader.trailer = {"/Root": mockRootIndirect}
+    mockPdfReaderClass.return_value = mockReader
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    test_case_id = uuid.uuid4()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+
+    assert exc_info.value.status_code == 400
+    assert "security concern" in exc_info.value.detail
+    
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.Minio")
+@patch("app.core.cases.PdfReader")
+@patch("uuid.uuid4")
+async def test_addEvidence_pdf_javascript_rejected(mockUuid,mockPdfReaderClass, mockMinioClass, mockDbConnect):
+    fileContent = b"fake pdf bytes"
+    testContent = io.BytesIO(fileContent)
+
+    mockMedia = UploadFile(
+        file=testContent,
+        filename="clean.pdf",
+        headers={"content-type": "application/pdf"}
+    )
+
+    mockRootIndirect = MagicMock()
+    mockRootIndirect.get_object.return_value = {}
+
+    mockReader = MagicMock()
+    mockReader.trailer = {"/Root": mockRootIndirect}
+    mockPdfReaderClass.return_value = mockReader
+
+    fakeUuidString = "33333333-abcd-ef01-2345-6789abcdef01"
+    mockUuid.return_value = fakeUuidString
+
+    mockDbConnection = AsyncMock()
+    mockDbConnection.return_value = mockDbConnection
+
+    mockMediaTypeRecord = {
+        "MediaTypeId": "type-222",
+        "MediaBucket": "documents",
+        "MediaExtension": ".pdf"
+    }
+
+    mockDbConnection.fetchrow = AsyncMock(side_effect=[mockMediaTypeRecord, None])
+    mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-456")
+    mockDbConnection.execute = AsyncMock()
+    mockDbConnection.close = AsyncMock()
+
+    mockMinioClient = MagicMock()
+    mockMinioClass.return_value = mockMinioClient
+    
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    test_case_id = uuid.uuid4()
+
+    result = await case.addEvidence(media=mockMedia, case_id=test_case_id)
+
+    assert result is not None 
+    assert "url" in result
