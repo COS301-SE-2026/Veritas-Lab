@@ -427,3 +427,22 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == "Media not found."
+
+@pytest.mark.asyncio
+async def tes_addEvidence_invalid_case_id_uuid():
+    fileContent = b"A fake binary for a png"
+    testContent = io.BytesIO(fileContent)
+
+    mockMedia = UploadFile(
+        file=testContent,
+        filename="we_are_cooked.png",
+        headers={"content-type": "image/png"}
+    )
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addEvidence(media=mockMedia, case_id="not-a-valid-uuid")
+
+    assert excInfo.value.status_code == 400
+    assert excInfo.value.detail == "Invalid case_id UUID"

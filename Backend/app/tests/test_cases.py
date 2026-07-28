@@ -1408,3 +1408,41 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
         "status": "error",
         "message": "Only the case creator or an admin can delete this case"
     }
+
+@pytest.mark.asyncio
+async def test_add_comment_case_not_found():
+    connection = AsyncMock()
+    connection.fetchrow = AsyncMock(return_value=None)
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case.CaseId = uuid4()
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addComment(connection, "someone", "comment_ig", "USER")
+
+    assert excInfo.value.status_code == 404
+    assert excInfo.value.detail == "Case not found"
+
+@pytest.mark.asyncio
+async def test_add_comment_user_blocked_on_open_case():
+    connection = AsyncMock()
+    connection.fetchrow = AsyncMock(return_value={
+        "commentid": None,
+        "caseid": None,
+        "username": None,
+        "comment": None,
+        "commenttimestamp": None,
+        "caseclosed": False,
+        "case_exists": True,
+        "comment_inserted": False
+    })
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case.CaseId = uuid4()
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addComment(connection, "someone", "comment_ig", "USER")
+        
+    assert excInfo.value.status_code == 403
+    assert excInfo.value.detail == "Users may only comment on closed cases"
+
