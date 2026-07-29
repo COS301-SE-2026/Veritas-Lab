@@ -32,3 +32,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-afacad), Arial, Helvetica, sans-serif;
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
