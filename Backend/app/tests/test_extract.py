@@ -185,7 +185,7 @@ async def test_get_media_record_not_found(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_download_media(monkeypatch):
+async def test_download_media(monkeypatch, tmp_path):
     service = ImageService()
 
     fake_s3_client = MagicMock()
@@ -196,13 +196,14 @@ async def test_download_media(monkeypatch):
         "object_name": "12345678-abcd-ef01-2345-6789abcdef01.jpg"
     }
 
-    await service.downloadMedia(media_record, "/tmp/test.jpg")
+    file_path = str(tmp_path / "test.jpg")
 
-    fake_s3_client.download_fileobj.assert_called_once_with(
-        Bucket="jpg-bucket",
-        Key="12345678-abcd-ef01-2345-6789abcdef01.jpg",
-        Fileobj=ANY
-    )
+    await service.downloadMedia(media_record, file_path)
+
+    call_kwargs = fake_s3_client.download_fileobj.call_args.kwargs
+    assert call_kwargs["Bucket"] == "jpg-bucket"
+    assert call_kwargs["Key"] == "12345678-abcd-ef01-2345-6789abcdef01.jpg"
+    assert hasattr(call_kwargs["Fileobj"], "write")  
 
 
 def mock_env(monkeypatch, values):

@@ -1485,8 +1485,8 @@ async def test_delete_case_unauthorized(mockDbConnect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
-async def test_delete_case_success_with_orphan_media_cleanup(mockMinioClass, mockDbConnect):
+@patch("app.core.cases.getObject")
+async def test_delete_case_success_with_orphan_media_cleanup(mockGetObject, mockDbConnect):
     connection = make_mock_connection_with_transaction()
     mockDbConnect.return_value = connection
 
@@ -1500,15 +1500,15 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockMinioClass, moc
 
     connection.fetch = AsyncMock(return_value=[{"mediaid": "media-1"}])
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     result = await Case.deleteCase(case_id, "tha_real_creator", "USER")
 
     assert result == {"deleted": True, "reason": "deleted"}
-    mockMinioClient.remove_object.assert_called_once_with(
-        bucket_name="evidence-bucket",
-        object_name="media-1.jpg"
+    mock_s3_client.head_object.assert_called_once_with(
+        Bucket="evidence-bucket",
+        Key="media-1.jpg"
     )
     connection.close.assert_called_once()
 

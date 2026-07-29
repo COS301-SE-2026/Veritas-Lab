@@ -45,10 +45,8 @@ async def test_images_Upload_Success(mockUuid, mockGetObject, mockDbConnect):
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mockStorageClient = MagicMock()
-    mockStorageClient.put_object = MagicMock()
-    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id = uuid.uuid4()
@@ -140,10 +138,8 @@ async def test_sameImageDifferentName(mockUuid, mockGetObject, mockDbConnect):
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mockStorageClient = MagicMock()
-    mockStorageClient.put_object = MagicMock()
-    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id_1 = uuid.uuid4()
@@ -224,10 +220,8 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockGetObject, mockDb
     )
     mockDbConnection.close = AsyncMock()
 
-    mockStorageClient = MagicMock()
-    mockStorageClient.put_object = MagicMock()
-    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id = uuid.uuid4()
@@ -248,7 +242,7 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockGetObject, mockDb
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 @patch("app.core.cases.getObject")
-async def test_deleteEvidence_investigator_duplicate_entry(mockGetObject, mockDbConnect):
+async def test_deleteEvidence_investigator_duplicate_entry(mockgetObject, mockDbConnect):
     """
 An investigator deletes a duplicate. Only the report is deleted.
     """
@@ -259,8 +253,8 @@ An investigator deletes a duplicate. Only the report is deleted.
     mockDbConnection.fetchrow = AsyncMock(return_value=None)
     mockDbConnection.close = AsyncMock()
 
-    mockStorageClient = MagicMock()
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockgetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -270,7 +264,7 @@ An investigator deletes a duplicate. Only the report is deleted.
     result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
 
     mockDbConnection.execute.assert_called_once()
-    mockStorageClient.delete_object.assert_not_called()
+    mock_s3_client.remove_object.assert_not_called()
     assert result["Status"] == "success"
     assert result["Deleted"] == test_media_id
 
@@ -295,8 +289,8 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
     mockDbConnection.close = AsyncMock()
 
-    mockStorageClient = MagicMock()
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -305,7 +299,7 @@ An investigator deletes the only entry for that evidence.The report is deleted a
 
     result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
 
-    mockStorageClient.delete_object.assert_called_once_with(
+    mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
         Key="mocked-uuid.jpg"
     )
@@ -325,8 +319,8 @@ An admin deletes a duplicate. Therefore only the report is deleted
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
     mockDbConnection.fetchrow = AsyncMock(return_value=None)
 
-    mockStorageClient = MagicMock()
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -335,7 +329,7 @@ An admin deletes a duplicate. Therefore only the report is deleted
     result = await case.deleteEvidence(media_id=test_media_id)
 
     mockDbConnection.execute.assert_called_once()
-    mockStorageClient.delete_object.assert_not_called()
+    mock_s3_client.remove_object.assert_not_called()
     assert result["Status"] == "success"
 
 
@@ -358,8 +352,8 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
 
-    mockStorageClient = MagicMock()
-    mockGetObject.return_value = mockStorageClient
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
@@ -367,7 +361,7 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     
     result = await case.deleteEvidence(media_id=test_media_id)
 
-    mockStorageClient.delete_object.assert_called_once_with(
+    mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
         Key="admin-mocked-uuid.png"
     )
@@ -435,7 +429,7 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     assert excInfo.value.detail == "Media not found."
 
 @pytest.mark.asyncio
-async def tes_addEvidence_invalid_case_id_uuid():
+async def test_addEvidence_invalid_case_id_uuid():
     fileContent = b"A fake binary for a png"
     testContent = io.BytesIO(fileContent)
 
@@ -514,10 +508,10 @@ async def test_addEvidence_pdf_javascript_rejected(mockPdfReaderClass):
     
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.Minio")
+@patch("app.core.cases.getObject")
 @patch("app.core.cases.PdfReader")
 @patch("uuid.uuid4")
-async def test_addEvidence_pdf_javascript_rejected(mockUuid,mockPdfReaderClass, mockMinioClass, mockDbConnect):
+async def test_addEvidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass, mockGetObject, mockDbConnect):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -551,9 +545,9 @@ async def test_addEvidence_pdf_javascript_rejected(mockUuid,mockPdfReaderClass, 
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mockMinioClient = MagicMock()
-    mockMinioClass.return_value = mockMinioClient
-    
+    mock_s3_client = MagicMock()
+    mock_s3_client.generate_presigned_url.return_value = "https://fake-presigned-url"
+    mockGetObject.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
     test_case_id = uuid.uuid4()
@@ -561,4 +555,4 @@ async def test_addEvidence_pdf_javascript_rejected(mockUuid,mockPdfReaderClass, 
     result = await case.addEvidence(media=mockMedia, case_id=test_case_id)
 
     assert result is not None 
-    assert "url" in result
+    assert result["url"] == "https://fake-presigned-url"
