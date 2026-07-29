@@ -33,7 +33,7 @@ function formatValue(value: unknown): string {
         return '_';
     }
     if (Array.isArray(value)) {
-        return value.map((item) => String(item)).join(', ');
+        return value.map(String).join(', ');
     }
     return String(value);
 }
