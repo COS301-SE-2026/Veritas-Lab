@@ -10,7 +10,6 @@ import hashlib
 from dotenv import load_dotenv
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
-from minio import Minio
 from pypdf import PdfReader
 from datetime import datetime, timedelta, timezone
 import boto3
@@ -30,7 +29,7 @@ DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 
 _MISSING_CASE_ID = "Case id is missing"
 
-async def getConnection() -> asyncpg.Connection:
+async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -121,7 +120,7 @@ class Case:
         if self.CaseId is not None:
             raise ValueError("This case already exists")
         
-        connection = await getConnection()
+        connection = await get_connection()
 
         try:
             row = await connection.fetchrow(
@@ -196,7 +195,7 @@ class Case:
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid case_id UUID")
 
-        connection = await getConnection()
+        connection = await get_connection()
 
         try:
             typeRecord = await connection.fetchrow(
@@ -362,7 +361,7 @@ class Case:
         connection = None
 
         try:
-            connection=await getConnection()
+            connection=await get_connection()
 
             if JWT_username is not None:
 
@@ -505,7 +504,7 @@ class Case:
 
         connection = None
         try:
-            connection = await getConnection()
+            connection = await get_connection()
 
             rows = await connection.fetch(
             """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
@@ -590,7 +589,7 @@ class Case:
 
     @staticmethod
     async def deleteCase(case_id: uuid.UUID, username: str, role: str):
-        connection = await getConnection()
+        connection = await get_connection()
 
         orphan_media = []
 
