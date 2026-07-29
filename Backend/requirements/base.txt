@@ -101,3 +101,4 @@ Werkzeug==3.1.8
 wrapt==1.17.3
 xmltodict==1.0.4
 yarl==1.23.0
+mypy-boto3-s3

@@ -525,7 +525,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         }
     ]
 
-    mock_minio_client.presigned_get_object.return_value = fake_url
+    mock_minio_client.generate_presigned_url.return_value = fake_url
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=fake_row)
@@ -536,7 +536,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
-    monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
+    monkeypatch.setattr(cases_router.boto3, "client", MagicMock(return_value=mock_minio_client))
 
     with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
         mock_get_comments.return_value = []
