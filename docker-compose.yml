@@ -46,6 +46,7 @@ services:
             - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
             - MINIO_EXTERNAL_URL=${MINIO_EXTERNAL_URL}
             - FRONTEND_ORIGIN=${FRONTEND_ORIGIN}
+            - STORAGE_URL=${STORAGE_URL}
             - AWS_REGION=${AWS_REGION}        
             - ADMIN_NAME=${ADMIN_NAME}
             - ADMIN_EMAIL=${ADMIN_EMAIL}
