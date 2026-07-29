@@ -19,13 +19,13 @@ export default function LandingNavbar() {
 
     return (
         <header
-            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out
+            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out bg-(--color-primary)
                 ${visible
                     ? 'translate-y-0 opacity-100'
                     : '-translate-y-full opacity-0 pointer-events-none'}`}
         >
             <nav className="flex items-center justify-between gap-4 px-6 sm:px-10 py-3
-                            bg-white/80 backdrop-blur-xl border-b border-black/5
+                            backdrop-blur-xl border-b border-black/5
                             shadow-[0_8px_30px_-12px_var(--color-dark)]/10">
                 <button
                     type="button"
@@ -33,13 +33,13 @@ export default function LandingNavbar() {
                     className="flex items-center gap-3 cursor-pointer"
                 >
                     <Image
-                        src="/VL_Logo.svg"
+                        src="/VL_Logo_light.svg"
                         alt="Veritas Lab"
                         width={40}
                         height={40}
                         className="size-9 sm:size-10"
                     />
-                    <span className="text-(--color-text) text-xl sm:text-2xl font-semibold">
+                    <span className="text-(--color-lightest) text-xl sm:text-2xl font-semibold">
                         Veritas Lab
                     </span>
                 </button>

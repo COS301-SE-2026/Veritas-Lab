@@ -141,3 +141,16 @@ export interface Highlight {
     description: string;
     icon: LucideIcon;
 }
+
+export type Step = {
+    number: string;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+};
+
+export type Audience = {
+    title: string;
+    description: string;
+    icon: LucideIcon;
+};
