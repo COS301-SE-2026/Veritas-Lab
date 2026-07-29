@@ -6,10 +6,12 @@ on:
 
 jobs:
     deploy-preview:
+        # Vercel frontend preview runs whenever CI passes
+        if: github.event_name == 'pull_request'
         runs-on: ubuntu-latest
         timeout-minutes: 10
         environment:
-            name: Preview - veritas-lab
+            name: Dev - veritas-lab
             url: ${{ steps.deploy.outputs.url }}
         env:
             VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -28,3 +30,18 @@ jobs:
                   url="$(vercel deploy --token="$VERCEL_TOKEN")"
                   echo "url=$url" >> "$GITHUB_OUTPUT"
                   echo "preview deployed to $url"
+    deploy-backend:
+        # Render backend: only on merge/push to dev
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        concurrency:
+            group: render-backend-dev
+            cancel-in-progress: false
+        steps:
+            - name: trigger Render deploy
+              env:
+                  HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+              run: |
+                  curl -fsS -X POST "$HOOK"
+                  echo "Render deploy triggered"
