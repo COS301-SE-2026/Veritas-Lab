@@ -521,6 +521,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "reportartifacts": {"ocr": "captured"},
             "reportfindings": "Flood watermark detected",
             "reportcomments": "Upload approved",
+            "reportcertainty": 1,
             "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
         }
     ]
@@ -569,6 +570,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
                 "mediaUrl": fake_url,
                 "annotations": fake_annotations,
                 "reportArtifacts": {"ocr": "captured"},
+                "reportCertainty": 1,
                 "reportFindings": "Flood watermark detected",
                 "reportComments": "Upload approved",
                 "reportDateCreation": "2026-05-21T08:15:00+00:00"
@@ -611,6 +613,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
         "mediatypeid": media_type_uuid,
         "mediabucket": "evidence-bucket",
         "mediaextension": ".jpg",
+        "reportcertainty": None,
         "annotations": [],
     }
 

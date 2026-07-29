@@ -201,6 +201,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         "reportArtifacts": json.loads(row["reportartifacts"]) if isinstance(row["reportartifacts"], str) else row["reportartifacts"],
         "reportFindings": row["reportfindings"],
         "reportComments": row["reportcomments"],
+        "reportCertainty": row["reportcertainty"],
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
     }
 
@@ -432,6 +433,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 r.imagetitle AS "mediatitle",
                 r.ReportFindings AS "reportfindings",
                 r.ReportComments AS "reportcomments",
+                r.ReportCertainty AS "reportcertainty",
                 r.ReportDateCreation AS "reportdatecreation",
                 m.MediaTypeId AS "mediatypeid",
                 m.MediaBucket AS "mediabucket",
