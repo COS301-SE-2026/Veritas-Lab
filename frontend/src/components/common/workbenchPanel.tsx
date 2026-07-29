@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Pencil, Save, Trash2 } from 'lucide-react';
+import { Columns2, Pencil, Save, Trash2 } from 'lucide-react';
 import SliderBar from '@/components/ui/sliderBar';
 import Button from '@/components/ui/button';
 import AnnotationList from '@/components/common/annotationList';
@@ -23,6 +23,7 @@ export default function WorkbenchPanel({
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
     const isAnnotationsActive = activeWorkbenchTool === 'Annotations';
+    const isCompareActive = activeWorkbenchTool === 'Compare';
 
     const handleSave = async () => {
         setSaveStatus('saving');
@@ -41,7 +42,7 @@ export default function WorkbenchPanel({
                 <p className="mt-1 text-xs text-(--color-light)">Select a tool to work on this evidence.</p>
             </div>
 
-            {/* Tool list which only has annotations for now. It should grow as we add more tools*/}
+            {/* Tool list. currently: Annotations and the metadata Comparison view. */}
             <button
                 type="button"
                 onClick={() => onSelectWorkbenchTool(isAnnotationsActive ? null : 'Annotations')}
@@ -54,6 +55,21 @@ export default function WorkbenchPanel({
             >
                 <Pencil size={16} className="shrink-0" />
                 Annotations
+            </button>
+
+            {/* Shows the metadata side by side view */}
+            <button
+                type="button"
+                onClick={() => onSelectWorkbenchTool(isCompareActive ? null : 'Compare')}
+                aria-pressed={isCompareActive}
+                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${
+                    isCompareActive
+                        ? 'bg-(--color-secondary) text-(--color-text)'
+                        : 'text-(--color-text) hover:bg-(--color-lightest)'
+                }`}
+            >
+                <Columns2 size={16} className="shrink-0" />
+                View side by side
             </button>
 
             {/* Annotation controls only exist while the Annotations tool is active */}

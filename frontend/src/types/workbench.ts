@@ -65,8 +65,8 @@ export type AnnotationListProps = {
     onRemove: (id: string) => void;
 };
 
-// Workbench tools currently there is only annotations.
-export type WorkbenchTool = 'Annotations';
+// Workbench tools which now has both annotations and metadata compar.
+export type WorkbenchTool = 'Annotations' | 'Compare';
 
 export type WorkbenchPanelProps = {
     activeWorkbenchTool: WorkbenchTool | null;

@@ -563,6 +563,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "reportartifacts": {"ocr": "captured"},
             "reportfindings": "Flood watermark detected",
             "reportcomments": "Upload approved",
+            "reportcertainty": 1,
             "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
         }
     ]
@@ -623,6 +624,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
                 "mediaUrl": fake_url,
                 "annotations": fake_annotations,
                 "reportArtifacts": {"ocr": "captured"},
+                "reportCertainty": 1,
                 "reportFindings": "Flood watermark detected",
                 "reportComments": "Upload approved",
                 "reportDateCreation": "2026-05-21T08:15:00+00:00"
@@ -665,6 +667,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
         "mediatypeid": media_type_uuid,
         "mediabucket": "evidence-bucket",
         "mediaextension": ".jpg",
+        "reportcertainty": None,
         "annotations": [],
     }
 
@@ -1573,4 +1576,207 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
     assert response.json() == {
         "status": "error",
         "message": "Only the case creator or an admin can delete this case"
+    }
+
+@pytest.mark.asyncio
+async def test_add_comment_case_not_found():
+    connection = AsyncMock()
+    connection.fetchrow = AsyncMock(return_value=None)
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case.CaseId = uuid4()
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addComment(connection, "someone", "comment_ig", "USER")
+
+    assert excInfo.value.status_code == 404
+    assert excInfo.value.detail == "Case not found"
+
+@pytest.mark.asyncio
+async def test_add_comment_user_blocked_on_open_case():
+    connection = AsyncMock()
+    connection.fetchrow = AsyncMock(return_value={
+        "commentid": None,
+        "caseid": None,
+        "username": None,
+        "comment": None,
+        "commenttimestamp": None,
+        "caseclosed": False,
+        "case_exists": True,
+        "comment_inserted": False
+    })
+
+    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case.CaseId = uuid4()
+
+    with pytest.raises(HTTPException) as excInfo:
+        await case.addComment(connection, "someone", "comment_ig", "USER")
+        
+    assert excInfo.value.status_code == 403
+    assert excInfo.value.detail == "Users may only comment on closed cases"
+
+def make_mock_connection_with_transaction():
+    connection = AsyncMock()
+    transaction_cm = MagicMock()
+    transaction_cm.__aenter__ = AsyncMock(return_value=None)
+    transaction_cm.__aexit__ = AsyncMock(return_value=False)
+    connection.transaction = MagicMock(return_value=transaction_cm)
+    return connection
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_delete_case_not_found(mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    connection.fetchrow = AsyncMock(return_value=None)
+
+    result = await Case.deleteCase(uuid4(), "someone", "USER")
+
+    assert result == {"deleted": False, "reason": "not_found"}
+    connection.close.assert_called_once()
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+async def test_delete_case_unauthorized(mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    connection.fetchrow = AsyncMock(return_value={"casecreator": "tha_real_creator"})
+
+    result = await Case.deleteCase(uuid4(), "someone_eklse", "USER")
+
+    assert result == {"deleted": False, "reason": "unauthorized"}
+    #connection.close.assert_called_once()
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.getObject")
+async def test_delete_case_success_with_orphan_media_cleanup(mockGetObject, mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    case_id = uuid4()
+
+    connection.fetchrow = AsyncMock(side_effect=[
+        {"casecreator": "tha_real_creator"},
+        {"caseid": case_id},
+        {"mediaid": "media-1", "mediabucket": "evidence-bucket", "mediaextension": ".jpg" },
+        ])
+
+    connection.fetch = AsyncMock(return_value=[{"mediaid": "media-1"}])
+
+    mock_s3_client = MagicMock()
+    mockGetObject.return_value = mock_s3_client
+
+    result = await Case.deleteCase(case_id, "tha_real_creator", "USER")
+
+    assert result == {"deleted": True, "reason": "deleted"}
+    mock_s3_client.head_object.assert_called_once_with(
+        Bucket="evidence-bucket",
+        Key="media-1.jpg"
+    )
+    connection.close.assert_called_once()
+
+def test_get_comments_missing_jwt(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        raise ValueError("Missing authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing authorization header"
+    }
+
+def test_delete_evidence_missing_jwt(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        raise ValueError("Missing authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing authorization header"
+    }
+
+def test_delete_evidence_success(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_result = {
+        "Status": "success",
+        "Deleted": "22222222-abcd-ef01-2345-6789abcdef01"
+    }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.Case, "deleteEvidence", AsyncMock(return_value=fake_result))
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == fake_result
+
+def test_delete_evidence_invalid_media_id(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/not-a-valid-uuid"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid UUID format for media_id."
+    }
+
+def test_delete_evidence_user_forbidden(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "some_user",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
     }
