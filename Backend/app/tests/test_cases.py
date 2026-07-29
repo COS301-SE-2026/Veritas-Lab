@@ -1508,3 +1508,4 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockMinioClass, moc
         object_name="media-1.jpg"
     )
     connection.close.assert_called_once()
+

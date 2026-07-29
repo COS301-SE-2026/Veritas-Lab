@@ -387,10 +387,10 @@ async def test_pdf_service_ai_analysis_stub():
     }
 
 @pytest.mark.asyncio
-async def test_pdf_service_analse_metadata_stub():
+async def test_pdf_service_analyse_metadata_stub():
     service = PDFService() 
 
-    result = await service.analyseMetadata({"some:" "metadata"})
+    result = await service.analyseMetadata({"some": "metadata"})
 
-    assert result.certainty == "0"
+    assert result.Certainty == 0
     assert result.Findings == "NOT implemented yet"
