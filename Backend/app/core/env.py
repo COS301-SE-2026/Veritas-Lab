@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+IS_PROD = os.environ.get("ENVIRONMENT", "development").strip().lower() == "production"
+
 class ENVLoader:
 
     def getRequiredEnv(self, name: str) -> str:
