@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
+import MetadataComparison from '@/components/common/workbenchSideBySide';
 import useAnnotations from '@/lib/hooks/useAnnotations';
 import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
@@ -56,6 +57,7 @@ export default function WorkbenchPage() {
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);
     const annotationsActive = activeWorkbenchTool === 'Annotations';
+    const comparisonActive = activeWorkbenchTool === 'Compare';
 
     const handleSave = () => saveAnnotations({ evidenceId, annotations });
 
@@ -90,6 +92,14 @@ export default function WorkbenchPage() {
                         onAddShape={addShape}
                         onAddNote={addNote}
                     />
+
+                    {comparisonActive ? (
+                        <MetadataComparison
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            metadata={evidence?.reportArtifacts}
+                        />
+                    ) : null}
                 </div>
 
                 <WorkbenchPanel

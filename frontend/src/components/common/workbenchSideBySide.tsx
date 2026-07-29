@@ -13,7 +13,7 @@ function formatValue(value: unknown): string
 {
     if(value === null || value === undefined || value === '')
     {
-        return '—';
+        return '_';
     }
     if(Array.isArray(value))
     {
