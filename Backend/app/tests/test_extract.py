@@ -198,7 +198,7 @@ async def test_download_media(monkeypatch, tmp_path):
 
     file_path = str(tmp_path / "test.jpg")
 
-    await service.downloadMedia(media_record, file_path)
+    await service.download_media(media_record, file_path)
 
     call_kwargs = fake_s3_client.download_fileobj.call_args.kwargs
     assert call_kwargs["Bucket"] == "jpg-bucket"
@@ -389,7 +389,7 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
 async def test_pdf_service_ai_analysis_stub():
     service = PDFService() 
 
-    result = await service.AIAnalysis("some/path.pdf")
+    result = await service.ai_analysis("some/path.pdf")
 
     assert result == {
         "risk_level": 0,
@@ -402,7 +402,7 @@ async def test_pdf_service_ai_analysis_stub():
 async def test_pdf_service_analyse_metadata_stub():
     service = PDFService() 
 
-    result = await service.analyseMetadata({"some": "metadata"})
+    result = await service.analyse_metadata({"some": "metadata"})
 
     assert result.Certainty == 0
     assert result.Findings == "NOT implemented yet"

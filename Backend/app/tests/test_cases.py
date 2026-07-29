@@ -1587,7 +1587,7 @@ async def test_add_comment_case_not_found():
     case.CaseId = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addComment(connection, "someone", "comment_ig", "USER")
+        await case.add_comment(connection, "someone", "comment_ig", "USER")
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == "Case not found"
@@ -1610,7 +1610,7 @@ async def test_add_comment_user_blocked_on_open_case():
     case.CaseId = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addComment(connection, "someone", "comment_ig", "USER")
+        await case.add_comment(connection, "someone", "comment_ig", "USER")
         
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == "Users may only comment on closed cases"
@@ -1631,7 +1631,7 @@ async def test_delete_case_not_found(mockDbConnect):
 
     connection.fetchrow = AsyncMock(return_value=None)
 
-    result = await Case.deleteCase(uuid4(), "someone", "USER")
+    result = await Case.delete_case(uuid4(), "someone", "USER")
 
     assert result == {"deleted": False, "reason": "not_found"}
     connection.close.assert_called_once()
@@ -1644,15 +1644,18 @@ async def test_delete_case_unauthorized(mockDbConnect):
 
     connection.fetchrow = AsyncMock(return_value={"casecreator": "tha_real_creator"})
 
-    result = await Case.deleteCase(uuid4(), "someone_eklse", "USER")
+    result = await Case.delete_case(uuid4(), "someone_eklse", "USER")
 
-    assert result == {"deleted": False, "reason": "unauthorized"}
+    assert result == {
+        "deleted": False, 
+        "reason": "unauthorized"
+    }
     #connection.close.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
-async def test_delete_case_success_with_orphan_media_cleanup(mockGetObject, mockDbConnect):
+@patch("app.core.cases.get_object")
+async def test_delete_case_success_with_orphan_media_cleanup(mockget_object, mockDbConnect):
     connection = make_mock_connection_with_transaction()
     mockDbConnect.return_value = connection
 
@@ -1667,9 +1670,9 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockGetObject, mock
     connection.fetch = AsyncMock(return_value=[{"mediaid": "media-1"}])
 
     mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
-    result = await Case.deleteCase(case_id, "tha_real_creator", "USER")
+    result = await Case.delete_case(case_id, "tha_real_creator", "USER")
 
     assert result == {"deleted": True, "reason": "deleted"}
     mock_s3_client.head_object.assert_called_once_with(
@@ -1681,10 +1684,14 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockGetObject, mock
 def test_get_comments_missing_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing authorization header")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
 
@@ -1697,10 +1704,14 @@ def test_get_comments_missing_jwt(monkeypatch):
 def test_delete_evidence_missing_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing authorization header")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post("/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01")
 
@@ -1713,7 +1724,7 @@ def test_delete_evidence_missing_jwt(monkeypatch):
 def test_delete_evidence_success(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "admin-id",
             "username": "admin_user",
@@ -1725,8 +1736,16 @@ def test_delete_evidence_success(monkeypatch):
         "Deleted": "22222222-abcd-ef01-2345-6789abcdef01"
     }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.Case, "deleteEvidence", AsyncMock(return_value=fake_result))
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.Case, 
+        "delete_evidence", 
+        AsyncMock(return_value=fake_result)
+    )
 
     response = client.post(
         "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
@@ -1738,14 +1757,18 @@ def test_delete_evidence_success(monkeypatch):
 def test_delete_evidence_invalid_media_id(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "admin-id",
             "username": "admin_user",
             "role": "ADMIN"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post(
         "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/not-a-valid-uuid"
@@ -1760,14 +1783,18 @@ def test_delete_evidence_invalid_media_id(monkeypatch):
 def test_delete_evidence_user_forbidden(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "some_user",
             "role": "USER"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post(
         "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"

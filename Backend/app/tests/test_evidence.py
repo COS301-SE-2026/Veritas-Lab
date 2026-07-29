@@ -435,7 +435,7 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     assert excInfo.value.detail == "Media not found."
 
 @pytest.mark.asyncio
-async def test_addEvidence_invalid_case_id_uuid():
+async def test_add_evidence_invalid_case_id_uuid():
     fileContent = b"A fake binary for a png"
     testContent = io.BytesIO(fileContent)
 
@@ -448,14 +448,14 @@ async def test_addEvidence_invalid_case_id_uuid():
     case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia, case_id="not-a-valid-uuid")
+        await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid")
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail == "Invalid case_id UUID"
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
-async def test_addEvidence_pdf_open_action_rejected(mockPdfReaderClass):
+async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -476,14 +476,14 @@ async def test_addEvidence_pdf_open_action_rejected(mockPdfReaderClass):
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert excInfo.value.status_code == 400
     assert "security concern" in excInfo.value.detail
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
-async def test_addEvidence_pdf_javascript_rejected(mockPdfReaderClass):
+async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -507,17 +507,17 @@ async def test_addEvidence_pdf_javascript_rejected(mockPdfReaderClass):
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert exc_info.value.status_code == 400
     assert "security concern" in exc_info.value.detail
     
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
+@patch("app.core.cases.get_object")
 @patch("app.core.cases.PdfReader")
 @patch("uuid.uuid4")
-async def test_addEvidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass, mockGetObject, mockDbConnect):
+async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass, mockget_object, mockDbConnect):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -553,12 +553,12 @@ async def test_addEvidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass
 
     mock_s3_client = MagicMock()
     mock_s3_client.generate_presigned_url.return_value = "https://fake-presigned-url"
-    mockGetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
     test_case_id = uuid.uuid4()
 
-    result = await case.addEvidence(media=mockMedia, case_id=test_case_id)
+    result = await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert result is not None 
     assert result["url"] == "https://fake-presigned-url"
