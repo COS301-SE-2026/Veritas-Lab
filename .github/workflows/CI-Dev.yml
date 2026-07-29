@@ -28,6 +28,10 @@ jobs:
 
             - name: run PyTest
               env:
+                  ENVIRONMENT: development
+                  FRONTEND_ORIGIN: http://localhost:3000
+                  STORAGE_URL: http://localhost:9000
+                  MINIO_EXTERNAL_URL: http://localhost:9000
                   DB_HOST: localhost
                   DB_USER: postgres
                   DB_PASSWORD: postgres
@@ -66,8 +70,7 @@ jobs:
               run: |
                   cd frontend
                   npx jest
-    deploy-preview:
+    deploy:
         needs: [backend-tests, frontend-tests]
-        if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'preview')
         uses: ./.github/workflows/CD-Dev.yml
         secrets: inherit
