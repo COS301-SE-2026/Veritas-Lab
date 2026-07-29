@@ -53,8 +53,8 @@ describe('Sidebar', () => {
 		mockUsePathname.mockReturnValue('/dashboard');
 		renderWithWrapper();
 		const homeLink = screen.getByRole('link', { name: 'Dashboard' });
-		expect(homeLink.className).toContain('bg-(--color-secondary)');
-		expect(homeLink.className).toContain('text-(--color-text)');
+		expect(homeLink.className).toContain('bg-[var(--color-secondary)]');
+		expect(homeLink.className).toContain('text-[var(--color-text)]');
 	});
 
 	it('toggles collapsed state when the button is clicked', () => {

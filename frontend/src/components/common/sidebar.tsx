@@ -8,95 +8,94 @@ import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-  ChevronLeft, Menu, Home, Construction, LogOut, UserStar,
+  ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 
-// List of navigation items with their labels, paths, and icons
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard',  icon: Home },
-];
-
 export default function Sidebar() {
-    // Get the current pathname to determine which nav item is active
-    const pathname = usePathname();
-    const userRole = useUserRole();
-    // State to manage whether the sidebar is collapsed or expanded
-    const { collapsed, toggle } = useSidebar();
+  const pathname = usePathname();
+  const userRole = useUserRole();
+  const { collapsed, toggle } = useSidebar();
   const { logOut } = useLogOut();
 
-    const navItems = [
-      { label: 'Dashboard', href: '/dashboard',  icon: Home },
-      ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
-    ];
+  const navItems = [
+    { label: 'Dashboard', href: '/dashboard', icon: Home },
+    ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
+    { label: 'Help', href: '/help', icon: HelpCircle },
+  ];
 
-    return (
-      // Sidebar container with dynamic width based on collapsed state
-        <div
-        className={`
-            flex flex-col h-screen sticky top-0
-            bg-(--color-primary) text-(--color-background) border-r 
-            transition-all duration-300 ease-in-out
-            ${collapsed ? 'w-16' : 'w-64'}
-        `}
-        >
-        <div className="flex items-center justify-between px-4 py-5">
-            {!collapsed && (
-              <div className="flex items-center gap-2 ml-4">
-                <Image src="/VL_Logo.svg" alt="Veritas Lab Logo" width={0} height={0} className="w-10 h-10" />
-                <div className="font-semibold text-xl mt-1 text-white">
-                  Veritas Lab
-                </div>
-              </div>
-            )}
-            {/* Toggle button to collapse or expand the sidebar */}
-            <Button
-            onClick={toggle}
-            variant="sidebar"
-            >
-            {collapsed ? <Menu size={18} /> : <ChevronLeft size={18} className='text-(--color-light)'/>}
-            </Button>
-        </div>
-        {/* Navigation items */}
-        <nav className="flex-1 px-2 py-4 space-y-1">
+  return (
+    <div
+      className={`
+        relative z-0 flex flex-col h-screen sticky top-0
+        bg-[var(--color-primary)] text-white
+        transition-all duration-300 ease-in-out
+        ${collapsed ? 'w-16' : 'w-64'}
+      `}
+    >
+      <div/>
+
+      <header className="flex items-center justify-between px-4 py-5">
+        {!collapsed && (
+          <div className="flex items-center gap-2 ml-3">
+            <Image src="/VL_Logo.svg" alt="Veritas Lab Logo" width={0} height={0} className="w-10 h-10" />
+            <div className="font-semibold text-xl mt-1 text-white">Veritas Lab</div>
+          </div>
+        )}
+        <Button onClick={toggle} variant="sidebar">
+          {collapsed
+            ? <Menu size={18} />
+            : <ChevronLeft size={18} className="text-[var(--color-light)]" />}
+        </Button>
+      </header>
+
+      <nav className={`flex-1 py-4 space-y-3 ${collapsed ? 'pl-2 pr-0' : 'pl-7 pr-0'}`}>
         {navItems.map(({ label, href, icon: Icon }) => {
           const isActive = pathname === href;
           return (
-            /* The navigation links and their styles depending on their active state */
-            <Link
-              key={href}
-              href={href}
-              className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-full text-sm
-                transition-colors duration-150
-                ${isActive
-                  ? 'bg-(--color-secondary) text-(--color-text) font-medium'
-                  : 'text-white hover:bg-(--color-dark) hover:text-white'
-                }
-                ${collapsed ? 'justify-center' : 'justify-start'}
-              `}
-            >
-              <Icon size={18} />
-              {!collapsed && <div>{label}</div>}
-            </Link>
+            <div key={href} className="relative">
+              <Link
+                href={href}
+                className={`
+                  group relative flex items-center gap-3 text-sm
+                  rounded-l-full rounded-r-none
+                  transition-[transform,background-color,color] duration-200 ease-out
+                  ${collapsed
+                    ? 'justify-center py-3 pl-0 pr-4 -mr-3'
+                    : 'justify-start py-3 pl-4 pr-16 -mr-12'}
+                  ${isActive
+                    ? 'bg-[var(--color-secondary)] text-[var(--color-text)] font-medium translate-x-0'
+                    : 'bg-white/8 text-white/90 -translate-x-1 hover:translate-x-0 hover:bg-white/15'}
+                `}
+              >
+                <Icon size={18} className="shrink-0" />
+                {!collapsed && <span className="truncate">{label}</span>}
+              </Link>
+
+              <span
+                className={`absolute right-0 top-1/2 -translate-y-1/2
+                            h-6 w-px ${isActive ? 'bg-black/20' : 'bg-white/10'}`}
+              />
+            </div>
           );
         })}
-        <footer className="absolute bottom-0 w-full p-4 text-center text-xs text-gray-400">
-            <Button variant="sidebar" onClick={logOut} className="">
-              <div className="flex items-center gap-2 justify-center pr-15 rounded-full text-sm text-white hover:bg-(--color-dark) transition-colors">
-                {!collapsed && (
-                  <div>
-                    Log Out
-                  </div>
-                )}
-                <div>
-                  <LogOut size={18} />
-                </div>
-              </div>
-                
-            </Button>
-        </footer>
       </nav>
-        </div>
+
+      <footer className={`pb-6 ${collapsed ? 'pl-2' : 'pl-7'}`}>
+        <button
+          onClick={logOut}
+          className={`
+            flex items-center gap-3 text-sm rounded-l-full rounded-r-none
+            bg-white/8 text-white/90 hover:bg-white/15
+            -translate-x-1 hover:translate-x-0
+            transition-[transform,background-color] duration-200 ease-out
+            ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}
+          `}
+        >
+          <LogOut size={18} className="shrink-0" />
+          {!collapsed && <span>Log Out</span>}
+        </button>
+      </footer>
+    </div>
   );
 }

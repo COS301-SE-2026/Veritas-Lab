@@ -521,11 +521,12 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "reportartifacts": {"ocr": "captured"},
             "reportfindings": "Flood watermark detected",
             "reportcomments": "Upload approved",
+            "reportcertainty": 1,
             "reportdatecreation": datetime(2026, 5, 21, 8, 15, 0, tzinfo=timezone.utc)
         }
     ]
 
-    mock_minio_client.presigned_get_object.return_value = fake_url
+    mock_minio_client.generate_presigned_url.return_value = fake_url
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=fake_row)
@@ -536,7 +537,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
-    monkeypatch.setattr(cases_router, "Minio", MagicMock(return_value=mock_minio_client))
+    monkeypatch.setattr(cases_router.boto3, "client", MagicMock(return_value=mock_minio_client))
 
     with patch("app.api.routers.cases_router.Case.getComments", new_callable=AsyncMock) as mock_get_comments:
         mock_get_comments.return_value = []
@@ -569,6 +570,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
                 "mediaUrl": fake_url,
                 "annotations": fake_annotations,
                 "reportArtifacts": {"ocr": "captured"},
+                "reportCertainty": 1,
                 "reportFindings": "Flood watermark detected",
                 "reportComments": "Upload approved",
                 "reportDateCreation": "2026-05-21T08:15:00+00:00"
@@ -611,6 +613,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
         "mediatypeid": media_type_uuid,
         "mediabucket": "evidence-bucket",
         "mediaextension": ".jpg",
+        "reportcertainty": None,
         "annotations": [],
     }
 

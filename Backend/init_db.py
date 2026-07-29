@@ -32,7 +32,7 @@ async def seed_users():
 
         if invest_email != "" and invest_pass != "" and invest_user != "":
             invest_pass = hash_password(invest_pass)
-            await insert_user(email=invest_email, username=invest_user, role="ADMIN", hashed_password=invest_pass)
+            await insert_user(email=invest_email, username=invest_user, role="INVESTIGATOR", hashed_password=invest_pass)
         else:
             print("A needed environment variable is missing from the .env for the investigator")
 

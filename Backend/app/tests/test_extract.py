@@ -1,6 +1,6 @@
 import json
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, ANY
 from app.core.image_service import ImageService
 from app.core.pdf_service import PDFService
 from app.core.media_service import AnalysisFindings
@@ -188,8 +188,8 @@ async def test_get_media_record_not_found(monkeypatch):
 async def test_download_media(monkeypatch):
     service = ImageService()
 
-    fake_minio_client = MagicMock()
-    monkeypatch.setattr(service, "createMinioClient", lambda: fake_minio_client)
+    fake_s3_client = MagicMock()
+    monkeypatch.setattr("app.core.media_service.getObject", lambda: fake_s3_client)
 
     media_record = {
         "bucket": "jpg-bucket",
@@ -198,10 +198,10 @@ async def test_download_media(monkeypatch):
 
     await service.downloadMedia(media_record, "/tmp/test.jpg")
 
-    fake_minio_client.fget_object.assert_called_once_with(
-        bucket_name="jpg-bucket",
-        object_name="12345678-abcd-ef01-2345-6789abcdef01.jpg",
-        file_path="/tmp/test.jpg"
+    fake_s3_client.download_fileobj.assert_called_once_with(
+        Bucket="jpg-bucket",
+        Key="12345678-abcd-ef01-2345-6789abcdef01.jpg",
+        Fileobj=ANY
     )
 
 
@@ -209,48 +209,6 @@ def mock_env(monkeypatch, values):
     monkeypatch.setattr(
         "app.core.media_service.env.getRequiredEnv",
         lambda name: values[name]
-    )
-
-
-def test_create_minio_client_https(monkeypatch):
-    mock_env(monkeypatch, {
-        "STORAGE_URL": "https://minio.example.com",
-        "MINIO_ROOT_USER": "root",
-        "MINIO_ROOT_PASSWORD": "password"
-    })
-
-    fake_minio_class = MagicMock()
-    monkeypatch.setattr("app.core.media_service.Minio", fake_minio_class)
-
-    service = ImageService()
-    service.createMinioClient()
-
-    fake_minio_class.assert_called_once_with(
-        "minio.example.com",
-        access_key="root",
-        secret_key="password",
-        secure=True
-    )
-
-
-def test_create_minio_client_no_netloc(monkeypatch):
-    mock_env(monkeypatch, {
-        "STORAGE_URL": "localhost:9000",
-        "MINIO_ROOT_USER": "root",
-        "MINIO_ROOT_PASSWORD": "password"
-    })
-
-    fake_minio_class = MagicMock()
-    monkeypatch.setattr("app.core.media_service.Minio", fake_minio_class)
-
-    service = ImageService()
-    service.createMinioClient()
-
-    fake_minio_class.assert_called_once_with(
-        "9000",
-        access_key="root",
-        secret_key="password",
-        secure=False
     )
 
 

@@ -1,7 +1,7 @@
 import uuid
 from uuid import uuid4
 import json
-from app.core.env import ENVLoader
+from app.core.env import ENVLoader, IS_PROD
 import asyncpg
 import asyncio
 import os
@@ -13,7 +13,10 @@ from pathlib import Path
 from minio import Minio
 from pypdf import PdfReader
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlparse
+import boto3
+from botocore.client import Config
+from mypy_boto3_s3 import S3Client
+
 
 load_dotenv()
 env = ENVLoader()
@@ -36,6 +39,53 @@ async def getConnection() -> asyncpg.Connection:
         port=DB_PORT,
         ssl="require" if DB_SSL else None,
     )
+
+def getObject(for_presign: bool = False) -> S3Client:
+    if not IS_PROD:
+
+        if for_presign:
+            minio_domain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
+        else:
+            minio_domain = os.getenv("STORAGE_URL", "http://localhost:9000")
+        
+        
+        if not minio_domain.startswith(("http://", "https://")):
+            minio_domain = f"http://{minio_domain}"
+
+        return boto3.client(
+            "s3",
+            endpoint_url=minio_domain,
+            aws_access_key_id=os.getenv("MINIO_ROOT_USER"),
+            aws_secret_access_key=os.getenv("MINIO_ROOT_PASSWORD"),
+            region_name=os.getenv("AWS_REGION", "us-east-1"),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
+
+    else:
+        cloud_url = os.getenv("R2_URL", "")
+        
+        if not cloud_url.startswith(("http://", "https://")):
+            cloud_url = f"https://{cloud_url}"
+
+        key_id=os.getenv("R2_ACCESS_KEY_ID")
+        secret=os.getenv("R2_SECRET_ACCESS_KEY")
+        print(f"Key ID: {repr(key_id)}")
+        print(f"Secret Length: {len(secret) if secret else 'None'}")
+
+        return boto3.client(
+            "s3",
+            endpoint_url=cloud_url,
+            aws_access_key_id=key_id,
+            aws_secret_access_key=secret,
+            region_name="auto",
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"}
+            ),
+        )
 
 # If the case_id is None then the case is not in the db. You may call create().
 # When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
@@ -171,19 +221,7 @@ class Case:
                 #Hash the image for uniqueness
             mediaHash = hashlib.sha256(fileBytes).hexdigest()
 
-            minioEndpointRaw = (
-                os.getenv("MINIO_ENDPOINT")
-                or os.getenv("AWS_S3_ENDPOINT_URL")
-                or "localhost:9000"
-            )
-            minioSecure = minioEndpointRaw.startswith("https://")
-            minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
-            minioClient = Minio(
-                minioEndpoint,
-                access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-                secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-                secure=minioSecure
-            )
+            storage_client = getObject()
 
             
             #checking for a duplicate
@@ -255,13 +293,12 @@ class Case:
                 await media.seek(0)
                 
                 fileStream = io.BytesIO(fileBytes)
-                minioClient.put_object(
-                    bucket_name=bucketName,
-                    object_name=targetFilename,
-                    data=fileStream,
-                    length=len(fileBytes),
-                    content_type=media.content_type
-                )  
+                storage_client.put_object(
+                    Bucket=bucketName,
+                    Key=targetFilename,
+                    Body=fileStream,
+                    ContentType=media.content_type
+                )
 
                 try:
                     # Insesrt into the Reports table allowing the report to have the image's name in the image title column
@@ -287,23 +324,16 @@ class Case:
                 except Exception:
                     pass
 
-            minioDomain = os.getenv("MINIO_EXTERNAL_URL") or "http://localhost:9000"
-            parsedUrl = urlparse(minioDomain)
-            minioEndpoint = parsedUrl.netloc if parsedUrl.netloc else minioDomain
-            isSecure = parsedUrl.scheme == "https"
             #Creation of presigned URL below
-            presign_client = Minio(
-                minioEndpoint, # External domain the browser uses
-                access_key=os.getenv("MINIO_ROOT_USER"),
-                secret_key=os.getenv("MINIO_ROOT_PASSWORD"),
-                region=os.getenv("AWS_REGION"),
-                secure=isSecure
-            )
+            presign_client = getObject(for_presign=True)# function to get the client until we do the pools
 
-            fileUrl = presign_client.presigned_get_object(
-                bucket_name=bucketName,
-                object_name=targetFilename,
-                expires=timedelta(hours=1)
+            fileUrl = presign_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucketName,
+                    'Key': targetFilename
+                },
+                ExpiresIn=3600 
             )
 
             return{
@@ -332,13 +362,7 @@ class Case:
         connection = None
 
         try:
-            connection=await asyncpg.connect(
-                user=DB_USER,
-                password=DB_PASSWORD,
-                database=DB_NAME,
-                host=DB_HOST,
-                port=DB_PORT
-            )
+            connection=await getConnection()
 
             if JWT_username is not None:
 
@@ -382,31 +406,19 @@ class Case:
 
                 if deleted_media is not None:
                     
-                    minioEndpointRaw = (
-                        os.getenv("MINIO_ENDPOINT")
-                        or os.getenv("AWS_S3_ENDPOINT_URL")
-                        or "localhost:9000"
-                    )
 
-                    minioSecure = minioEndpointRaw.startswith("https://")
-                    minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
-
-                    minioClient = Minio(
-                        minioEndpoint,
-                        access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-                        secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-                        secure=minioSecure
-                    )
+                    storage_client = getObject()
 
                     object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
                     try:
-                        minioClient.remove_object(
-                            bucket_name=deleted_media["mediabucket"],
-                            object_name=object_name
+                        storage_client.delete_object(
+                            Bucket=deleted_media["mediabucket"], 
+                            Key=object_name
                         )
+                        
                     except Exception as e:
-                        print(f"Failed to delete MinIO object {object_name}: {e}")
+                        print(f"Failed to delete stored object {object_name}: {e}")
         # Above this is the normal investigator deleting something
             else:
                 # This block contain the logic for the Admin deleting
@@ -448,31 +460,19 @@ class Case:
 
                 if deleted_media is not None:
                     
-                    minioEndpointRaw = (
-                        os.getenv("MINIO_ENDPOINT")
-                        or os.getenv("AWS_S3_ENDPOINT_URL")
-                        or "localhost:9000"
-                    )
-
-                    minioSecure = minioEndpointRaw.startswith("https://")
-                    minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
-
-                    minioClient = Minio(
-                        minioEndpoint,
-                        access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-                        secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-                        secure=minioSecure
-                    )
+                    storage_client = getObject()
 
                     object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
                     try:
-                        minioClient.remove_object(
-                            bucket_name=deleted_media["mediabucket"],
-                            object_name=object_name
+                        storage_client.delete_object(
+                            Bucket=deleted_media["mediabucket"], 
+                            Key=object_name
                         )
+                        
+                        
                     except Exception as e:
-                        print(f"Failed to delete MinIO object {object_name}: {e}")
+                        print(f"Failed to delete stored object {object_name}: {e}")
         
             return {
                 "Status" : "success",
@@ -672,32 +672,19 @@ class Case:
                             "mediaextension": deleted_media["mediaextension"]
                         })                 
                 
-            minioEndpointRaw = (
-                os.getenv("MINIO_ENDPOINT")
-                or os.getenv("AWS_S3_ENDPOINT_URL")
-                or "localhost:9000"
-            )
-
-            minioSecure = minioEndpointRaw.startswith("https://")
-            minioEndpoint = minioEndpointRaw.removeprefix("http://").removeprefix("https://")
-
-            minioClient = Minio(
-                minioEndpoint,
-                access_key=os.getenv("MINIO_ACCESS_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-                secret_key=os.getenv("MINIO_SECRET_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-                secure=minioSecure
-            )
+            storage_client = getObject()
 
             for media in orphan_media:
                 object_name = f"{media['mediaid']}{media['mediaextension']}"
 
                 try:
-                    minioClient.remove_object(
-                        bucket_name=media["mediabucket"],
-                        object_name=object_name
+                    #$414
+                    storage_client.head_object(
+                        Bucket=media["mediabucket"], 
+                        Key=object_name
                     )
                 except Exception as e:
-                    print(f"Failed to delete MinIO object {object_name}: {e}")
+                    print(f"Failed to delete stored object {object_name}: {e}")
 
             return {
                 "deleted": True,

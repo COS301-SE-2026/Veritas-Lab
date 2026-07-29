@@ -10,7 +10,7 @@ on:
 jobs:
     backend-tests:
         runs-on: ubuntu-latest
-        timeout-minutes: 5
+        timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
 
@@ -22,10 +22,16 @@ jobs:
             - name: install dependencies
               run: |
                   cd Backend
+                  python -m pip install --upgrade pip
+                  python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
                   python -m pip install -r requirements/base.txt
 
             - name: run PyTest
               env:
+                  ENVIRONMENT: development
+                  FRONTEND_ORIGIN: http://localhost:3000
+                  STORAGE_URL: http://localhost:9000
+                  MINIO_EXTERNAL_URL: http://localhost:9000
                   DB_HOST: localhost
                   DB_USER: postgres
                   DB_PASSWORD: postgres
@@ -46,7 +52,7 @@ jobs:
 
     frontend-tests:
         runs-on: ubuntu-latest
-        timeout-minutes: 5
+        timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
 
@@ -64,8 +70,7 @@ jobs:
               run: |
                   cd frontend
                   npx jest
-    deploy-preview:
+    deploy:
         needs: [backend-tests, frontend-tests]
-        if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'preview')
         uses: ./.github/workflows/CD-Dev.yml
         secrets: inherit

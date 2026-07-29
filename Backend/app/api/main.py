@@ -5,9 +5,8 @@ import os
 from pydantic import BaseModel # For JSON
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
-from app.core.env import ENVLoader
+from app.core.env import ENVLoader,IS_PROD
 
-IS_PROD = os.environ.get("ENVIRONMENT", "development").strip().lower() == "production"
 
 app = FastAPI(
     title="Veritas Lab API",
@@ -21,7 +20,9 @@ app = FastAPI(
 allowed_origins = [
     os.environ.get("FRONTEND_ORIGIN", ""),
 ]
-if os.environ.get("ENVIRONMENT", "development") != "production": allowed_origins.append("http://localhost:3000")
+
+if (not IS_PROD):
+    allowed_origins.append("http://localhost:3000")
 
 app.add_middleware(
     CORSMiddleware,

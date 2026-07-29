@@ -36,13 +36,18 @@ services:
             - TOKEN_EXPIRE=${TOKEN_EXPIRE}
             # BOTO3 / MINIO CONFIGURATION
             - STORAGE_PROVIDER=minio
+            - R2_URL=${R2_URL}
+            - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+            - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
             - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}      
             - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-            - AWS_S3_ENDPOINT_URL=http://minio:9000     
             - AWS_DEFAULT_REGION=${AWS_REGION}
             - MINIO_ROOT_USER=${MINIO_ROOT_USER}
             - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
             - MINIO_EXTERNAL_URL=${MINIO_EXTERNAL_URL}
+            - STORAGE_URL=${STORAGE_URL}
+            - FRONTEND_ORIGIN=${FRONTEND_ORIGIN}
+            - STORAGE_URL=${STORAGE_URL}
             - AWS_REGION=${AWS_REGION}        
             - ADMIN_NAME=${ADMIN_NAME}
             - ADMIN_EMAIL=${ADMIN_EMAIL}
@@ -54,9 +59,14 @@ services:
             - E2E_USER_EMAIL=${E2E_USER_EMAIL}
             - E2E_USER_PASSWORD=${E2E_USER_PASSWORD}
         depends_on:
-            - postgres
-            - redis
-            - minio
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_started
+            minio:
+                condition: service_healthy
+            minio-init:
+                condition: service_completed_successfully
         networks:
             - app-network
 
@@ -97,9 +107,13 @@ services:
             - postgres_data:/var/lib/postgresql
             - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/schema-users.sql
             - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/schema-cases.sql
-            - ./Backend/app/database/seedingUsers.sql:/docker-entrypoint-initdb.d/seed-users.sql
             - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/seed-cases.sql
             - ./Backend/app/database/seed_cases.sql:/docker-entrypoint-initdb.d/seed-cases-extra.sql
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
         networks:
             - app-network
 
