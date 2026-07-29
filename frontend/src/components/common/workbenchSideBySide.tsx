@@ -87,9 +87,6 @@ export default function MetadataComparison({
                 </div>
             </div>
 
-            <p className="text-xs text-(--color-light)">
-                The right column is a metadata example of the same type
-            </p>
         </div>
     );
 }

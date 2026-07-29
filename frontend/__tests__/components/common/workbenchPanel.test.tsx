@@ -41,6 +41,7 @@ jest.mock('@/components/common/annotationList', () => ({
 
 jest.mock('lucide-react', () => ({
     __esModule: true,
+    Columns2: () => <div data-testid="columns-icon" />,
     Pencil: () => <div data-testid="pencil-icon" />,
     Save: () => <div data-testid="save-icon" />,
     Trash2: () => <div data-testid="trash-icon" />,
@@ -114,5 +115,37 @@ describe('WorkbenchPanel', () => {
         fireEvent.click(screen.getByText('Save'));
  
         expect(await screen.findByText('Couldn’t save. Try again.')).toBeInTheDocument();
+    });
+
+    it('renders the View side by side tool button', () => {
+        renderPanel();
+        expect(screen.getByText('View side by side')).toBeInTheDocument();
+    });
+
+    it('calls onSelectWorkbenchTool with Compare when clicked while inactive', () => {
+        const props = renderPanel({ activeWorkbenchTool: null });
+        fireEvent.click(screen.getByText('View side by side'));
+        expect(props.onSelectWorkbenchTool).toHaveBeenCalledWith('Compare');
+    });
+
+    it('calls onSelectWorkbenchTool with null when Compare is clicked while already active', () => {
+        const props = renderPanel({ activeWorkbenchTool: 'Compare' });
+        fireEvent.click(screen.getByText('View side by side'));
+        expect(props.onSelectWorkbenchTool).toHaveBeenCalledWith(null);
+    });
+
+    it('marks the Compare button as pressed only when Compare is the active tool', () => {
+        renderPanel({ activeWorkbenchTool: 'Compare' });
+        expect(screen.getByText('View side by side').closest('button')).toHaveAttribute(
+            'aria-pressed',
+            'true'
+        );
+    });
+
+    it('does not render annotation controls when Compare is the active tool', () => {
+        renderPanel({ activeWorkbenchTool: 'Compare', annotations: mockAnnotations });
+        expect(screen.queryByTestId('slider-bar')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('annotation-list')).not.toBeInTheDocument();
+        expect(screen.queryByText('Save')).not.toBeInTheDocument();
     });
 });
