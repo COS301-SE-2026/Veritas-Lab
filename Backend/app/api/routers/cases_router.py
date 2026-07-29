@@ -30,9 +30,9 @@ DB_NAME= env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 NOT_USER= ["INVESTIGATOR", "ADMIN"]
 DATABASE_ERROR_MESSAGE="Database error"
-_CASE_ID_REQUIRED = "CaseID required"
-_INVALID_CASE_ID = "Invalid CaseID"
-_CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
+CASE_ID_REQUIRED = "CaseID required"
+INVALID_CASE_ID = "Invalid CaseID"
+CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -64,7 +64,9 @@ def get_object(for_presign: bool = False) -> S3Client:
             region_name=os.getenv("AWS_REGION", "us-east-1"),
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"}
+                s3={
+                    "addressing_style": "path"
+                }
             ),
         )
 
@@ -87,7 +89,9 @@ def get_object(for_presign: bool = False) -> S3Client:
             region_name="auto",
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"}
+                s3={
+                    "addressing_style": "path"
+                }
             ),
         )
 
@@ -313,7 +317,7 @@ async def get_cases(request: Request):
             case.CaseClosed = row["caseclosed"]
             case.CaseCreationDate = row["casecreationdate"]
 
-            cases.append(case.toJSON())
+            cases.append(case.to_json())
 
         return JSONResponse(
             status_code=200,
@@ -351,7 +355,7 @@ async def get_cases(request: Request):
         },
         400:{
             "model": ErrorResponse,
-            "description": _CASE_ID_REQUIRED
+            "description": CASE_ID_REQUIRED
         }
 
     }
@@ -373,7 +377,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             status_code=400,
             detail={
                 "status": "error",
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
 
@@ -460,8 +464,8 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             status_code=200,
             content=jsonable_encoder({
                 "status": "success",
-                "case": case.toJSON(),
-                "comments": await case.getComments(),
+                "case": case.to_json(),
+                "comments": await case.get_comments(),
                 "evidence": [_format_case_evidence(row,is_user) for row in evidence_rows]
             })
         )
@@ -562,7 +566,7 @@ async def upload_evidence(
         case.CaseClosed = row["caseclosed"]
         case.CaseCreationDate = row["casecreationdate"]
 
-        result = await case.addEvidence(media, case_uuid)
+        result = await case.add_evidence(media, case_uuid)
 
         # start pipeline here
         extension = Path(result["Filename"]).suffix.lower()
@@ -611,7 +615,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
     
@@ -622,7 +626,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400, 
             content={
                 "status": "error", 
-                "message": _INVALID_CASE_ID
+                "message": INVALID_CASE_ID
             }
         )
 
@@ -646,7 +650,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -690,7 +694,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
             status_code=400, 
             content={
                 "status": "error", 
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
 
@@ -701,7 +705,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
             status_code=400, 
             content={
                 "status": "error", 
-                "message": _INVALID_CASE_ID
+                "message": INVALID_CASE_ID
             }
         )
 
@@ -750,7 +754,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -801,7 +805,7 @@ async def update_comment(
             status_code=400, 
             content={
                 "status": "error", 
-                "message": _INVALID_CASE_ID
+                "message": INVALID_CASE_ID
             }
         )
     try:
@@ -827,7 +831,7 @@ async def update_comment(
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -937,7 +941,7 @@ async def retreive_comments(
 
     try:
         case = Case(CaseID=case_id)
-        comments_data= await case.getComments()
+        comments_data= await case.get_comments()
 
         return JSONResponse(
             status_code=200,
@@ -1001,7 +1005,7 @@ async def delete_evidence(
     try:
         case = Case(CaseID=case_id)
         username=payload.get("username") if user_role == "INVESTIGATOR" else None
-        response=await case.deleteEvidence(media_id=media_id, JWT_username=username)
+        response=await case.delete_evidence(media_id=media_id, JWT_username=username)
 
         return JSONResponse(
             status_code=200,
@@ -1045,7 +1049,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     role = payload.get("role")
     username = payload.get("username")
 
-    if not body.comment or not Case.validateCommentLength(body.comment):
+    if not body.comment or not Case.validate_comment_length(body.comment):
         return JSONResponse(
             status_code=400,
             content={
@@ -1059,7 +1063,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     try:
         case = Case(CaseID=str(body.case_id))
 
-        new_comment = await case.addComment(
+        new_comment = await case.add_comment(
             connection, 
             username, 
             body.comment, 
@@ -1105,7 +1109,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
     
@@ -1121,7 +1125,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
     try:
-        result = await Case.deleteCase(
+        result = await Case.delete_case(
             case_id=case_id,
             username=payload.get("username"),
             role=payload.get("role")

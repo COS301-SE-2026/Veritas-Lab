@@ -26,9 +26,21 @@ def test_successful_login(monkeypatch):
     async def mock_update_user_jwt_issued(email):
         return None
     
-    monkeypatch.setattr(auth,"search_users_via_email",mock_search_users_via_email)
-    monkeypatch.setattr(auth,"create_token",mock_create_token)
-    monkeypatch.setattr(auth, "update_user_jwt_issued", mock_update_user_jwt_issued)
+    monkeypatch.setattr(
+        auth,
+        "search_users_via_email",
+        mock_search_users_via_email
+    )
+    monkeypatch.setattr(
+        auth,
+        "create_token",
+        mock_create_token
+    )
+    monkeypatch.setattr(
+        auth, 
+        "update_user_jwt_issued", 
+        mock_update_user_jwt_issued
+    )
 
     response = client.post(
         "/api/login",
@@ -60,7 +72,11 @@ def test_login_incorrect_password(monkeypatch):
             "password": hashed_password
         }
 
-    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
 
     response = client.post(
         "/api/login",
@@ -83,7 +99,11 @@ def test_login_user_does_not_exist(monkeypatch):
     async def mock_search_users_via_email(email):
         return None
 
-    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
 
     response = client.post(
         "/api/login",

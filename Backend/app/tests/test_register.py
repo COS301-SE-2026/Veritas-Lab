@@ -135,8 +135,16 @@ def test_duplicate_email_returns_409(monkeypatch):
     async def mock_search_users_via_username(username):
         return None
 
-    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
-    monkeypatch.setattr(auth, "search_users_via_username", mock_search_users_via_username)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_username", 
+        mock_search_users_via_username
+    )
 
     response = client.post(
         "/api/register",
@@ -164,8 +172,16 @@ def test_duplicate_username_returns_409(monkeypatch):
             "role": "USER"
         }
 
-    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
-    monkeypatch.setattr(auth, "search_users_via_username", mock_search_users_via_username)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_username", 
+        mock_search_users_via_username
+    )
 
     response = client.post(
         "api/register",

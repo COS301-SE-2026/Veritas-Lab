@@ -37,8 +37,16 @@ def test_fetch_users_success(monkeypatch):
             "role": "ADMIN"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
-    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        auth.asyncpg, 
+        "connect", 
+        mock_connect
+    )
 
     response =client.post(
         "/api/fetchUsers",
@@ -73,7 +81,11 @@ def test_fetch_users_not_admin(monkeypatch):
             "role": "USER"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post(
         "/api/fetchUsers",
@@ -94,7 +106,11 @@ def test_fetch_users_invalid_token(monkeypatch):
     def mock_verify_jwt(request):
         raise ValueError("Invalid token")
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post(
         "/api/fetchUsers",
@@ -129,8 +145,16 @@ def test_fetch_users_no_users(monkeypatch):
             "role": "ADMIN"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
-    monkeypatch.setattr(auth.asyncpg, "connect", empty_mock_connect)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        auth.asyncpg, 
+        "connect", 
+        empty_mock_connect
+    )
 
     response = client.post(
         "/api/fetchUsers",
@@ -165,8 +189,16 @@ def test_change_user_role_success(monkeypatch):
             "role": "ADMIN"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
-    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        auth.asyncpg, 
+        "connect", 
+        mock_connect
+    )
 
     response = client.post(
         "/api/changeUserRole",
@@ -194,7 +226,11 @@ def test_change_user_role_not_admin(monkeypatch):
             "role": "USER"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post(
         "/api/changeUserRole",
@@ -229,8 +265,16 @@ def test_change_user_role_no_user(monkeypatch):
             "role": "ADMIN"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
-    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        auth.asyncpg, 
+        "connect", 
+        mock_connect
+    )
 
     response = client.post(
         "/api/changeUserRole",
@@ -258,7 +302,11 @@ def test_change_user_role_invalid_role(monkeypatch):
             "role": "ADMIN"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.post(
         "/api/changeUserRole",
@@ -299,8 +347,16 @@ def test_admin_cannot_change_self(monkeypatch):
             "role": "ADMIN"
         }
     
-    monkeypatch.setattr(auth, "verify_jwt", mock_verify_jwt)
-    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+    monkeypatch.setattr(
+        auth, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        auth.asyncpg, 
+        "connect", 
+        mock_connect
+    )
 
     response = client.post(
         "/api/changeUserRole",

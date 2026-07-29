@@ -27,7 +27,7 @@ DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 
-def getObject() -> S3Client:
+def get_object() -> S3Client:
     if not IS_PROD:
         minio_domain = os.getenv("STORAGE_URL", "http://localhost:9000")
         
@@ -93,7 +93,7 @@ class MediaService(ABC):
             "metadata": metadata
         }
     
-    async def getMediaRecord(self, media_id: UUID):
+    async def get_media_record(self, media_id: UUID):
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -131,8 +131,8 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
-    async def downloadMedia(self, media_record: dict, file_path: str):
-        storage_client = getObject()
+    async def download_media(self, media_record: dict, file_path: str):
+        storage_client = get_object()
 
         def _download_from_s3() -> None:
             with open(file_path, "wb") as file_obj:
@@ -148,7 +148,7 @@ class MediaService(ABC):
     
     
 
-    async def getExistingMetadata(self, media_id: UUID):
+    async def get_existing_metadata(self, media_id: UUID):
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -178,7 +178,7 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
-    async def saveMetadata(self, media_id: UUID, metadata: dict):
+    async def save_metadata(self, media_id: UUID, metadata: dict):
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -203,7 +203,7 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
-    async def updateAnalysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
+    async def update_analysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
         connection = await asyncpg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -230,22 +230,22 @@ class MediaService(ABC):
             await connection.close()
 
     async def analyse(self, media_id: UUID):
-        metadata = await self.getExistingMetadata(media_id)
+        metadata = await self.get_existing_metadata(media_id)
         combined_findings = None
 
         if metadata is None:
-            media_record = await self.getMediaRecord(media_id)
+            media_record = await self.get_media_record(media_id)
 
             async with aiofiles.tempfile.TemporaryDirectory() as temp_dir:
                 file_path = Path(temp_dir) / f"{media_id}{media_record['extension']}"
-                await self.downloadMedia(media_record, str(file_path))
+                await self.download_media(media_record, str(file_path))
 
                 metadata = await self.extract(
                     file_path=str(file_path),
                     media_record=media_record
                 )
 
-                ai_analysis = await self.AIAnalysis(file_path)
+                ai_analysis = await self.ai_analysis(file_path)
                 
             #This is to remove information about the system that does not 
             #affect the analysis
@@ -256,9 +256,9 @@ class MediaService(ABC):
             if "File:Directory" in metadata:
                 del metadata["File:Directory"]
 
-            await self.saveMetadata(media_id, metadata)
+            await self.save_metadata(media_id, metadata)
             
-            report_findings = await self.analyseMetadata(metadata)
+            report_findings = await self.analyse_metadata(metadata)
 
             final_risk_level = max(
                 int(ai_analysis["risk_level"]),
@@ -273,9 +273,9 @@ class MediaService(ABC):
             print(json.dumps(combined_findings, indent=4))
 
             # use this when you want to upload to the database
-            final_findings = self.createFindingsString(combined_findings)
+            final_findings = self.create_findings_string(combined_findings)
             final_analysis = AnalysisFindings(Certainty=final_risk_level, Findings=final_findings)
-            await self.updateAnalysis(media_id=media_id, analysis=final_analysis)
+            await self.update_analysis(media_id=media_id, analysis=final_analysis)
 
         if combined_findings is None:
            return None
@@ -283,13 +283,13 @@ class MediaService(ABC):
         return combined_findings
     
     @abstractmethod
-    async def analyseMetadata(self,metadata: dict)-> AnalysisFindings:
+    async def analyse_metadata(self,metadata: dict)-> AnalysisFindings:
         pass
 
     @abstractmethod
-    async def AIAnalysis(self, path : str|Path) ->dict:
+    async def ai_analysis(self, path : str|Path) ->dict:
         pass
 
     @abstractmethod
-    def createFindingsString(self, input: dict) ->str:
+    def create_findings_string(self, input: dict) ->str:
         pass

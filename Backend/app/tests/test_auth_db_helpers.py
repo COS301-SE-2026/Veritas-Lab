@@ -10,7 +10,11 @@ def mock_connection(monkeypatch, fetchrowResult=None, executeResult=None):
     connection.execute = AsyncMock(return_value=executeResult)
     connection.close = AsyncMock()
 
-    monkeypatch.setattr(auth, "get_connection", AsyncMock(return_value=connection))
+    monkeypatch.setattr(
+        auth, 
+        "get_connection", 
+        AsyncMock(return_value=connection)
+    )
 
     return connection
 
