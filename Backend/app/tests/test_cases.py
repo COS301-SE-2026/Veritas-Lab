@@ -1509,3 +1509,105 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockMinioClass, moc
     )
     connection.close.assert_called_once()
 
+def test_get_comments_missing_jwt(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        raise ValueError("Missing authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing authorization header"
+    }
+
+def test_delete_evidence_missing_jwt(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        raise ValueError("Missing authorization header")
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post("/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "status": "error",
+        "message": "Missing authorization header"
+    }
+
+def test_delete_evidence_success(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_result = {
+        "Status": "success",
+        "Deleted": "22222222-abcd-ef01-2345-6789abcdef01"
+    }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router.Case, "deleteEvidence", AsyncMock(return_value=fake_result))
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == fake_result
+
+def test_delete_evidence_invalid_media_id(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/not-a-valid-uuid"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "Invalid UUID format for media_id."
+    }
+
+def test_delete_evidence_user_forbidden(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verifyJWT(request):
+        return {
+            "sub": "user-id",
+            "username": "some_user",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
+    }
