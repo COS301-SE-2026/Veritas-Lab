@@ -40,8 +40,41 @@ jobs:
             cancel-in-progress: false
         steps:
             - name: trigger Render deploy
+              id: trigger
               env:
                   HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
               run: |
-                  curl -fsS -X POST "$HOOK"
-                  echo "Render deploy triggered"
+                  response="$(curl -fsS -X POST "$HOOK")"
+                  echo "Render response: $response"
+                  deploy_id="$(echo "$response" | jq -r '.deploy.id // empty')"
+                  if [ -z "$deploy_id" ]; then
+                    echo "could not read deploy id from hook response"
+                    exit 1
+                  fi
+                  echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
+
+            - name: wait for build to finish
+              env:
+                  RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+                  SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+                  DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
+              run: |
+                  for i in $(seq 1 60); do
+                    status="$(curl -fsS \
+                      -H "Authorization: Bearer $RENDER_API_KEY" \
+                      -H "Accept: application/json" \
+                      "https://api.render.com/v1/services/$SERVICE_ID/deploys/$DEPLOY_ID" \
+                      | jq -r '.status')"
+                    echo "attempt $i/60: $status"
+                    case "$status" in
+                      live)
+                        echo "::notice::Render deploy succeeded"
+                        exit 0 ;;
+                      build_failed|update_failed|pre_deploy_failed|canceled)
+                        echo "::error::Render deploy failed with status: $status"
+                        exit 1 ;;
+                    esac
+                    sleep 15
+                  done
+                  echo "::error::timed out after 15 minutes waiting for Render"
+                  exit 1
