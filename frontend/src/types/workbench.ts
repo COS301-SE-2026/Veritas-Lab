@@ -93,3 +93,13 @@ export type LoadAnnotationsParams = {
 
 // How a piece of evidence should be previewed on the canvas
 export type MediaKind = 'image' | 'pdf' | 'unsupported';
+
+export type ReportModalProps = {
+    isOpen: boolean;
+    onClose: () => void;
+    mediaUrl?: string;
+    mediaKind?: MediaKind;
+    mediaName: string;
+    certainty: number | null;
+    findings: string | null;
+};
