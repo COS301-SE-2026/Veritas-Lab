@@ -234,10 +234,10 @@ async def test_create_case_cannot_be_called_twice(mock_connect):
 
 def test_get_cases_missing_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing Authorization header")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post("/api/getCases", json={})
 
@@ -249,10 +249,10 @@ def test_get_cases_missing_jwt(monkeypatch):
 
 def test_get_cases_invalid_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post(
         "/api/getCases",
@@ -267,7 +267,7 @@ def test_get_cases_invalid_jwt(monkeypatch):
 
 def test_get_cases_admin_returns_cases(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -299,7 +299,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -338,7 +338,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
 
 def test_get_cases_investigator_returns_empty_list(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -351,7 +351,7 @@ def test_get_cases_investigator_returns_empty_list(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -371,10 +371,10 @@ def test_get_cases_investigator_returns_empty_list(monkeypatch):
 
 def test_get_single_case_missing_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         raise ValueError("Missing Authorization header")
 
-    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt_", mock_verify_jwt_)
 
     response = client.post("/api/getSingleCase", json={})
 
@@ -386,10 +386,10 @@ def test_get_single_case_missing_jwt(monkeypatch):
 
 def test_get_single_case_invalid_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt_", mock_verify_jwt_)
 
     response = client.post(
         "/api/getSingleCase",
@@ -404,14 +404,14 @@ def test_get_single_case_invalid_jwt(monkeypatch):
 
 def test_get_single_case_missing_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
             "role": "ADMIN"
         }
 
-    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt_", mock_verify_jwt_)
 
     response = client.post(
         "/api/getSingleCase",
@@ -428,14 +428,14 @@ def test_get_single_case_missing_case_id(monkeypatch):
 
 def test_get_single_case_invalid_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
             "role": "ADMIN"
         }
 
-    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt_", mock_verify_jwt_)
 
     response = client.post(
         "/api/getSingleCase",
@@ -448,7 +448,7 @@ def test_get_single_case_invalid_case_id(monkeypatch):
 
 def test_get_single_case_not_found(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -461,7 +461,7 @@ def test_get_single_case_not_found(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt_", mock_verify_jwt_)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -482,7 +482,7 @@ def test_get_single_case_not_found(monkeypatch):
 def test_get_single_case_admin_returns_case(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -534,7 +534,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt_", mock_verify_jwt_)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
     monkeypatch.setattr(cases_router.boto3, "client", MagicMock(return_value=mock_minio_client))
 
@@ -578,7 +578,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
 def test_get_single_case_success_for_a_normal_user(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    def mock_verify_jwt_(request):
         return {
             "sub": "mock-user-id",
             "username": "standard_user",
@@ -621,7 +621,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
     mock_connect = AsyncMock(return_value=mock_connection)
 
     monkeypatch.setattr("app.core.cases.Case.getComments", AsyncMock(return_value=[]))
-    monkeypatch.setattr(cases_router,"verify_jwt", mock_verify_jwt)
+    monkeypatch.setattr(cases_router,"verify_jwt_", mock_verify_jwt_)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -645,7 +645,7 @@ def test_close_case_user_unauthorized(monkeypatch):
             "role": "USER"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.post(
         "/api/closeCase",
@@ -667,7 +667,7 @@ def test_close_case_not_found(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -687,7 +687,7 @@ def test_close_case_not_found(monkeypatch):
 
 def test_close_case_not_case_creator(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "different_user",
@@ -701,7 +701,7 @@ def test_close_case_not_case_creator(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -721,7 +721,7 @@ def test_close_case_not_case_creator(monkeypatch):
 
 def test_close_case_success_investigator(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -740,7 +740,7 @@ def test_close_case_success_investigator(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -768,7 +768,7 @@ def test_close_case_success_investigator(monkeypatch):
 
 def test_close_case_success_admin(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -787,7 +787,7 @@ def test_close_case_success_admin(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -815,7 +815,7 @@ def test_close_case_success_admin(monkeypatch):
 
 def test_close_case_admin_not_case_creator(monkeypatch):
     client.cookies.clear()
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -830,7 +830,7 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 
     mock_connect = AsyncMock(return_value=mock_connection)
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect)
 
     response = client.post(
@@ -859,12 +859,12 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="investigator_user", role="INVESTIGATOR"):
     def mock_verify_jwt(request):
         return {"sub": sub, "username": username, "role": role}
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
 def _mock_jwt_failure(monkeypatch, message):
     def mock_verify_jwt(request):
         raise ValueError(message)
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verify_jwt)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
 def _mock_db_connect(monkeypatch, *, fetchrow_return=None):
     mock_connection = AsyncMock()
@@ -1171,7 +1171,7 @@ Raises an error due to the database going down
 def test_delete_case_success_creator(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-user-id",
             "username": "investigator_user",
@@ -1189,7 +1189,7 @@ def test_delete_case_success_creator(monkeypatch):
             "reason": "deleted"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
     response = client.request(
@@ -1209,7 +1209,7 @@ def test_delete_case_success_creator(monkeypatch):
 def test_delete_case_success_admin(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -1226,7 +1226,7 @@ def test_delete_case_success_admin(monkeypatch):
             "reason": "deleted"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
     response = client.request(
@@ -1246,10 +1246,10 @@ def test_delete_case_success_admin(monkeypatch):
 def test_delete_case_missing_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing token")
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.request(
         "DELETE",
@@ -1268,14 +1268,14 @@ def test_delete_case_missing_jwt(monkeypatch):
 def test_delete_case_user_forbidden(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-user-id",
             "username": "normal_user",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     
     response = client.request(
         "DELETE",
@@ -1296,14 +1296,14 @@ def test_delete_case_user_forbidden(monkeypatch):
 def test_delete_case_missing_case_id(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.request(
         "DELETE",
@@ -1320,14 +1320,14 @@ def test_delete_case_missing_case_id(monkeypatch):
 def test_delete_case_invalid_case_id(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
             "role": "INVESTIGATOR"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.request(
         "DELETE",
@@ -1343,7 +1343,7 @@ def test_delete_case_invalid_case_id(monkeypatch):
 def test_delete_case_not_found(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return{
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -1356,7 +1356,7 @@ def test_delete_case_not_found(monkeypatch):
             "reason": "not_found"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
     response = client.request(
@@ -1376,7 +1376,7 @@ def test_delete_case_not_found(monkeypatch):
 def test_delete_case_unauthorized_non_creator(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
             "username": "other_investigator",
@@ -1392,7 +1392,7 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
             "reason": "unauthorized"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
     monkeypatch.setattr(cases_router.Case, "deleteCase", mock_deleteCase)
 
     response = client.request(

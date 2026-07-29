@@ -77,7 +77,7 @@ def test_refresh_token_success_within_one_minute(monkeypatch):
         }
     
     monkeypatch.setattr(auth.jwt, "decode", mock_jwt_decode)
-    monkeypatch.setattr(auth, "createToken", mock_create_token)
+    monkeypatch.setattr(auth, "create_token", mock_create_token)
     monkeypatch.setattr(auth, "update_user_jwt_issued_via_user", mock_update_user_jwt_issued_via_user)
 
     response = make_client("almost-expired-token").post("/api/refreshToken")
@@ -121,7 +121,7 @@ def test_refresh_token_success_when_expired(monkeypatch):
         }
 
     monkeypatch.setattr(auth.jwt, "decode", mock_jwt_decode)
-    monkeypatch.setattr(auth, "createToken", mock_create_token)
+    monkeypatch.setattr(auth, "create_token", mock_create_token)
     monkeypatch.setattr(auth, "update_user_jwt_issued_via_user", mock_update_user_jwt_issued_via_user)
 
     response = make_client("expired-token").post("/api/refreshToken")
@@ -209,7 +209,7 @@ def test_refresh_token_update_jwt_issued_fails(monkeypatch):
         raise Exception("Database error")
 
     monkeypatch.setattr(auth.jwt, "decode", mock_jwt_decode)
-    monkeypatch.setattr(auth, "createToken", mock_create_token)
+    monkeypatch.setattr(auth, "create_token", mock_create_token)
     monkeypatch.setattr(auth, "update_user_jwt_issued_via_user", mock_update_user_jwt_issued_via_user)
 
     response = make_client("almost-expired-token").post("/api/refreshToken")

@@ -21,12 +21,12 @@ def admin_payload():
 
 def test_admin_deletes_user_successfully(client, monkeypatch):
 
-    monkeypatch.setattr(auth , "verifyJWT", lambda request: admin_payload())
+    monkeypatch.setattr(auth , "verify_jwt", lambda request: admin_payload())
 
     async def fake_delete(user_id):
         return True #row found and deleted
 
-    monkeypatch.setattr(auth, "deleteUserById", fake_delete)
+    monkeypatch.setattr(auth, "delete_user_by_id", fake_delete)
 
     response = client.delete(f"/api/users/{TARGET_USER_ID}")
 
@@ -39,7 +39,7 @@ def test_admin_deletes_user_successfully(client, monkeypatch):
 def test_non_admin_is_forbidden(client, monkeypatch):
 
     monkeypatch.setattr(auth ,
-        "verifyJWT", 
+        "verify_jwt", 
         lambda request: {"sub": ADMIN_USER_ID, "username": "Alex", "role": "USER"})
         
     response = client.delete(f"/api/users/{TARGET_USER_ID}")
@@ -50,11 +50,11 @@ def test_non_admin_is_forbidden(client, monkeypatch):
 
 def test_missing_token_is_unauthorized(client, monkeypatch):
 
-    """No or invalid token: verifyJWT rasises ValueError, the 401"""
+    """No or invalid token: verify_jwt rasises ValueError, the 401"""
     def raise_value_error(request):
         raise ValueError("Missing or invalid token")
 
-    monkeypatch.setattr(auth, "verifyJWT", raise_value_error)
+    monkeypatch.setattr(auth, "verify_jwt", raise_value_error)
 
     response = client.delete(f"/api/users/{TARGET_USER_ID}")
 
@@ -64,7 +64,7 @@ def test_missing_token_is_unauthorized(client, monkeypatch):
 
 def test_malformed_uuid_is_rejected(client, monkeypatch):
 
-    monkeypatch.setattr(auth , "verifyJWT", lambda request: admin_payload())
+    monkeypatch.setattr(auth , "verify_jwt", lambda request: admin_payload())
 
     malformed_uuid = "not-a-valid-uuid"
     response = client.delete(f"/api/users/{malformed_uuid}")
@@ -77,7 +77,7 @@ def test_malformed_uuid_is_rejected(client, monkeypatch):
 #Admin cannot delete themselves. Error on return is 400
 def test_admin_cannot_delete_themself(client, monkeypatch):
 
-    monkeypatch.setattr(auth, "verifyJWT", lambda request: admin_payload())
+    monkeypatch.setattr(auth, "verify_jwt", lambda request: admin_payload())
 
     #The target is the same as the admin's ID
     response = client.delete(f"/api/users/{ADMIN_USER_ID}")
@@ -89,12 +89,12 @@ def test_admin_cannot_delete_themself(client, monkeypatch):
 #Testing nonexistent user with error code 404 
 def test_nonexistent_user_delete_404(client, monkeypatch):
     
-    monkeypatch.setattr(auth, "verifyJWT", lambda request: admin_payload())
+    monkeypatch.setattr(auth, "verify_jwt", lambda request: admin_payload())
 
     async def fake_delete(user_id):
         return False # found no one 
 
-    monkeypatch.setattr(auth, "deleteUserById", fake_delete)
+    monkeypatch.setattr(auth, "delete_user_by_id", fake_delete)
 
     response = client.delete(
         f"/api/users/{TARGET_USER_ID}"
@@ -110,7 +110,7 @@ def test_invalid_jwt_rejected(client, monkeypatch):
     def fake_verify_raises(request):
         raise ValueError("Invalid token")
 
-    monkeypatch.setattr(auth, "verifyJWT", fake_verify_raises)
+    monkeypatch.setattr(auth, "verify_jwt", fake_verify_raises)
 
     response = client.delete(
         f"/api/users/{TARGET_USER_ID}"

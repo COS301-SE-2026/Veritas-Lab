@@ -6,7 +6,7 @@ client = TestClient(app)
 
 def test_successful_registration(monkeypatch):
     client.cookies.clear()
-    async def mock_searchUsersViaEmail(email):
+    async def mock_search_users_via_email(email):
         return None
 
     async def mock_search_users_via_username(username):
@@ -26,11 +26,11 @@ def test_successful_registration(monkeypatch):
     async def mock_update_user_JWT_issued(email): 
         return None
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_search_users_via_username)
+    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
+    monkeypatch.setattr(auth, "search_users_via_username", mock_search_users_via_username)
     monkeypatch.setattr(auth, "insert_user", mock_insert_user)
-    monkeypatch.setattr(auth, "createToken", mock_create_token)
-    monkeypatch.setattr(auth, "updateUserJWTIssued", mock_update_user_JWT_issued)
+    monkeypatch.setattr(auth, "create_token", mock_create_token)
+    monkeypatch.setattr(auth, "update_user_jwt_issued", mock_update_user_JWT_issued)
 
     response = client.post(
         "/api/register",
@@ -124,7 +124,7 @@ def test_missing_username_returns_400():
 
 def test_duplicate_email_returns_409(monkeypatch):
     client.cookies.clear()
-    async def mock_searchUsersViaEmail(email):
+    async def mock_search_users_via_email(email):
         return {
             "id": "existing-id",
             "email": email,
@@ -135,8 +135,8 @@ def test_duplicate_email_returns_409(monkeypatch):
     async def mock_search_users_via_username(username):
         return None
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_search_users_via_username)
+    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
+    monkeypatch.setattr(auth, "search_users_via_username", mock_search_users_via_username)
 
     response = client.post(
         "/api/register",
@@ -153,7 +153,7 @@ def test_duplicate_email_returns_409(monkeypatch):
 def test_duplicate_username_returns_409(monkeypatch):
     client.cookies.clear()
 
-    async def mock_searchUsersViaEmail(email):
+    async def mock_search_users_via_email(email):
         return None
 
     async def mock_search_users_via_username(username):
@@ -164,8 +164,8 @@ def test_duplicate_username_returns_409(monkeypatch):
             "role": "USER"
         }
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_search_users_via_username)
+    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
+    monkeypatch.setattr(auth, "search_users_via_username", mock_search_users_via_username)
 
     response = client.post(
         "api/register",

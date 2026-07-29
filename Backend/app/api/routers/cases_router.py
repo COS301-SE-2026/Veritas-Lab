@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List
 from app.core.cases import Case
-from app.auth.auth import verifyJWT
+from app.auth.auth import verify_jwt
 from app.core.env import ENVLoader, IS_PROD
 import asyncpg
 from uuid import UUID
@@ -132,9 +132,9 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., examples=["Invalid token or database failure"])
 
 #A mask until the veriftJWT gets fixed to raise HTTPException so the try-excepts can be removed so FastApi can handle it 
-def verify_jwt(request:Request):
+def verify_jwt_(request:Request):
     try:
-        return verifyJWT(request)
+        return verify_jwt(request)
     except ValueError as e:
         raise HTTPException(
             status_code=401,
@@ -215,7 +215,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 )
 async def create_case(case_request: CreateCaseRequest, request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -256,7 +256,7 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 )
 async def get_cases(request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -348,7 +348,7 @@ async def get_cases(request: Request):
 )
 async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verify_jwt(request)
+        payload = verify_jwt_(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -497,7 +497,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
 )
 async def upload_evidence(request: Request, background_task: BackgroundTasks, case_id: str = Form(...), media: UploadFile = File(...)):
 
-    payload = verify_jwt(request)
+    payload = verify_jwt_(request)
 
 
     verify_not_user(payload.get("role"))
@@ -567,7 +567,7 @@ async def upload_evidence(request: Request, background_task: BackgroundTasks, ca
 async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     connection = None
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -643,7 +643,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
 async def update_case(case_request: UpdateCaseRequest, request: Request):
     connection = None
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
 
@@ -723,7 +723,7 @@ async def update_comment(
     request: Request
 ):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -790,7 +790,7 @@ async def update_comment(
 @router.delete("/deleteComment/comment/{comment_id}")
 async def delete_comment(request: Request, comment_id: int):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -853,7 +853,7 @@ async def retreive_comments(
     request: Request
 ):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -895,7 +895,7 @@ async def delete_evidence(
     request: Request
 ):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -942,7 +942,7 @@ async def delete_evidence(
 async def create_comment(body: CreateCommentRequest, req: Request):
 
     try:
-        payload = verifyJWT(req)
+        payload = verify_jwt(req)
     except Exception as e:
         return JSONResponse(status_code=401,
                             content={"status": "error", "message": str(e)})
@@ -975,7 +975,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
 )
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -1140,7 +1140,7 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
     }
 )
 async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
-    cookie=verify_jwt(request)
+    cookie=verify_jwt_(request)
     user_role=cookie.get("role")
     # Checking authorization
     verify_not_user(user_role)
