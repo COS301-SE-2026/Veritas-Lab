@@ -57,7 +57,7 @@ export default function CasePage() {
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
-    const canUploadEvidence = userRole === 'INVESTIGATOR';
+    const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';

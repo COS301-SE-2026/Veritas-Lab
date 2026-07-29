@@ -97,7 +97,7 @@ export default function WorkbenchPage() {
                         <MetadataComparison
                             mediaKind={mediaKind}
                             mediaName={mediaName}
-                            metadata={evidence?.reportArtifacts}
+                            reportArtifacts={evidence?.reportArtifacts}
                         />
                     ) : null}
                 </div>
