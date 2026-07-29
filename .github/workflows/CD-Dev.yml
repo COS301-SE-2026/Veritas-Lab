@@ -32,7 +32,7 @@ jobs:
                   echo "preview deployed to $url"
     deploy-backend:
         # Render backend: only on merge/push to dev
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        if: github.event_name == 'pull_request'
         runs-on: ubuntu-latest
         timeout-minutes: 20
         concurrency:
