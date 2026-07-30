@@ -1,3 +1,88 @@
+import { expect, type Page } from '@playwright/test';
+
+export type TestUser = {
+    username: string;
+    email: string;
+    password: string;
+};
+
+export async function registerUser(page: Page, user: TestUser): Promise<void> {
+    await page.goto('/');
+
+    await expect(page).toHaveURL(/\/landing$/);
+
+    const heroSection = page
+        .getByRole('heading', {
+            name: 'Discover the future of digital forensics',
+        })
+        .locator('xpath=ancestor::section[1]');
+
+    await heroSection.getByRole('button', {
+        name: 'Sign Up',
+        exact: true
+    }).click();
+
+    await expect(page).toHaveURL(/\/register$/);
+
+    await page.getByLabel('Username').fill(user.username);
+    await page.getByLabel('Work Email').fill(user.email);
+    await page
+        .getByLabel('Password', { exact: true })
+        .fill(user.password);
+    await page
+        .getByLabel('Confirm Password')
+        .fill(user.password);
+
+    const registerResponsePromise = page.waitForResponse(response =>
+        response.url().includes('/api/register') &&
+        response.request().method() === 'POST'
+    );
+
+    await page.getByRole('button', {
+        name: 'Create Account',
+        exact: true
+    }).click();
+
+    const registerResponse = await registerResponsePromise;
+    expect(registerResponse.status()).toBe(201);
+
+    await page.waitForURL(/\/(dashboard|landing|login)$/);
+
+    if (!page.url().endsWith('/dashboard')) {
+        if (page.url().endsWith('/landing')) {
+            const heroSection = page
+                .getByRole('heading', {
+                    name: 'Discover the future of digital forensics',
+                })
+                .locator('xpath=ancestor::section[1]');
+
+            await heroSection.getByRole('button', {
+                name: 'Log In',
+                exact: true
+            }).click();
+        }
+
+        await expect(page).toHaveURL(/\/login$/);
+
+        await page.getByLabel('Email').fill(user.email);
+        await page.getByLabel('Password').fill(user.password);
+
+        const loginResponsePromise = page.waitForResponse(response =>
+            response.url().includes('/api/login') && response.request().method() === 'POST'
+        );
+
+        await page.getByRole('button', {
+            name: 'Login',
+            exact: true
+        }).click();
+
+        const loginResponse = await loginResponsePromise;
+        expect(loginResponse.status()).toBe(200);
+    }
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+}
+
 export type DashboardCase = {
     caseId: string;
     caseReviews: Record<string, unknown> | null;
