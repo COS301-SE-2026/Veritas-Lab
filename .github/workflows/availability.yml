@@ -16,3 +16,10 @@ jobs:
           curl --fail --silent --show-error \
           --max-time 10 \
           https://veritas-lab-api-asgpged7esdpakas.uaenorth-01.azurewebsites.net/
+
+      - name: Check frontend availability
+        run: |
+          curl --fail --silent --show-error \
+            --max-time 10 \
+            --location \
+            https://veritsalab.vercel.app/login
