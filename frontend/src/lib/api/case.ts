@@ -1,6 +1,5 @@
 import type { CaseResponse } from '@/types/api';
-function normalizeComment(comment: Record<string, unknown>)
-{
+function normalizeComment(comment: Record<string, unknown>) {
     return {
         commentId: Number(comment.commentId ?? comment.commentid ?? 0),
         caseId: String(comment.caseId ?? comment.caseid ?? ''),
@@ -58,10 +57,8 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
         throw error;
     }
 }
-export async function addComment(caseId: string, comment: string)
-{
-    try
-    {
+export async function addComment(caseId: string, comment: string) {
+    try {
         const res = await fetch(`/api/cases/comments`, {
             method: 'POST',
             credentials: 'include',
@@ -72,15 +69,36 @@ export async function addComment(caseId: string, comment: string)
         });
 
         const data = await res.json().catch(() => null);
-        if(!res.ok)
-        {
+        if (!res.ok) {
             throw new Error(data?.message ?? 'Failed to add comment');
         }
         return normalizeComment(data.comment ?? {});
     }
-    catch(error)
-    {
+    catch (error) {
         console.error('Error adding comment:', error);
+        throw error;
+    }
+}
+
+export async function closeCase(caseId: string): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/closeCase`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ CaseID: caseId }),
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to close case');
+        }
+        return data;
+    }
+    catch (error) {
+        console.error(`Error closing case with ID ${caseId}:`, error);
         throw error;
     }
 }

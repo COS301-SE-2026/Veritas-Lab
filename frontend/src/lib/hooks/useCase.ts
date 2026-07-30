@@ -1,9 +1,10 @@
-import { fetchCase, addEvidence as submitEvidence } from '@/lib/api/case';
+import { fetchCase, addEvidence as submitEvidence, closeCase as closeCaseRequest } from '@/lib/api/case';
 
 export default function useCase() {
     return {
         fetchCase,
         fetchCases: fetchCase,
         addEvidence: submitEvidence,
+        closeCase: closeCaseRequest,
     };
 }
