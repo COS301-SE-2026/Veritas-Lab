@@ -85,8 +85,13 @@ jobs:
               env:
                   E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
                   E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
                   ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
                   ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_PASSWORD }}
               run: |
                   cat <<'EOF' > .env.ci
                   DB_USER=postgres
@@ -108,10 +113,15 @@ jobs:
                   NEXT_PUBLIC_API_URL=http://backend:8000
                   ENVIRONMENT=development
                   FRONTEND_ORIGIN=http://localhost:3000
+                  E2E_INVESTIGATOR_NAME=${E2E_INVESTIGATOR_PASSWORD}
                   E2E_INVESTIGATOR_EMAIL=${E2E_INVESTIGATOR_EMAIL}
                   E2E_INVESTIGATOR_PASSWORD=${E2E_INVESTIGATOR_PASSWORD}
+                  ADMIN_NAME=${ADMIN_NAME}
                   ADMIN_EMAIL=${ADMIN_EMAIL}
                   ADMIN_PASSWORD=${ADMIN_PASSWORD}
+                  E2E_USER_EMAIL=${E2E_USER_EMAIL}
+                  E2E_USER_PASSWORD=${E2E_USER_PASSWORD}
+                  E2E_USER_NAME=${E2E_USER_PASSWORD}
                   EOF
  
             #build and start the docker-compose
