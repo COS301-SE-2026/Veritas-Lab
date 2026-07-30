@@ -7,8 +7,7 @@ type UseCaseReviewsOptions = {
     caseId: string;
     initialComments: CaseComment[];
 };
-export default function useCaseReviews({ caseId, initialComments }: UseCaseReviewsOptions)
-{
+export default function useCaseReviews({ caseId, initialComments }: UseCaseReviewsOptions) {
     const [comments, setComments] = useState<CaseComment[]>(initialComments);
     const [draft, setDraft] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -20,28 +19,24 @@ export default function useCaseReviews({ caseId, initialComments }: UseCaseRevie
     const submitComment = async () => {
         const trimmedComment = draft.trim();
 
-        if(!trimmedComment || isSubmitting)
-        {
+        if (!trimmedComment || isSubmitting) {
             return;
         }
         setIsSubmitting(true);
         setError(null);
-        try
-        {
+        try {
             const createdComment = await addComment(caseId, trimmedComment);
             setComments((current) => [...current, createdComment]);
             setDraft('');
-        }catch(submitError)
-        {
+        } catch (submitError) {
             setError(submitError instanceof Error ? submitError.message : 'Failed to add comment');
         }
-        finally
-        {
+        finally {
             setIsSubmitting(false);
         }
     };
 
-    return{
+    return {
         comments,
         draft,
         setDraft,

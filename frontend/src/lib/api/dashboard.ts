@@ -4,7 +4,7 @@ export async function fetchCases(): Promise<DashboardCase[]> {
 	try {
 		const res = await fetch(`/api/getCases`, {
 			method: 'POST',
-			 credentials: 'include',
+			credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
 			},
@@ -28,7 +28,7 @@ export async function createCase(title: string, description?: string): Promise<{
 	try {
 		const res = await fetch(`/api/createCase`, {
 			method: 'POST',
-			 credentials: 'include',
+			credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
 			},

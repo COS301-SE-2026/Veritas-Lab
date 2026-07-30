@@ -8,27 +8,23 @@ type CurrentUser = { //added to ensure admin cant delete itself or role change
     username: string;
     role: UserRole;
 };
-function decodeJwtPayload(segment: string): Record<string, unknown>
-{
+function decodeJwtPayload(segment: string): Record<string, unknown> {
     return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
 }
 function getUserFromToken(token: string): CurrentUser {
-    if(!token)
-    {
-        return{ id: '', username: '', role: 'USER' };
+    if (!token) {
+        return { id: '', username: '', role: 'USER' };
     }
-    try
-    {
+    try {
         const payload = decodeJwtPayload(token.split('.')[1]);
-        return{
+        return {
             id: typeof payload.sub === 'string' ? payload.sub : '',
             username: typeof payload.username === 'string' ? payload.username : '',
             role: (payload.role ?? 'USER') as UserRole,
         };
     }
-    catch
-    {
-        return{ id: '', username: '', role: 'USER' };
+    catch {
+        return { id: '', username: '', role: 'USER' };
     }
 }
 

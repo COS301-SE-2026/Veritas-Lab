@@ -62,7 +62,6 @@ function buildEntries(mediaKind: MediaKind, metadata: Record<string, unknown>): 
     return toEntries(metadata);
 }
 
-/** Pulls the nested `metadata` object out of a CaseEvidence.reportArtifacts envelope. */
 function extractMetadata(reportArtifacts: Record<string, unknown> | null | undefined): Record<string, unknown> {
     const nested = reportArtifacts?.metadata;
     return nested && typeof nested === 'object' && !Array.isArray(nested)
@@ -82,8 +81,8 @@ function MetadataList({ entries }: Readonly<{ entries: MetadataEntry[] }>) {
                     key={key}
                     className="flex flex-col gap-0.5 border-b border-(--color-light)/40 pb-2 last:border-none"
                 >
-                    <dt className="font-mono text-xs text-(--color-light)">{key}</dt>
-                    <dd className="text-(--color-text) break-words">{value}</dd>
+                    <dt className="font-mono text-xs text-(--color-text)">{key}</dt>
+                    <dd className="text-(--color-light) break-words">{value}</dd>
                 </div>
             ))}
         </dl>
@@ -110,7 +109,7 @@ export default function MetadataComparison({
         <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-(--color-light) p-4">
             <div className="flex items-center gap-2">
                 <Columns2 size={16} className="shrink-0 text-(--color-light)" />
-                <h3 className="text-sm font-semibold text-(--color-text)">
+                <h3 className="text-s font-semibold text-(--color-text)">
                     Metadata side-by-side
                 </h3>
             </div>

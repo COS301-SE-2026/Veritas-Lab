@@ -11,8 +11,7 @@ const initialFormState: RegisterFormState = {
     confirmPassword: '',
 };
 
-export default function useRegisterForm()
-{
+export default function useRegisterForm() {
     const router = useRouter();
     const [formState, setFormState] = useState<RegisterFormState>(initialFormState);
     const [status, setStatus] = useState<FormStatusState>({
@@ -33,23 +32,19 @@ export default function useRegisterForm()
     };
 
     const validateForm = () => {
-        if(!formState.username.trim())
-        {
+        if (!formState.username.trim()) {
             return 'Please enter a username.';
         }
 
-        if(!emailPattern.test(formState.email.trim()))
-        {
+        if (!emailPattern.test(formState.email.trim())) {
             return 'Please enter a valid work email.';
         }
 
-        if(!passwordPattern.test(formState.password))
-        {
+        if (!passwordPattern.test(formState.password)) {
             return 'Password must be atleast 12 characters, have an upper and lower case character and a special character';
         }
 
-        if(formState.password !== formState.confirmPassword)
-        {
+        if (formState.password !== formState.confirmPassword) {
             return 'Passwords do not match.';
         }
 
@@ -60,19 +55,17 @@ export default function useRegisterForm()
         event.preventDefault();
 
         const validationMessage = validateForm();
-        if(validationMessage)
-        {
+        if (validationMessage) {
             setStatus({ error: validationMessage, success: null, isSubmitting: false });
             return;
         }
 
         setStatus({ error: null, success: null, isSubmitting: true });
 
-        try{
+        try {
             const response = await register(formState.username, formState.email, formState.password);
 
-            if(!response.status || response.status !== 'success')
-            {
+            if (!response.status || response.status !== 'success') {
                 const message = response.message ?? 'Registration failed. Please try again.';
                 setStatus({ error: message, success: null, isSubmitting: false });
                 return;
@@ -86,8 +79,7 @@ export default function useRegisterForm()
             setFormState(initialFormState);
             router.replace('/dashboard');
         }
-        catch(error)
-        {
+        catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to reach the server. Please try again later.';
 
             setStatus({

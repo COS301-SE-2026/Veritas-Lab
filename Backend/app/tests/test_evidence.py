@@ -11,9 +11,9 @@ from starlette.datastructures import UploadFile
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
+@patch("app.core.cases.get_object")
 @patch("uuid.uuid4")
-async def test_images_Upload_Success(mockUuid, mockGetObject, mockDbConnect):
+async def test_images_upload_success(mockUuid, mockget_object, mockDbConnect):
     """
     Test successful evidence processing and extension identification
     """
@@ -45,13 +45,15 @@ async def test_images_Upload_Success(mockUuid, mockGetObject, mockDbConnect):
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockStorageClient = MagicMock()
+    mockStorageClient.put_object = MagicMock()
+    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
+    mockget_object.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
-    result = await case.addEvidence(media=mockMedia, case_id=test_case_id)
+    result = await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     # Verify the result
     assert result is not None
@@ -60,7 +62,7 @@ async def test_images_Upload_Success(mockUuid, mockGetObject, mockDbConnect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_InvalidFileType(mockDbConnect):
+async def test_invalid_file_type(mockDbConnect):
     """Test that a rubbish file format throws a clean 400 error"""
     fileContent = b"some random junk text data matching food"
     testContent = io.BytesIO(fileContent)
@@ -81,7 +83,7 @@ async def test_InvalidFileType(mockDbConnect):
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert excInfo.value.status_code == 400
     assert "Unsupported file extension: .food" in excInfo.value.detail    
@@ -91,9 +93,9 @@ async def test_InvalidFileType(mockDbConnect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
+@patch("app.core.cases.get_object")
 @patch("uuid.uuid4")
-async def test_sameImageDifferentName(mockUuid, mockGetObject, mockDbConnect):
+async def test_same_image_different_name(mockUuid, mockget_object, mockDbConnect):
     """
     Testing the image hash for dupe  prevention
     """
@@ -138,16 +140,18 @@ async def test_sameImageDifferentName(mockUuid, mockGetObject, mockDbConnect):
     mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockStorageClient = MagicMock()
+    mockStorageClient.put_object = MagicMock()
+    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
+    mockget_object.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id_1 = uuid.uuid4()
     test_case_id_2 = uuid.uuid4()
 
-    result1 = await case.addEvidence(media=mockMedia1, case_id=test_case_id_1)
+    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id_1)
     
-    result2 = await case.addEvidence(media=mockMedia2, case_id=test_case_id_2)
+    result2 = await case.add_evidence(media=mockMedia2, case_id=test_case_id_2)
 
     assert result1 is not None
     assert "url" in result1
@@ -166,9 +170,9 @@ async def test_sameImageDifferentName(mockUuid, mockGetObject, mockDbConnect):
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
+@patch("app.core.cases.get_object")
 @patch("uuid.uuid4")
-async def test_duplicateReportViolatesConstraint(mockUuid, mockGetObject, mockDbConnect):
+async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mockDbConnect):
     """
     Test uniqueness error handling when dupes in same case appear
     """
@@ -220,19 +224,21 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockGetObject, mockDb
     )
     mockDbConnection.close = AsyncMock()
 
-    mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockStorageClient = MagicMock()
+    mockStorageClient.put_object = MagicMock()
+    mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
+    mockget_object.return_value = mockStorageClient
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
-    result1 = await case.addEvidence(media=mockMedia1, case_id=test_case_id)
+    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id)
     assert result1 is not None
     assert result1.get("Status") == "uploaded"
     
     # Second upload should raise HTTPException with 409 Conflict
     with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia2, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia2, case_id=test_case_id)
     
     assert excInfo.value.status_code == 409
     assert "already associated with this case" in excInfo.value.detail
@@ -241,8 +247,8 @@ async def test_duplicateReportViolatesConstraint(mockUuid, mockGetObject, mockDb
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
-async def test_deleteEvidence_investigator_duplicate_entry(mockgetObject, mockDbConnect):
+@patch("app.core.cases.get_object")
+async def test_delete_evidence_investigator_duplicate_entry(mockget_object, mockDbConnect):
     """
 An investigator deletes a duplicate. Only the report is deleted.
     """
@@ -254,14 +260,14 @@ An investigator deletes a duplicate. Only the report is deleted.
     mockDbConnection.close = AsyncMock()
 
     mock_s3_client = MagicMock()
-    mockgetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
-    result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+    result = await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
@@ -271,8 +277,8 @@ An investigator deletes a duplicate. Only the report is deleted.
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
-async def test_deleteEvidence_investigator_only_entry(mockGetObject, mockDbConnect):
+@patch("app.core.cases.get_object")
+async def test_delete_evidence_investigator_only_entry(mockget_object, mockDbConnect):
     """
 An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
     """
@@ -290,14 +296,14 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     mockDbConnection.close = AsyncMock()
 
     mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
-    result = await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+    result = await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
 
     mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
@@ -308,8 +314,8 @@ An investigator deletes the only entry for that evidence.The report is deleted a
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
-async def test_deleteEvidence_admin_duplicate_entry(mockGetObject, mockDbConnect):
+@patch("app.core.cases.get_object")
+async def test_delete_evidence_admin_duplicate_entry(mockget_object, mockDbConnect):
     """
 An admin deletes a duplicate. Therefore only the report is deleted
     """
@@ -320,13 +326,13 @@ An admin deletes a duplicate. Therefore only the report is deleted
     mockDbConnection.fetchrow = AsyncMock(return_value=None)
 
     mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.deleteEvidence(media_id=test_media_id)
+    result = await case.delete_evidence(media_id=test_media_id)
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
@@ -335,8 +341,8 @@ An admin deletes a duplicate. Therefore only the report is deleted
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
-async def test_deleteEvidence_admin_only_entry(mockGetObject, mockDbConnect):
+@patch("app.core.cases.get_object")
+async def test_delete_evidence_admin_only_entry(mockget_object, mockDbConnect):
     """
 An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
     """
@@ -353,13 +359,13 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
 
     mock_s3_client = MagicMock()
-    mockGetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
     case.CaseId = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.deleteEvidence(media_id=test_media_id)
+    result = await case.delete_evidence(media_id=test_media_id)
 
     mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
@@ -368,7 +374,7 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     assert result["Status"] == "success"
 
 @pytest.mark.asyncio
-async def test_deleteEvidence_missing_case_id_400():
+async def test_delete_evidence_missing_case_id_400():
     """
     A missing Media_id should raise an exception
     """
@@ -379,14 +385,14 @@ async def test_deleteEvidence_missing_case_id_400():
     test_user = "Investigator_Bob"
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+        await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail == "Case id is missing"
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_deleteEvidence_investigator_unauthorized_403(mockDbConnect):
+async def test_delete_evidence_investigator_unauthorized_403(mockDbConnect):
     """
 An investigator tries to delete evidence but it fails due to either CaseCreator validation or record is missing (returns DELETE 0). Should raise 403.
     """
@@ -401,7 +407,7 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
     test_user = "Hacker_Eve"
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.deleteEvidence(media_id=test_media_id, JWT_username=test_user)
+        await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
 
     assert excInfo.value.status_code == 403
     assert "Unauthorized" in excInfo.value.detail
@@ -409,7 +415,7 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_deleteEvidence_admin_not_found_404(mockDbConnect):
+async def test_delete_evidence_admin_not_found_404(mockDbConnect):
     """
 When an admin tries to delete a record that does not exist. (returns DELETE 0). Should raise 404.
     """
@@ -423,13 +429,13 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     test_media_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.deleteEvidence(media_id=test_media_id)
+        await case.delete_evidence(media_id=test_media_id)
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == "Media not found."
 
 @pytest.mark.asyncio
-async def test_addEvidence_invalid_case_id_uuid():
+async def test_add_evidence_invalid_case_id_uuid():
     fileContent = b"A fake binary for a png"
     testContent = io.BytesIO(fileContent)
 
@@ -442,14 +448,14 @@ async def test_addEvidence_invalid_case_id_uuid():
     case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia, case_id="not-a-valid-uuid")
+        await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid")
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail == "Invalid case_id UUID"
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
-async def test_addEvidence_pdf_open_action_rejected(mockPdfReaderClass):
+async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -470,14 +476,14 @@ async def test_addEvidence_pdf_open_action_rejected(mockPdfReaderClass):
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert excInfo.value.status_code == 400
     assert "security concern" in excInfo.value.detail
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
-async def test_addEvidence_pdf_javascript_rejected(mockPdfReaderClass):
+async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -501,17 +507,17 @@ async def test_addEvidence_pdf_javascript_rejected(mockPdfReaderClass):
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.addEvidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert exc_info.value.status_code == 400
     assert "security concern" in exc_info.value.detail
     
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-@patch("app.core.cases.getObject")
+@patch("app.core.cases.get_object")
 @patch("app.core.cases.PdfReader")
 @patch("uuid.uuid4")
-async def test_addEvidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass, mockGetObject, mockDbConnect):
+async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass, mockget_object, mockDbConnect):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -547,12 +553,12 @@ async def test_addEvidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass
 
     mock_s3_client = MagicMock()
     mock_s3_client.generate_presigned_url.return_value = "https://fake-presigned-url"
-    mockGetObject.return_value = mock_s3_client
+    mockget_object.return_value = mock_s3_client
 
     case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
     test_case_id = uuid.uuid4()
 
-    result = await case.addEvidence(media=mockMedia, case_id=test_case_id)
+    result = await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert result is not None 
     assert result["url"] == "https://fake-presigned-url"

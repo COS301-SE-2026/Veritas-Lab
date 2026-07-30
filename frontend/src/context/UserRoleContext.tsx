@@ -22,7 +22,6 @@ export function UserRoleProvider({ user, children }: { user: CurrentUser; childr
 export function useUserRole() {
     return useContext(UserRoleContext);
 }
-export function useCurrentUser()
-{
+export function useCurrentUser() {
     return useContext(CurrentUserContext);
 }

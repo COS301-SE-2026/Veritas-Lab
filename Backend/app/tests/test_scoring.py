@@ -58,7 +58,11 @@ def test_probability_to_risk_level_rejects_invalid_thresholds(low_threshold: flo
         ValueError,
         match="Thresholds must satisfy"
     ):
-        probability_to_risk_level(probability=0.5, low_threshold=low_threshold, high_threshold=high_threshold)
+        probability_to_risk_level(
+            probability=0.5, 
+            low_threshold=low_threshold, 
+            high_threshold=high_threshold
+        )
 
 @pytest.mark.parametrize(
     ("risk_level", "expected_classification"),

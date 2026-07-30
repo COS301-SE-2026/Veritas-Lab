@@ -1,15 +1,13 @@
 import type { DropdownProps } from '@/types/components';
 //still might review all of these comps that i created if we need to add styling here.
-export default function Dropdown(
-{
+export default function Dropdown({
 	options,
 	onChange,
 	defaultValue,
 	disabled = false,
 	className,
 	optionClassName
-}: DropdownProps)
-{
+}: DropdownProps) {
 	return (
 		<select
 			onChange={onChange}

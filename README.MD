@@ -32,7 +32,7 @@ Demo 2
 
 | Resources | Description |
 |-----------|-------------|
-|||
+|[User Manual](Docs/Demo_2/User-Manual-Veritas-Lab.pdf)| The user manual|
 
 </div>
 </div>

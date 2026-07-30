@@ -1,6 +1,6 @@
 import type { ButtonProps } from '@/types/components';
 
-export default function Button({ 
+export default function Button({
     children,
     text,
     onClick,
@@ -9,7 +9,7 @@ export default function Button({
     variant = 'primary',
     size = 'medium',
     className = '',
- }: ButtonProps) {
+}: ButtonProps) {
 
     const sizeClasses = {
         small: '',

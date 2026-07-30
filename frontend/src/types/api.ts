@@ -39,6 +39,7 @@ export type CaseEvidence = {
     annotations: [] | null;
     reportArtifacts: Record<string, unknown> | null;
     reportFindings: string | null;
+    reportCertainty: number | null;
     reportComments: string | null;
     reportDateCreation: string | null;
 };

@@ -6,6 +6,7 @@ import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
+import CaseCloseButton from "@/components/common/caseCloseButton";
 import useCase from "@/lib/hooks/useCase";
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import CaseReviewsPanel from '@/components/common/caseReviewsPanel';
@@ -54,10 +55,25 @@ export default function CasePage() {
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
 
+    // Shared reload used after an upload or a case close, so the panel/details stay in sync.
+    const reloadCaseData = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            const response = await fetchCase(id);
+            setCaseData(response);
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : 'Failed to load case');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
     const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
+    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed;
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
@@ -127,24 +143,18 @@ export default function CasePage() {
                                 <p className="text-(--color-light) mt-2">Status: {caseDetails?.caseClosed ? 'Closed' : 'Open'}</p>
                                 <p className="text-(--color-light) mt-1">Created: {formatCaseDate(caseDetails?.caseCreationDate)}</p>
                         </div>
+                        {canCloseCase ? (
+                            <CaseCloseButton
+                                caseId={id}
+                                onClosed={reloadCaseData}
+                                className="mt-4"
+                            />
+                        ) : null}
                     </div>
                 </div>
             </div>
             {canUploadEvidence ? (
-                <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={() => {
-                    void (async () => {
-                        try {
-                            setIsLoading(true);
-                            setError(null);
-                            const response = await fetchCase(id);
-                            setCaseData(response);
-                        } catch (loadError) {
-                            setError(loadError instanceof Error ? loadError.message : 'Failed to load case');
-                        } finally {
-                            setIsLoading(false);
-                        }
-                    })();
-                }} />
+                <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={reloadCaseData} />
             ) : null}
         </>
     );
