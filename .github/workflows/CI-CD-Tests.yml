@@ -82,6 +82,11 @@ jobs:
  
             #create local env used by docker compose for integration tests.
             - name: create CI env
+              env:
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
               run: |
                   cat <<'EOF' > .env.ci
                   DB_USER=postgres
@@ -92,7 +97,7 @@ jobs:
                   DB_SSL=false
                   JWT_SECRET=test-secret
                   HASH=HS256
-                  TOKEN_EXPIRE=5
+                  TOKEN_EXPIRE=10
                   MINIO_ROOT_USER=minioadmin
                   MINIO_ROOT_PASSWORD=minioadmin
                   MINIO_API_PORT=9000
@@ -103,6 +108,10 @@ jobs:
                   NEXT_PUBLIC_API_URL=http://backend:8000
                   ENVIRONMENT=development
                   FRONTEND_ORIGIN=http://localhost:3000
+                  E2E_INVESTIGATOR_EMAIL=${E2E_INVESTIGATOR_EMAIL}
+                  E2E_INVESTIGATOR_PASSWORD=${secrets.E2E_INVESTIGATOR_PASSWORD}
+                  ADMIN_EMAIL=${ADMIN_EMAIL}
+                  ADMIN_PASSWORD=${secrets.ADMIN_PASSWORD}
                   EOF
  
             #build and start the docker-compose
@@ -147,11 +156,6 @@ jobs:
                   npx playwright install --with-deps
  
             - name: run Playwright
-              env:
-                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
-                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
-                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
               run: |
                   cd frontend
                   npx playwright test --project=chromium --project=firefox
