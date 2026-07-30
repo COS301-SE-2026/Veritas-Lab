@@ -18,12 +18,10 @@ export async function fetchUsers(): Promise<AdminUser[]> {
         body: JSON.stringify({}),
     });
     const data = (await response.json().catch(() => null)) as ApiResult & { users?: AdminUser[] } | AdminUser[] | null;
-    if(!response.ok)
-    {
+    if (!response.ok) {
         throw new Error((data && 'message' in data && data.message) || 'Failed to fetch users');
     }
-    if(Array.isArray(data))
-    {
+    if (Array.isArray(data)) {
         return data;
     }
     return data?.users ?? [];
@@ -38,8 +36,7 @@ export async function changeUserRole(userId: string, newRole: AdminUser['role'])
         },
         body: JSON.stringify({ userId, NewRole: newRole }),
     });
-    if(!response.ok)
-    {
+    if (!response.ok) {
         const data = (await response.json().catch(() => null)) as ApiResult | null;
         throw new Error(data?.message || 'Failed to update user role');
     }
@@ -53,8 +50,7 @@ export async function deleteUser(userId: string): Promise<void> {
             'Content-Type': 'application/json',
         },
     });
-    if(!response.ok)
-    {
+    if (!response.ok) {
         const data = (await response.json().catch(() => null)) as ApiResult | null;
         throw new Error(data?.message || 'Failed to delete user');
     }

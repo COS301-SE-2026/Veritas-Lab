@@ -20,11 +20,10 @@ export default function AnnotationList({ annotations, selectedId, onSelect, onRe
                         return (
                             <li key={annotation.id}>
                                 <div
-                                    className={`flex w-full items-start gap-2 rounded-xl p-2 text-sm transition-colors ${
-                                        isSelected
+                                    className={`flex w-full items-start gap-2 rounded-xl p-2 text-sm transition-colors ${isSelected
                                             ? 'bg-(--color-secondary)/20 text-(--color-text)'
                                             : 'text-(--color-text) hover:bg-(--color-lightest)'
-                                    }`}
+                                        }`}
                                 >
                                     <button
                                         type="button"

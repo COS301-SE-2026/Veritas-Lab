@@ -7,8 +7,7 @@ type CaseReviewComposerProps = {
     onDraftChange: (value: string) => void;
     onSubmit: () => void;
 };
-export default function CaseReviewComposer({ draft, isSubmitting, onDraftChange, onSubmit }: CaseReviewComposerProps)
-{
+export default function CaseReviewComposer({ draft, isSubmitting, onDraftChange, onSubmit }: CaseReviewComposerProps) {
     return (
         <div className="mt-4 rounded-[24px] border border-[var(--color-light)]/30 bg-white p-4 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)]">
             <label htmlFor="case-review-message" className="sr-only">

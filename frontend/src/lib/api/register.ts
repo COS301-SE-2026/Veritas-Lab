@@ -1,6 +1,6 @@
 import type { RegisterResponse } from '@/types/api';
 
-export async function register(username: string, email: string, password: string): Promise<RegisterResponse > {
+export async function register(username: string, email: string, password: string): Promise<RegisterResponse> {
     const res = await fetch(`/api/register`, {
         method: 'POST',
         headers: {
@@ -8,7 +8,7 @@ export async function register(username: string, email: string, password: string
         },
         body: JSON.stringify({ username, email, password })
     });
-    
+
     const data: RegisterResponse = await res.json();
 
     if (!res.ok) {

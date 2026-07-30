@@ -6,25 +6,20 @@ type CaseReviewMessageProps = {
     isMine: boolean;
 };
 
-function getAvatarText(username: string)
-{
+function getAvatarText(username: string) {
     const trimmedUsername = username.trim();
-    if(!trimmedUsername)
-    {
+    if (!trimmedUsername) {
         return '?'; //this technically shouldnt happen but hey we need protection incase
     }
     return trimmedUsername.slice(0, 1).toUpperCase();
 }
 
-function formatTimestamp(timestamp: string | null)
-{
-    if(!timestamp)
-    {
+function formatTimestamp(timestamp: string | null) {
+    if (!timestamp) {
         return 'Now';
     }
     const parsedDate = new Date(timestamp);
-    if(Number.isNaN(parsedDate.getTime()))
-    {
+    if (Number.isNaN(parsedDate.getTime())) {
         return 'Now';
     }
     return parsedDate.toLocaleString('en-GB', {
@@ -33,8 +28,7 @@ function formatTimestamp(timestamp: string | null)
     });
 }
 
-export default function CaseReviewMessage({ comment, isMine }: CaseReviewMessageProps)
-{
+export default function CaseReviewMessage({ comment, isMine }: CaseReviewMessageProps) {
     const avatarText = getAvatarText(comment.username);
     const bubbleClasses = isMine ? 'bg-[var(--color-secondary)] text-[var(--color-text)]' : 'bg-white text-[var(--color-text)]';
     const metaTextClasses = isMine ? 'text-[var(--color-text)]/75' : 'text-[var(--color-light)]';

@@ -43,6 +43,12 @@ export type MediaUploadModalProps = {
     onUploaded?: () => void | Promise<void>;
 };
 
+export type CaseCloseButtonProps = {
+    caseId: string;
+    onClosed: () => void | Promise<void>;
+    className?: string;
+};
+
 export type CheckBoxProps = {
     label: string;
     onChange: (event: ChangeEvent<HTMLInputElement>) => void;

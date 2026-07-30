@@ -1,21 +1,18 @@
 import type { ChangeEvent } from 'react';
 import type { CheckBoxProps } from '@/types/components';
 
-export default function CheckBox(
-{
+export default function CheckBox({
 	label,
 	onChange,
 	checked,
 	defaultChecked,
 	disabled = false,
 	className
-}: CheckBoxProps)
-{
+}: CheckBoxProps) {
 	const isControlled = typeof checked === 'boolean';
 	//handles a missed error
 	const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-		if(disabled)
-		{
+		if (disabled) {
 			return;
 		}
 

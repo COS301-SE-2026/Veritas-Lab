@@ -30,13 +30,11 @@ export default function useLoginForm() {
     };
 
     const validateForm = () => {
-        if(!emailPattern.test(formState.email.trim()))
-        {
+        if (!emailPattern.test(formState.email.trim())) {
             return 'Please enter a valid email.';
         }
 
-        if(!formState.password.trim())
-        {
+        if (!formState.password.trim()) {
             return 'Please enter your password.';
         }
 
@@ -47,17 +45,16 @@ export default function useLoginForm() {
         event.preventDefault();
 
         const validationMessage = validateForm();
-        if(validationMessage)
-        {
+        if (validationMessage) {
             setStatus({ error: validationMessage, success: null, isSubmitting: false });
             return;
         }
         setStatus({ error: null, success: null, isSubmitting: true });
 
-        try{
+        try {
             const response = await login(formState.email.trim(), formState.password);
 
-            if(response.status !== 'success') {
+            if (response.status !== 'success') {
                 setStatus({
                     error: response.message || 'Login failed. Please check your credentials and try again.',
                     success: null,
@@ -74,8 +71,7 @@ export default function useLoginForm() {
             setFormState(initialFormState);
             router.push('/dashboard');
         }
-        catch(error)
-        {
+        catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to reach the server. Please try again later.';
 
             setStatus({
@@ -86,7 +82,7 @@ export default function useLoginForm() {
         }
     };
 
-    return{
+    return {
         formState,
         status,
         updateField,

@@ -9,13 +9,13 @@ function decodeJwtPayload(segment: string): Record<string, unknown> {
     }
     return JSON.parse(atob(base64));
 }
- 
+
 function isValidToken(token: string | undefined): boolean {
     if (!token) return false;
- 
+
     const parts = token.split('.');
     if (parts.length !== 3) return false;
- 
+
     try {
         const payload = decodeJwtPayload(parts[1]);
         const exp = payload.exp;

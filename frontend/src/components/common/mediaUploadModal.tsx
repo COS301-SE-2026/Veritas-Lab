@@ -51,7 +51,7 @@ export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }
                         : <>
                             <p className="text-sm font-semibold text-[var(--color-text)]">Click to browse</p>
                             <p className="text-xs text-gray-400">PNG/PDF file types supported</p>
-                          </>
+                        </>
                     }
                 </div>
 

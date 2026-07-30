@@ -11,9 +11,8 @@ type CaseReviewsPanelProps = {
 };
 //the panel that contains all the case reviews/messages/comments 
 //note - we Really need to come back and ensure the naming is either consistent with DB or makes sense because currently "review" and "comment" are being used interchangably
-export default function CaseReviewsPanel({ caseId, initialComments, currentUsername }: CaseReviewsPanelProps)
-{
-    const{
+export default function CaseReviewsPanel({ caseId, initialComments, currentUsername }: CaseReviewsPanelProps) {
+    const {
         comments,
         draft,
         setDraft,
@@ -22,7 +21,7 @@ export default function CaseReviewsPanel({ caseId, initialComments, currentUsern
         submitComment,
     } = useCaseReviews({ caseId, initialComments });
     //
-    return(
+    return (
         <div className="rounded-[28px] border border-[var(--color-light)]/30 bg-white p-4 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)]">
             <div className="flex items-center justify-between gap-4">
                 <div>

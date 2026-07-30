@@ -47,11 +47,10 @@ export default function WorkbenchPanel({
                 type="button"
                 onClick={() => onSelectWorkbenchTool(isAnnotationsActive ? null : 'Annotations')}
                 aria-pressed={isAnnotationsActive}
-                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${
-                    isAnnotationsActive
+                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${isAnnotationsActive
                         ? 'bg-(--color-secondary) text-(--color-text)'
                         : 'text-(--color-text) hover:bg-(--color-lightest)'
-                }`}
+                    }`}
             >
                 <Pencil size={16} className="shrink-0" />
                 Annotations
@@ -62,11 +61,10 @@ export default function WorkbenchPanel({
                 type="button"
                 onClick={() => onSelectWorkbenchTool(isCompareActive ? null : 'Compare')}
                 aria-pressed={isCompareActive}
-                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${
-                    isCompareActive
+                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${isCompareActive
                         ? 'bg-(--color-secondary) text-(--color-text)'
                         : 'text-(--color-text) hover:bg-(--color-lightest)'
-                }`}
+                    }`}
             >
                 <Columns2 size={16} className="shrink-0" />
                 View side by side
