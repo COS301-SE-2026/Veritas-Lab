@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import HelpMenuTutorial, { TUTORIALS } from '@/components/common/helpMenuTutorial';
+import HelpMenuTutorial, { TUTORIALS, filterTutorials } from '@/components/common/helpMenuTutorial';
 
 describe('HelpMenuTutorial', () => {
 	it('renders the title and summary for every tutorial', () => {
@@ -49,5 +49,37 @@ describe('HelpMenuTutorial', () => {
 	it('renders nothing when there are no items', () => {
 		render(<HelpMenuTutorial items={[]} openIndex={null} onToggle={jest.fn()} />);
 		expect(screen.queryAllByRole('button')).toHaveLength(0);
+	});
+	
+	it('returns all tutorials for an empty query', () => {
+        expect(filterTutorials('')).toEqual(TUTORIALS);
+    });
+
+    it('finds tutorials by title', () => {
+        const result = filterTutorials('workbench');
+
+        expect(result.length).toBeGreaterThan(0);
+    });
+	
+    it('finds tutorials by summary', () => {
+		const result = filterTutorials('dashboard');
+		
+        expect(result.length).toBeGreaterThan(0);
+    });
+	
+    it('finds tutorials by step text', () => {
+		const result = filterTutorials('Create Case');
+		
+        expect(result.length).toBeGreaterThan(0);
+    });
+	
+    it('returns an empty array when nothing matches', () => {
+		expect(filterTutorials('nothinghere123')).toEqual([]);
+    });
+	
+    it('is case insensitive', () => {
+		expect(filterTutorials('WORKBENCH')).toEqual(
+			filterTutorials('workbench'),
+        );
 	});
 });

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { changeUserRole, deleteUser, fetchUsers } from '@/lib/api/admin';
 import type { AdminUser } from '@/types/api';
 export type AdminRoleFilter = 'All' | AdminUser['role'];
@@ -84,31 +84,25 @@ export default function useAdminUsers() {
         };
     }, []);
 
-    const visibleUsers = useMemo(() => {
-        const normalizedQuery = searchQuery.trim().toLowerCase();
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const filtered = users.filter((user) => {
+        const matchesRole = roleFilter === 'All' || user.role === roleFilter;
+        if (!matchesRole) {
+            return false;
+        }
 
-        const filtered = users.filter((user) => {
-            const matchesRole = roleFilter === 'All' || user.role === roleFilter;
-
-            if (!matchesRole) {
-                return false;
-            }
-
-            if (!normalizedQuery) {
-                return true;
-            }
-            const displayName = getDisplayName(user).toLowerCase();
-            return (
-                user.id.toLowerCase().includes(normalizedQuery) ||
-                user.username.toLowerCase().includes(normalizedQuery) ||
-                user.role.toLowerCase().includes(normalizedQuery) ||
-                displayName.includes(normalizedQuery)
-            );
-        });
-
-        return sortUsers(filtered, sortKey);
-    }, [roleFilter, searchQuery, sortKey, users]);
-
+        if (!normalizedQuery) {
+            return true;
+        }
+        const displayName = getDisplayName(user).toLowerCase();
+        return (
+            user.id.toLowerCase().includes(normalizedQuery) ||
+            user.username.toLowerCase().includes(normalizedQuery) ||
+            user.role.toLowerCase().includes(normalizedQuery) ||
+            displayName.includes(normalizedQuery)
+        );
+    });
+    const visibleUsers = sortUsers(filtered, sortKey);
     const updateUserRole = async (userId: string, nextRole: AdminUser['role']) => {
         setPendingUserId(userId);
         setActionError(null);
@@ -156,4 +150,4 @@ export default function useAdminUsers() {
         removeUser,
     };
 }
-//i think this is now done... but i may be back LOL
+//i think this is now done... but i may be back LOL (i did comeback)
