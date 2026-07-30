@@ -28,20 +28,32 @@ test('admin user management works against the live backend and database', async 
         waitUntil: 'domcontentloaded'
     });
 
-    await expect(
-        page.getByRole('button', {
-            name: 'Login',
-            exact: true
-        })
-    ).toBeVisible()
-
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(password);
-
-    await page.getByRole('button', {
+    const loginEmail = page.getByLabel('Email');
+    const loginPassword = page.getByLabel('Password');
+    const loginButton = page.getByRole('button', {
         name: 'Login',
         exact: true
-    }).click();
+    });
+
+    await expect(loginEmail).toBeVisible();
+    await expect(loginEmail).toBeEditable();
+    await expect(loginPassword).toBeEditable();
+    await expect(loginButton).toBeEnabled();
+
+    await loginEmail.fill(email);
+    await loginPassword.fill(password);
+
+    await expect(loginEmail).toHaveValue(email);
+    await expect(loginPassword).toHaveValue(password);
+
+    const [loginResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            response.url().includes('/api/login') && response.request().method() === 'POST'
+        ),
+        loginButton.click()
+    ]);
+
+    expect(loginResponse.status()).toBe(200);
 
     await expect(page).toHaveURL(/\/dashboard$/);
 
