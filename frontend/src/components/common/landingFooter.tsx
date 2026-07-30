@@ -30,9 +30,15 @@ export default function LandingFooter() {
                             className="w-full sm:w-auto px-8 sm:px-20 py-3 text-lg font-semibold"
                             onClick={() => router.push('/login')}
                         />
+                        <Button
+                            text="Style Guide"
+                            variant="primary"
+                            className="text-(--color-lightest) text-base font-semibold hover:text-white transition-colors duration-200"
+                            onClick={() => router.push('/style-guide')}
+                        />
                     </div>
                 </div>
-                
+
                 <div className="mt-14 pt-8 border-t border-white/15">
                     <div className="flex items-center gap-3">
                         <Image src="/VL_Logo_light.svg" alt="" width={40} height={40} className="size-9" />
