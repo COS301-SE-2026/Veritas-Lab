@@ -10,7 +10,12 @@ permissions:
     packages: write
 
 jobs:
+    #This runs the tests again when anything gets on main not just when we do PR's
+    tests:
+        uses: ./.github/workflows/CI-CD-Tests.yml
+    
     deploy-azure:
+        needs: [tests]
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
@@ -40,6 +45,7 @@ jobs:
                   publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
                   images: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
     deploy-vercel:
+        needs: [tests]
         runs-on: ubuntu-latest
         timeout-minutes: 15
         environment:
@@ -67,6 +73,7 @@ jobs:
     rollback:
         name: automatic rollback
         needs: [deploy-azure, deploy-vercel]
+        #Always attempts to rollback even when tests succeed this is to make sure failurs run this job
         if: always() && (needs.deploy-azure.result == 'failure' || needs.deploy-vercel.result == 'failure')
         runs-on: ubuntu-latest
         timeout-minutes: 15
