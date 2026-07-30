@@ -82,7 +82,7 @@ export default function WorkbenchPage() {
                         Use the tools on the right to work on this evidence.
                     </p>
                 </div>
-                <Button variant="outline" onClick={openReport} className="flex items-center gap-2">
+                <Button variant="submit" onClick={openReport} className="flex items-center gap-2">
                     <FileText size={16} />
                     <span className="text-sm">Show Report</span>
                 </Button>

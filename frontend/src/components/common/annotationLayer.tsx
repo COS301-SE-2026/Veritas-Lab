@@ -105,7 +105,7 @@ export default function AnnotationLayer({
                                 points={shape.points.map((p) => `${p.x},${p.y}`).join(' ')}
                                 fill="none"
                                 stroke={shape.id === selectedId ? 'var(--color-secondary)' : 'var(--color-primary)'}
-                                strokeWidth={0.6}
+                                strokeWidth={4}
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 vectorEffect="non-scaling-stroke"
@@ -116,7 +116,7 @@ export default function AnnotationLayer({
                                 points={drawingPoints.map((p) => `${p.x},${p.y}`).join(' ')}
                                 fill="none"
                                 stroke="var(--color-secondary)"
-                                strokeWidth={0.6}
+                                strokeWidth={4}
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 vectorEffect="non-scaling-stroke"

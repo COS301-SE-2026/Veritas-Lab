@@ -1,6 +1,5 @@
 import type { SaveAnnotationsPayload } from '@/types/workbench';
 
-
 export async function saveAnnotations({ evidenceId, annotations }: SaveAnnotationsPayload): Promise<void> {
     try {
         const reportId = evidenceId;

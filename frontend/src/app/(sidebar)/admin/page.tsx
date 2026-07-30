@@ -31,8 +31,7 @@ export default function AdminPage() {
     } = useAdminUsers();
 
     useEffect(() => {
-        if(userRole !== 'ADMIN')
-        {
+        if (userRole !== 'ADMIN') {
             router.replace('/dashboard');
         }
     }, [router, userRole]);
@@ -43,11 +42,10 @@ export default function AdminPage() {
         { label: 'User ID', value: 'id' },
         { label: 'Role', value: 'role' },
     ]), []);
-    if(userRole !== 'ADMIN')
-    {
+    if (userRole !== 'ADMIN') {
         return <div className='mt-8 ml-8 text-sm text-[var(--color-light)]'>Redirecting...</div>;
     }
-    return(
+    return (
         <div className='mt-8 ml-8 mr-8'>
             <div className='flex items-start justify-between gap-4'>
                 <div>
@@ -81,15 +79,13 @@ export default function AdminPage() {
                         isBusy={pendingUserId !== null}
                         currentUserId={currentUser?.id ?? ''}
                         onRoleChange={(userId, nextRole) => {
-                            if(userId === currentUser?.id)
-                            {
+                            if (userId === currentUser?.id) {
                                 return;
                             }
                             void updateUserRole(userId, nextRole);
                         }}
                         onDelete={(user) => {
-                            if(user.id === currentUser?.id)
-                            {
+                            if (user.id === currentUser?.id) {
                                 return;
                             }
                             setDeleteTarget(user);
@@ -107,18 +103,15 @@ export default function AdminPage() {
                 isSubmitting={pendingUserId === deleteTarget?.id}
                 onClose={() => setDeleteTarget(null)}
                 onConfirm={() => {
-                    if(!deleteTarget)
-                    {
+                    if (!deleteTarget) {
                         return;
                     }
                     void (async () => {
-                        try
-                        {
+                        try {
                             await removeUser(deleteTarget.id);
                             setDeleteTarget(null);
                         }
-                        catch
-                        {
+                        catch {
                             //will be handled in hook
                         }
                     })();

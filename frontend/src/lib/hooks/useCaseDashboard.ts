@@ -81,29 +81,29 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
         };
     }, [options.initialCases]);
 
-   
-        const normalizedQuery = searchQuery.trim().toLowerCase();
 
-        const filtered = cases.filter((item) => {
-            const caseStatus: CaseStatus = item.caseClosed ? 'Closed' : 'Open';
-            const matchesStatus = statusFilter === 'All' || caseStatus === statusFilter;
+    const normalizedQuery = searchQuery.trim().toLowerCase();
 
-            if (!matchesStatus) {
-                return false;
-            }
+    const filtered = cases.filter((item) => {
+        const caseStatus: CaseStatus = item.caseClosed ? 'Closed' : 'Open';
+        const matchesStatus = statusFilter === 'All' || caseStatus === statusFilter;
 
-            if (!normalizedQuery) {
-                return true;
-            }
+        if (!matchesStatus) {
+            return false;
+        }
 
-            return (
-                item.caseId.toLowerCase().includes(normalizedQuery) ||
-                item.caseName.toLowerCase().includes(normalizedQuery) ||
-                item.caseCreator.toLowerCase().includes(normalizedQuery)
-            );
-        });
+        if (!normalizedQuery) {
+            return true;
+        }
 
-        const visibleCases = sortCases(filtered, sortKey);
+        return (
+            item.caseId.toLowerCase().includes(normalizedQuery) ||
+            item.caseName.toLowerCase().includes(normalizedQuery) ||
+            item.caseCreator.toLowerCase().includes(normalizedQuery)
+        );
+    });
+
+    const visibleCases = sortCases(filtered, sortKey);
 
     return {
         searchQuery,
