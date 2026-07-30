@@ -24,7 +24,16 @@ test('admin user management works against the live backend and database', async 
 
     const { email, password } = getAdminCredentials();
 
-    await page.goto('/login');
+    await page.goto('/login', {
+        waitUntil: 'domcontentloaded'
+    });
+
+    await expect(
+        page.getByRole('button', {
+            name: 'Login',
+            exact: true
+        })
+    ).toBeVisible()
 
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);

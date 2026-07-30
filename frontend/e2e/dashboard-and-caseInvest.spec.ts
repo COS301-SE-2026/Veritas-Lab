@@ -1,20 +1,24 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'crypto';
 import { getInvestigatorCredentials } from './investigatorCredentials';
+import path from 'path'
 
-test('investigator can search cases, create a case, upload media, add a review, annotate and open the workbench', async ({ page }) => {
+test('investigator can search cases, create a case, close case, upload media, add a review, annotate, view report, score and metadata, and open the workbench', async ({ page }) => {
     const { email, password } = getInvestigatorCredentials();
 
     const uniqueId = randomUUID().slice(0, 8);
     const caseTitle = `investigator-case-${uniqueId}`;
     const caseDescription = 'Investigator created case from the E2E flow.';
-    const uploadedFileName = `investigator-proof-${uniqueId}.png`;
     const reviewText = `E2E review ${uniqueId}`;
 
-    const pngBuffer = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4YQAAAAASUVORK5CYII=',
-        'base64'
-    );
+    const testImagePath = path.join(
+        process.cwd(),
+        'e2e',
+        'image',
+        'test.png'
+    )
+
+    const uploadedFileName = 'test.png'
 
     await page.goto('/login');
     await expect(page).toHaveURL(/\/login\/?$/);
@@ -165,11 +169,9 @@ test('investigator can search cases, create a case, upload media, add a review, 
 
     await expect(uploadMediaButton).toBeVisible();
 
-    await page.locator('input[type="file"]').setInputFiles({
-        name: uploadedFileName,
-        mimeType: 'image/png',
-        buffer: pngBuffer
-    });
+    await page
+        .locator('input[type="file"]')
+        .setInputFiles(testImagePath);
 
     await expect(uploadMediaButton).toBeEnabled();
 
@@ -332,4 +334,101 @@ test('investigator can search cases, create a case, upload media, add a review, 
     await expect(annotationItems).toHaveCount(annotationCountBefore + 1);
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
+
+    const sideBySideButton = page.getByRole('button', {
+        name: 'View side by side',
+        exact: true
+    });
+
+    await sideBySideButton.click();
+
+    await expect(
+        page.getByText('Metadata side-by-side', {
+            exact: true
+        })
+    ).toBeVisible()
+
+    await expect(
+        page.getByRole('heading', {
+            name: 'test.png',
+            exact: true,
+            level: 4
+        })
+    ).toBeVisible();
+
+    await expect(
+        page.getByRole('heading', {
+            name: 'Known bad example (image)',
+            exact: true,
+            level: 4
+        })
+    ).toBeVisible();
+
+    await expect(
+        page.getByText('JUMBF:Claim_Generator_InfoName', {
+            exact: true
+        }).first()
+    ).toBeVisible();
+
+    const reportButton = page.getByRole('button', {
+        name: 'Show Report',
+        exact: true
+    });
+
+    await expect(reportButton).toBeVisible();
+    await reportButton.click();
+
+    await expect(
+        page.getByRole('heading', {
+            name: 'Report',
+            exact: true
+        })
+    ).toBeVisible();
+
+    const analysedRisk = page.getByText(
+        /High Risk|Medium Risk|Low Risk|Not Analysed/,
+        { exact: true }
+    );
+
+    await expect(analysedRisk).toBeVisible();
+
+    await page.getByRole('button', {
+        name: 'Close report',
+        exact: true
+    }).click();
+
+    await expect(
+        page.getByText('High Risk', {
+            exact: true
+        })
+    ).toHaveCount(0);
+
+    await page.getByRole('link', {
+        name: 'Back to case',
+        exact: true
+    }).click();
+
+    await expect(page).toHaveURL(/\/case-page\/[^/]+\/?$/);
+
+    const closeCaseButton = page.getByRole('button', {
+        name: 'Close Case',
+        exact: true
+    });
+
+    await expect(closeCaseButton).toBeVisible();
+
+    const [closeCaseResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            response.url().includes('/api/closeCase') && response.request().method() === 'POST'
+        ),
+        closeCaseButton.click()
+    ]);
+
+    expect(closeCaseResponse.ok()).toBeTruthy();
+
+    await expect(
+        page.getByText('Status: Closed', {
+            exact: true
+        })
+    ).toBeVisible();
 });
