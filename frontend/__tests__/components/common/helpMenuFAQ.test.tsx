@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import HelpMenuFAQ, { FAQS } from '@/components/common/helpMenuFAQ';
+import HelpMenuFAQ, { FAQS, filterFaqs } from '@/components/common/helpMenuFAQ';
 
 describe('HelpMenuFAQ', () => {
     it('renders a button for every FAQ question', () => {
@@ -35,5 +35,29 @@ describe('HelpMenuFAQ', () => {
     it('renders nothing when there are no items', () => {
         render(<HelpMenuFAQ items={[]} openIndex={null} onToggle={jest.fn()} />);
         expect(screen.queryAllByRole('button')).toHaveLength(0);
+    });
+    
+    it('returns every FAQ for an empty query', () => {
+        expect(filterFaqs('')).toEqual(FAQS);
+        expect(filterFaqs('   ')).toEqual(FAQS);
+    });
+    
+    it('filters by question text', () => {
+        const result = filterFaqs('password');
+        expect(result).toHaveLength(1);
+        expect(result[0].question).toContain('password');
+    });
+    
+    it('filters by answer text', () => {
+        const result = filterFaqs('administrator');
+        expect(result.length).toBeGreaterThan(0);
+    });
+    
+    it('returns an empty array when nothing matches', () => {
+        expect(filterFaqs('abcdefgh12345')).toEqual([]);
+    });
+    
+    it('is case insensitive', () => {
+        expect(filterFaqs('PASSWORD')).toEqual(filterFaqs('password'));
     });
 });

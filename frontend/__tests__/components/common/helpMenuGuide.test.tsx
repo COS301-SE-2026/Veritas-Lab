@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import HelpMenuGuide, { GUIDES } from '@/components/common/helpMenuGuide';
+import HelpMenuGuide, { GUIDES, filterGuides} from '@/components/common/helpMenuGuide';
 
 describe('HelpMenuGuide', () => {
     it('renders a card for every guide', () => {
@@ -24,5 +24,30 @@ describe('HelpMenuGuide', () => {
     it('renders nothing when there are no items', () => {
         render(<HelpMenuGuide items={[]} />);
         expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+    });
+
+    it('returns all guides for an empty query', () => {
+        expect(filterGuides('')).toEqual(GUIDES);
+    });
+
+    it('filters by title', () => {
+        const result = filterGuides('roles');
+
+        expect(result).toHaveLength(1);
+        expect(result[0].title).toContain('Roles');
+    });
+
+    it('filters by body', () => {
+        const result = filterGuides('JWT');
+
+        expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('is case insensitive', () => {
+        expect(filterGuides('ANNOTATION')).toEqual(filterGuides('annotation'));
+    });
+
+    it('returns an empty array when there is no match', () => {
+        expect(filterGuides('xyzxyzxyz')).toEqual([]);
     });
 });
