@@ -1,8 +1,8 @@
-import {expect, test} from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { getAdminCredentials } from './adminCredentials';
 
-test ('landing, dashboard and admin functionality work against the live backend and database', async ({page}) => {
-    const {email,password} = getAdminCredentials();
+test('landing, dashboard and admin functionality work against the live backend and database', async ({ page }) => {
+    const { email, password } = getAdminCredentials();
 
     await page.goto('/');
 
@@ -15,18 +15,18 @@ test ('landing, dashboard and admin functionality work against the live backend 
     ).toBeVisible();
 
     await expect(
-        page.getByText('Veritas Lab', {exact: true})
+        page.getByText('Veritas Lab', { exact: true })
     ).toBeVisible();
 
     await expect(
-        page.getByRole('button', {name: 'Sign Up'})
+        page.getByRole('button', { name: 'Sign Up' })
     ).toBeVisible();
 
     await expect(
-        page.getByRole('button', {name: 'Log-in'})
+        page.getByRole('button', { name: 'Log-in' })
     ).toBeVisible();
 
-    await page.getByRole('button', {'name': 'Log-in'}).click();
+    await page.getByRole('button', { 'name': 'Log-in' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
     const loginEmail = page.getByPlaceholder('Enter your email');
@@ -45,7 +45,7 @@ test ('landing, dashboard and admin functionality work against the live backend 
         response.url().includes('/api/login') && response.request().method() === 'POST'
     );
 
-    await page.getByRole('button', {name: 'Login'}).click();
+    await page.getByRole('button', { name: 'Login' }).click();
 
     const loginResponse = await loginResponsePromise;
     expect(loginResponse.status()).toBe(200);

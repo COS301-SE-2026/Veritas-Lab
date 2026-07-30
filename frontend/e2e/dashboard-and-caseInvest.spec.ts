@@ -28,7 +28,7 @@ test('investigator can search cases, create a case, and upload media', async ({ 
     await expect(loginPassword).toHaveValue(password);
 
     const [loginResponse] = await Promise.all([
-            page.waitForResponse(response =>
+        page.waitForResponse(response =>
             response.url().includes('/api/login') &&
             response.request().method() === 'POST'
         ),
