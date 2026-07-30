@@ -35,15 +35,23 @@ async def mock_connect_database_error(*args, **kwargs):
 def test_delete_comment_success(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_success)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_success
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -56,10 +64,14 @@ def test_delete_comment_success(monkeypatch):
 def test_delete_comment_invalid_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Invalid token")
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -72,10 +84,14 @@ def test_delete_comment_invalid_jwt(monkeypatch):
 def test_delete_comment_missing_jwt_cookie(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         raise ValueError("Missing authentication cookie")
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -88,15 +104,23 @@ def test_delete_comment_missing_jwt_cookie(monkeypatch):
 def test_delete_comment_not_found(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_no_row)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_no_row
+    )
 
     response = client.delete("/api/deleteComment/comment/999")
 
@@ -109,15 +133,23 @@ def test_delete_comment_not_found(monkeypatch):
 def test_delete_comment_unauthorized_user(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "other-user-id",
             "username": "Different User",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_no_row)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_no_row
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -130,15 +162,23 @@ def test_delete_comment_unauthorized_user(monkeypatch):
 def test_delete_comment_database_error(monkeypatch):
     client.cookies.clear()
 
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
 
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_database_error)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_database_error
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -162,15 +202,23 @@ def test_delete_comment_uses_comment_id_and_username(monkeypatch):
     async def mock_connect_same_connection(*args, **kwargs):
         return mock_connection
     
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_same_connection)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_same_connection
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -195,15 +243,23 @@ def test_delete_comment_closes_connection_on_success(monkeypatch):
     async def mock_connect_same_connection(*args, **kwargs):
         return mock_connection
     
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_same_connection)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_same_connection
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -218,15 +274,23 @@ def test_delete_comment_closes_connection_on_database_error(monkeypatch):
     async def mock_connect_same_connection(*args, **kwargs):
         return mock_connection
     
-    def mock_verifyJWT(request):
+    def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
     
-    monkeypatch.setattr(cases_router, "verifyJWT", mock_verifyJWT)
-    monkeypatch.setattr(cases_router.asyncpg, "connect", mock_connect_same_connection)
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.asyncpg, 
+        "connect", 
+        mock_connect_same_connection
+    )
 
     response = client.delete("/api/deleteComment/comment/5")
 

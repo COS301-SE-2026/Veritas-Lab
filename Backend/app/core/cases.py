@@ -10,7 +10,6 @@ import hashlib
 from dotenv import load_dotenv
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
-from minio import Minio
 from pypdf import PdfReader
 from datetime import datetime, timedelta, timezone
 import boto3
@@ -28,9 +27,9 @@ DB_PORT = env.getRequiredIntEnv("DB_PORT")
 DB_NAME = env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 
-_MISSING_CASE_ID = "Case id is missing"
+MISSING_CASE_ID = "Case id is missing"
 
-async def getConnection() -> asyncpg.Connection:
+async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -40,7 +39,7 @@ async def getConnection() -> asyncpg.Connection:
         ssl="require" if DB_SSL else None,
     )
 
-def getObject(for_presign: bool = False) -> S3Client:
+def get_object(for_presign: bool = False) -> S3Client:
     if not IS_PROD:
 
         if for_presign:
@@ -60,7 +59,9 @@ def getObject(for_presign: bool = False) -> S3Client:
             region_name=os.getenv("AWS_REGION", "us-east-1"),
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"}
+                s3={
+                    "addressing_style": "path"
+                }
             ),
         )
 
@@ -83,20 +84,28 @@ def getObject(for_presign: bool = False) -> S3Client:
             region_name="auto",
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"}
+                s3={
+                    "addressing_style": "path"
+                }
             ),
         )
 
 # If the case_id is None then the case is not in the db. You may call create().
 # When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 class Case:
-    def __init__(self, CaseCreator: str = None, CaseName: str = None, CaseDescription: str=None, CaseID: str=None):
-        if  not (CaseCreator is None):
+    def __init__(
+        self, 
+        CaseCreator: str = None, 
+        CaseName: str = None, 
+        CaseDescription: str=None, 
+        CaseID: str=None
+    ):
+        if  (CaseCreator is not None):
             if not CaseCreator.strip():
                 raise ValueError("CaseCreator is required")
             if  len(CaseCreator) > 100:
                 raise ValueError("Name is too long. Must be 100 characters or less")
-        if not (CaseName is None):
+        if  (CaseName is not None):
             if not CaseName.strip():
                 raise ValueError("CaseName is required")
             if len(CaseName) > 255:
@@ -121,7 +130,7 @@ class Case:
         if self.CaseId is not None:
             raise ValueError("This case already exists")
         
-        connection = await getConnection()
+        connection = await get_connection()
 
         try:
             row = await connection.fetchrow(
@@ -144,7 +153,7 @@ class Case:
         finally:
             await connection.close()
 
-    async def addEvidence(self, media: UploadFile, case_id: uuid.UUID):
+    async def add_evidence(self, media: UploadFile, case_id: uuid.UUID):
         filename = media.filename
         localExtension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
         fileBytes = await media.read()
@@ -175,9 +184,9 @@ class Case:
                                     )
                 except HTTPException:
                     raise
-                except KeyError as k_err:
+                except KeyError :
                     pass
-                except Exception as scan_err:
+                except Exception :
                     raise HTTPException(
                         status_code=400,
                         detail="Could not verify PDF security. File rejected."
@@ -194,9 +203,12 @@ class Case:
         try:
             case_uuid = uuid.UUID(str(case_id)) if not isinstance(case_id, uuid.UUID) else case_id
         except Exception:
-            raise HTTPException(status_code=400, detail="Invalid case_id UUID")
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid case_id UUID"
+            )
 
-        connection = await getConnection()
+        connection = await get_connection()
 
         try:
             typeRecord = await connection.fetchrow(
@@ -221,7 +233,7 @@ class Case:
                 #Hash the image for uniqueness
             mediaHash = hashlib.sha256(fileBytes).hexdigest()
 
-            storage_client = getObject()
+            storage_client = get_object()
 
             
             #checking for a duplicate
@@ -325,7 +337,7 @@ class Case:
                     pass
 
             #Creation of presigned URL below
-            presign_client = getObject(for_presign=True)# function to get the client until we do the pools
+            presign_client = get_object(for_presign=True)# function to get the client until we do the pools
 
             fileUrl = presign_client.generate_presigned_url(
                 'get_object',
@@ -355,14 +367,17 @@ class Case:
             await connection.close()
             await media.close()
 
-    async def deleteEvidence(self, media_id: uuid.UUID, JWT_username: str = None):
+    async def delete_evidence(self, media_id: uuid.UUID, JWT_username: str = None):
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
+            raise HTTPException(
+                status_code=400, 
+                detail=MISSING_CASE_ID
+            )
 
         connection = None
 
         try:
-            connection=await getConnection()
+            connection=await get_connection()
 
             if JWT_username is not None:
 
@@ -407,7 +422,7 @@ class Case:
                 if deleted_media is not None:
                     
 
-                    storage_client = getObject()
+                    storage_client = get_object()
 
                     object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
@@ -460,7 +475,7 @@ class Case:
 
                 if deleted_media is not None:
                     
-                    storage_client = getObject()
+                    storage_client = get_object()
 
                     object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
@@ -489,7 +504,7 @@ class Case:
                 await connection.close()
         
 
-    def toJSON(self):
+    def to_json(self):
         return {
             "caseId": str(self.CaseId) if self.CaseId is not None else None,
             "caseName": self.CaseName,
@@ -499,13 +514,16 @@ class Case:
             "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
         }
 
-    async def getComments(self):
+    async def get_comments(self):
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
+            raise HTTPException(
+                status_code=400, 
+                detail=MISSING_CASE_ID
+            )
 
         connection = None
         try:
-            connection = await getConnection()
+            connection = await get_connection()
 
             rows = await connection.fetch(
             """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
@@ -525,14 +543,23 @@ class Case:
                 await connection.close()
 
     @staticmethod
-    def validateCommentLength(comment: str) -> bool:
+    def validate_comment_length(comment: str) -> bool:
         if not isinstance(comment, str):
             return False
         return len(comment.strip()) > 0
 
-    async def addComment(self, connection: asyncpg.Connection, username: str, comment: str, role: str) -> dict:
+    async def add_comment(
+        self, 
+        connection: asyncpg.Connection, 
+        username: str, 
+        comment: str, 
+        role: str
+    ) -> dict:
         if self.CaseId is None:
-            raise HTTPException(status_code=400, detail=_MISSING_CASE_ID)
+            raise HTTPException(
+                status_code=400, 
+                detail=MISSING_CASE_ID
+            )
 
         row = await connection.fetchrow(
             """
@@ -571,14 +598,21 @@ class Case:
         )
 
         if row is None or not row["case_exists"]:
-            raise HTTPException(status_code=404, detail="Case not found")
+            raise HTTPException(
+                status_code=404, 
+                detail="Case not found"
+            )
 
         if not row["comment_inserted"]:
             if role == "USER":
-                raise HTTPException(status_code=403, detail="Users may only comment on closed cases")
-            # if role == "INVESTIGATOR":
-            #     raise HTTPException(status_code=403, detail="Investigators may only comment on open cases")
-            raise HTTPException(status_code=403, detail="Permission denied")
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Users may only comment on closed cases"
+                )
+            raise HTTPException(
+                status_code=403, 
+                detail="Permission denied"
+            )
 
         return {
             "commentId": row["commentid"],
@@ -589,8 +623,12 @@ class Case:
         }
 
     @staticmethod
-    async def deleteCase(case_id: uuid.UUID, username: str, role: str):
-        connection = await getConnection()
+    async def delete_case(
+        case_id: uuid.UUID, 
+        username: str, 
+        role: str
+    ):
+        connection = await get_connection()
 
         orphan_media = []
 
@@ -672,7 +710,7 @@ class Case:
                             "mediaextension": deleted_media["mediaextension"]
                         })                 
                 
-            storage_client = getObject()
+            storage_client = get_object()
 
             for media in orphan_media:
                 object_name = f"{media['mediaid']}{media['mediaextension']}"

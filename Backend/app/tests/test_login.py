@@ -10,7 +10,7 @@ AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
 def test_successful_login(monkeypatch):
     client.cookies.clear()
     
-    async def mock_searchUsersViaEmail(email):
+    async def mock_search_users_via_email(email):
         hashed_password= hash_password("StrongP@ssword12334567")
         return {
             "id": "mock-user-id",
@@ -20,15 +20,27 @@ def test_successful_login(monkeypatch):
             "password": hashed_password
         }
     
-    def mock_createToken(user):
+    def mock_create_token(user):
         return "mockedJWTToken"
     
-    async def mock_updateUserJWTIssued(email):
+    async def mock_update_user_jwt_issued(email):
         return None
     
-    monkeypatch.setattr(auth,"searchUsersViaEmail",mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth,"createToken",mock_createToken)
-    monkeypatch.setattr(auth, "updateUserJWTIssued", mock_updateUserJWTIssued)
+    monkeypatch.setattr(
+        auth,
+        "search_users_via_email",
+        mock_search_users_via_email
+    )
+    monkeypatch.setattr(
+        auth,
+        "create_token",
+        mock_create_token
+    )
+    monkeypatch.setattr(
+        auth, 
+        "update_user_jwt_issued", 
+        mock_update_user_jwt_issued
+    )
 
     response = client.post(
         "/api/login",
@@ -50,7 +62,7 @@ def test_successful_login(monkeypatch):
 
 def test_login_incorrect_password(monkeypatch):
     client.cookies.clear()
-    async def mock_searchUsersViaEmail(email):
+    async def mock_search_users_via_email(email):
         hashed_password= hash_password("CorrectP@ssword1234567")
         return {
             "id": "mock-user-id",
@@ -60,7 +72,11 @@ def test_login_incorrect_password(monkeypatch):
             "password": hashed_password
         }
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
 
     response = client.post(
         "/api/login",
@@ -80,10 +96,14 @@ def test_login_incorrect_password(monkeypatch):
 
 def test_login_user_does_not_exist(monkeypatch):
     client.cookies.clear()
-    async def mock_searchUsersViaEmail(email):
+    async def mock_search_users_via_email(email):
         return None
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
 
     response = client.post(
         "/api/login",

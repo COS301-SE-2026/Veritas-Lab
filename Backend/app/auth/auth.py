@@ -25,7 +25,7 @@ COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
 INVALID_TOKEN= "Invalid token"
 
-async def getConnection() -> asyncpg.Connection:
+async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -39,7 +39,7 @@ router = APIRouter(
     tags=["Auth"]
 )
 
-def verifyJWT(request: Request) -> dict:
+def verify_jwt(request: Request) -> dict:
 
 
     token = request.cookies.get(COOKIE_NAME)
@@ -65,7 +65,7 @@ def verifyJWT(request: Request) -> dict:
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
 # an "@", one or more valid post-@ pre. characters (0-9, a-z, A-z,.,-), a ".",
 # and finally two or more valid post. characters (A-Z and a-z).
-def validateEmail(email: str) -> bool:
+def validate_email(email: str) -> bool:
     if not isinstance(email,str):
         return False
 
@@ -80,7 +80,7 @@ def validateEmail(email: str) -> bool:
 #Validates that a string is a well-formed UUID
 #The delete endpoint gets userId as  a arw string from the URL path
 # Thus checking it before sending it to the db to avoid db level-error
-def validateUUID(value: str) -> bool:
+def validate_uuid(value: str) -> bool:
     if  not isinstance(value, str):
         return False
     try:
@@ -92,7 +92,7 @@ def validateUUID(value: str) -> bool:
 # Validates a password. 
 # Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
 # Regex : At least 1 lower case, At least 1 upper case, At least 1 number number, At least 1 special char, must be 12 chars long
-def validatePassword(password: str) -> bool:
+def validate_password(password: str) -> bool:
     if not isinstance(password,str):
         return False
     
@@ -108,7 +108,7 @@ def hash_password(input: str) -> str:
     return hashed.decode("utf-8")
 
 # utf-8 encodes both strings and uses bcrypt.checkpw to see if they are the same
-def verifyPassword(password: str, hashed_password: str) ->bool:
+def verify_password(password: str, hashed_password: str) ->bool:
     converted_password = password.encode("utf-8")
     converted_hash = hashed_password.encode("utf-8")
     return bcrypt.checkpw(converted_password,converted_hash)
@@ -126,8 +126,8 @@ class ChangeRoleRequest(BaseModel):
     userId: str | None = None
     NewRole: str | None = None
 
-async def updateUserJWTIssued(email: str):
-    connection = await getConnection()
+async def update_user_jwt_issued(email: str):
+    connection = await get_connection()
     try:
         await connection.execute(
             """
@@ -141,7 +141,7 @@ async def updateUserJWTIssued(email: str):
         await connection.close()
 
 async def update_user_jwt_issued_via_user(user: dict):
-    connection = await getConnection()
+    connection = await get_connection()
     try:
         await connection.execute(
             """
@@ -155,8 +155,8 @@ async def update_user_jwt_issued_via_user(user: dict):
         await connection.close()
 
 # Once the envs are setup this will need to be updated
-async def searchUsersViaEmail(email:str):
-    connection = await getConnection()
+async def search_users_via_email(email:str):
+    connection = await get_connection()
     try:
         row = await connection.fetchrow(
             """
@@ -180,8 +180,8 @@ async def searchUsersViaEmail(email:str):
     finally:
         await connection.close()
     
-async def searchUsersViaUsername(username: str):
-    connection = await getConnection()
+async def search_users_via_username(username: str):
+    connection = await get_connection()
 
     try:
         row = await connection.fetchrow(
@@ -208,8 +208,8 @@ async def searchUsersViaUsername(username: str):
 
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
-async def deleteUserById(user_id: str) -> bool:
-    connection = await getConnection()
+async def delete_user_by_id(user_id: str) -> bool:
+    connection = await get_connection()
 
     try:
         row = await connection.fetchrow(
@@ -225,8 +225,14 @@ async def deleteUserById(user_id: str) -> bool:
     finally:
         await connection.close()
 
-async def insert_user(email : str, username : str, role : str, hashed_password : str):
-    connection = await getConnection()
+async def insert_user(
+    email : str, 
+    username : str, 
+    role : str, 
+    hashed_password : str
+):
+
+    connection = await get_connection()
 
     try:
         row = await connection.fetchrow(
@@ -248,7 +254,7 @@ async def insert_user(email : str, username : str, role : str, hashed_password :
     finally:
         await connection.close()
 
-def createToken(user: dict) ->str:
+def create_token(user: dict) ->str:
     expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
@@ -264,7 +270,7 @@ def createToken(user: dict) ->str:
 # POST /api/login
 @router.post("/login")
 async def login(request: LoginRequest, response: Response):
-    if not validateEmail(request.email):
+    if not validate_email(request.email):
         return JSONResponse(
             status_code=400,
             content={
@@ -273,7 +279,7 @@ async def login(request: LoginRequest, response: Response):
             }
         )
 
-    if not validatePassword(request.password):
+    if not validate_password(request.password):
         return JSONResponse(
             status_code=400,
             content={
@@ -282,7 +288,7 @@ async def login(request: LoginRequest, response: Response):
             }
         )
 
-    user = await searchUsersViaEmail(request.email.strip())
+    user = await search_users_via_email(request.email.strip())
 
     if user is None:
         return JSONResponse(
@@ -293,7 +299,7 @@ async def login(request: LoginRequest, response: Response):
             }
         )
     
-    if not verifyPassword(request.password, user["password"]):
+    if not verify_password(request.password, user["password"]):
         return JSONResponse(
             status_code=401,
             content={
@@ -302,9 +308,9 @@ async def login(request: LoginRequest, response: Response):
             }
         )
 
-    token = createToken(user)
+    token = create_token(user)
 
-    await updateUserJWTIssued(user["email"])
+    await update_user_jwt_issued(user["email"])
 
     response.set_cookie(
         key=COOKIE_NAME,
@@ -323,7 +329,7 @@ async def login(request: LoginRequest, response: Response):
 # POST /api/register
 @router.post("/register", status_code=201)
 async def register(request: RegisterRequest, response: Response):
-    if not validateEmail(request.email):
+    if not validate_email(request.email):
         return JSONResponse(
             status_code=400,
             content={
@@ -332,7 +338,7 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
 
-    if not validatePassword(request.password):
+    if not validate_password(request.password):
         return JSONResponse(
             status_code=400,
             content={
@@ -350,7 +356,7 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
 
-    existing_user = await searchUsersViaEmail(request.email.strip())
+    existing_user = await search_users_via_email(request.email.strip())
 
     if existing_user is not None:
         return JSONResponse(
@@ -361,7 +367,7 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
     
-    existing_username = await searchUsersViaUsername(request.username.strip())
+    existing_username = await search_users_via_username(request.username.strip())
     
     if existing_username is not None:
         return JSONResponse(
@@ -373,11 +379,16 @@ async def register(request: RegisterRequest, response: Response):
         )
 
     hashed_password = hash_password(request.password)
-    new_user = await insert_user(request.email.strip(), request.username.strip(), "USER", hashed_password)
+    new_user = await insert_user(
+        request.email.strip(), 
+        request.username.strip(), 
+        "USER", 
+        hashed_password
+    )
 
-    token = createToken(new_user)
+    token = create_token(new_user)
 
-    await updateUserJWTIssued(new_user["email"])
+    await update_user_jwt_issued(new_user["email"])
 
     response.set_cookie(
         key=COOKIE_NAME,
@@ -394,11 +405,11 @@ async def register(request: RegisterRequest, response: Response):
     }
 
 @router.post("/fetchUsers")
-async def fetchUsers(request: Request):
+async def fetch_users(request: Request):
     connection = None
 
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
 
         if payload.get("role") != "ADMIN":
             return JSONResponse(
@@ -409,7 +420,7 @@ async def fetchUsers(request: Request):
                 }
             )
         
-        connection = await getConnection()
+        connection = await get_connection()
 
         rows = await connection.fetch(
             """
@@ -421,11 +432,13 @@ async def fetchUsers(request: Request):
         users = []
 
         for row in rows:
-            users.append({
-                "id":str(row["userid"]),
-                "username":row["username"],
-                "role": row["userrole"]
-            })
+            users.append(
+                {
+                    "id":str(row["userid"]),
+                    "username":row["username"],
+                    "role": row["userrole"]
+                }
+            )
 
         return JSONResponse(
             status_code=200,
@@ -447,13 +460,13 @@ async def fetchUsers(request: Request):
             await connection.close()
 
 @router.post("/changeUserRole")
-async def changeUserRole(
-    changeRoleRequest: ChangeRoleRequest,
+async def change_user_role(
+    change_role_request: ChangeRoleRequest,
     request: Request
 ):
     connection = None
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -472,8 +485,8 @@ async def changeUserRole(
             }
         )
 
-    user_id = changeRoleRequest.userId
-    new_role = changeRoleRequest.NewRole
+    user_id = change_role_request.userId
+    new_role = change_role_request.NewRole
 
     if not user_id or not new_role:
         return JSONResponse(
@@ -514,7 +527,7 @@ async def changeUserRole(
         )
     
     try:
-        connection = await getConnection()
+        connection = await get_connection()
 
         result = await connection.execute(
             """
@@ -554,10 +567,10 @@ async def changeUserRole(
             await connection.close()
 
 @router.delete("/users/{user_id}")
-async def deleteUser(user_id: str, request: Request):
+async def delete_user(user_id: str, request: Request):
     try:
         #Verify the JWT for security
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
         user_id = user_id.strip()
 
         #Authorization. Only Admins can delete
@@ -568,7 +581,7 @@ async def deleteUser(user_id: str, request: Request):
             )
 
         #Validate input. This rejects improper UUIDs before touching the DB
-        if not validateUUID(user_id):
+        if not validate_uuid(user_id):
             return JSONResponse(
                 status_code = 400,
                 content = {"status": "error", "message": "Invalid User ID format."}
@@ -584,7 +597,7 @@ async def deleteUser(user_id: str, request: Request):
 
         #Now delete
         try:
-            deleted = await deleteUserById(user_id)
+            deleted = await delete_user_by_id(user_id)
         except asyncpg.PostgresError:
             return JSONResponse(
                 status_code=500,
@@ -716,7 +729,7 @@ async def refresh_token(request: Request, response: Response):
         "role": payload["role"]
     }
 
-    new_token = createToken(user)
+    new_token = create_token(user)
 
     try:
         await update_user_jwt_issued_via_user(user)

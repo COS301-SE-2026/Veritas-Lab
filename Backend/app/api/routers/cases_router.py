@@ -3,9 +3,9 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, H
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Annotated
 from app.core.cases import Case
-from app.auth.auth import verifyJWT
+from app.auth.auth import verify_jwt
 from app.core.env import ENVLoader, IS_PROD
 import asyncpg
 from uuid import UUID
@@ -30,11 +30,11 @@ DB_NAME= env.getRequiredEnv("DB_NAME")
 DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 NOT_USER= ["INVESTIGATOR", "ADMIN"]
 DATABASE_ERROR_MESSAGE="Database error"
-_CASE_ID_REQUIRED = "CaseID required"
-_INVALID_CASE_ID = "Invalid CaseID"
-_CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
+CASE_ID_REQUIRED = "CaseID required"
+INVALID_CASE_ID = "Invalid CaseID"
+CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 
-async def getConnection() -> asyncpg.Connection:
+async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=DB_USER,
         password=DB_PASSWORD,
@@ -44,7 +44,7 @@ async def getConnection() -> asyncpg.Connection:
         ssl="require" if DB_SSL else None,
     )
 
-def getObject(for_presign: bool = False) -> S3Client:
+def get_object(for_presign: bool = False) -> S3Client:
     if not IS_PROD:
 
         if for_presign:
@@ -64,7 +64,9 @@ def getObject(for_presign: bool = False) -> S3Client:
             region_name=os.getenv("AWS_REGION", "us-east-1"),
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"}
+                s3={
+                    "addressing_style": "path"
+                }
             ),
         )
 
@@ -87,7 +89,9 @@ def getObject(for_presign: bool = False) -> S3Client:
             region_name="auto",
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path"}
+                s3={
+                    "addressing_style": "path"
+                }
             ),
         )
 
@@ -132,9 +136,9 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., examples=["Invalid token or database failure"])
 
 #A mask until the veriftJWT gets fixed to raise HTTPException so the try-excepts can be removed so FastApi can handle it 
-def verify_jwt(request:Request):
+def verify_jwt_(request:Request):
     try:
-        return verifyJWT(request)
+        return verify_jwt(request)
     except ValueError as e:
         raise HTTPException(
             status_code=401,
@@ -175,7 +179,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
             #Creation of presigned URL below
     target_filename = f"{media_id}{media_extension}"
     if user: # so none user log in block
-        presign_client =  getObject(for_presign=True)
+        presign_client =  get_object(for_presign=True)
 
         file_url = presign_client.generate_presigned_url(
             'get_object',
@@ -216,7 +220,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 )
 async def create_case(case_request: CreateCaseRequest, request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -228,7 +232,11 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
     verify_not_user(payload.get("role"))
 
     try:
-        case = Case(CaseName=case_request.title, CaseCreator=payload.get("username"), CaseDescription=case_request.description)
+        case = Case(
+            CaseName=case_request.title, 
+            CaseCreator=payload.get("username"), 
+            CaseDescription=case_request.description
+        )
     except ValueError as e:
         return JSONResponse(
             status_code=400,
@@ -251,13 +259,19 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 @router.post(
     "/getCases",
     responses={
-        401: {"model": ErrorResponse, "description": "Unauthorized - Invalid or missing token"},
-        500: {"model": ErrorResponse, "description": "Internal Server Error - Database error"},
+        401: {
+            "model": ErrorResponse, 
+            "description": "Unauthorized - Invalid or missing token"
+        },
+        500: {
+            "model": ErrorResponse, 
+            "description": "Internal Server Error - Database error"
+        },
     }
 )
 async def get_cases(request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -270,7 +284,7 @@ async def get_cases(request: Request):
     connection = None
 
     try:
-        connection = await getConnection()
+        connection = await get_connection()
 
         if payload.get("role") == "USER":
             rows = await connection.fetch(
@@ -304,7 +318,7 @@ async def get_cases(request: Request):
             case.CaseClosed = row["caseclosed"]
             case.CaseCreationDate = row["casecreationdate"]
 
-            cases.append(case.toJSON())
+            cases.append(case.to_json())
 
         return JSONResponse(
             status_code=200,
@@ -342,14 +356,14 @@ async def get_cases(request: Request):
         },
         400:{
             "model": ErrorResponse,
-            "description": _CASE_ID_REQUIRED
+            "description": CASE_ID_REQUIRED
         }
 
     }
 )
 async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verify_jwt(request)
+        payload = verify_jwt_(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -364,7 +378,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             status_code=400,
             detail={
                 "status": "error",
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
 
@@ -382,7 +396,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
     connection = None
     is_user= None
     try:
-        connection = await getConnection()
+        connection = await get_connection()
         is_user = payload.get("role") != "USER"
         if is_user:
             row= await connection.fetchrow(
@@ -452,8 +466,8 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             status_code=200,
             content=jsonable_encoder({
                 "status": "success",
-                "case": case.toJSON(),
-                "comments": await case.getComments(),
+                "case": case.to_json(),
+                "comments": await case.get_comments(),
                 "evidence": [_format_case_evidence(row,is_user) for row in evidence_rows]
             })
         )
@@ -497,9 +511,14 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         },
     },
 )
-async def upload_evidence(request: Request, background_task: BackgroundTasks, case_id: str = Form(...), media: UploadFile = File(...)):
+async def upload_evidence(
+    request: Request, 
+    background_task: BackgroundTasks, 
+    case_id: Annotated[str, Form()], 
+    media: Annotated[UploadFile, File()]
+):
 
-    payload = verify_jwt(request)
+    payload = verify_jwt_(request)
 
 
     verify_not_user(payload.get("role"))
@@ -517,7 +536,7 @@ async def upload_evidence(request: Request, background_task: BackgroundTasks, ca
             }
         )
 
-    connection = await getConnection()
+    connection = await get_connection()
 
     try:
         row = await connection.fetchrow("""
@@ -531,7 +550,13 @@ async def upload_evidence(request: Request, background_task: BackgroundTasks, ca
         )
         
         if row is None:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "Case not found/ Nor permissions"})
+            return JSONResponse(
+                status_code=404, 
+                content={
+                    "status": "error", 
+                    "message": "Case not found/ Nor permissions"
+                }
+            )
 
         case = Case(
             CaseCreator=row["casecreator"],
@@ -543,7 +568,7 @@ async def upload_evidence(request: Request, background_task: BackgroundTasks, ca
         case.CaseClosed = row["caseclosed"]
         case.CaseCreationDate = row["casecreationdate"]
 
-        result = await case.addEvidence(media, case_uuid)
+        result = await case.add_evidence(media, case_uuid)
 
         # start pipeline here
         extension = Path(result["Filename"]).suffix.lower()
@@ -553,27 +578,36 @@ async def upload_evidence(request: Request, background_task: BackgroundTasks, ca
 
         background_task.add_task(media_relay.relay_to_service)
 
-        return JSONResponse(status_code=201, content={"status": "success", "evidence": result})
-
-    except HTTPException as e:
-        raise
+        return JSONResponse(
+            status_code=201, 
+            content={
+                "status": "success", 
+                "evidence": result
+            }
+        )
 
     finally:
         await connection.close()
 
 @router.post("/closeCase",
     responses={
-        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+        403: {
+            "model": ErrorResponse, 
+            "description": "Forbidden - User unauthorized"
+        },
     }
 )
 async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     connection = None
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
 
     verify_not_user(payload.get("role"))
@@ -583,7 +617,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
     
@@ -594,12 +628,12 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400, 
             content={
                 "status": "error", 
-                "message": _INVALID_CASE_ID
+                "message": INVALID_CASE_ID
             }
         )
 
     try:    
-        connection = await getConnection()
+        connection = await get_connection()
 
         row = await connection.fetchrow(
             """
@@ -618,7 +652,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -645,32 +679,62 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
 async def update_case(case_request: UpdateCaseRequest, request: Request):
     connection = None
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
-        return JSONResponse(status_code=401, content={"status": "error", "message": str(e)})
+        return JSONResponse(
+            status_code=401, 
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
+        )
 
     verify_not_user(payload.get("role"))
 
     if not case_request.CaseID:
-        return JSONResponse(status_code=400, content={"status": "error", "message": _CASE_ID_REQUIRED})
+        return JSONResponse(
+            status_code=400, 
+            content={
+                "status": "error", 
+                "message": CASE_ID_REQUIRED
+            }
+        )
 
     try:
         case_uuid = UUID(case_request.CaseID)
     except ValueError:
-        return JSONResponse(status_code=400, content={"status": "error", "message": _INVALID_CASE_ID})
+        return JSONResponse(
+            status_code=400, 
+            content={
+                "status": "error", 
+                "message": INVALID_CASE_ID
+            }
+        )
 
     if case_request.CaseName is None and case_request.CaseDescription is None:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "At least one of CaseName or CaseDescription must be provided"})
+        return JSONResponse(
+            status_code=400, 
+            content={
+                "status": "error", 
+                "message": "At least one of CaseName or CaseDescription must be provided"
+            }
+        )
 
     validated_name = None
     if case_request.CaseName is not None:
         try:
             validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
         except ValueError as e:
-            return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+            return JSONResponse(
+                status_code=400, 
+                content={
+                    "status": "error", 
+                    "message": str(e)
+                }
+            )
 
     try:
-        connection = await getConnection()
+        connection = await get_connection()
 
         row = await connection.fetchrow(
             """
@@ -692,7 +756,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -725,11 +789,14 @@ async def update_comment(
     request: Request
 ):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
 
 
@@ -740,11 +807,11 @@ async def update_comment(
             status_code=400, 
             content={
                 "status": "error", 
-                "message": _INVALID_CASE_ID
+                "message": INVALID_CASE_ID
             }
         )
     try:
-        connection = await getConnection()
+        connection = await get_connection()
 
         row = await connection.fetchrow(
             """
@@ -766,7 +833,7 @@ async def update_comment(
                 status_code=404,
                 content={
                     "status": "error",
-                    "message": _CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
@@ -792,16 +859,19 @@ async def update_comment(
 @router.delete("/deleteComment/comment/{comment_id}")
 async def delete_comment(request: Request, comment_id: int):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
     
     connection = None
     try:
-        connection = await getConnection()
+        connection = await get_connection()
 
         row = await connection.fetchrow(
             """
@@ -847,7 +917,10 @@ async def delete_comment(request: Request, comment_id: int):
 @router.post(
     "/getComments/{case_id}",
     responses={
-        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+        403: {
+            "model": ErrorResponse, 
+            "description": "Forbidden - User unauthorized"
+        },
     }
 )
 async def retreive_comments(
@@ -855,11 +928,14 @@ async def retreive_comments(
     request: Request
 ):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
 
     user_role=payload.get("role")
@@ -867,7 +943,7 @@ async def retreive_comments(
 
     try:
         case = Case(CaseID=case_id)
-        comments_data= await case.getComments()
+        comments_data= await case.get_comments()
 
         return JSONResponse(
             status_code=200,
@@ -882,13 +958,19 @@ async def retreive_comments(
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
 
 @router.post(
     "/delete/case/{case_id}/evidence/{media_id}",
     responses={
-        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+        403: {
+            "model": ErrorResponse, 
+            "description": "Forbidden - User unauthorized"
+        },
     }
 )
 async def delete_evidence(
@@ -897,11 +979,14 @@ async def delete_evidence(
     request: Request
 ):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
 
     user_role=payload.get("role")
@@ -913,13 +998,16 @@ async def delete_evidence(
     except ValueError:
         return JSONResponse(
             status_code=400,
-            content={"status": "error", "message": "Invalid UUID format for media_id."}
+            content={
+                "status": "error", 
+                "message": "Invalid UUID format for media_id."
+            }
         )
         
     try:
         case = Case(CaseID=case_id)
         username=payload.get("username") if user_role == "INVESTIGATOR" else None
-        response=await case.deleteEvidence(media_id=media_id, JWT_username=username)
+        response=await case.delete_evidence(media_id=media_id, JWT_username=username)
 
         return JSONResponse(
             status_code=200,
@@ -931,12 +1019,18 @@ async def delete_evidence(
     except ValueError as e:
         return JSONResponse(
             status_code=400,
-            content={"status": "error", "message": f"Invalid case_id: {str(e)}"}
+            content={
+                "status": "error", 
+                "message": f"Invalid case_id: {str(e)}"
+            }
         )
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": str(e)}
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
         )
 
 
@@ -944,27 +1038,47 @@ async def delete_evidence(
 async def create_comment(body: CreateCommentRequest, req: Request):
 
     try:
-        payload = verifyJWT(req)
+        payload = verify_jwt(req)
     except Exception as e:
-        return JSONResponse(status_code=401,
-                            content={"status": "error", "message": str(e)})
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error", 
+                "message": str(e)
+            }
+        )
 
     role = payload.get("role")
     username = payload.get("username")
 
-    if not body.comment or not Case.validateCommentLength(body.comment):
-        return JSONResponse(status_code=400,
-                            content={"status": "error", "message": "Comment must be a non-empty string"})
+    if not body.comment or not Case.validate_comment_length(body.comment):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error", 
+                "message": "Comment must be a non-empty string"
+            }
+        )
 
-    connection = await getConnection()
+    connection = await get_connection()
 
     try:
         case = Case(CaseID=str(body.case_id))
 
-        new_comment = await case.addComment(connection, username, body.comment, role)
+        new_comment = await case.add_comment(
+            connection, 
+            username, 
+            body.comment, 
+            role
+        )
 
-        return JSONResponse(status_code=201,
-                            content={"status": "success", "comment": new_comment})
+        return JSONResponse(
+            status_code=201,
+            content={
+                "status": "success", 
+                "comment": new_comment
+            }
+        )
 
     finally:
         await connection.close()
@@ -972,12 +1086,15 @@ async def create_comment(body: CreateCommentRequest, req: Request):
 @router.delete(
     "/deleteCase",
     responses={
-        403: {"model": ErrorResponse, "description": "Forbidden - User unauthorized"},
+        403: {
+            "model": ErrorResponse, 
+            "description": "Forbidden - User unauthorized"
+        },
     }
 )
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verifyJWT(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -994,7 +1111,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             status_code=400,
             content={
                 "status": "error",
-                "message": _CASE_ID_REQUIRED
+                "message": CASE_ID_REQUIRED
             }
         )
     
@@ -1010,7 +1127,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
     try:
-        result = await Case.deleteCase(
+        result = await Case.delete_case(
             case_id=case_id,
             username=payload.get("username"),
             role=payload.get("role")
@@ -1064,8 +1181,14 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
     """
     con = None
     try:
-        con=await getConnection()
-        await con.execute(query, annotations, report_id, user_name)
+        con=await get_connection()
+        await con.execute(
+            query, 
+            annotations, 
+            report_id, 
+            user_name
+        )
+
     except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
@@ -1142,7 +1265,7 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
     }
 )
 async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
-    cookie=verify_jwt(request)
+    cookie=verify_jwt_(request)
     user_role=cookie.get("role")
     # Checking authorization
     verify_not_user(user_role)
@@ -1151,7 +1274,11 @@ async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
     try:
         report_id=transform_to_uuid(payload.report_id)
         annotations_json_str = json.dumps(payload.annotations)
-        await _save_annotations(report_id,annotations_json_str,user_name)
+        await _save_annotations(
+            report_id,
+            annotations_json_str,
+            user_name
+        )
 
         return JSONResponse(
             status_code=200,
@@ -1165,7 +1292,10 @@ async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "message": str(e)}
+            detail={
+                "status": "error", 
+                "message": str(e)
+            }
         ) 
 
     

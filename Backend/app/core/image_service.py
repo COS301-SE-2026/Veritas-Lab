@@ -23,10 +23,22 @@ class ImageService(MediaService):
     def _find_software_traces(self, metadata: dict) -> list[str]:
         found = []
         known_editors = [
-            "adobe", "photoshop", "lightroom", "gimp", "canva", "snapseed", 
-            "picsart", "vsco", "pixlr", "fotor", "corel", "paint.net", "photopea"
+            "adobe", 
+            "photoshop", 
+            "lightroom", 
+            "gimp", 
+            "canva", 
+            "snapseed", 
+            "picsart", 
+            "vsco", 
+            "pixlr", 
+            "fotor", 
+            "corel", 
+            "paint.net", 
+            "photopea"
         ]
-        software_keys = ["EXIF:Software", "XMP:CreatorTool", "XMP:HistorySoftwareAgent", "EXIF:ProcessingSoftware"]
+        software_keys = ["EXIF:Software", "XMP:CreatorTool", 
+        "XMP:HistorySoftwareAgent", "EXIF:ProcessingSoftware"]
         
         dev_model = str(metadata.get("EXIF:Model", "")).lower()
         dev_make = str(metadata.get("EXIF:Make", "")).lower()
@@ -78,7 +90,7 @@ class ImageService(MediaService):
             
         return report_lines, True, claims_found
 
-    async def analyseMetadata(self, metadata: dict) -> AnalysisFindings:
+    async def analyse_metadata(self, metadata: dict) -> AnalysisFindings:
         analysis_findings = AnalysisFindings(Certainty=0, Findings="")
         report_lines = []
         
@@ -116,13 +128,13 @@ class ImageService(MediaService):
         analysis_findings.Findings = "\n".join(report_lines)
         return analysis_findings
 
-    async def AIAnalysis(self, path: str| Path) ->dict:
+    async def ai_analysis(self, path: str| Path) ->dict:
         return await run_in_threadpool(
             self.detector.analyse_image,
             path
         )
 
-    def createFindingsString(self, input: dict) -> str:
+    def create_findings_string(self, input: dict) -> str:
         if input is None or input == {}:
             return "No findings"
 

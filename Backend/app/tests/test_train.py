@@ -121,7 +121,11 @@ def train_mocks():
         patch("app.training.train.evaluate_model") as mock_evaluate_model,
         patch("app.training.train.torch.save") as mock_torch_save,
     ):
-        mock_loaders.return_value = (mock_train_loader, mock_val_loader, MagicMock())
+        mock_loaders.return_value = (
+            mock_train_loader, 
+            mock_val_loader, 
+            MagicMock()
+        )
         mock_model = MagicMock()
         mock_model_class.return_value.to.return_value = mock_model
         mock_train_epoch.return_value = 0.35

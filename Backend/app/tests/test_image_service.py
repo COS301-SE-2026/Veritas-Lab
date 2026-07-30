@@ -13,9 +13,9 @@ NO_CAMERA_MESSAGE="This image contains no camera metadata. It has likely been st
 CREDENTIALS_FOUND_MESSAGE="[+] Content Credentials (C2PA) Found:"
 TRACES_FOUND_MESSAGE="[+] Traces of editing software found:"
 HIGH_FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
-# The metadata within this tests are real for the analyseMetadata tests
+# The metadata within this tests are real for the analyse_metadata tests
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_ms_paint():
+async def test_analyse_metadata_detects_ms_paint():
     """
     This tests the "XMP:About": check for the Microsofts signature 
     """
@@ -77,13 +77,13 @@ async def test_analysemetadata_detects_ms_paint():
         "Composite:LightValue": 4.26935247692254
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 2
     assert TRACES_FOUND_MESSAGE in result.Findings
     assert "* XMP:About (Confirmed Editor): Microsoft Paint / Windows Photo tool signature detected" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_drawing_software():
+async def test_analyse_metadata_detects_drawing_software():
     """
     This is artwork png that the method needs to detect the software.
     """
@@ -201,14 +201,14 @@ async def test_analysemetadata_detects_drawing_software():
         "Composite:Megapixels": 2.0736
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 3
     assert HIGH_FRAUD_MESSAGE in result.Findings
     assert TRACES_FOUND_MESSAGE in result.Findings
     assert "Adobe Photoshop 25.0 (Macintosh)" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_ai_chatgpt():
+async def test_analyse_metadata_detects_ai_chatgpt():
     """
     It needs to flag this as highly suspicious since it is AI and is not a camera (Chatgpt)
     """
@@ -290,14 +290,14 @@ async def test_analysemetadata_detects_ai_chatgpt():
         "Composite:Megapixels": 1.573044
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 3
     assert HIGH_FRAUD_MESSAGE in result.Findings
     assert CREDENTIALS_FOUND_MESSAGE in result.Findings
     assert "* JUMBF:Claim_Generator_InfoName: OpenAI Media Service API" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_ai_gemini():
+async def test_analyse_metadata_detects_ai_gemini():
     """
     It needs to flag this as highly suspicious since it is AI and is not a camera (Gemini)
     """
@@ -389,14 +389,14 @@ async def test_analysemetadata_detects_ai_gemini():
         "Composite:Megapixels": 1.081344
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 3
     assert HIGH_FRAUD_MESSAGE in result.Findings
     assert CREDENTIALS_FOUND_MESSAGE in result.Findings
     assert "* JUMBF:Claim_Generator_InfoName: Google C2PA Core Generator Library" in result.Findings
 
 @pytest.mark.asyncio
-async def test_analysemetadata_detects_screenshot():
+async def test_analyse_metadata_detects_screenshot():
     """
     It needs to flag the screenshot as low so the investigator can tell the client to send the actual image
     """
@@ -427,7 +427,7 @@ async def test_analysemetadata_detects_screenshot():
         "Composite:Megapixels": 0.57147
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 1
     assert NO_CAMERA_MESSAGE in result.Findings
 
@@ -486,7 +486,7 @@ async def test_analyse_metadata_detects_social_media_stripping():
         "Composite:Megapixels": 1.8096
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 1
     assert NO_CAMERA_MESSAGE in result.Findings
 
@@ -603,7 +603,7 @@ async def test_analyse_metadata_finds_nothing_with_normal_phone_picture():
         "Composite:LightValue": 2.64273883200036
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 0
     assert not result.Findings
 
@@ -714,7 +714,7 @@ async def test_analyse_metadata_find_nothing_with_a_perfect_rule_obeying_phone_p
         "Composite:LightValue": 4.26935247692254
     }
 
-    result = await CONSTANT_IMAGE_SERVICE.analyseMetadata(mock_metadata)
+    result = await CONSTANT_IMAGE_SERVICE.analyse_metadata(mock_metadata)
     assert result.Certainty == 0
     assert not result.Findings
 
@@ -751,7 +751,7 @@ async def test_ai_analysis_calls_detector() -> None:
 
     image_path = Path("test_image.jpg")
 
-    result = await service.AIAnalysis(
+    result = await service.ai_analysis(
         image_path
     )
 
@@ -785,21 +785,21 @@ async def test_ai_analysis_returns_risk_level(risk_level: int, expected: int) ->
     ):
         service = ImageService()
 
-    result = await service.AIAnalysis(Path("test_image.jpg"))
+    result = await service.ai_analysis(Path("test_image.jpg"))
 
     assert result["risk_level"] == expected
 
 def test_create_findings_string_returns_no_findings_for_none():
     service = ImageService()
 
-    result = service.createFindingsString(None)
+    result = service.create_findings_string(None)
 
     assert result == "No findings"
 
 def test_create_findings_string_returns_no_findings_for_empty_dict():
     service = ImageService()
 
-    result = service.createFindingsString({})
+    result = service.create_findings_string({})
     assert result == "No findings"
 
 def test_create_findings_string_with_no_metadata_findings():
@@ -813,7 +813,7 @@ def test_create_findings_string_with_no_metadata_findings():
         "reasons": []
     }
 
-    result = service.createFindingsString(input_data)
+    result = service.create_findings_string(input_data)
 
     assert "Metadata:" in result
     assert "No metadata findings." in result
@@ -831,7 +831,7 @@ def test_create_findings_string_with_metadata_findings():
         "reasons": []
     }
 
-    result = service.createFindingsString(input_data)
+    result = service.create_findings_string(input_data)
 
     assert "Metadata:" in result
     assert "Editing software detected." in result
@@ -848,7 +848,7 @@ def test_create_findings_string_when_ai_analysis_unavailable():
         "reasons": []
     }
 
-    result = service.createFindingsString(input_data)
+    result = service.create_findings_string(input_data)
 
     assert "Metadata findings" in result
     assert "Binary classifier analysis unavailable." in result
@@ -866,7 +866,7 @@ def test_create_findings_string_includes_classification():
         "reasons": []
     }
 
-    result = service.createFindingsString(input_data)
+    result = service.create_findings_string(input_data)
 
     assert "Classification: Inconclusive" in result
 
@@ -888,7 +888,7 @@ def test_create_findings_string_includes_reasons():
         ]
     }
 
-    result = service.createFindingsString(input_data)
+    result = service.create_findings_string(input_data)
 
     assert "Reasons" in result
     assert " - Unusual texture patterns detected." in result
@@ -913,6 +913,6 @@ def test_create_findings_string_ignores_reason_without_message():
         ]
     }
 
-    result = service.createFindingsString(input_data)
+    result = service.create_findings_string(input_data)
 
     assert result.count(" - ") == 1
