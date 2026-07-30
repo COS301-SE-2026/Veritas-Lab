@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import AdminUserSearchBar from '@/components/common/adminUserSearchBar';
@@ -36,12 +36,12 @@ export default function AdminPage() {
         }
     }, [router, userRole]);
 
-    const sortOptions = useMemo(() => ([
+    const sortOptions = [
         { label: 'User Name', value: 'displayName' },
         { label: 'Username', value: 'username' },
         { label: 'User ID', value: 'id' },
         { label: 'Role', value: 'role' },
-    ]), []);
+    ];
     if (userRole !== 'ADMIN') {
         return <div className='mt-8 ml-8 text-sm text-[var(--color-light)]'>Redirecting...</div>;
     }

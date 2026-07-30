@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import type { Annotation, AnnotationPoint, AnnotationTool } from '@/types/workbench';
 
 let fallbackIdCounter = 0;
