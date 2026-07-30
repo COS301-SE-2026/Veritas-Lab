@@ -109,9 +109,9 @@ jobs:
                   ENVIRONMENT=development
                   FRONTEND_ORIGIN=http://localhost:3000
                   E2E_INVESTIGATOR_EMAIL=${E2E_INVESTIGATOR_EMAIL}
-                  E2E_INVESTIGATOR_PASSWORD=${secrets.E2E_INVESTIGATOR_PASSWORD}
+                  E2E_INVESTIGATOR_PASSWORD=${E2E_INVESTIGATOR_PASSWORD}
                   ADMIN_EMAIL=${ADMIN_EMAIL}
-                  ADMIN_PASSWORD=${secrets.ADMIN_PASSWORD}
+                  ADMIN_PASSWORD=${ADMIN_PASSWORD}
                   EOF
  
             #build and start the docker-compose
