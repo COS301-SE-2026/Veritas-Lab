@@ -1,7 +1,9 @@
 name: CD
 #Only runs when codes gets on main so either a merged PR or a direct push.
 on:
-    workflow_call: 
+    push:
+        branches: ["main"]
+    workflow_dispatch:
 
 permissions:
     contents: read
@@ -62,3 +64,51 @@ jobs:
                   url="$(vercel deploy --prod --token="$VERCEL_TOKEN")"
                   echo "url=$url" >> "$GITHUB_OUTPUT"
                   echo "production frontend deployed to $url"
+    rollback:
+        name: automatic rollback
+        needs: [deploy-azure, deploy-vercel]
+        if: always() && (needs.deploy-azure.result == 'failure' || needs.deploy-vercel.result == 'failure')
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        environment:
+            name: production
+        steps:
+            - name: fetch previous good commit
+              id: resolve
+              run: |
+                  sha="${{ github.event.before }}"
+                  if [ -z "$sha" ] || [ "$sha" = "0000000000000000000000000000000000000000" ]; then
+                      echo "valid=false" >> "$GITHUB_OUTPUT"
+                      echo "::error::No previous commit available to automatically rollback."
+                  else
+                      echo "valid=true" >> "$GITHUB_OUTPUT"
+                      echo "sha=$sha" >> "$GITHUB_OUTPUT"
+                      echo "rolling both services back to $sha"
+                  fi
+
+            - name: roll back Azure Web App to previous image
+              if: always() && steps.resolve.outputs.valid == 'true'
+              uses: azure/webapps-deploy@v3
+              with:
+                  app-name: veritas-lab-api
+                  publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+                  images: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ steps.resolve.outputs.sha }}
+ 
+            - name: roll back Vercel production deployment
+              if: always() && steps.resolve.outputs.valid == 'true'
+              env:
+                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+              run: |
+                  npm install -g vercel
+                  vercel rollback --token="$VERCEL_TOKEN" --yes
+ 
+            - name: report outcome
+              if: always()
+              run: |
+                  if [ "${{ steps.resolve.outputs.valid }}" = "true" ]; then
+                      echo "::error::CD failed (deploy-azure=${{ needs.deploy-azure.result }}, deploy-vercel=${{ needs.deploy-vercel.result }}). Automatic rollback to ${{ steps.resolve.outputs.sha }} was attempted."
+                  else
+                      echo "::error::CD failed (deploy-azure=${{ needs.deploy-azure.result }}, deploy-vercel=${{ needs.deploy-vercel.result }}). Automatic rollback was NOT possible."
+                  fi
