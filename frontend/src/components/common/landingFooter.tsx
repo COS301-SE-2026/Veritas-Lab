@@ -30,25 +30,23 @@ export default function LandingFooter() {
                             className="w-full sm:w-auto px-8 sm:px-20 py-3 text-lg font-semibold"
                             onClick={() => router.push('/login')}
                         />
+                        <Button
+                            text="Style Guide"
+                            variant="primary"
+                            className="text-(--color-lightest) text-base font-semibold hover:text-white transition-colors duration-200"
+                            onClick={() => router.push('/style-guide')}
+                        />
                     </div>
                 </div>
-                
-                <div className="mt-14 pt-8 border-t border-white/15 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <Image src="/VL_Logo_light.svg" alt="" width={40} height={40} className="size-9" />
-                            <span className="text-white text-xl font-semibold">Veritas Lab</span>
-                        </div>
-                        <p className="text-(--color-light) text-base mt-4 max-w-xl">
-                            A digital media forensics platform built by Delta Tech, in partnership with Naked Insurance.
-                        </p>
+
+                <div className="mt-14 pt-8 border-t border-white/15">
+                    <div className="flex items-center gap-3">
+                        <Image src="/VL_Logo_light.svg" alt="" width={40} height={40} className="size-9" />
+                        <span className="text-white text-xl font-semibold">Veritas Lab</span>
                     </div>
-                    <Button
-                        text="Style Guide"
-                        variant="primary"
-                        className="text-(--color-lightest) text-sm font-medium hover:text-white transition-colors duration-200"
-                        onClick={() => router.push('/style-guide')}
-                    />
+                    <p className="text-(--color-light) text-base mt-4 max-w-xl">
+                        A digital media forensics platform built by Delta Tech, in partnership with Naked Insurance.
+                    </p>
                 </div>
             </div>
         </footer>

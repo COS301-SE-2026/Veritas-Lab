@@ -366,7 +366,7 @@ export default function StyleGuidePage() {
               <Button text="Light" variant="light" />
               <Button text="Sad Sack" variant="sadSack" />
               <Button variant="sidebar"><Menu size={18} aria-hidden="true" /></Button>
-              <Button text="Disabled (HTML only)" variant="submit" disabled />
+              <Button text="Disabled" variant="submit" disabled />
             </div>
 
             <h3 className="mt-10 text-lg font-semibold">Form input</h3>
