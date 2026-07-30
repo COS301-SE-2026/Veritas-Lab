@@ -93,7 +93,7 @@ jobs:
                   DB_PASSWORD=postgres
                   DB_NAME=veritas_ci
                   DB_PORT=5432
-                  DB_HOST=localhost
+                  DB_HOST=postgres
                   DB_SSL=false
                   JWT_SECRET=test-secret
                   HASH=HS256
