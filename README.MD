@@ -32,8 +32,12 @@ Demo 2
 
 | Resources | Description |
 |-----------|-------------|
-|[User Manual](Docs/Demo_2/User-Manual-Veritas-Lab.pdf)| The user manual|
+|[SRS Document](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Introduction-Demo-2)| Introduction to the SRS Doc|
+|[SAS Document](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Introduction-SAS-DEMO-2)| Introduction to the SAS Doc|
 |[Brand Style Guide](Docs/Demo_2/Veritas-Labs_BrandStyleGuide_Demo2.pdf)| Brand Style Guide|
+|[Coding Standard Document](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Coding-Standards-Demo2)| Coding Standard Doc|
+|[User Manual](Docs/Demo_2/User-Manual-Veritas-Lab.pdf)| The user manual|
+|[Testing Policy](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Testing-Policy-Document-Demo-2)| Testing Policy Doc|'
 
 </div>
 </div>
