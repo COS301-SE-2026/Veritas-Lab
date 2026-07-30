@@ -100,6 +100,9 @@ jobs:
                   AWS_REGION=af-south-1
                   STORAGE_URL=http://minio:9000
                   MINIO_EXTERNAL_URL=http://localhost:9000
+                  NEXT_PUBLIC_API_URL=http://backend:8000
+                  ENVIRONMENT= development
+                  FRONTEND_ORIGIN=http://localhost:3000
                   EOF
  
             #build and start the docker-compose
