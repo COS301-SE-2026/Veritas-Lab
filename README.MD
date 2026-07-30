@@ -33,6 +33,7 @@ Demo 2
 | Resources | Description |
 |-----------|-------------|
 |[User Manual](Docs/Demo_2/User-Manual-Veritas-Lab.pdf)| The user manual|
+|[Brand Style Guide](Docs/Demo_2/Veritas-Labs_BrandStyleGuide_Demo2.pdf)| Brand Style Guide|
 
 </div>
 </div>
