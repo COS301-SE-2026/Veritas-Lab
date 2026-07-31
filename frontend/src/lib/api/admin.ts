@@ -1,7 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 import type { AdminUser } from '@/types/api';
-
 type ApiResult = {
     status?: 'success' | 'error';
     message?: string;
@@ -9,7 +6,7 @@ type ApiResult = {
 
 //get users list for cards.
 export async function fetchUsers(): Promise<AdminUser[]> {
-    const response = await fetch(`${API_BASE_URL}/api/fetchUsers`, {
+    const response = await fetch(`/api/fetchUsers`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -28,7 +25,7 @@ export async function fetchUsers(): Promise<AdminUser[]> {
 }
 //change role
 export async function changeUserRole(userId: string, newRole: AdminUser['role']): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/changeUserRole`, {
+    const response = await fetch(`/api/changeUserRole`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -43,7 +40,7 @@ export async function changeUserRole(userId: string, newRole: AdminUser['role'])
 }
 //del user
 export async function deleteUser(userId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    const response = await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
