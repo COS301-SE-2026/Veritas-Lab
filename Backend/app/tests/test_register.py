@@ -4,24 +4,33 @@ import app.auth.auth as auth
 
 client = TestClient(app)
 
-def testSuccessfulRegistration(monkeypatch):
-    async def mock_searchUsersViaEmail(email):
+def test_successful_registration(monkeypatch):
+    client.cookies.clear()
+    async def mock_search_users_via_email(email):
         return None
 
-    async def mock_searchUsersViaUsername(username):
+    async def mock_search_users_via_username(username):
         return None
 
-    async def mock_insertUser(email, username, role, hashedPassword):
+    async def mock_insert_user(email, username, role, hashedPassword):
         return {
             "id": "mock-user-id",
             "email": email,
             "username": username,
             "role": role
         }
+    
+    def mock_create_token(user):
+        return "mockedJWTToken"
+    
+    async def mock_update_user_JWT_issued(email): 
+        return None
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
-    monkeypatch.setattr(auth, "insertUser", mock_insertUser)
+    monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
+    monkeypatch.setattr(auth, "search_users_via_username", mock_search_users_via_username)
+    monkeypatch.setattr(auth, "insert_user", mock_insert_user)
+    monkeypatch.setattr(auth, "create_token", mock_create_token)
+    monkeypatch.setattr(auth, "update_user_jwt_issued", mock_update_user_JWT_issued)
 
     response = client.post(
         "/api/register",
@@ -38,7 +47,11 @@ def testSuccessfulRegistration(monkeypatch):
         "message": "Account created successfully"
     }
 
-def testInvalidEmailReturns400():
+    assert auth.COOKIE_NAME in response.cookies
+    assert response.cookies.get(auth.COOKIE_NAME) == "mockedJWTToken"
+
+def test_invalid_email_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -49,8 +62,10 @@ def testInvalidEmailReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testMissingEmailReturns400():
+def test_missing_email_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -61,9 +76,11 @@ def testMissingEmailReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
 #testing invalid password
-def testInvalidPasswordReturns400():
+def test_invalid_password_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -74,8 +91,10 @@ def testInvalidPasswordReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testMissingPasswordReturns400():
+def test_missing_password_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -86,9 +105,11 @@ def testMissingPasswordReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-    #test missing username
-def testMissingUsernameReturns400():
+#test missing username
+def test_missing_username_returns_400():
+    client.cookies.clear()
     response = client.post(
         "/api/register",
         json={
@@ -99,9 +120,11 @@ def testMissingUsernameReturns400():
     )
 
     assert response.status_code == 400
+    assert auth.COOKIE_NAME not in response.cookies
 
-def testDuplicateEmailReturns409(monkeypatch):
-    async def mock_searchUsersViaEmail(email):
+def test_duplicate_email_returns_409(monkeypatch):
+    client.cookies.clear()
+    async def mock_search_users_via_email(email):
         return {
             "id": "existing-id",
             "email": email,
@@ -109,11 +132,19 @@ def testDuplicateEmailReturns409(monkeypatch):
             "role": "USER"
         }
 
-    async def mock_searchUsersViaUsername(username):
+    async def mock_search_users_via_username(username):
         return None
 
-    monkeypatch.setattr(auth, "searchUsersViaEmail", mock_searchUsersViaEmail)
-    monkeypatch.setattr(auth, "searchUsersViaUsername", mock_searchUsersViaUsername)
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_username", 
+        mock_search_users_via_username
+    )
 
     response = client.post(
         "/api/register",
@@ -125,3 +156,41 @@ def testDuplicateEmailReturns409(monkeypatch):
     )
 
     assert response.status_code == 409
+    assert auth.COOKIE_NAME not in response.cookies
+
+def test_duplicate_username_returns_409(monkeypatch):
+    client.cookies.clear()
+
+    async def mock_search_users_via_email(email):
+        return None
+
+    async def mock_search_users_via_username(username):
+        return{
+            "id": "existing-id",
+            "email": "someone@veritas.lab",
+            "username": username,
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_email", 
+        mock_search_users_via_email
+    )
+    monkeypatch.setattr(
+        auth, 
+        "search_users_via_username", 
+        mock_search_users_via_username
+    )
+
+    response = client.post(
+        "api/register",
+        json={
+            "email": "analyst@veritas.lab",
+            "password": "Makelana@2026_Capstone",
+            "username": "Taken Username"
+        }
+    )
+
+    assert response.status_code == 409
+    assert auth.COOKIE_NAME not in response.cookies

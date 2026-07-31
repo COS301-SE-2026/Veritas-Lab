@@ -1,24 +1,36 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import re
+import os
 from pydantic import BaseModel # For JSON
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
+from app.core.env import ENVLoader,IS_PROD
+
 
 app = FastAPI(
     title="Veritas Lab API",
-    description="This is the backend REST API for Veritas Lab"
+    description="This is the backend REST API for Veritas Lab",
+    docs_url=None if IS_PROD else "/docs",
+    redoc_url=None if IS_PROD else "/redoc",
+    openapi_url=None if IS_PROD else "/openapi.json",
 )
 
 
 allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    os.environ.get("FRONTEND_ORIGIN", ""),
 ]
+
+if (not IS_PROD):
+    allowed_origins.append("http://localhost:3000")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=os.environ.get(
+        "FRONTEND_ORIGIN_REGEX",
+        r"^https://veritsalab-[a-z0-9-]+\.vercel\.app$"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -27,6 +39,7 @@ app.add_middleware(
 app.include_router(cases_router)
 
 app.include_router(auth_router)
+
 
 @app.get("/")
 def root():

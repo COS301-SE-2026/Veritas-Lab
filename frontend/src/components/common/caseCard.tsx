@@ -1,11 +1,5 @@
 import Link from 'next/link';
-
-type CaseCardProps = {
-    caseTitle: string;
-    caseDescription: string;
-    caseStatus: 'Open' | 'Closed' | 'In Progress';
-    href?: string;
-};
+import type { CaseCardProps } from '@/types/components';
 
 export default function CaseCard({ caseTitle, caseDescription, caseStatus, href }: CaseCardProps) {
     const cardContent = (

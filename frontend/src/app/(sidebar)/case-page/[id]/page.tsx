@@ -1,22 +1,62 @@
 'use client';
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+//import { getCookie } from '@/auth/cookie';
 import { useParams } from "next/navigation";
 import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
-import useCase from "@/hooks/useCase";
+import CaseCloseButton from "@/components/common/caseCloseButton";
+import useCase from "@/lib/hooks/useCase";
+import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
+import CaseReviewsPanel from '@/components/common/caseReviewsPanel';
+
+const TABS = ['Evidence', 'Reviews'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [userRole, setUserRole] = useState<'ADMIN' | 'INVESTIGATOR' | 'USER'>('USER');
-
+    const userRole = useUserRole();
+    const currentUser = useCurrentUser();
     const params = useParams<{ id: string }>();
     const id = params.id;
+    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
 
-    const loadCase = useCallback(async () => {
+    useEffect(() => {
+        let isActive = true;
+
+        void (async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                const response = await fetchCase(id);
+
+                if (isActive) {
+                    setCaseData(response);
+                }
+            } catch (loadError) {
+                if (isActive) {
+                    setError(loadError instanceof Error ? loadError.message : 'Failed to load case');
+                }
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            isActive = false;
+        };
+    }, [fetchCase, id]);
+
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const openModal = () => setIsModalOpen(true);
+    const closeModal = () => setIsModalOpen(false);
+
+    // Shared reload used after an upload or a case close, so the panel/details stay in sync.
+    const reloadCaseData = async () => {
         try {
             setIsLoading(true);
             setError(null);
@@ -27,37 +67,13 @@ export default function CasePage() {
         } finally {
             setIsLoading(false);
         }
-    }, [fetchCase, id]);
-
-    useEffect(() => {
-        void loadCase();
-    }, [loadCase]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const token = window.localStorage.getItem('authToken');
-
-        if (!token) {
-            setUserRole('USER');
-            return;
-        }
-
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            setUserRole((payload.role ?? 'USER') as 'ADMIN' | 'INVESTIGATOR' | 'USER');
-        } catch {
-            setUserRole('USER');
-        }
-    }, []);
-
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const openModal = () => setIsModalOpen(true);
-    const closeModal = () => setIsModalOpen(false);
+    };
 
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
-    const canUploadEvidence = userRole === 'INVESTIGATOR';
+    const caseComments = caseData?.comments ?? [];
+    const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
+    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed;
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
@@ -86,22 +102,40 @@ export default function CasePage() {
                     ) : null}
                 </div>
                 <div className="mt-8">
-                    <SliderBar filters={['Evidence', 'Analysis', 'Provenance', 'Activity']}  className='w-full'/>
+                    <SliderBar //changed sliderbar to fetch TABS and actively change page layout
+                        filters={TABS}
+                        defaultFilter={activeTab}
+                        onChange={(tab) => setActiveTab(tab)}
+                        className='w-full'
+                    />
                 </div>
                 <div className="flex flex-cols-2 mt-8">
                     <div className="w-4/5">
-                        <div className="flex gap-2 flex-wrap">
-                            {evidenceList.length > 0 ? evidenceList.map((evidence) => (
-                                <EvidenceCard
-                                    key={evidence.reportId}
-                                    mediaName={evidence.mediaName}
-                                    mediaUrl={evidence.mediaUrl}
-                                    mediaExtension={evidence.mediaExtension}
-                                />
-                            )) : (
-                                <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
-                            )}
-                        </div>
+                        {activeTab === 'Evidence' ? (
+                            <div className="flex gap-2 flex-wrap">
+                                {evidenceList.length > 0 ? evidenceList.map((evidence) => (
+                                    <EvidenceCard
+                                        key={evidence.reportId}
+                                        mediaName={evidence.mediaName}
+                                        mediaUrl={evidence.mediaUrl}
+                                        mediaExtension={evidence.mediaExtension}
+                                        href={`/case-page/${id}/workbench/${evidence.reportId}`}
+                                    />
+                                )) : (
+                                    <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
+                                )}
+                            </div>
+                        ) : activeTab === 'Reviews' ? (
+                            <CaseReviewsPanel
+                                caseId={id}
+                                initialComments={caseComments}
+                                currentUsername={currentUser?.username ?? ''}
+                            />
+                        ) : (
+                            <div className="rounded-[28px] border border-dashed border-[var(--color-light)]/30 bg-white p-10 text-center text-sm text-[var(--color-light)]">
+                                {activeTab} is not available yet.
+                            </div>
+                        )}
                     </div>
                     <div className="w-1/5">
                         <div className="shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-[21px] p-4">
@@ -109,11 +143,18 @@ export default function CasePage() {
                                 <p className="text-(--color-light) mt-2">Status: {caseDetails?.caseClosed ? 'Closed' : 'Open'}</p>
                                 <p className="text-(--color-light) mt-1">Created: {formatCaseDate(caseDetails?.caseCreationDate)}</p>
                         </div>
+                        {canCloseCase ? (
+                            <CaseCloseButton
+                                caseId={id}
+                                onClosed={reloadCaseData}
+                                className="mt-4"
+                            />
+                        ) : null}
                     </div>
                 </div>
             </div>
             {canUploadEvidence ? (
-                <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={loadCase} />
+                <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={reloadCaseData} />
             ) : null}
         </>
     );

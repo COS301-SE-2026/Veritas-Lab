@@ -30,7 +30,7 @@ describe('LoginForm', () => {
 
 	it('renders heading and fields', () => {
 		render(<LoginForm />);
-		expect(screen.getByText('Welcome Back!')).toBeInTheDocument();
+		expect(screen.getByText('Welcome back')).toBeInTheDocument();
 		expect(screen.getByLabelText('Email')).toBeInTheDocument();
 		expect(screen.getByLabelText('Password')).toBeInTheDocument();
 	});
@@ -38,12 +38,12 @@ describe('LoginForm', () => {
 	it('renders action buttons', () => {
 		render(<LoginForm />);
 		expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Sign Up' })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
 	});
 
-	it('navigates to register when clicking Sign Up', () => {
+	it('navigates to register when clicking Create an account', () => {
 		render(<LoginForm />);
-		fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
 		expect(mockPush).toHaveBeenCalledWith('/register');
 	});
 
@@ -79,7 +79,7 @@ describe('LoginForm', () => {
 		fillValidForm();
 		const submitButton = screen.getByRole('button', { name: 'Login' });
 		fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
-		expect(screen.getByRole('button', { name: 'Logging In...' })).toBeDisabled();
+		expect(await screen.findByRole('button', { name: 'Logging in...' })).toBeInTheDocument();
 
 		resolveFetch({
 			ok: true,

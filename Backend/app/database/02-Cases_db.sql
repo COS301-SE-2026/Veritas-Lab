@@ -12,7 +12,6 @@ Create TABLE IF NOT EXISTS "Cases_DB"."MediaType"(
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    CaseReviews JSONB,
     CaseName varchar(255) NOT NULL,
     CaseCreator varchar(100) NOT NULL, -- A case has to have a creator 
     CaseDescription TEXT,
@@ -20,23 +19,36 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseCreationDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Media"(
     MediaId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     MediaType UUID NOT NULL REFERENCES "Cases_DB"."MediaType"(MediaTypeId) ON DELETE RESTRICT ON UPDATE CASCADE,
     MediaHash TEXT UNIQUE,
+    MediaAnnotations JSONB,
     MediaUploadDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Reports"(
     ReportId UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     CaseId UUID NOT NULL REFERENCES "Cases_DB"."Cases"(CaseId) ON DELETE CASCADE ON UPDATE CASCADE,
-    ImageId UUID NOT NULL REFERENCES "Cases_DB"."Media"(MediaId) ON UPDATE CASCADE,
+    MediaId UUID NOT NULL REFERENCES "Cases_DB"."Media"(MediaId) ON UPDATE CASCADE,
+    ImageTitle Text,
     ReportArtifacts JSONB,
     ReportFindings TEXT,
     ReportComments TEXT,
+    ReportCertainty SMALLINT CHECK (ReportCertainty <=3), -- 0=Nothing, 1=low, 2=moderately , 3=high
     ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Comments"(
+    CommentID BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    CaseId UUID NOT NULL REFERENCES "Cases_DB"."Cases"(CaseId) ON DELETE CASCADE ON UPDATE CASCADE,
+    Username varchar(100) NOT NULL,
+    Comment TEXT,
+    CommentTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+create UNIQUE INDEX CaseImage ON "Cases_DB"."Reports"(CaseId, MediaId);
 
 
 

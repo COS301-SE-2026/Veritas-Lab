@@ -4,13 +4,8 @@ import Modal from "../ui/modal";
 import Button from "../ui/button";
 import Label from "../ui/label";
 import { UploadCloud } from 'lucide-react';
-import useCase from '@/hooks/useCase';
-type MediaUploadModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    caseId?: string;
-    onUploaded?: () => void | Promise<void>;
-};
+import useCase from '@/lib/hooks/useCase';
+import type { MediaUploadModalProps } from '@/types/components';
 
 export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }: MediaUploadModalProps) {
     const { addEvidence } = useCase();
@@ -56,7 +51,7 @@ export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }
                         : <>
                             <p className="text-sm font-semibold text-[var(--color-text)]">Click to browse</p>
                             <p className="text-xs text-gray-400">PNG/PDF file types supported</p>
-                          </>
+                        </>
                     }
                 </div>
 

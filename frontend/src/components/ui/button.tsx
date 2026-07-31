@@ -1,17 +1,6 @@
-import React from 'react';
+import type { ButtonProps } from '@/types/components';
 
-type ButtonProps = {
-    children?: React.ReactNode;
-    text?: string;
-    onClick?: () => void;
-    disabled?: boolean;
-    type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack';
-    size?: 'small' | 'medium' | 'large';
-    className?: string;
-};
-
-export default function Button({ 
+export default function Button({
     children,
     text,
     onClick,
@@ -20,7 +9,7 @@ export default function Button({
     variant = 'primary',
     size = 'medium',
     className = '',
- }: ButtonProps) {
+}: ButtonProps) {
 
     const sizeClasses = {
         small: '',
@@ -35,6 +24,7 @@ export default function Button({
         sidebar: 'p-2 rounded-md hover:bg-(--color-dark) transition-colors ml-auto',
         submit: 'bg-[var(--color-secondary)] text-(--color-text) font-medium py-2 px-4 rounded-full hover:bg-[#2E9E66] transition-colors font-semibold',
         sadSack: 'py-2 px-4 text-[var(--color-text)] hover:text-[var(--color-primary)] rounded-full',
+        light: 'py-2 px-4 bg-[var(--color-background)] text-[var(--color-text)] hover:bg-[var(--color-light)] rounded-full',
     };
 
     return (

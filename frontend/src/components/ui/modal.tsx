@@ -1,11 +1,5 @@
 'use client';
-import { ReactNode } from 'react';
-
-type ModalProps = {
-    children: ReactNode;
-    isOpen: boolean;
-    onClose: () => void;
-}
+import type { ModalProps } from '@/types/components';
 
 export default function Modal({ children, isOpen, onClose }: ModalProps) {
     if (!isOpen) return null;

@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import Dashboard from '../../../src/app/(sidebar)/dashboard/page';
-import useCaseDashboard from '../../../src/hooks/useCaseDashboard';
+import useCaseDashboard from '../../../src/lib/hooks/useCaseDashboard';
 
-jest.mock('../../../src/hooks/useCaseDashboard');
+jest.mock('../../../src/lib/hooks/useCaseDashboard');
 
 const mockUseCaseDashboard = useCaseDashboard as jest.MockedFunction<typeof useCaseDashboard>;
 

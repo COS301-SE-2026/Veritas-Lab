@@ -1,9 +1,5 @@
 import Card from '@/components/ui/card';
-import type { DashboardCase } from '@/api/dashboard';
-
-type DashboardCardsProps = {
-    cases?: DashboardCase[];
-};
+import type { DashboardCardsProps } from '@/types/components';
 //made it so that the values are actually populated with real data now.
 export default function DashboardCards({ cases = [] }: DashboardCardsProps) {
     const total = cases.length;

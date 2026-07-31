@@ -1,0 +1,124 @@
+'use client';
+import { useEffect, useState, useRef } from 'react';
+import { fetchCases as fetchDashboardCases } from '@/lib/api/dashboard';
+import type { CaseStatus, CaseSummary, SortKey, StatusFilter, UseCaseDashboardOptions, UserRole } from '@/types/hooks';
+
+const sortCases = (cases: CaseSummary[], sortKey: SortKey) => {
+    return [...cases].sort((left, right) => {
+        if (sortKey === 'caseCreationDate') {
+            const leftDate = new Date(left.caseCreationDate).getTime();
+            const rightDate = new Date(right.caseCreationDate).getTime();
+            return rightDate - leftDate;
+        }
+
+        return left[sortKey].localeCompare(right[sortKey]);
+    });
+};
+
+export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
+    const [sortKey, setSortKey] = useState<SortKey>('caseCreationDate');
+    const [userRole, setUserRole] = useState<UserRole>(options.initialRole ?? 'USER');
+    const [fetchedCases, setFetchedCases] = useState<CaseSummary[]>([]);
+    const [isLoading, setIsLoading] = useState(!options.initialCases);
+    const [error, setError] = useState<string | null>(null);
+    const cases = options.initialCases ?? fetchedCases;
+    const isMounted = useRef(true);
+
+    const loadCases = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const dashboardCases = await fetchDashboardCases();
+
+            if (isMounted.current) {
+                setFetchedCases(dashboardCases);
+            }
+        } catch (loadError) {
+            if (isMounted.current) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load cases');
+            }
+        } finally {
+            if (isMounted.current) {
+                setIsLoading(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (options.initialCases) {
+            return;
+        }
+
+        let isActive = true;
+
+        void (async () => {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const dashboardCases = await fetchDashboardCases();
+
+                if (isActive) {
+                    setFetchedCases(dashboardCases);
+                }
+            } catch (loadError) {
+                if (isActive) {
+                    setError(loadError instanceof Error ? loadError.message : 'Failed to load cases');
+                }
+            } finally {
+                if (isActive) {
+                    setIsLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            isMounted.current = false;
+            isActive = false;
+        };
+    }, [options.initialCases]);
+
+
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    const filtered = cases.filter((item) => {
+        const caseStatus: CaseStatus = item.caseClosed ? 'Closed' : 'Open';
+        const matchesStatus = statusFilter === 'All' || caseStatus === statusFilter;
+
+        if (!matchesStatus) {
+            return false;
+        }
+
+        if (!normalizedQuery) {
+            return true;
+        }
+
+        return (
+            item.caseId.toLowerCase().includes(normalizedQuery) ||
+            item.caseName.toLowerCase().includes(normalizedQuery) ||
+            item.caseCreator.toLowerCase().includes(normalizedQuery)
+        );
+    });
+
+    const visibleCases = sortCases(filtered, sortKey);
+
+    return {
+        searchQuery,
+        setSearchQuery,
+        statusFilter,
+        setStatusFilter,
+        sortKey,
+        setSortKey,
+        userRole,
+        setUserRole,
+        visibleCases,
+        allCases: cases,
+        refreshCases: loadCases,
+        showDashboardCards: userRole === 'ADMIN' || userRole === 'INVESTIGATOR',
+        isLoading,
+        error,
+    };
+}

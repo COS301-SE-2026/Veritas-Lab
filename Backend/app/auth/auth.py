@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header, Response, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re as regex
 import bcrypt
+import uuid as uuidlib
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
@@ -16,26 +17,34 @@ DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
 DB_HOST= env.getRequiredEnv("DB_HOST")
 DB_PORT= env.getRequiredIntEnv("DB_PORT")
 DB_NAME= env.getRequiredEnv("DB_NAME")
+DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
 SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
 ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
 ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
+COOKIE_NAME = "JWT_token"
+AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+INVALID_TOKEN= "Invalid token"
 
+async def get_connection() -> asyncpg.Connection:
+    return await asyncpg.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        host=DB_HOST,
+        port=DB_PORT,
+        ssl="require" if DB_SSL else None,
+    )
 router = APIRouter(
     prefix="/api",
     tags=["Auth"]
 )
 
-def verifyJWT(authorizationHeader: str) -> dict:
-    if authorizationHeader is None or authorizationHeader.strip() == "":
-        raise ValueError("Missing Authorization header")
+def verify_jwt(request: Request) -> dict:
 
-    if not authorizationHeader.startswith("Bearer "):
-        raise ValueError("Invalid Authorization header format")
 
-    token = authorizationHeader.replace("Bearer ", "", 1).strip()
-
-    if token == "":
-        raise ValueError("Missing JWT token")
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise ValueError("Not authenticated")
 
     try:
         payload = jwt.decode(
@@ -50,13 +59,13 @@ def verifyJWT(authorizationHeader: str) -> dict:
         raise ValueError("Token has expired")
 
     except JWTError:
-        raise ValueError("Invalid token")
+        raise ValueError(INVALID_TOKEN)
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
 # an "@", one or more valid post-@ pre. characters (0-9, a-z, A-z,.,-), a ".",
 # and finally two or more valid post. characters (A-Z and a-z).
-def validateEmail(email: str) -> bool:
+def validate_email(email: str) -> bool:
     if not isinstance(email,str):
         return False
 
@@ -68,10 +77,22 @@ def validateEmail(email: str) -> bool:
     pattern = r"^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
     return regex.match(pattern, email) is not None
 
+#Validates that a string is a well-formed UUID
+#The delete endpoint gets userId as  a arw string from the URL path
+# Thus checking it before sending it to the db to avoid db level-error
+def validate_uuid(value: str) -> bool:
+    if  not isinstance(value, str):
+        return False
+    try:
+        uuidlib.UUID(value.strip())
+        return True
+    except ValueError:
+        return False
+
 # Validates a password. 
 # Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
 # Regex : At least 1 lower case, At least 1 upper case, At least 1 number number, At least 1 special char, must be 12 chars long
-def validatePassword(password: str) -> bool:
+def validate_password(password: str) -> bool:
     if not isinstance(password,str):
         return False
     
@@ -80,17 +101,17 @@ def validatePassword(password: str) -> bool:
 
 # utf-8 encode the input string because bcrypt uses this, generate a salt, use the encoded string and salt to make the hash
 # the hash is also utf-8 encoded so it needs to be decoded before it is returned
-def hashPassword(input: str) -> str:
-    convertedString = input.encode("utf-8")
+def hash_password(input: str) -> str:
+    converted_string = input.encode("utf-8")
     salt =bcrypt.gensalt()
-    hashed = bcrypt.hashpw(convertedString, salt)
+    hashed = bcrypt.hashpw(converted_string, salt)
     return hashed.decode("utf-8")
 
 # utf-8 encodes both strings and uses bcrypt.checkpw to see if they are the same
-def verifyPassword(password: str, hashedPassword: str) ->bool:
-    convertedPassword = password.encode("utf-8")
-    convertedHash = hashedPassword.encode("utf-8")
-    return bcrypt.checkpw(convertedPassword,convertedHash)
+def verify_password(password: str, hashed_password: str) ->bool:
+    converted_password = password.encode("utf-8")
+    converted_hash = hashed_password.encode("utf-8")
+    return bcrypt.checkpw(converted_password,converted_hash)
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
@@ -101,14 +122,12 @@ class LoginRequest(BaseModel):
 class RegisterRequest(LoginRequest):
     username: str | None = None
 
-async def updateUserJWTIssued(email: str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+class ChangeRoleRequest(BaseModel):
+    userId: str | None = None
+    NewRole: str | None = None
+
+async def update_user_jwt_issued(email: str):
+    connection = await get_connection()
     try:
         await connection.execute(
             """
@@ -121,16 +140,23 @@ async def updateUserJWTIssued(email: str):
     finally:
         await connection.close()
 
-# Once the envs are setup this will need to be updated
-async def searchUsersViaEmail(email:str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+async def update_user_jwt_issued_via_user(user: dict):
+    connection = await get_connection()
+    try:
+        await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userjwtissued = NOW()
+            WHERE userid = $1
+            """,
+            user["id"]
+        )
+    finally:
+        await connection.close()
 
+# Once the envs are setup this will need to be updated
+async def search_users_via_email(email:str):
+    connection = await get_connection()
     try:
         row = await connection.fetchrow(
             """
@@ -154,14 +180,8 @@ async def searchUsersViaEmail(email:str):
     finally:
         await connection.close()
     
-async def searchUsersViaUsername(username: str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+async def search_users_via_username(username: str):
+    connection = await get_connection()
 
     try:
         row = await connection.fetchrow(
@@ -186,14 +206,33 @@ async def searchUsersViaUsername(username: str):
     finally:
         await connection.close()
 
-async def insertUser(email: str, username: str, role: str, hashedPassword: str):
-    connection = await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+#Delete functionaslity hard deletes the user row by UUID in the db
+#Returns True if found and False if not found
+async def delete_user_by_id(user_id: str) -> bool:
+    connection = await get_connection()
+
+    try:
+        row = await connection.fetchrow(
+            """
+            DELETE FROM "Users_DB"."Users"
+            WHERE userid = $1::uuid
+            RETURNING userid
+            """,
+            user_id
+        )
+
+        return row is not None # when the specified user is not found in the Db
+    finally:
+        await connection.close()
+
+async def insert_user(
+    email : str, 
+    username : str, 
+    role : str, 
+    hashed_password : str
+):
+
+    connection = await get_connection()
 
     try:
         row = await connection.fetchrow(
@@ -203,7 +242,7 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
             VALUES ($1, $2, $3, $4)
             RETURNING userid, useremail, username, userrole
             """,
-            email, username, role, hashedPassword
+            email, username, role, hashed_password
         )
 
         return {
@@ -215,14 +254,14 @@ async def insertUser(email: str, username: str, role: str, hashedPassword: str):
     finally:
         await connection.close()
 
-def createToken(user: dict) ->str:
-    expiryTime = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+def create_token(user: dict) ->str:
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
         "sub": user["id"],
         "username": user["username"],
         "role": user["role"],
-        "exp": expiryTime
+        "exp": expiry_time
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
@@ -230,8 +269,8 @@ def createToken(user: dict) ->str:
 
 # POST /api/login
 @router.post("/login")
-async def login(request: LoginRequest):
-    if not validateEmail(request.email):
+async def login(request: LoginRequest, response: Response):
+    if not validate_email(request.email):
         return JSONResponse(
             status_code=400,
             content={
@@ -240,7 +279,7 @@ async def login(request: LoginRequest):
             }
         )
 
-    if not validatePassword(request.password):
+    if not validate_password(request.password):
         return JSONResponse(
             status_code=400,
             content={
@@ -249,39 +288,48 @@ async def login(request: LoginRequest):
             }
         )
 
-    user = await searchUsersViaEmail(request.email.strip())
+    user = await search_users_via_email(request.email.strip())
 
     if user is None:
         return JSONResponse(
             status_code=404,
             content={
                 "status": "error",
-                "message": "A User with this email does not exist. Please register"
+                "message": AMBIGUOUS_ERROR
             }
         )
     
-    if not verifyPassword(request.password, user["password"]):
+    if not verify_password(request.password, user["password"]):
         return JSONResponse(
             status_code=401,
             content={
                 "status": "error",
-                "message": "Invalid email or password"
+                "message": AMBIGUOUS_ERROR
             }
         )
 
-    token = createToken(user)
+    token = create_token(user)
 
-    await updateUserJWTIssued(user["email"])
+    await update_user_jwt_issued(user["email"])
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=1800
+    )
 
     return {
         "status" : "success",
-        "token" : token
+        "message" : "Logged in successfully"
     }
 
 # POST /api/register
 @router.post("/register", status_code=201)
-async def register(request: RegisterRequest):
-    if not validateEmail(request.email):
+async def register(request: RegisterRequest, response: Response):
+    if not validate_email(request.email):
         return JSONResponse(
             status_code=400,
             content={
@@ -290,7 +338,7 @@ async def register(request: RegisterRequest):
             }
         )
 
-    if not validatePassword(request.password):
+    if not validate_password(request.password):
         return JSONResponse(
             status_code=400,
             content={
@@ -308,39 +356,407 @@ async def register(request: RegisterRequest):
             }
         )
 
-    existingUser = await searchUsersViaEmail(request.email.strip())
+    existing_user = await search_users_via_email(request.email.strip())
 
-    if existingUser is not None:
+    if existing_user is not None:
         return JSONResponse(
             status_code=409,
             content={
                 "status": "error",
-                "message": "An account with this email already exists"
+                "message": AMBIGUOUS_ERROR
             }
         )
     
-    existingUsername = await searchUsersViaUsername(request.username.strip())
+    existing_username = await search_users_via_username(request.username.strip())
     
-    if existingUsername is not None:
+    if existing_username is not None:
         return JSONResponse(
             status_code=409,
             content={
                 "status": "error",
-                "message": "An account with this username already exists"
+                "message": AMBIGUOUS_ERROR
             }
         )
 
-    hashedPassword = hashPassword(request.password)
-    await insertUser(request.email.strip(), request.username.strip(), "USER", hashedPassword)
+    hashed_password = hash_password(request.password)
+    new_user = await insert_user(
+        request.email.strip(), 
+        request.username.strip(), 
+        "USER", 
+        hashed_password
+    )
 
-    return JSONResponse(
-        status_code=201,
-        content={
+    token = create_token(new_user)
+
+    await update_user_jwt_issued(new_user["email"])
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=1800
+    )
+
+    return {
             "status": "success",
             "message": "Account created successfully"
+    }
+
+@router.post("/fetchUsers")
+async def fetch_users(request: Request):
+    connection = None
+
+    try:
+        payload = verify_jwt(request)
+
+        if payload.get("role") != "ADMIN":
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "status":"error",
+                    "message": "User unauthorized"
+                }
+            )
+        
+        connection = await get_connection()
+
+        rows = await connection.fetch(
+            """
+            SELECT userid, username, userrole
+            FROM "Users_DB"."Users"
+            """
+        )
+
+        users = []
+
+        for row in rows:
+            users.append(
+                {
+                    "id":str(row["userid"]),
+                    "username":row["username"],
+                    "role": row["userrole"]
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status":"success",
+                "users": users
+            }
+        )
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+    finally:
+        if connection is not None:
+            await connection.close()
+
+@router.post("/changeUserRole")
+async def change_user_role(
+    change_role_request: ChangeRoleRequest,
+    request: Request
+):
+    connection = None
+    try:
+        payload = verify_jwt(request)
+    except ValueError as e:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+    if payload.get("role") != "ADMIN":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status":"error",
+                "message": "User unauthorized"
+            }
+        )
+
+    user_id = change_role_request.userId
+    new_role = change_role_request.NewRole
+
+    if not user_id or not new_role:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Missing userId or NewRole field."
+            }
+        )
+    
+    if payload.get("sub") == user_id:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "status": "error",
+               "message": "Not allowed to change own role"
+           }
+        )
+
+    try:
+        user_id = uuidlib.UUID(user_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status":"error",
+                "message":"Invalid userId format."
+            }
+        )
+
+    if new_role not in ["USER", "ADMIN", "INVESTIGATOR"]:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid or missing NewRole field."
+            }
+        )
+    
+    try:
+        connection = await get_connection()
+
+        result = await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userrole = $1
+            WHERE userid = $2
+            """,
+            new_role, user_id
+        )
+
+        if result == "UPDATE 0":
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "status": "error",
+                    "message": "No user found with the provided user ID"
+                }
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status":"success",
+                "message": f"User role updated to {new_role} successfully"
+            }
+        )
+    except asyncpg.PostgresError:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
+    finally:
+        if connection is not None:
+            await connection.close()
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, request: Request):
+    try:
+        #Verify the JWT for security
+        payload = verify_jwt(request)
+        user_id = user_id.strip()
+
+        #Authorization. Only Admins can delete
+        if payload.get("role") != "ADMIN":
+            return JSONResponse(
+                status_code = 403,
+                content = {"status": "error", "message": "User is unauthorized."}
+            )
+
+        #Validate input. This rejects improper UUIDs before touching the DB
+        if not validate_uuid(user_id):
+            return JSONResponse(
+                status_code = 400,
+                content = {"status": "error", "message": "Invalid User ID format."}
+            )
+
+        #An admin cannot delete themselves
+        caller_id = payload.get("sub")
+        if caller_id == user_id:
+            return JSONResponse(
+                status_code = 400,
+                content = {"status": "error", "message": "Admins cannot delete themselves."}
+            )
+
+        #Now delete
+        try:
+            deleted = await delete_user_by_id(user_id)
+        except asyncpg.PostgresError:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status":"error",
+                    "message":"Database error"
+                }
+            )
+        
+        #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
+        if not deleted:
+            return JSONResponse(
+                status_code = 404,
+                content = {
+                    "status": "error", 
+                    "message": "No user found with the provided ID."
+                    }
+            )
+
+        return JSONResponse(
+            status_code = 200,
+            content = {
+                "status": "success", 
+                "message": "User deleted successfully."
+                }
+        )
+
+        #safety net for unexpected errors
+    except ValueError as e:
+        #Errors from Jwt.
+        return JSONResponse(
+            status_code = 401,
+            content = {
+                "status": "error", 
+                "message": str(e)
+                }
+        )
+
+@router.post("/refreshToken")
+async def refresh_token(request: Request, response: Response):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error", 
+                "message": "Not authenticated"
+                }
+        )
+
+    if token == "":
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error", 
+                "message": "Missing JWT token"
+                }
+        )
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+    except ExpiredSignatureError:
+        #I can make a new token here
+        try:
+            payload = jwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=[ALGORITHM],
+                options={"verify_exp": False}
+            )
+        except JWTError:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error", 
+                    "message": INVALID_TOKEN
+                    }
+            )
+
+    except JWTError:
+        return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error", 
+                    "message": INVALID_TOKEN
+                    }
+            )
+    
+    expiry = payload.get("exp")
+
+    if expiry is None:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error", 
+                "message": "Token missing expiry"
+                }
+        )
+
+    current_time = datetime.now(timezone.utc).timestamp()
+    seconds_until_expiry = expiry - current_time
+
+    if seconds_until_expiry > 60:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Token does not need refreshing"
+            }
+        )
+    
+    if "sub" not in payload or "username" not in payload or "role" not in payload:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": "Token missing required fields"
+            }
+        )
+    
+    user = {
+        "id":payload["sub"],
+        "username": payload["username"],
+        "role": payload["role"]
+    }
+
+    new_token = create_token(user)
+
+    try:
+        await update_user_jwt_issued_via_user(user)
+    except Exception:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status":"error",
+                "message": "Failed to update token issue time"
+            }
+        )
+
+    final_response = JSONResponse(
+        status_code=200,
+        content={
+            "status":"success",
+            "message": "Token refreshed"
         }
     )
 
-
-
-
+    final_response.set_cookie(
+        key=COOKIE_NAME,
+        value=new_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=1800
+    )
+    
+    return final_response

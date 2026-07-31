@@ -1,2 +1,7 @@
-.env
 __pycache__
+.env
+note.txt
+.vercel
+.coverage
+Commands.txt
+dataset

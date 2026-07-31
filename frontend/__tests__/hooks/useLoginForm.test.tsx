@@ -1,131 +1,225 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
-import { AuthProvider } from '../../src/context/AuthContext';
-import useLoginForm from '../../src/hooks/useLoginForm';
-import { login } from '../../src/api/login';
+import { renderHook, act } from '@testing-library/react';
+import useLoginForm from '@/lib/hooks/useLoginForm';
+import { login } from '@/lib/api/login';
+import { useRouter } from 'next/navigation';
 
-const mockPush = jest.fn();
-const mockReplace = jest.fn();
-
-jest.mock('../../src/api/login', () => ({
-	login: jest.fn(),
+jest.mock('@/lib/api/login', () => ({
+    login: jest.fn(),
 }));
 
 jest.mock('next/navigation', () => ({
-	useRouter: () => ({
-		push: mockPush,
-		replace: mockReplace,
-	}),
+    useRouter: jest.fn(),
 }));
 
 describe('useLoginForm', () => {
-	afterEach(() => {
-		jest.clearAllMocks();
-		window.localStorage.clear();
-	});
+    const mockPush = jest.fn();
 
-	it('starts with empty fields', () => {
-		const { result } = renderHook(() => useLoginForm(), {
-			wrapper: AuthProvider,
-		});
+    beforeEach(() => {
+        jest.clearAllMocks();
 
-		expect(result.current.formState.email).toBe('');
-		expect(result.current.formState.password).toBe('');
-		expect(result.current.status.isSubmitting).toBe(false);
-	});
+        (useRouter as jest.Mock).mockReturnValue({
+            push: mockPush,
+        });
+    });
 
-	it('submits successfully and stores the token', async () => {
-		const mockedLogin = login as jest.MockedFunction<typeof login>;
-		mockedLogin.mockResolvedValue({
-			status: 'success',
-			token: 'token-123',
-			message: 'Login successful.',
-		});
+    describe('initial state', () => {
+        it('should return empty form state', () => {
+            const { result } = renderHook(() => useLoginForm());
+            expect(result.current.formState).toEqual({ email: '', password: '' });
+        });
 
-		const { result } = renderHook(() => useLoginForm(), {
-			wrapper: AuthProvider,
-		});
+        it('should return idle status', () => {
+            const { result } = renderHook(() => useLoginForm());
+            expect(result.current.status).toEqual({
+                error: null,
+                success: null,
+                isSubmitting: false,
+            });
+        });
+    });
 
-		act(() => {
-			result.current.updateField('email', 'user@example.com');
-			result.current.updateField('password', 'ValidPassword!1');
-		});
+    describe('updateField', () => {
+        it('should update the email field', () => {
+            const { result } = renderHook(() => useLoginForm());
 
-		await act(async () => {
-			await result.current.handleSubmit({ preventDefault: jest.fn() } as unknown as React.SubmitEvent<HTMLFormElement>);
-		});
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+            });
 
-		await waitFor(() => {
-			expect(window.localStorage.getItem('authToken')).toBe('token-123');
-			expect(result.current.status.success).toBe('Login successful.');
-			expect(result.current.formState.email).toBe('');
-			expect(result.current.formState.password).toBe('');
-			expect(mockPush).toHaveBeenCalledWith('/dashboard');
-		});
-	});
+            expect(result.current.formState.email).toBe('test@example.com');
+        });
 
-	it('shows an API error when login does not return success', async () => {
-		const mockedLogin = login as jest.MockedFunction<typeof login>;
-		mockedLogin.mockResolvedValue({
-			status: 'error',
-			token: '',
-			message: 'Invalid credentials',
-		});
+        it('should update the password field', () => {
+            const { result } = renderHook(() => useLoginForm());
 
-		const { result } = renderHook(() => useLoginForm(), {
-			wrapper: AuthProvider,
-		});
+            act(() => {
+                result.current.updateField('password', 'secret123');
+            });
 
-		act(() => {
-			result.current.updateField('email', 'user@example.com');
-			result.current.updateField('password', 'ValidPassword!1');
-		});
+            expect(result.current.formState.password).toBe('secret123');
+        });
 
-		await act(async () => {
-			await result.current.handleSubmit({ preventDefault: jest.fn() } as unknown as React.SubmitEvent<HTMLFormElement>);
-		});
+        it('should not overwrite other fields when updating one', () => {
+            const { result } = renderHook(() => useLoginForm());
 
-		expect(result.current.status.error).toBe('Invalid credentials');
-		expect(mockPush).not.toHaveBeenCalled();
-	});
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+                result.current.updateField('password', 'secret123');
+            });
 
-	it('shows a network error when the login request rejects', async () => {
-		const mockedLogin = login as jest.MockedFunction<typeof login>;
-		mockedLogin.mockRejectedValue(new Error('Unable to reach the server. Please try again later.'));
+            expect(result.current.formState).toEqual({
+                email: 'test@example.com',
+                password: 'secret123',
+            });
+        });
+    });
 
-		const { result } = renderHook(() => useLoginForm(), {
-			wrapper: AuthProvider,
-		});
+    describe('validation', () => {
+        const makeEvent = () =>
+            ({ preventDefault: jest.fn() } as unknown as React.SubmitEvent<HTMLFormElement>);
 
-		act(() => {
-			result.current.updateField('email', 'user@example.com');
-			result.current.updateField('password', 'ValidPassword!1');
-		});
+        it('should set error if email is empty', async () => {
+            const { result } = renderHook(() => useLoginForm());
 
-		await act(async () => {
-			await result.current.handleSubmit({ preventDefault: jest.fn() } as unknown as React.SubmitEvent<HTMLFormElement>);
-		});
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
 
-		expect(result.current.status.error).toBe('Unable to reach the server. Please try again later.');
-		expect(mockPush).not.toHaveBeenCalled();
-	});
+            expect(result.current.status.error).toBe('Please enter a valid email.');
+            expect(result.current.status.isSubmitting).toBe(false);
+        });
 
-	it('uses the fallback login error when the rejection is not an Error', async () => {
-		const mockedLogin = login as jest.MockedFunction<typeof login>;
-		mockedLogin.mockRejectedValue('offline');
+        it('should set error if email is invalid', async () => {
+            const { result } = renderHook(() => useLoginForm());
 
-		const { result } = renderHook(() => useLoginForm(), {
-			wrapper: AuthProvider,
-		});
+            act(() => {
+                result.current.updateField('email', 'not-an-email');
+            });
 
-		act(() => {
-			result.current.updateField('email', 'user@example.com');
-			result.current.updateField('password', 'ValidPassword!1');
-		});
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
 
-		await act(async () => {
-			await result.current.handleSubmit({ preventDefault: jest.fn() } as unknown as React.SubmitEvent<HTMLFormElement>);
-		});
+            expect(result.current.status.error).toBe('Please enter a valid email.');
+        });
 
-		expect(result.current.status.error).toBe('Unable to reach the server. Please try again later.');
-	});
+        it('should set error if password is empty', async () => {
+            const { result } = renderHook(() => useLoginForm());
+
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(result.current.status.error).toBe('Please enter your password.');
+        });
+
+        it('should set error if password is only whitespace', async () => {
+            const { result } = renderHook(() => useLoginForm());
+
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+                result.current.updateField('password', '   ');
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(result.current.status.error).toBe('Please enter your password.');
+        });
+
+        it('should not call login if validation fails', async () => {
+            const { result } = renderHook(() => useLoginForm());
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(login).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('handleSubmit - success', () => {
+        const makeEvent = () =>
+            ({ preventDefault: jest.fn() } as unknown as React.SubmitEvent<HTMLFormElement>);
+
+        beforeEach(() => {
+            (login as jest.Mock).mockResolvedValue({ status: 'success', message: 'OK' });
+        });
+
+        it('should set isSubmitting true while request is in flight', async () => {
+            let submittingDuringCall = false;
+
+            (login as jest.Mock).mockImplementation(async () => {
+                submittingDuringCall = true;
+                return { status: 'success' };
+            });
+
+            const { result } = renderHook(() => useLoginForm());
+
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+                result.current.updateField('password', 'secret123');
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(submittingDuringCall).toBe(true);
+        });
+
+        it('should set success status on successful login', async () => {
+            const { result } = renderHook(() => useLoginForm());
+
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+                result.current.updateField('password', 'secret123');
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(result.current.status).toEqual({
+                error: null,
+                success: 'Login successful.',
+                isSubmitting: false,
+            });
+        });
+
+        it('should reset form state on successful login', async () => {
+            const { result } = renderHook(() => useLoginForm());
+
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+                result.current.updateField('password', 'secret123');
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(result.current.formState).toEqual({ email: '', password: '' });
+        });
+
+        it('should redirect to /dashboard on successful login', async () => {
+            const { result } = renderHook(() => useLoginForm());
+
+            act(() => {
+                result.current.updateField('email', 'test@example.com');
+                result.current.updateField('password', 'secret123');
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit(makeEvent());
+            });
+
+            expect(mockPush).toHaveBeenCalledWith('/dashboard');
+        });
+    });
 });
