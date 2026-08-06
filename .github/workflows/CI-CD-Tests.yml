@@ -1,0 +1,186 @@
+#Test can be called from here instead of duplicating it in both CI/CD files
+name: Tests
+
+on:
+    workflow_call:
+
+permissions: 
+    contents: read
+
+jobs:
+    backend-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - uses: actions/checkout@v4
+ 
+            - name: set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+ 
+            - name: install dependencies
+              run: |
+                  cd Backend
+                  python -m pip install --upgrade pip==24.2
+                  python -m pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cpu
+                  python -m pip install -r requirements/base.txt
+ 
+            - name: debug env
+              run: |
+                  echo "DB_HOST=$DB_HOST"
+              env:
+                  DB_HOST: localhost
+ 
+            - name: run PyTest
+              env:
+                  DB_HOST: localhost
+                  DB_USER: postgres
+                  DB_PASSWORD: postgres
+                  DB_NAME: test_db
+                  DB_PORT: 5432
+                  DB_SSL: false
+                  JWT_SECRET: test-secret
+                  HASH: HS256
+                  TOKEN_EXPIRE: 5
+                  MINIO_ROOT_USER: minioadmin
+                  MINIO_ROOT_PASSWORD: minioadmin
+                  MINIO_API_PORT: 9000
+                  MINIO_CONSOLE_PORT: 9001
+                  AWS_REGION: af-south-1
+              run: |
+                  cd Backend
+                  python -m pytest app/tests/ --asyncio-mode=auto --cov=app
+ 
+    frontend-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - uses: actions/checkout@v4
+ 
+            - name: set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+ 
+            - name: install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+ 
+            - name: run Jest
+              run: |
+                  cd frontend
+                  npx jest
+ 
+    e2e-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        needs: [backend-tests, frontend-tests]
+        steps:
+            - uses: actions/checkout@v4
+ 
+            #create local env used by docker compose for integration tests.
+            - name: create CI env
+              env:
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_PASSWORD }}
+              run: |
+                  cat <<EOF > .env.ci
+                  DB_USER=postgres
+                  DB_PASSWORD=postgres
+                  DB_NAME=veritas_ci
+                  DB_PORT=5432
+                  DB_HOST=postgres
+                  DB_SSL=false
+                  JWT_SECRET=test-secret
+                  HASH=HS256
+                  TOKEN_EXPIRE=10
+                  MINIO_ROOT_USER=minioadmin
+                  MINIO_ROOT_PASSWORD=minioadmin
+                  MINIO_API_PORT=9000
+                  MINIO_CONSOLE_PORT=9001
+                  AWS_REGION=af-south-1
+                  STORAGE_URL=http://minio:9000
+                  MINIO_EXTERNAL_URL=http://localhost:9000
+                  NEXT_PUBLIC_API_URL=http://backend:8000
+                  ENVIRONMENT=development
+                  FRONTEND_ORIGIN=http://localhost:3000
+                  E2E_INVESTIGATOR_NAME=${E2E_INVESTIGATOR_NAME}
+                  E2E_INVESTIGATOR_EMAIL=${E2E_INVESTIGATOR_EMAIL}
+                  E2E_INVESTIGATOR_PASSWORD=${E2E_INVESTIGATOR_PASSWORD}
+                  ADMIN_NAME=${ADMIN_NAME}
+                  ADMIN_EMAIL=${ADMIN_EMAIL}
+                  ADMIN_PASSWORD=${ADMIN_PASSWORD}
+                  E2E_USER_EMAIL=${E2E_USER_EMAIL}
+                  E2E_USER_PASSWORD=${E2E_USER_PASSWORD}
+                  E2E_USER_NAME=${E2E_USER_NAME}
+                  EOF
+ 
+            #build and start the docker-compose
+            - name: start services
+              run: docker compose --env-file .env.ci up -d --build
+ 
+            #check the backend endpoint until it is ready or fails
+            - name: wait on backend
+              run: |
+                  for i in {1..30}; do
+                      if curl -fsS http://localhost:8000/docs > /dev/null; then
+                          exit 0
+                      fi
+                      sleep 2
+                  done
+                  echo "Backend did not become ready";
+                  docker compose logs backend;
+                  exit 1
+ 
+            #check the frontend endpoint until it is ready or fails
+            - name: wait on frontend
+              run: |
+                  for i in {1..30}; do
+                      if curl -fsS http://localhost:3000 > /dev/null; then
+                          exit 0
+                      fi
+                      sleep 2
+                  done
+                  echo "Frontend did not become ready";
+                  docker compose logs frontend;
+                  exit 1
+ 
+            - name: set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+ 
+            - name: install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+                  npx playwright install --with-deps
+ 
+            - name: run Playwright
+              env:
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
+                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
+              run: |
+                  cd frontend
+                  npx playwright test --project=chromium --project=firefox
+ 
+            #shut down services and remove volumes after the run
+            - name: Remover
+              if: always()
+              run: docker compose --env-file .env.ci down -v

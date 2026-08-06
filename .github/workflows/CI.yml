@@ -1,0 +1,16 @@
+#The CI now only catches PR's and runs tests on them well kinda already only did that tho
+name: CI
+#we want the CI to only run when we create a pull request to main or when that PR is updated
+#obviously if the CI fails you dont merge.
+on:
+    pull_request:
+        branches: ["main"]
+    workflow_dispatch:
+    
+permissions:
+    contents: read
+#the backend testing, frontend testing and the integration testing y
+jobs:
+    tests:
+        uses: ./.github/workflows/CI-CD-Tests.yml
+        secrets: inherit
