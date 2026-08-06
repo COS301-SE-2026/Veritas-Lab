@@ -1,7 +1,7 @@
-name: CD
+name: Main CI-CD
 #Only runs when codes gets on main so either a merged PR or a direct push.
 on:
-    push:
+    pull_request:
         branches: ["main"]
     workflow_dispatch:
 
