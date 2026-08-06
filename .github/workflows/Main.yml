@@ -1,7 +1,7 @@
-name: CD
+name: Main CI-CD
 #Only runs when codes gets on main so either a merged PR or a direct push.
 on:
-    push:
+    pull_request:
         branches: ["main"]
     workflow_dispatch:
 
@@ -12,7 +12,7 @@ permissions:
 jobs:
     #This runs the tests again when anything gets on main not just when we do PR's
     tests:
-        uses: ./.github/workflows/CI-CD-Tests.yml
+        uses: ./.github/workflows/Main-Tests.yml
         secrets: inherit
     
     deploy-azure:
