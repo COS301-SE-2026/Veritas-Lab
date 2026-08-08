@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Header, Response, Request
+from fastapi import APIRouter, HTTPException, Header, Response, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re as regex
 import bcrypt
 import uuid as uuidlib
@@ -8,40 +8,41 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
-from app.core.env import ENVLoader
+from app.core.env import Postgres_Settings, Auth_Settings
 
-env = ENVLoader()
-
-DB_USER= env.getRequiredEnv("DB_USER")
-DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
-DB_HOST= env.getRequiredEnv("DB_HOST")
-DB_PORT= env.getRequiredIntEnv("DB_PORT")
-DB_NAME= env.getRequiredEnv("DB_NAME")
-DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
-SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
-ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
-ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
 INVALID_TOKEN= "Invalid token"
 
+postgres_settings = Postgres_Settings()
+auth_settings = Auth_Settings()
+
+SECRET_KEY = auth_settings.JWT_SECRET
+ALGORITHM = auth_settings.HASH
+
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT,
-        ssl="require" if DB_SSL else None,
+        user=postgres_settings.DB_USER,
+        password=postgres_settings.DB_PASSWORD,
+        database=postgres_settings.DB_NAME,
+        host=postgres_settings.DB_HOST,
+        port=postgres_settings.DB_PORT,
+        ssl="require" if postgres_settings.DB_SSL else None,
     )
+
 router = APIRouter(
     prefix="/api",
     tags=["Auth"]
 )
 
+class success_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+
+class error_response(BaseModel):
+    status: str = Field(..., examples=["error"])
+    message: str = Field(..., examples=["Invalid token or database failure"])
+
 def verify_jwt(request: Request) -> dict:
-
-
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise ValueError("Not authenticated")
@@ -115,11 +116,11 @@ def verify_password(password: str, hashed_password: str) ->bool:
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
-class LoginRequest(BaseModel):
+class login_request(BaseModel):
     email: str | None=None
     password: str | None=None
 
-class RegisterRequest(LoginRequest):
+class RegisterRequest(login_request):
     username: str | None = None
 
 class ChangeRoleRequest(BaseModel):
@@ -255,7 +256,7 @@ async def insert_user(
         await connection.close()
 
 def create_token(user: dict) ->str:
-    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=auth_settings.TOKEN_EXPIRE)
 
     payload = {
         "sub": user["id"],
@@ -264,25 +265,90 @@ def create_token(user: dict) ->str:
         "exp": expiry_time
     }
 
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
+    token = jwt.encode(payload, auth_settings.JWT_SECRET, algorithm=auth_settings.HASH) # the signature is made from SECRET_KEY and ALGORITHM
     return token
 
 # POST /api/login
-@router.post("/login")
-async def login(request: LoginRequest, response: Response):
+@router.post(
+    "/login",
+    status_code=status.HTTP_200_OK,
+    summary="User Login",
+    description="Logs the user in and produces a JWT for the authorization of the user.",
+    responses={
+        200: {
+            "description": "User successfully logged in",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Account created successfully"
+                    }
+                }
+            }
+        },
+        400:{
+            "model" : error_response,
+            "description": "Validation Error (Invalid email or failed password rules)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidEmail": {
+                            "summary": "Invalid or Missing Email",
+                            "description": "Triggered when the email fails format validation.",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+                                }
+                            }
+                        },
+                        "InvalidPassword": {
+                            "summary": "Invalid or Missing Password",
+                            "description": "Triggered when the password fails the rule validation.",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid or missing password. Password must be at least 12 characters, have an upper and lower case char and a special character"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "model": error_response,
+            "summary": "Password and/or Email were not found",
+            "description": "Trigger when credentials used in the login were not found.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail":{
+                            "status": "error",
+                            "message": AMBIGUOUS_ERROR
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+)
+async def login(request: login_request, response: Response):
     if not validate_email(request.email):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
             }
         )
 
     if not validate_password(request.password):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
@@ -291,18 +357,18 @@ async def login(request: LoginRequest, response: Response):
     user = await search_users_via_email(request.email.strip())
 
     if user is None:
-        return JSONResponse(
-            status_code=404,
-            content={
+        raise HTTPException(
+            status_code=401,
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
         )
     
     if not verify_password(request.password, user["password"]):
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
@@ -660,8 +726,8 @@ async def refresh_token(request: Request, response: Response):
     try:
         payload = jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
+            auth_settings.JWT_SECRET,
+            algorithms=[auth_settings.HASH]
         )
 
     except ExpiredSignatureError:
@@ -669,8 +735,8 @@ async def refresh_token(request: Request, response: Response):
         try:
             payload = jwt.decode(
                 token,
-                SECRET_KEY,
-                algorithms=[ALGORITHM],
+                auth_settings.JWT_SECRET,
+                algorithms=[auth_settings.HASH],
                 options={"verify_exp": False}
             )
         except JWTError:
