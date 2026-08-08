@@ -8,40 +8,31 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
-from app.core.env import ENVLoader
+from app.core.env import Postgres_Settings, Auth_Settings
 
-env = ENVLoader()
-
-DB_USER= env.getRequiredEnv("DB_USER")
-DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
-DB_HOST= env.getRequiredEnv("DB_HOST")
-DB_PORT= env.getRequiredIntEnv("DB_PORT")
-DB_NAME= env.getRequiredEnv("DB_NAME")
-DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
-SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
-ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
-ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
 INVALID_TOKEN= "Invalid token"
 
+postgres_settings = Postgres_Settings()
+auth_settings = Auth_Settings()
+
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT,
-        ssl="require" if DB_SSL else None,
+        user=postgres_settings.DB_USER,
+        password=postgres_settings.DB_PASSWORD,
+        database=postgres_settings.DB_NAME,
+        host=postgres_settings.DB_HOST,
+        port=postgres_settings.DB_PORT,
+        ssl="require" if postgres_settings.DB_SSL else None,
     )
+
 router = APIRouter(
     prefix="/api",
     tags=["Auth"]
 )
 
 def verify_jwt(request: Request) -> dict:
-
-
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise ValueError("Not authenticated")
@@ -49,8 +40,8 @@ def verify_jwt(request: Request) -> dict:
     try:
         payload = jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
+            auth_settings.JWT_SECRET,
+            algorithms=[auth_settings.HASH]
         )
 
         return payload
@@ -255,7 +246,7 @@ async def insert_user(
         await connection.close()
 
 def create_token(user: dict) ->str:
-    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=auth_settings.TOKEN_EXPIRE)
 
     payload = {
         "sub": user["id"],
@@ -264,7 +255,7 @@ def create_token(user: dict) ->str:
         "exp": expiry_time
     }
 
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
+    token = jwt.encode(payload, auth_settings.JWT_SECRET, algorithm=auth_settings.HASH) # the signature is made from SECRET_KEY and ALGORITHM
     return token
 
 # POST /api/login
@@ -660,8 +651,8 @@ async def refresh_token(request: Request, response: Response):
     try:
         payload = jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
+            auth_settings.JWT_SECRET,
+            algorithms=[auth_settings.HASH]
         )
 
     except ExpiredSignatureError:
@@ -669,8 +660,8 @@ async def refresh_token(request: Request, response: Response):
         try:
             payload = jwt.decode(
                 token,
-                SECRET_KEY,
-                algorithms=[ALGORITHM],
+                auth_settings.JWT_SECRET,
+                algorithms=[auth_settings.HASH],
                 options={"verify_exp": False}
             )
         except JWTError:

@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod #abstractmethod is to override methods
 from uuid import UUID
 import asyncpg
-import os
-from dotenv import load_dotenv
 import exiftool
-from app.core.env import ENVLoader
+from app.core.env import Minio_Settings, R2_Settings, Other_Settings, Postgres_Settings
 from minio import Minio
 import json
 from urllib.parse import urlparse
@@ -14,22 +12,16 @@ from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 import boto3
 from botocore.client import Config
-from app.core.env import ENVLoader,IS_PROD
 from mypy_boto3_s3 import S3Client
 
-load_dotenv()
-env = ENVLoader()
-
-DB_USER = env.getRequiredEnv("DB_USER")
-DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
-DB_HOST = env.getRequiredEnv("DB_HOST")
-DB_PORT = env.getRequiredIntEnv("DB_PORT")
-DB_NAME = env.getRequiredEnv("DB_NAME")
-DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
+minio_settings = Minio_Settings()
+r2_settings = R2_Settings()
+other_settings = Other_Settings()
+postgres_settings = Postgres_Settings()
 
 def get_object() -> S3Client:
-    if not IS_PROD:
-        minio_domain = os.getenv("STORAGE_URL", "http://localhost:9000")
+    if other_settings.ENVIRONMENT == "development":
+        minio_domain = minio_settings.STORAGE_URL
         
         if not minio_domain.startswith(("http://", "https://")):
             minio_domain = f"http://{minio_domain}"
@@ -37,23 +29,23 @@ def get_object() -> S3Client:
         return boto3.client(
             "s3",
             endpoint_url=minio_domain,
-            aws_access_key_id=os.getenv("MINIO_ROOT_USER"),
-            aws_secret_access_key=os.getenv("MINIO_ROOT_PASSWORD"),
-            region_name=os.getenv("AWS_REGION", "us-east-1"),
+            aws_access_key_id=minio_settings.MINIO_ROOT_USER,
+            aws_secret_access_key=minio_settings.MINIO_ROOT_PASSWORD,
+            region_name=minio_settings.AWS_REGION,
             config=Config(
                 signature_version="s3v4",
                 s3={"addressing_style": "path"}
             ),
         )
 
-    else:
-        cloud_url = os.getenv("R2_URL", "")
+    elif other_settings.ENVIRONMENT == "production":
+        cloud_url = r2_settings.R2_URL
         
         if not cloud_url.startswith(("http://", "https://")):
             cloud_url = f"https://{cloud_url}"
 
-        key_id=os.getenv("R2_ACCESS_KEY_ID")
-        secret=os.getenv("R2_SECRET_ACCESS_KEY")
+        key_id=r2_settings.R2_ACCESS_KEY_ID
+        secret=r2_settings.R2_SECRET_ACCESS_KEY
 
         return boto3.client(
             "s3",
@@ -95,12 +87,12 @@ class MediaService(ABC):
     
     async def get_media_record(self, media_id: UUID):
         connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT,
-            ssl="require" if DB_SSL else None,
+            user=postgres_settings.DB_USER,
+            password=postgres_settings.DB_PASSWORD,
+            database=postgres_settings.DB_NAME,
+            host=postgres_settings.DB_HOST,
+            port=postgres_settings.DB_PORT,
+            ssl="require" if postgres_settings.DB_SSL else None,
         )
 
         try:
@@ -150,12 +142,12 @@ class MediaService(ABC):
 
     async def get_existing_metadata(self, media_id: UUID):
         connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT,
-            ssl="require" if DB_SSL else None,
+            user=postgres_settings.DB_USER,
+            password=postgres_settings.DB_PASSWORD,
+            database=postgres_settings.DB_NAME,
+            host=postgres_settings.DB_HOST,
+            port=postgres_settings.DB_PORT,
+            ssl="require" if postgres_settings.DB_SSL else None,
         )
 
         try:
@@ -180,12 +172,12 @@ class MediaService(ABC):
 
     async def save_metadata(self, media_id: UUID, metadata: dict):
         connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT,
-            ssl="require" if DB_SSL else None,
+            user=postgres_settings.DB_USER,
+            password=postgres_settings.DB_PASSWORD,
+            database=postgres_settings.DB_NAME,
+            host=postgres_settings.DB_HOST,
+            port=postgres_settings.DB_PORT,
+            ssl="require" if postgres_settings.DB_SSL else None,
         )
 
         try:
@@ -205,12 +197,12 @@ class MediaService(ABC):
 
     async def update_analysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
         connection = await asyncpg.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            host=DB_HOST,
-            port=DB_PORT,
-            ssl="require" if DB_SSL else None,
+            user=postgres_settings.DB_USER,
+            password=postgres_settings.DB_PASSWORD,
+            database=postgres_settings.DB_NAME,
+            host=postgres_settings.DB_HOST,
+            port=postgres_settings.DB_PORT,
+            ssl="require" if postgres_settings.DB_SSL else None,
         )
 
         try:

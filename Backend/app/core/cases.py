@@ -1,51 +1,40 @@
 import uuid
 from uuid import uuid4
-import json
-from app.core.env import ENVLoader, IS_PROD
 import asyncpg
-import asyncio
-import os
 import io
 import hashlib
-from dotenv import load_dotenv
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from pypdf import PdfReader
 from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.client import Config
+from app.core.env import Postgres_Settings, Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
 
-
-load_dotenv()
-env = ENVLoader()
-
-DB_USER = env.getRequiredEnv("DB_USER")
-DB_PASSWORD = env.getRequiredEnv("DB_PASSWORD")
-DB_HOST = env.getRequiredEnv("DB_HOST")
-DB_PORT = env.getRequiredIntEnv("DB_PORT")
-DB_NAME = env.getRequiredEnv("DB_NAME")
-DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
-
 MISSING_CASE_ID = "Case id is missing"
+postgres_settings = Postgres_Settings()
+minio_settings = Minio_Settings()
+other_settings = Other_Settings()
+r2_settings= R2_Settings()
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT,
-        ssl="require" if DB_SSL else None,
+        user=postgres_settings.DB_USER,
+        password=postgres_settings.DB_PASSWORD,
+        database=postgres_settings.DB_NAME,
+        host=postgres_settings.DB_HOST,
+        port=postgres_settings.DB_PORT,
+        ssl="require" if postgres_settings.DB_SSL else None,
     )
 
 def get_object(for_presign: bool = False) -> S3Client:
-    if not IS_PROD:
+    if other_settings.ENVIRONMENT == "development":
 
         if for_presign:
-            minio_domain = os.getenv("MINIO_EXTERNAL_URL", "http://localhost:9000")
+            minio_domain = minio_settings.MINIO_EXTERNAL_URL
         else:
-            minio_domain = os.getenv("STORAGE_URL", "http://localhost:9000")
+            minio_domain = minio_settings.STORAGE_URL
         
         
         if not minio_domain.startswith(("http://", "https://")):
@@ -54,9 +43,9 @@ def get_object(for_presign: bool = False) -> S3Client:
         return boto3.client(
             "s3",
             endpoint_url=minio_domain,
-            aws_access_key_id=os.getenv("MINIO_ROOT_USER"),
-            aws_secret_access_key=os.getenv("MINIO_ROOT_PASSWORD"),
-            region_name=os.getenv("AWS_REGION", "us-east-1"),
+            aws_access_key_id=minio_settings.MINIO_ROOT_USER,
+            aws_secret_access_key=minio_settings.MINIO_ROOT_PASSWORD,
+            region_name=minio_settings.AWS_REGION,
             config=Config(
                 signature_version="s3v4",
                 s3={
@@ -65,16 +54,14 @@ def get_object(for_presign: bool = False) -> S3Client:
             ),
         )
 
-    else:
-        cloud_url = os.getenv("R2_URL", "")
+    elif other_settings.ENVIRONMENT == "production":
+        cloud_url = r2_settings.R2_URL
         
         if not cloud_url.startswith(("http://", "https://")):
             cloud_url = f"https://{cloud_url}"
 
-        key_id=os.getenv("R2_ACCESS_KEY_ID")
-        secret=os.getenv("R2_SECRET_ACCESS_KEY")
-        print(f"Key ID: {repr(key_id)}")
-        print(f"Secret Length: {len(secret) if secret else 'None'}")
+        key_id=r2_settings.R2_ACCESS_KEY_ID
+        secret=r2_settings.R2_SECRET_ACCESS_KEY
 
         return boto3.client(
             "s3",
