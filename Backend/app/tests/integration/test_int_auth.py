@@ -64,98 +64,7 @@ async def test_integration_user_login_success(client):
     finally:
         await connection.close()
 
-@pytest.mark.asyncio
-async def test_integration_login_invalid_password_failure(client):
-    client.post("/api/register")
-    payload = {
-        "email": USER_SETTINGS.E2E_USER_EMAIL,
-        "password": "Failedp@ssword"
-    }
-    before_login_time = datetime.now(timezone.utc)
-
-    response = client.post("/api/login", json=payload)
-
-    assert response.status_code == 400
-
-    data = response.json()
-    assert data["detail"]["status"] == "error"
-    assert data["detail"]["message"] == "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
-    connection=await  get_connection()
-    try:
-        row = await connection.fetchrow(
-            """
-            SELECT userjwtissued 
-            FROM "Users_DB"."Users" 
-            WHERE useremail = $1
-            """,
-            USER_SETTINGS.E2E_USER_EMAIL
-        )
-
-
-        jwt_issued_at = row["userjwtissued"]
-        
-
-        assert jwt_issued_at < before_login_time, (
-            f"userjwtissued timestamp ({jwt_issued_at}) was updated while testing a failure. "
-        )
-    finally:
-        await connection.close()
-
-@pytest.mark.asyncio
-async def test_integration_login_wrong_password_failure(client):
-    client.post("/api/register")
-    payload = {
-        "email": USER_SETTINGS.E2E_USER_EMAIL,
-        "password": "Failedp@ssword1246"
-    }
-    before_login_time = datetime.now(timezone.utc)
-
-    response = client.post("/api/login", json=payload)
-
-    assert response.status_code == 401
-
-    data = response.json()
-    assert data["detail"]["status"] == "error"
-    assert data["detail"]["message"] == AMBIGUOUS_ERROR
-    connection=await  get_connection()
-    try:
-        row = await connection.fetchrow(
-            """
-            SELECT userjwtissued 
-            FROM "Users_DB"."Users" 
-            WHERE useremail = $1
-            """,
-            USER_SETTINGS.E2E_USER_EMAIL
-        )
-
-
-        jwt_issued_at = row["userjwtissued"]
-        
-
-        assert jwt_issued_at < before_login_time, (
-            f"userjwtissued timestamp ({jwt_issued_at}) was updated while testing a failure. "
-        )
-    finally:
-        await connection.close()
-
-
-
-@pytest.mark.asyncio
-async def test_integration_login_no_email_failure(client):
-    client.post("/api/register")
-    payload = {
-        "email": "",
-        "password": USER_SETTINGS.E2E_USER_PASSWORD
-    }
-    before_login_time = datetime.now(timezone.utc)
-
-    response = client.post("/api/login", json=payload)
-
-    assert response.status_code == 400
-
-    data = response.json()
-    assert data["detail"]["status"] == "error"
-    assert data["detail"]["message"] == "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+async def check_no_jwt_issued(before_login_time):
     connection=await  get_connection()
     try:
         row = await connection.fetchrow(
@@ -176,6 +85,63 @@ async def test_integration_login_no_email_failure(client):
         )
     finally:
         await connection.close()
+
+
+@pytest.mark.asyncio
+async def test_integration_login_invalid_password_failure(client):
+    client.post("/api/register")
+    payload = {
+        "email": USER_SETTINGS.E2E_USER_EMAIL,
+        "password": "Failedp@ssword"
+    }
+    before_login_time = datetime.now(timezone.utc)
+
+    response = client.post("/api/login", json=payload)
+
+    assert response.status_code == 400
+
+    data = response.json()
+    assert data["detail"]["status"] == "error"
+    assert data["detail"]["message"] == "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+    await check_no_jwt_issued(before_login_time)
+
+@pytest.mark.asyncio
+async def test_integration_login_wrong_password_failure(client):
+    client.post("/api/register")
+    payload = {
+        "email": USER_SETTINGS.E2E_USER_EMAIL,
+        "password": "Failedp@ssword1246"
+    }
+    before_login_time = datetime.now(timezone.utc)
+
+    response = client.post("/api/login", json=payload)
+
+    assert response.status_code == 401
+
+    data = response.json()
+    assert data["detail"]["status"] == "error"
+    assert data["detail"]["message"] == AMBIGUOUS_ERROR
+    await check_no_jwt_issued(before_login_time)
+
+
+
+@pytest.mark.asyncio
+async def test_integration_login_no_email_failure(client):
+    client.post("/api/register")
+    payload = {
+        "email": "",
+        "password": USER_SETTINGS.E2E_USER_PASSWORD
+    }
+    before_login_time = datetime.now(timezone.utc)
+
+    response = client.post("/api/login", json=payload)
+
+    assert response.status_code == 400
+
+    data = response.json()
+    assert data["detail"]["status"] == "error"
+    assert data["detail"]["message"] == "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+    await check_no_jwt_issued(before_login_time)
 
 @pytest.mark.asyncio
 async def test_integration_login_invalid_email_failure(client):
@@ -230,23 +196,4 @@ async def test_integration_login_wrong_email_failure(client):
     data = response.json()
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == AMBIGUOUS_ERROR
-    connection=await  get_connection()
-    try:
-        row = await connection.fetchrow(
-            """
-            SELECT userjwtissued 
-            FROM "Users_DB"."Users" 
-            WHERE useremail = $1
-            """,
-            USER_SETTINGS.E2E_USER_EMAIL
-        )
-
-
-        jwt_issued_at = row["userjwtissued"]
-        
-
-        assert jwt_issued_at < before_login_time , (
-            f"userjwtissued timestamp ({jwt_issued_at}) was updated while testing a failure. "
-        )
-    finally:
-        await connection.close()
+    await check_no_jwt_issued(before_login_time)
