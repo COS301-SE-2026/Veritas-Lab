@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Header, Response, Request
+from fastapi import APIRouter, HTTPException, Header, Response, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re as regex
 import bcrypt
 import uuid as uuidlib
@@ -17,6 +17,9 @@ INVALID_TOKEN= "Invalid token"
 postgres_settings = Postgres_Settings()
 auth_settings = Auth_Settings()
 
+SECRET_KEY = auth_settings.JWT_SECRET
+ALGORITHM = auth_settings.HASH
+
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=postgres_settings.DB_USER,
@@ -32,6 +35,13 @@ router = APIRouter(
     tags=["Auth"]
 )
 
+class success_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+
+class error_response(BaseModel):
+    status: str = Field(..., examples=["error"])
+    message: str = Field(..., examples=["Invalid token or database failure"])
+
 def verify_jwt(request: Request) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
@@ -40,8 +50,8 @@ def verify_jwt(request: Request) -> dict:
     try:
         payload = jwt.decode(
             token,
-            auth_settings.JWT_SECRET,
-            algorithms=[auth_settings.HASH]
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
         )
 
         return payload
@@ -106,11 +116,11 @@ def verify_password(password: str, hashed_password: str) ->bool:
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
-class LoginRequest(BaseModel):
+class login_request(BaseModel):
     email: str | None=None
     password: str | None=None
 
-class RegisterRequest(LoginRequest):
+class RegisterRequest(login_request):
     username: str | None = None
 
 class ChangeRoleRequest(BaseModel):
@@ -259,21 +269,86 @@ def create_token(user: dict) ->str:
     return token
 
 # POST /api/login
-@router.post("/login")
-async def login(request: LoginRequest, response: Response):
+@router.post(
+    "/login",
+    status_code=status.HTTP_200_OK,
+    summary="User Login",
+    description="Logs the user in and produces a JWT for the authorization of the user.",
+    responses={
+        200: {
+            "description": "User successfully logged in",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Account created successfully"
+                    }
+                }
+            }
+        },
+        400:{
+            "model" : error_response,
+            "description": "Validation Error (Invalid email or failed password rules)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidEmail": {
+                            "summary": "Invalid or Missing Email",
+                            "description": "Triggered when the email fails format validation.",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+                                }
+                            }
+                        },
+                        "InvalidPassword": {
+                            "summary": "Invalid or Missing Password",
+                            "description": "Triggered when the password fails the rule validation.",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid or missing password. Password must be at least 12 characters, have an upper and lower case char and a special character"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "model": error_response,
+            "summary": "Password and/or Email were not found",
+            "description": "Trigger when credentials used in the login were not found.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail":{
+                            "status": "error",
+                            "message": AMBIGUOUS_ERROR
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+)
+async def login(request: login_request, response: Response):
     if not validate_email(request.email):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
             }
         )
 
     if not validate_password(request.password):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
@@ -282,18 +357,18 @@ async def login(request: LoginRequest, response: Response):
     user = await search_users_via_email(request.email.strip())
 
     if user is None:
-        return JSONResponse(
-            status_code=404,
-            content={
+        raise HTTPException(
+            status_code=401,
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
         )
     
     if not verify_password(request.password, user["password"]):
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
