@@ -309,7 +309,7 @@ def create_token(user: dict) ->str:
                             "value": {
                                 "detail":{
                                     "status": "error",
-                                    "message": "Invalid or missing password. Password must be at least 12 characters, have an upper and lower case char and a special character"
+                                    "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
                                 }
                             }
                         }
