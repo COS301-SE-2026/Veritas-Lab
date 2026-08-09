@@ -11,7 +11,7 @@ import asyncpg # This is the library for communicating with Postgres
 from app.core.env import Postgres_Settings, Auth_Settings
 
 COOKIE_NAME = "JWT_token"
-AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
 
 postgres_settings = Postgres_Settings()
@@ -282,7 +282,7 @@ def create_token(user: dict) ->str:
                 "application/json": {
                     "example": {
                         "status": "success",
-                        "message": "Account created successfully"
+                        "message": "Logged in successfully"
                     }
                 }
             }
@@ -393,30 +393,123 @@ async def login(request: login_request, response: Response):
     }
 
 # POST /api/register
-@router.post("/register", status_code=201)
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    summary="Register User",
+    description="Registers a new user account and produces a JWT for the authorization of the user.",
+    responses={
+        201: {
+            "description": "Account successfully created",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Account created successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Invalid registration information",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidEmail": {
+                            "summary": "Invalid or missing email",
+                            "description": "Triggered when the provided email address fails email validation.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+                                }
+                            }
+                        },
+
+                        "InvalidPassword": {
+                            "summary": "Invalid or missing password",
+                            "description": "Triggered when the provided password does not meet the password requirements.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+                                }
+                            }
+                        },
+
+                        "InvalidUsername": {
+                            "summary": "Invalid or missing username",
+                            "description": "Triggered when the username is missing, empty, or contains only whitespace.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing username"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        409: {
+            "description": "Email or username already exists",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "EmailAlreadyExists": {
+                            "summary": "Email already registered",
+                            "description": "Triggered when the provided email address is already associated with an account.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": AMBIGUOUS_ERROR
+                                }
+                            }
+                        },
+
+                        "UsernameAlreadyExists": {
+                            "summary": "Username already registered",
+                            "description": "Triggered when the provided username is already associated with an account.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": AMBIGUOUS_ERROR
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def register(request: RegisterRequest, response: Response):
     if not validate_email(request.email):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
             }
         )
 
     if not validate_password(request.password):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
         )
 
     if not request.username or not request.username.strip():
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing username"
             }
@@ -425,9 +518,9 @@ async def register(request: RegisterRequest, response: Response):
     existing_user = await search_users_via_email(request.email.strip())
 
     if existing_user is not None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=409,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
@@ -436,9 +529,9 @@ async def register(request: RegisterRequest, response: Response):
     existing_username = await search_users_via_username(request.username.strip())
     
     if existing_username is not None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=409,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
@@ -466,8 +559,8 @@ async def register(request: RegisterRequest, response: Response):
     )
 
     return {
-            "status": "success",
-            "message": "Account created successfully"
+        "status": "success",
+        "message": "Account created successfully"
     }
 
 @router.post("/fetchUsers")
