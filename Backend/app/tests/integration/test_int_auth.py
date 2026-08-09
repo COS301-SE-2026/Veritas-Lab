@@ -19,6 +19,20 @@ async def get_connection() -> asyncpg.Connection:
         ssl="require" if POSTGRES_SEETTINGS.DB_SSL else None,
     )
 
+
+async def delete_user_by_email(email: str):
+    connection = await get_connection()
+    try:
+        await connection.execute(
+            '''
+            DELETE FROM "Users_DB"."Users"
+            WHERE UserEmail = $1
+            ''',
+            email
+        )
+    finally:
+        await connection.close()
+
 @pytest.fixture
 def client():
     with TestClient(app) as test_client:
@@ -214,6 +228,8 @@ async def test_integration_register_success(client):
         "message": "Account created successfully"
     }
 
+    await delete_user_by_email(payload["email"])
+
 @pytest.mark.asyncio
 async def test_integration_register_sets_jwt_cookie(client):
     payload = {
@@ -243,6 +259,8 @@ async def test_integration_register_sets_jwt_cookie(client):
         assert user["userjwtissued"] is not None
     finally:
         await connection.close()
+
+    await delete_user_by_email(payload["email"])
 
 
 @pytest.mark.asyncio
@@ -313,6 +331,8 @@ async def test_integration_register_duplicate_email(client):
     assert response.status_code == 409
     assert response.json()["detail"]["status"] == "error"
 
+    await delete_user_by_email(first_user["email"])
+
 @pytest.mark.asyncio
 async def test_integration_register_duplicate_username(client):
     first_user = {
@@ -335,6 +355,8 @@ async def test_integration_register_duplicate_username(client):
 
     assert response.status_code == 409
     assert response.json()["detail"]["status"] == "error"
+
+    await delete_user_by_email(first_user["email"])
 
 @pytest.mark.asyncio
 async def test_integration_register_persists_user(client):
@@ -365,3 +387,5 @@ async def test_integration_register_persists_user(client):
         assert user["userrole"] == "USER"
     finally:
         await connection.close()
+
+    await delete_user_by_email(payload["email"])
