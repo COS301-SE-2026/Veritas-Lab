@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SEETTINGS=Postgres_Settings()
-AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+AMBIGUOUS_ERROR= "The email and/or password are invalid"
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -197,3 +197,171 @@ async def test_integration_login_wrong_email_failure(client):
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == AMBIGUOUS_ERROR
     await check_no_jwt_issued(before_login_time)
+
+@pytest.mark.asyncio
+async def test_integration_register_success(client):
+    payload = {
+        "email": "integration.register@example.com",
+        "username": "integration_user",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=payload)
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "status": "success",
+        "message": "Account created successfully"
+    }
+
+@pytest.mark.asyncio
+async def test_integration_register_sets_jwt_cookie(client):
+    payload = {
+        "email": "cookie.register@example.com",
+        "username": "cookie_user",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=payload)
+    assert response.status_code == 201
+    assert "JWT_token" in response.cookies
+    assert response.cookies.get("JWT_token") is not None
+
+    connection = await get_connection()
+
+    try:
+        user = await connection.fetchrow(
+            """
+            SELECT UserJWTIssued
+            FROM "Users_DB"."Users"
+            WHERE UserEmail = $1
+            """,
+            payload["email"]
+        )
+
+        assert user is not None
+        assert user["userjwtissued"] is not None
+    finally:
+        await connection.close()
+
+
+@pytest.mark.asyncio
+async def test_integration_register_invalid_email(client):
+    payload = {
+        "email": "invalid-email",
+        "username": "test_user",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+
+@pytest.mark.asyncio
+async def test_integration_register_invalid_password(client):
+    payload = {
+        "email": "valid@example.com",
+        "username": "test_user",
+        "password": "password"
+    }
+
+    response = client.post("/api/register", json=payload)
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+
+@pytest.mark.asyncio
+async def test_integration_register_blank_username(client):
+    payload = {
+        "email": "blankusername@example.com",
+        "username": "   ",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=payload)
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Invalid or missing username"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_register_duplicate_email(client):
+    first_user = {
+        "email": "duplicate@example.com",
+        "username": "first_user",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=first_user)
+
+    assert response.status_code == 201
+
+    second_user = {
+        "email": "duplicate@example.com",
+        "username": "different_user",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=second_user)
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["status"] == "error"
+
+@pytest.mark.asyncio
+async def test_integration_register_duplicate_username(client):
+    first_user = {
+        "email": "user1@example.com",
+        "username": "duplicate_username",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=first_user)
+
+    assert response.status_code == 201
+
+    second_user = {
+        "email": "user2@example.com",
+        "username": "duplicate_username",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=second_user)
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["status"] == "error"
+
+@pytest.mark.asyncio
+async def test_integration_register_persists_user(client):
+    payload = {
+        "email": "persisted@example.com",
+        "username": "persisted_user",
+        "password": "ValidPassword!123"
+    }
+
+    response = client.post("/api/register", json=payload)
+
+    assert response.status_code == 201
+
+    connection=await get_connection()
+    try:
+        user = await connection.fetchrow(
+            """
+            SELECT UserEmail, UserName, UserRole 
+            FROM "Users_DB"."Users" 
+            WHERE UserEmail = $1
+            """,
+            payload["email"]
+        )
+    
+        assert user is not None
+        assert user["useremail"] == payload["email"]
+        assert user["username"] == payload["username"]
+        assert user["userrole"] == "USER"
+    finally:
+        await connection.close()
