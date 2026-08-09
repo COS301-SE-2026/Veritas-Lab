@@ -129,19 +129,7 @@ class SuccessResponse(BaseModel):
 class ErrorResponse(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
-
-#A mask until the veriftJWT gets fixed to raise HTTPException so the try-excepts can be removed so FastApi can handle it 
-def verify_jwt_(request:Request):
-    try:
-        return verify_jwt(request)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+  
 
 def verify_not_user(user_role:str):
     if  user_role not in NOT_USER: #This solves for it being blank and non sense roles.
@@ -358,7 +346,7 @@ async def get_cases(request: Request):
 )
 async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
-        payload = verify_jwt_(request)
+        payload = verify_jwt(request)
     except ValueError as e:
         return JSONResponse(
             status_code=401,
@@ -513,7 +501,7 @@ async def upload_evidence(
     media: Annotated[UploadFile, File()]
 ):
 
-    payload = verify_jwt_(request)
+    payload = verify_jwt(request)
 
 
     verify_not_user(payload.get("role"))
@@ -1260,7 +1248,7 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
     }
 )
 async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
-    cookie=verify_jwt_(request)
+    cookie=verify_jwt(request)
     user_role=cookie.get("role")
     # Checking authorization
     verify_not_user(user_role)

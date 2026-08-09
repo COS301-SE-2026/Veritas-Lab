@@ -45,7 +45,13 @@ class error_response(BaseModel):
 def verify_jwt(request: Request) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
-        raise ValueError("Not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Not authenticated"
+            }
+        )
 
     try:
         payload = jwt.decode(
@@ -57,10 +63,22 @@ def verify_jwt(request: Request) -> dict:
         return payload
 
     except ExpiredSignatureError:
-        raise ValueError("Token has expired")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Token has expired"
+            }
+        ) 
 
     except JWTError:
-        raise ValueError(INVALID_TOKEN)
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
