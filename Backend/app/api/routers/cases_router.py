@@ -116,9 +116,9 @@ class CreateCommentRequest(BaseModel):
     case_id: UUID
     comment: str | None = None
 
-class SaveAnnotationsPayload(BaseModel):
+class save_snnotations_payload(BaseModel):
     #Mapping from CamelCase to SnakeCase for Sonar to be Happy
-    report_id: str = Field(..., alias="reportId")
+    connector_id: str = Field(..., alias="reportId")
     #since the format of the annotations was not specified by frontend we will be accepting any valid JSON
     annotations: List[Dict[str, Any]]
     model_config = ConfigDict(populate_by_name=True)
@@ -126,7 +126,7 @@ class SaveAnnotationsPayload(BaseModel):
 class SuccessResponse(BaseModel):
     status: str = Field(..., examples=["success"])
 
-class ErrorResponse(BaseModel):
+class error_response(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
 
@@ -160,7 +160,10 @@ def transform_to_uuid(changer:str)->UUID:
     except ValueError as e:
         raise HTTPException(
             status_code=401,
-            detail={"status": "error", "message": str(e)}
+            detail={
+                "status": "error", 
+                "message": str(e)
+            }
         )
     
 
@@ -208,7 +211,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
     "/createCase",
     responses={
         403: {
-            "model": ErrorResponse,
+            "model": error_response,
             "description": "Forbidden - User unauthorized"
         },
     }
@@ -255,11 +258,11 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
     "/getCases",
     responses={
         401: {
-            "model": ErrorResponse, 
+            "model": error_response, 
             "description": "Unauthorized - Invalid or missing token"
         },
         500: {
-            "model": ErrorResponse, 
+            "model": error_response, 
             "description": "Internal Server Error - Database error"
         },
     }
@@ -338,19 +341,19 @@ async def get_cases(request: Request):
     "/getSingleCase",
     responses={
         500: {
-            "model": ErrorResponse,
+            "model": error_response,
             "description": DATABASE_ERROR_MESSAGE
         },
         401: {
-            "model": ErrorResponse,
+            "model": error_response,
             "description": "Unauthorized - Missing or invalid JWT token",
         },
         404:{
-            "model": ErrorResponse,
+            "model": error_response,
             "description": " Case not found"
         },
         400:{
-            "model": ErrorResponse,
+            "model": error_response,
             "description": CASE_ID_REQUIRED
         }
 
@@ -493,15 +496,15 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
     "/cases/evidence",
     responses={
         401: {
-            "model": ErrorResponse,
+            "model": error_response,
             "description": "Unauthorized - Missing or invalid JWT token",
         },
         403: {
-            "model": ErrorResponse,
+            "model": error_response,
             "description": "Forbidden - User lacks required investigator/admin permissions",
         },
         404: {
-            "model": ErrorResponse,
+            "model": error_response,
             "description": "Case not found or user lacks permission",
         },
     },
@@ -587,7 +590,7 @@ async def upload_evidence(
 @router.post("/closeCase",
     responses={
         403: {
-            "model": ErrorResponse, 
+            "model": error_response, 
             "description": "Forbidden - User unauthorized"
         },
     }
@@ -913,7 +916,7 @@ async def delete_comment(request: Request, comment_id: int):
     "/getComments/{case_id}",
     responses={
         403: {
-            "model": ErrorResponse, 
+            "model": error_response, 
             "description": "Forbidden - User unauthorized"
         },
     }
@@ -963,7 +966,7 @@ async def retreive_comments(
     "/delete/case/{case_id}/evidence/{media_id}",
     responses={
         403: {
-            "model": ErrorResponse, 
+            "model": error_response, 
             "description": "Forbidden - User unauthorized"
         },
     }
@@ -1082,7 +1085,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     "/deleteCase",
     responses={
         403: {
-            "model": ErrorResponse, 
+            "model": error_response, 
             "description": "Forbidden - User unauthorized"
         },
     }
@@ -1163,8 +1166,9 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             }
         )
 
-async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
+async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
     #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
+    #report_id was changed to connector_id to prepare for the database change since the reports need to be de a one-to-many relationship and not one-to-one
     query = """
         UPDATE "Cases_DB"."Media" m
         SET MediaAnnotations = $1::jsonb
@@ -1180,7 +1184,7 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
         await con.execute(
             query, 
             annotations, 
-            report_id, 
+            connector_id, 
             user_name
         )
 
@@ -1208,23 +1212,31 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
             "model": SuccessResponse,
             "content": {
                 "application/json": {
-                    "example": {"status": "success"}
+                    "example": {
+                        "status": "success"
+                    }
                 }
             },
         },
         401: {
             "description": "Unauthorized - Missing/Invalid JWT cookie or non-UUID report ID format.",
-            "model": ErrorResponse,
+            "model": error_response,
             "content": {
                 "application/json": {
                     "examples": {
                         "Invalid JWT": {
                             "summary": "Invalid JWT Token",
-                            "value": {"status": "error", "message": "Signature has expired."}
+                            "value": {
+                                "status": "error", 
+                                "message": "Signature has expired."
+                            }
                         },
                         "Invalid UUID": {
                             "summary": "Invalid Report UUID",
-                            "value": {"status": "error", "message": "badly formed hexadecimal UUID string"}
+                            "value": {
+                                "status": "error", 
+                                "message": "badly formed hexadecimal UUID string"
+                            }
                         }
                     }
                 }
@@ -1232,26 +1244,39 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
         },
         403: {
             "description": "Forbidden - User does not have permission (e.g. Standard 'USER' role).",
-            "model": ErrorResponse,
+            "model": error_response,
             "content": {
                 "application/json": {
-                    "example": {"status": "error", "message": "User unauthorized"}
+                    "example": {
+                        "status": "error", 
+                        "message": "User unauthorized"
+                    }
                 }
             },
         },
         500: {
             "description": "Internal Server Error - Database failure or unhandled exception.",
-            "model": ErrorResponse,
+            "model": error_response,
             "content": {
                 "application/json": {
                     "examples": {
                         "Database Error": {
                             "summary": "Database Failure",
-                            "value": {"detail": {"status": "error", "message": "Database error"}}
+                            "value": {
+                                "detail": {
+                                    "status": "error", 
+                                    "message": "Database error"
+                                }
+                            }
                         },
                         "Server Exception": {
                             "summary": "Unexpected Error",
-                            "value": {"detail": {"status": "error", "message": "An unexpected error occurred"}}
+                            "value": {
+                                "detail": {
+                                    "status": "error", 
+                                    "message": "An unexpected error occurred"
+                                }
+                            }
                         }
                     }
                 }
@@ -1259,7 +1284,7 @@ async def _save_annotations(report_id:UUID,annotations:str,user_name:str):
         },
     }
 )
-async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
+async def save_annotations(payload: save_snnotations_payload, request:Request):
     cookie=verify_jwt_(request)
     user_role=cookie.get("role")
     # Checking authorization
@@ -1267,10 +1292,10 @@ async def save_annotations(payload: SaveAnnotationsPayload, request:Request):
     user_name=cookie.get("username")
 
     try:
-        report_id=transform_to_uuid(payload.report_id)
+        connector_id=transform_to_uuid(payload.connector_id)
         annotations_json_str = json.dumps(payload.annotations)
         await _save_annotations(
-            report_id,
+            connector_id,
             annotations_json_str,
             user_name
         )
