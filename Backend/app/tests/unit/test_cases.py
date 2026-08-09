@@ -394,7 +394,7 @@ def test_get_single_case_missing_jwt(monkeypatch):
 
     monkeypatch.setattr(
         cases_router, 
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
 
@@ -413,7 +413,7 @@ def test_get_single_case_invalid_jwt(monkeypatch):
 
     monkeypatch.setattr(
         cases_router, 
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
 
@@ -439,7 +439,7 @@ def test_get_single_case_missing_case_id(monkeypatch):
 
     monkeypatch.setattr(
         cases_router, 
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
 
@@ -467,7 +467,7 @@ def test_get_single_case_invalid_case_id(monkeypatch):
 
     monkeypatch.setattr(
         cases_router, 
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
 
@@ -497,7 +497,7 @@ def test_get_single_case_not_found(monkeypatch):
 
     monkeypatch.setattr(
         cases_router, 
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
     monkeypatch.setattr(
@@ -579,7 +579,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
     monkeypatch.setattr(
         cases_router, 
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
     monkeypatch.setattr(
@@ -680,7 +680,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
     monkeypatch.setattr("app.core.cases.Case.get_comments", AsyncMock(return_value=[]))
     monkeypatch.setattr(
         cases_router,
-        "verify_jwt_", 
+        "verify_jwt", 
         mock_verify_jwt_
     )
     monkeypatch.setattr(
