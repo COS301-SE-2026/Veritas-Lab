@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
@@ -34,6 +36,19 @@ app.add_middleware(
 app.include_router(cases_router)
 
 app.include_router(auth_router)
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    content = exc.detail if isinstance(exc.detail, str) else {
+        "status": "error",
+        "message": exc.detail
+    }
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=content,
+        headers=exc.headers
+    )
 
 
 @app.get("/")
