@@ -39,7 +39,7 @@ app.include_router(auth_router)
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    content = exc.detail if isinstance(exc.detail, str) else {
+    content = exc.detail if isinstance(exc.detail, dict) else {
         "status": "error",
         "message": exc.detail
     }
