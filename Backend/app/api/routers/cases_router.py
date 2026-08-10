@@ -123,7 +123,7 @@ class save_snnotations_payload(BaseModel):
     annotations: List[Dict[str, Any]]
     model_config = ConfigDict(populate_by_name=True)
 
-class SuccessResponse(BaseModel):
+class success_response(BaseModel):
     status: str = Field(..., examples=["success"])
 
 class error_response(BaseModel):
@@ -903,27 +903,112 @@ async def delete_comment(request: Request, comment_id: int):
 @router.post(
     "/getComments/{case_id}",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Retrieval of comments was successful.",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "comments": [
+                            {
+                                "commentid": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+                                "username": "TestInvestigator",
+                                "comment": "Reviewed section 3. Everything looks consistent with the report.",
+                                "commenttimestamp": "2026-08-10T14:30:00Z"
+                            },
+                            {
+                                "commentid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                                "username": "LeadAnalyst",
+                                "comment": "Additional context required for media hash verification.",
+                                "commenttimestamp": "2026-08-10T15:15:00Z"
+                            }
+                        ]
+                    }
+                }
+            },
         },
+        400: {
+            "description": "Bad Request - Missing or invalid case ID",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Missing case ID."
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "status": "error",
+                                "message": "Signature has expired."
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "status": "error",
+                                "message": "Not authenticated"
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "status": "error",
+                                "message": "Invalid token"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - User lacks sufficient permissions",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "User unauthorized"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Database connection or unexpected server failure",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "PostgreSQL Exception",
+                            "value": {
+                                "detail": "Database connection failure. Internal Server Error."
+                            }
+                        },
+                        "Unhandled Exception": {
+                            "summary": "General Server Failure",
+                            "value": {
+                                "status": "error",
+                                "message": "An unexpected error occurred."
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def retreive_comments(
     case_id: str,
     request: Request
 ):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
 
+    payload = verify_jwt(request)
     user_role=payload.get("role")
     verify_not_user(user_role) 
 
@@ -1193,11 +1278,11 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
     status_code=status.HTTP_200_OK,
     summary="Save Report Annotations",
     description="Updates the JSONB media annotations for a specific report/evidence item in PostgreSQL.",
-    response_model=SuccessResponse,
+    response_model=success_response,
     responses={
         200: {
             "description": "Annotations successfully saved.",
-            "model": SuccessResponse,
+            "model": success_response,
             "content": {
                 "application/json": {
                     "example": {
@@ -1207,16 +1292,29 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
             },
         },
         401: {
-            "description": "Unauthorized - Missing/Invalid JWT cookie or non-UUID report ID format.",
-            "model": error_response,
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
             "content": {
                 "application/json": {
                     "examples": {
-                        "Invalid JWT": {
-                            "summary": "Invalid JWT Token",
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
                             "value": {
-                                "status": "error", 
+                                "status": "error",
                                 "message": "Signature has expired."
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "status": "error",
+                                "message": "Not authenticated"
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "status": "error",
+                                "message": "Invalid token"
                             }
                         },
                         "Invalid UUID": {

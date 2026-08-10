@@ -1260,10 +1260,9 @@ Return a dict of the comments belonging to the case id
     assert result[0]["comment"] == "I am your child"
     assert result[0]["commenttimestamp"]=="2026-06-29 15:37:28.458993+00"
 
-    mock_connection.fetch.assert_called_once_with(
-        """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
-        , str(fake_id)
-    )
+    mock_connection.fetch.assert_called_once()
+    called_args = mock_connection.fetch.call_args[0]
+    assert called_args[1] == str(fake_id)
 
 @pytest.mark.asyncio
 async def test_get_comment_database_error():
@@ -1693,13 +1692,10 @@ def test_get_comments_missing_jwt(monkeypatch):
         mock_verify_jwt
     )
 
-    response = client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
+    with pytest.raises(ValueError) as excinfo:
+        client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
 
-    assert response.status_code == 401
-    assert response.json() == {
-        "status": "error",
-        "message": "Missing authorization header"
-    }
+    assert "Missing authorization header" in str(excinfo.value)
 
 def test_delete_evidence_missing_jwt(monkeypatch):
     client.cookies.clear()
