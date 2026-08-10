@@ -1,6 +1,16 @@
 <h1 align="center" style="border: none; padding: 0"> Veritas Lab </h1>
 <h4 align="center" style="none; margin: 0"> in partnership with Naked Insurance </h5>
 <h1></h1>
+
+<div align="center">
+
+[![Main CI-CD](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main.yml)
+![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritsalab.vercel.app%2Flanding)
+[![Availability check](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml)
+[![Tests](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-Tests.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-Tests.yml)
+
+</div>
+
 <h2 align="center"> Description </h2>
 
 <div align="justify">
