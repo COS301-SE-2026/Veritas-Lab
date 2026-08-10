@@ -29,6 +29,13 @@ CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 
+GET_CASES_SQL = """
+    SELECT caseid, casecreator, casename, casedescrition, caseclosed, casecreationdate
+    FROM "Cases_DB"."Cases"
+    where $1::boolean IS FALSE OR caseclosed IS TRUE
+    ORDER BY casecreationdate DESC
+    """ 
+
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=postgres_settings.DB_USER,
@@ -154,6 +161,19 @@ def transform_to_uuid(changer:str)->UUID:
             }
         )
     
+
+def  _row_to_case(row: dict) -> Case:
+    case = Case(
+        CaseCreator=row["casecreator"],
+        CaseName=row["casename"],
+        CaseDescription=row["casedescription"]
+    )
+
+    case.CaseId = row["caseid"]
+    case.CaseClosed = row["caseclosed"]
+    case.CaseCreationDate = row["casecreationdate"]
+
+    return case
 
 def _format_case_evidence(row: dict, user : bool) -> dict:
     media_id = row["mediaid"]
