@@ -101,7 +101,7 @@ class Case:
         self.case_creator = None if case_creator is None else case_creator.strip()
         self.case_name = None if case_name is None else case_name.strip()
         self.case_description = case_description
-        self.CaseClosed = False
+        self.case_closed = False
         if case_id is not None:
             cleaned_id = case_id.strip()
             try:
