@@ -264,15 +264,58 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
 @router.post(
     "/getCases",
+    status_code=status.HTTP_200_OK,
+    summary='List Cases',
+    description=(
+        "Returns cases cisible to the caller. INVESTIGATOR and ADMIN see every case."
+        "USER role sees only closed cases."
+    ),
     responses={
+        200: {
+            "description": "Cases retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "cases": [
+                            {
+                                "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                "caseName": "Reciepts sus",
+                                "caseDescription": "Sus receipts case",
+                                "caseClosed": False,
+                                "caseCreationDate": "2026-05-20T19:43:02+00:00",
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+
         401: {
-            "model": error_response, 
-            "description": "Unauthorized - Invalid or missing token"
+            "model": error_response,
+            "description": "Unauthorized - Missing or invalid JWT token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "Unauthorized - Missing or invalid JWT token"
+                    }
+                }
+            }
         },
+
         500: {
-            "model": error_response, 
-            "description": "Internal Server Error - Database error"
-        },
+            "model": error_response,
+            "description": "Internal server error " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": DATABASE_ERROR_MESSAGE
+                    }
+                }
+            }
+        }
     }
 )
 async def get_cases(request: Request):
