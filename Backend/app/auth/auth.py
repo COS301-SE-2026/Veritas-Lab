@@ -1162,26 +1162,140 @@ async def delete_user(user_id: str, request: Request):
         "message": "User deleted successfully."
     }
 
-@router.post("/refreshToken")
+@router.post(
+    "/refreshToken",
+    status_code=status.HTTP_200_OK,
+    summary="Refresh JWT Token",
+    description="Refreshes the user's JWT when the token has expired or has 1 minute left. Otherwise, no token is created.",
+    responses={
+        200: {
+            "description": "Token is valid or successfully refreshed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "TokenNotRefreshed": {
+                            "summary": "Token does not need refreshing",
+                            "description": "Triggered when the current JWT has more than 1 minute left before expiry.",
+                            "value": {
+                                "status": "success",
+                                "message": "Token does not need refreshing"
+                            }
+                        },
+
+                        "TokenRefreshed": {
+                            "summary": "Token successfully refreshed",
+                            "description": "Triggered when a new JWT is generated and stored in the authentication cookie.",
+                            "value": {
+                                "status": "success",
+                                "message": "Token refreshed"
+                            }
+                        }
+
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Token authentication or validation failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT token",
+                            "description": "Triggered when the authentication cookie exists but contains an empty JWT.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Missing JWT token"
+                                }
+                            }
+                        },
+
+                        "NotAuthenticated": {
+                            "summary": "Not authenticated",
+                            "description": "Triggered when the authentication cookie is not provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when the JWT cannot be decoded or fails validation.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        },
+
+                        "MissingExpiry": {
+                            "summary": "Token missing expiry",
+                            "description": "Triggered when the JWT does not contain an exp field.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Token missing expiry"
+                                }
+                            }
+                        },
+
+                        "MissingRequiredFields": {
+                            "summary": "Token missing required fields",
+                            "description": "Triggered when the JWT does not contain sub, username, or role.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Token missing required fields"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Failed to update token issue time",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Failed to update token issue time"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def refresh_token(request: Request, response: Response):
     token = request.cookies.get(COOKIE_NAME)
-    if not token:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": "Not authenticated"
-                }
-        )
 
     if token == "":
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error", 
                 "message": "Missing JWT token"
-                }
+            }
         )
+
+    if not token:
+        raise HTTPException (
+            status_code=401,
+            detail={
+                "status": "error", 
+                "message": "Not authenticated"
+            }
+        )
+
 
     try:
         payload = jwt.decode(
@@ -1200,50 +1314,48 @@ async def refresh_token(request: Request, response: Response):
                 options={"verify_exp": False}
             )
         except JWTError:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=401,
-                content={
+                detail={
                     "status": "error", 
                     "message": INVALID_TOKEN
-                    }
+                }
             )
 
     except JWTError:
-        return JSONResponse(
+        raise HTTPException(
                 status_code=401,
-                content={
+                detail={
                     "status": "error", 
                     "message": INVALID_TOKEN
-                    }
+                }
             )
     
     expiry = payload.get("exp")
 
     if expiry is None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error", 
                 "message": "Token missing expiry"
-                }
+            }
         )
 
     current_time = datetime.now(timezone.utc).timestamp()
     seconds_until_expiry = expiry - current_time
 
     if seconds_until_expiry > 60:
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Token does not need refreshing"
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Token does not need refreshing"
+        }
+        
     
     if "sub" not in payload or "username" not in payload or "role" not in payload:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error",
                 "message": "Token missing required fields"
             }
@@ -1260,23 +1372,15 @@ async def refresh_token(request: Request, response: Response):
     try:
         await update_user_jwt_issued_via_user(user)
     except Exception:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status":"error",
                 "message": "Failed to update token issue time"
             }
         )
 
-    final_response = JSONResponse(
-        status_code=200,
-        content={
-            "status":"success",
-            "message": "Token refreshed"
-        }
-    )
-
-    final_response.set_cookie(
+    response.set_cookie(
         key=COOKIE_NAME,
         value=new_token,
         httponly=True,
@@ -1284,5 +1388,8 @@ async def refresh_token(request: Request, response: Response):
         samesite="none",
         max_age=1800
     )
-    
-    return final_response
+
+    return {
+        "status":"success",
+        "message": "Token refreshed"
+    }
