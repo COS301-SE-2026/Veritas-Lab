@@ -583,7 +583,93 @@ async def register(request: RegisterRequest, response: Response):
         "message": "Account created successfully"
     }
 
-@router.post("/fetchUsers")
+@router.post(
+    "/fetchUsers",
+    status_code=status.HTTP_200_OK,
+    summary="Fetch Users",
+    description="Returns all registered users if the user is an admin.",
+    responses={
+        200: {
+            "description": "Users successfully fetched",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "users": [
+                            {
+                                "id": "550e8400-e29b-41d4-a716-446655440000",
+                                "username": "example_user",
+                                "role": "USER"
+                            },
+                            {
+                                "id": "123e4567-e89b-12d3-a456-426614174000",
+                                "username": "example_investigator",
+                                "role": "INVESTIGATOR"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        },
+
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when the request does not contain a valid authentication token.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User does not have permission to access this endpoint",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+)
 async def fetch_users(request: Request):
     connection = None
 
@@ -591,9 +677,9 @@ async def fetch_users(request: Request):
         payload = verify_jwt(request)
 
         if payload.get("role") != "ADMIN":
-            return JSONResponse(
+            raise HTTPException(
                 status_code=403,
-                content={
+                detail={
                     "status":"error",
                     "message": "User unauthorized"
                 }
@@ -619,21 +705,10 @@ async def fetch_users(request: Request):
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status":"success",
-                "users": users
-            }
-        )
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+        return {
+            "status":"success",
+            "users": users
+        }
     finally:
         if connection is not None:
             await connection.close()
