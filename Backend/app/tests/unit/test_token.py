@@ -17,8 +17,10 @@ def test_refresh_token_missing_cookie():
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Not authenticated"
+        "detail": {
+            "status": "error",
+            "message": "Not authenticated"
+        }
     }
 
 def test_refresh_token_invalid_jwt(monkeypatch):
@@ -32,8 +34,10 @@ def test_refresh_token_invalid_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
     assert auth.COOKIE_NAME not in response.cookies
 
@@ -198,8 +202,10 @@ def test_refresh_token_expired_but_invalid_on_second_decode(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
     assert decode_call_count["count"] == 2
     assert auth.COOKIE_NAME not in response.cookies
@@ -227,8 +233,10 @@ def test_refresh_token_missing_expiry(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Token missing expiry"
+        "detail": {
+            "status": "error",
+            "message": "Token missing expiry"
+        }
     }
     assert auth.COOKIE_NAME not in response.cookies
 
@@ -254,8 +262,10 @@ def test_refresh_token_missing_required_fields(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Token missing required fields"
+        "detail": {
+            "status": "error",
+            "message": "Token missing required fields"
+        }
     }
     assert auth.COOKIE_NAME not in response.cookies
 
@@ -299,7 +309,9 @@ def test_refresh_token_update_jwt_issued_fails(monkeypatch):
 
     assert response.status_code == 500
     assert response.json() == {
-        "status": "error",
-        "message": "Failed to update token issue time"
+        "detail": {
+            "status": "error",
+            "message": "Failed to update token issue time"
+        }
     }
     assert auth.COOKIE_NAME not in response.cookies

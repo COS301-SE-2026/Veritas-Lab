@@ -1,5 +1,5 @@
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 #module that contains router, verufyJWT, deeleUserById
@@ -19,8 +19,8 @@ def client():
 def admin_payload():
     return {"sub": ADMIN_USER_ID, "username": "Admin", "role": "ADMIN"}
 
-def test_admin_deletes_user_successfully(client, monkeypatch):
-
+@pytest.mark.asyncio
+async def test_admin_deletes_user_successfully(client, monkeypatch):
     monkeypatch.setattr(
         auth , 
         "verify_jwt", 
@@ -44,8 +44,8 @@ def test_admin_deletes_user_successfully(client, monkeypatch):
     assert auth.COOKIE_NAME not in response.cookies
 
 #Test for a logged in non-admin who tries to delete and gets blocked by 403 code error
-def test_non_admin_is_forbidden(client, monkeypatch):
-
+@pytest.mark.asyncio
+async def test_non_admin_is_forbidden(client, monkeypatch):
     monkeypatch.setattr(
         auth ,
         "verify_jwt", 
@@ -59,29 +59,36 @@ def test_non_admin_is_forbidden(client, monkeypatch):
     response = client.delete(f"/api/users/{TARGET_USER_ID}")
     
     assert response.status_code == 403
-    assert response.json()["status"] == "error"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "User is unauthorized."
     assert auth.COOKIE_NAME not in response.cookies
 
-def test_missing_token_is_unauthorized(client, monkeypatch):
-
-    """No or invalid token: verify_jwt rasises ValueError, the 401"""
-    def raise_value_error(request):
-        raise ValueError("Missing or invalid token")
+@pytest.mark.asyncio
+async def test_missing_token_is_unauthorized(client, monkeypatch):
+    def raise_http_exception(request):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Missing or invalid token"
+            }
+        )
 
     monkeypatch.setattr(
         auth, 
         "verify_jwt", 
-        raise_value_error
+        raise_http_exception
     )
 
     response = client.delete(f"/api/users/{TARGET_USER_ID}")
 
     assert response.status_code == 401
-    assert response.json()["status"] == "error"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Missing or invalid token"
     assert auth.COOKIE_NAME not in response.cookies
 
-def test_malformed_uuid_is_rejected(client, monkeypatch):
-
+@pytest.mark.asyncio
+async def test_malformed_uuid_is_rejected(client, monkeypatch):
     monkeypatch.setattr(
         auth , 
         "verify_jwt", 
@@ -92,13 +99,13 @@ def test_malformed_uuid_is_rejected(client, monkeypatch):
     response = client.delete(f"/api/users/{malformed_uuid}")
 
     assert response.status_code == 400
-    assert response.json()["status"] == "error"
-    assert response.json()["message"] == "Invalid User ID format."
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Invalid User ID format."
     assert auth.COOKIE_NAME not in response.cookies
 
 #Admin cannot delete themselves. Error on return is 400
-def test_admin_cannot_delete_themself(client, monkeypatch):
-
+@pytest.mark.asyncio
+async def test_admin_cannot_delete_themself(client, monkeypatch):
     monkeypatch.setattr(
         auth,
         "verify_jwt", 
@@ -108,13 +115,13 @@ def test_admin_cannot_delete_themself(client, monkeypatch):
     #The target is the same as the admin's ID
     response = client.delete(f"/api/users/{ADMIN_USER_ID}")
     assert response.status_code == 400
-    assert response.json()["status"] == "error"
-    assert response.json()["message"] == "Admins cannot delete themselves."
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Admins cannot delete themselves."
     assert auth.COOKIE_NAME not in response.cookies
 
-#Testing nonexistent user with error code 404 
-def test_nonexistent_user_delete_404(client, monkeypatch):
-    
+#Testing nonexistent user with error code 404
+@pytest.mark.asyncio
+async def test_nonexistent_user_delete_404(client, monkeypatch):
     monkeypatch.setattr(
         auth, 
         "verify_jwt", 
@@ -135,14 +142,21 @@ def test_nonexistent_user_delete_404(client, monkeypatch):
     )
 
     assert response.status_code == 404
-    assert response.json()["status"] == "error"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "No user found with the provided ID."
     assert auth.COOKIE_NAME not in response.cookies
 
 #invalid jwt is rejected
-def test_invalid_jwt_rejected(client, monkeypatch):
-    
+@pytest.mark.asyncio
+async def test_invalid_jwt_rejected(client, monkeypatch):
     def fake_verify_raises(request):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Invalid token"
+            }
+        )
 
     monkeypatch.setattr(
         auth, 
@@ -155,5 +169,6 @@ def test_invalid_jwt_rejected(client, monkeypatch):
     )
 
     assert response.status_code == 401
-    assert response.json()["status"] == "error"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Invalid token"
     assert auth.COOKIE_NAME not in response.cookies
