@@ -761,3 +761,220 @@ async def test_integration_fetch_users_non_admin(client):
     finally:
         await delete_user_by_email(email)
 
+@pytest.mark.asyncio
+async def test_integration_delete_user_success(client):
+    email = "deleteuser@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "delete_user_test",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert  user is not None
+        user_id = str(user["userid"])
+
+        admin_user = {
+            "id": str(ADMIN_USER["userid"]),
+            "username": ADMIN_USER["username"],
+            "role": "ADMIN"
+        }
+
+        admin_token = create_token(admin_user)
+
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            admin_token
+        )
+
+        response = client.delete(f"/api/users/{user_id}")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "success",
+            "message": "User deleted successfully."
+        }
+
+        connection = await get_connection()
+
+        try:
+            deleted_user = await connection.fetchrow(
+                """
+                SELECT userid
+                FROM "Users_DB"."Users"
+                WHERE userid = $1
+                """,
+                uuidlib.UUID(user_id)
+            )
+        finally:
+            await connection.close()
+
+        assert deleted_user is None
+
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_invalid_uuid(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete("/api/users/not-a-valid-uuid")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Invalid User ID format."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_self(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete(f"/api/users/{ADMIN_USER['userid']}")
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Admins cannot delete themselves."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_not_found(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "No user found with the provided ID."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_non_admin(client):
+    email = "delete_nonadmin@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "delete_nonadmin",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+
+        response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
+
+        assert response.status_code == 403
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "User is unauthorized."
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+def test_integration_delete_user_no_auth(client):
+    client.cookies.clear()
+
+    response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
+    assert response.status_code == 401
+
+
+
