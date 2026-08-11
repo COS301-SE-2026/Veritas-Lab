@@ -1,13 +1,42 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.api.main import app
-from app.core.env import User_Settings, Postgres_Settings
+from app.core.env import User_Settings, Postgres_Settings, Auth_Settings
 import asyncpg
 from datetime import datetime, timedelta, timezone
+import uuid as uuidlib
+from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN
+import asyncio
+from jose import jwt
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SEETTINGS=Postgres_Settings()
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
+AUTH_SETTINGS = Auth_Settings()
+
+ADMIN_USER = None
+
+@pytest.fixture(scope="session", autouse=True)
+def load_admin_user():
+    global ADMIN_USER
+
+    async def fetch_admin():
+        connection = await get_connection()
+
+        try:
+            return await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                USER_SETTINGS.ADMIN_EMAIL
+            )
+        finally:
+            await connection.close()
+
+    ADMIN_USER = asyncio.run(fetch_admin())
+    assert ADMIN_USER is not None
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -389,3 +418,746 @@ async def test_integration_register_persists_user(client):
         await connection.close()
 
     await delete_user_by_email(payload["email"])
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_success(client):
+    email = "rolechange@example.com"
+
+    await delete_user_by_email(email)
+
+    try:
+        register_payload = {
+            "email": email,
+            "username": "rolechange_user",
+            "password": "ValidPassword!123"
+        }
+
+        register_response = client.post(
+            "/api/register",
+            json=register_payload
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            target_user = await connection.fetchrow(
+                """
+                SELECT userid
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert target_user is not None
+
+        target_user_id = str(target_user["userid"])
+
+        admin_user = {
+            "id": str(ADMIN_USER["userid"]),
+            "username": ADMIN_USER["username"],
+            "role": "ADMIN"
+        }
+
+        admin_token = create_token(admin_user)
+
+        client.cookies.clear()
+
+        client.cookies.set(
+            COOKIE_NAME,
+            admin_token
+        )
+
+        response = client.post(
+            "/api/changeUserRole",
+            json={
+                "userId": target_user_id,
+                "NewRole": "INVESTIGATOR"
+            }
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "success",
+            "message": "User role updated to INVESTIGATOR successfully"
+        }
+
+        connection = await get_connection()
+
+        try:
+            updated_user = await connection.fetchrow(
+                """
+                SELECT userrole
+                FROM "Users_DB"."Users"
+                WHERE userid = $1
+                """,
+                uuidlib.UUID(target_user_id)
+            )
+        finally:
+            await connection.close()
+
+        assert updated_user is not None
+        assert updated_user["userrole"] == "INVESTIGATOR"
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_non_admin(client):
+    email = "normaluser@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "normal_user",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+
+        user_data = {
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        }
+
+        user_token = create_token(user_data)
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+
+        response = client.post(
+            "/api/changeUserRole",
+            json={
+                "userId": "550e8400-e29b-41d4-a716-446655440000",
+                "NewRole": "INVESTIGATOR"
+            }
+        )
+
+        assert response.status_code == 403
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_invalid_user_id(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "invalid-id",
+            "NewRole": "INVESTIGATOR"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Invalid userId format."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_invalid_role(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "550e8400-e29b-41d4-a716-446655440000",
+            "NewRole": "IRONMAN"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Invalid or missing NewRole field."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_no_auth(client):
+    client.cookies.clear()
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "550e8400-e29b-41d4-a716-446655440000",
+            "NewRole": "INVESTIGATOR"
+        }
+    )
+
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_integration_fetch_users_success(client):
+    email = "fetchusers@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "fetchusers_user",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+
+        admin_user = {
+            "id": str(ADMIN_USER["userid"]),
+            "username": ADMIN_USER["username"],
+            "role": "ADMIN"
+        }
+
+        admin_token = create_token(admin_user)
+
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            admin_token
+        )
+
+        response = client.post("/api/fetchUsers")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "users" in data
+        assert isinstance(data["users"], list)
+
+        fetched_user = next(
+            (
+                user
+                for user in data["users"]
+                if user["username"] == "fetchusers_user"
+            ),
+            None
+        )
+
+        assert fetched_user is not None
+        assert fetched_user["username"] == "fetchusers_user"
+        assert fetched_user["role"] == "USER"
+        assert "id" in fetched_user
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_fetch_users_no_auth(client):
+    client.cookies.clear()
+    response = client.post("/api/fetchUsers")
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_integration_fetch_users_non_admin(client):
+    email = "fetchusers_nonadmin@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "fetchusers_nonadmin",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+        connection = await get_connection()
+
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+
+        response = client.post("/api/fetchUsers")
+        assert response.status_code == 403
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        }
+
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_success(client):
+    email = "deleteuser@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "delete_user_test",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert  user is not None
+        user_id = str(user["userid"])
+
+        admin_user = {
+            "id": str(ADMIN_USER["userid"]),
+            "username": ADMIN_USER["username"],
+            "role": "ADMIN"
+        }
+
+        admin_token = create_token(admin_user)
+
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            admin_token
+        )
+
+        response = client.delete(f"/api/users/{user_id}")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "success",
+            "message": "User deleted successfully."
+        }
+
+        connection = await get_connection()
+
+        try:
+            deleted_user = await connection.fetchrow(
+                """
+                SELECT userid
+                FROM "Users_DB"."Users"
+                WHERE userid = $1
+                """,
+                uuidlib.UUID(user_id)
+            )
+        finally:
+            await connection.close()
+
+        assert deleted_user is None
+
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_invalid_uuid(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete("/api/users/not-a-valid-uuid")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Invalid User ID format."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_self(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete(f"/api/users/{ADMIN_USER['userid']}")
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Admins cannot delete themselves."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_not_found(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "No user found with the provided ID."
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_non_admin(client):
+    email = "delete_nonadmin@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "delete_nonadmin",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+
+        response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
+
+        assert response.status_code == 403
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "User is unauthorized."
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_delete_user_no_auth(client):
+    client.cookies.clear()
+
+    response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_not_needed(client):
+    user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    token = create_token(user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Token does not need refreshing"
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_near_expiry(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN",
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=30)
+    }
+
+    old_token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        old_token
+    )
+
+    response = client.post("/api/refreshToken")
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Token refreshed"
+    }
+
+    assert COOKIE_NAME in response.cookies
+
+    new_token = response.cookies.get(COOKIE_NAME)
+    assert new_token is not None
+    assert new_token != old_token
+
+@pytest.mark.asyncio
+async def test_integration_refresh_expired_token(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN",
+        "exp": datetime.now(timezone.utc) - timedelta(minutes=1)
+    }
+
+    expired_token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        expired_token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Token refreshed"
+    }
+
+    assert COOKIE_NAME in response.cookies
+
+    new_token = response.cookies.get(COOKIE_NAME)
+
+    assert new_token is not None
+    assert new_token != expired_token
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_no_auth(client):
+    client.cookies.clear()
+    response = client.post("/api/refreshToken")
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Not authenticated"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_invalid_token(client):
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        "this-is-not-a-valid-jwt"
+    )
+
+    response = client.post("/api/refreshToken")
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": INVALID_TOKEN
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_missing_expiry(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Token missing expiry"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_missing_required_fields(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=30)
+    }
+
+    token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Token missing required fields"
+        }
+    }
