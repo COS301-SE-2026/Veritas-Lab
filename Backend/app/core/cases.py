@@ -82,39 +82,39 @@ def get_object(for_presign: bool = False) -> S3Client:
 class Case:
     def __init__(
         self, 
-        CaseCreator: str = None, 
-        CaseName: str = None, 
-        CaseDescription: str=None, 
-        CaseID: str=None
+        case_creator: str = None, 
+        case_name: str = None, 
+        case_description: str=None, 
+        case_id: str=None
     ):
-        if  (CaseCreator is not None):
-            if not CaseCreator.strip():
+        if  (case_creator is not None):
+            if not case_creator.strip():
                 raise ValueError("CaseCreator is required")
-            if  len(CaseCreator) > 100:
+            if  len(case_creator) > 100:
                 raise ValueError("Name is too long. Must be 100 characters or less")
-        if  (CaseName is not None):
-            if not CaseName.strip():
+        if  (case_name is not None):
+            if not case_name.strip():
                 raise ValueError("CaseName is required")
-            if len(CaseName) > 255:
+            if len(case_name) > 255:
                 raise ValueError("CaseName must be 255 characters or less")
         
-        self.CaseCreator = None if CaseCreator is None else CaseCreator.strip()
-        self.CaseName = None if CaseName is None else CaseName.strip()
-        self.CaseDescription = CaseDescription
+        self.case_creator = None if case_creator is None else case_creator.strip()
+        self.case_name = None if case_name is None else case_name.strip()
+        self.case_description = case_description
         self.CaseClosed = False
-        if CaseID is not None:
-            cleaned_id = CaseID.strip()
+        if case_id is not None:
+            cleaned_id = case_id.strip()
             try:
                 uuid.UUID(cleaned_id)
-                self.CaseId = cleaned_id
+                self.case_id  = cleaned_id
             except ValueError:
-                raise ValueError(f"'{CaseID}' is not a valid UUID format")
+                raise ValueError(f"'{case_id}' is not a valid UUID format")
         else:
-            self.CaseId = None
-        self.CaseCreationDate = None
+            self.case_id = None
+        self.case_creation_date = None
 
     async def create(self):
-        if self.CaseId is not None:
+        if self.case_id  is not None:
             raise ValueError("This case already exists")
         
         connection = await get_connection()
@@ -127,14 +127,14 @@ class Case:
                 VALUES ($1, $2, $3, $4)
                 RETURNING caseid, casecreationdate
                 """,
-                self.CaseCreator,
-                self.CaseName,
-                self.CaseDescription,
-                self.CaseClosed
+                self.case_creator,
+                self.case_name,
+                self.case_description,
+                self.case_closed
             )
 
-            self.CaseId=row["caseid"]
-            self.CaseCreationDate=row["casecreationdate"]
+            self.case_id=row["caseid"]
+            self.case_creation_date=row["casecreationdate"]
             return str(row["caseid"])
 
         finally:
@@ -355,7 +355,7 @@ class Case:
             await media.close()
 
     async def delete_evidence(self, media_id: uuid.UUID, JWT_username: str = None):
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
@@ -375,7 +375,7 @@ class Case:
                     AND r."MediaId" = $2
                     AND c."CaseCreator" = $3;
                     """,
-                    self.CaseId,
+                    self.case_id,
                     media_id,
                     JWT_username
                 )
@@ -430,7 +430,7 @@ class Case:
                     r."CaseId" = $1
                     AND r."MediaId" = $2;
                     """,
-                    self.CaseId,
+                    self.case_id,
                     media_id
                 )
 
@@ -493,16 +493,16 @@ class Case:
 
     def to_json(self):
         return {
-            "caseId": str(self.CaseId) if self.CaseId is not None else None,
-            "caseName": self.CaseName,
-            "caseCreator": self.CaseCreator,
-            "caseDescription": self.CaseDescription,
-            "caseClosed": self.CaseClosed,
-            "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
+            "caseId": str(self.case_id) if self.case_id is not None else None,
+            "caseName": self.case_name,
+            "caseCreator": self.case_creator,
+            "caseDescription": self.case_description,
+            "caseClosed": self.case_closed,
+            "caseCreationDate": self.case_creation_date.isoformat() if self.case_creation_date else None
         }
 
     async def get_comments(self):
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
@@ -514,7 +514,7 @@ class Case:
 
             rows = await connection.fetch(
             """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
-            , self.CaseId
+            , self.case_id
         )
 
             return [dict(row) for row in rows]
@@ -542,7 +542,7 @@ class Case:
         comment: str, 
         role: str
     ) -> dict:
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
@@ -578,7 +578,7 @@ class Case:
             FROM case_check c
             LEFT JOIN inserted i ON true
             """,
-            self.CaseId,
+            self.case_id,
             username,
             comment.strip(),
             role,

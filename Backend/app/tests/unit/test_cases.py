@@ -17,106 +17,106 @@ client = TestClient(app)
 
 def test_case_creation_with_valid_data():
     client.cookies.clear()
-    case = Case(CaseCreator="James Bond", CaseName="Flood in Durban")
+    case = Case(case_creator="James Bond", case_name="Flood in Durban")
     
-    assert case.CaseCreator == "James Bond"
-    assert case.CaseName == "Flood in Durban"
-    assert case.CaseId is None
-    assert case.CaseCreationDate is None
-    assert case.CaseClosed is False
+    assert case.case_creator == "James Bond"
+    assert case.case_name == "Flood in Durban"
+    assert case.case_id is None
+    assert case.case_creation_date is None
+    assert case.case_closed is False
 
-def test_Case_Creation_Does_Not_Require_Creator():
-    test_case = Case(CaseName="Flood in Durban")
-    assert test_case.CaseCreator is None
-    assert test_case.CaseName == "Flood in Durban"
-    assert test_case.CaseId is None
-    assert test_case.CaseCreationDate is None
-    assert test_case.CaseClosed is False
+def test_case_creation_Does_Not_Require_Creator():
+    test_case = Case(case_name="Flood in Durban")
+    assert test_case.case_creator is None
+    assert test_case.case_name == "Flood in Durban"
+    assert test_case.case_id is None
+    assert test_case.case_creation_date is None
+    assert test_case.case_closed is False
 
-def test_Case_Creation_Does_Not_Require_CaseName():
-    test_case = Case(CaseCreator="Terry")
-    assert test_case.CaseCreator == "Terry"
-    assert test_case.CaseName is None
-    assert test_case.CaseId is None
-    assert test_case.CaseCreationDate is None
-    assert test_case.CaseClosed is False
+def test_case_creation_Does_Not_Require_CaseName():
+    test_case = Case(case_creator="Terry")
+    assert test_case.case_creator == "Terry"
+    assert test_case.case_name is None
+    assert test_case.case_id is None
+    assert test_case.case_creation_date is None
+    assert test_case.case_closed is False
 
 @pytest.mark.asyncio
-async def test_Case_Creation_Rejects_Blank_Creator():
+async def test_case_creation_Rejects_Blank_Creator():
     with pytest.raises(ValueError, match="CaseCreator is required"):
-        Case(CaseCreator="   ", CaseName="Test Case")
+        Case(case_creator="   ", case_name="Test Case")
 
 @pytest.mark.asyncio
-async def test_Cas_creation_Rejects_Invalid_UUID():
+async def test_case_creation_Rejects_Invalid_UUID():
     with pytest.raises(ValueError, match="'2' is not a valid UUID format"):
-        Case(CaseID="2")
+        Case(case_id="2")
 
-def test_CaseCreationRejectsBlankCaseName():
+def test_case_creation_Rejects_Blank_CaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
-        Case(CaseCreator="alice_dev", CaseName="   ")
+        Case(case_creator="alice_dev", case_name="   ")
 
 def test_name_is_too_long():
     client.cookies.clear()
     with pytest.raises(ValueError, match="Name is too long"):
-        Case(CaseName="Test Case", CaseCreator="A" * 101)
+        Case(case_name="Test Case", case_creator="A" * 101)
 
 def test_name_at_100_characters():
     client.cookies.clear()
     creator_name_100 = "A" * 100
 
-    case = Case(CaseName="Test Case", CaseCreator=creator_name_100)
+    case = Case(case_name="Test Case", case_creator=creator_name_100)
 
-    assert len(case.CaseCreator) == 100
-    assert case.CaseCreator == creator_name_100
+    assert len(case.case_creator) == 100
+    assert case.case_creator == creator_name_100
 
 def test_case_name_at_99_characters():
     client.cookies.clear()
     case_name_99 = "A" * 99
-    case = Case(CaseCreator="alice_dev", CaseName=case_name_99)
+    case = Case(case_creator="alice_dev", case_name=case_name_99)
     
-    assert len(case.CaseName) == 99
-    assert case.CaseName == case_name_99
+    assert len(case.case_name) == 99
+    assert case.case_name == case_name_99
 
 def test_case_name_at_254_characters():
     client.cookies.clear()
     case_name_254 = "A" * 254
-    case = Case(CaseCreator="alice_dev", CaseName=case_name_254)
+    case = Case(case_creator="alice_dev", case_name=case_name_254)
     
-    assert len(case.CaseName) == 254
-    assert case.CaseName == case_name_254
+    assert len(case.case_name) == 254
+    assert case.case_name == case_name_254
 
 def test_case_name_at_255_characters():
     client.cookies.clear()
     case_name_255 = "A" * 255
-    case = Case(CaseCreator="alice_dev", CaseName=case_name_255)
+    case = Case(case_creator="alice_dev", case_name=case_name_255)
     
-    assert len(case.CaseName) == 255
-    assert case.CaseName == case_name_255
+    assert len(case.case_name) == 255
+    assert case.case_name == case_name_255
 
 def test_case_name_at_256_characters():
     client.cookies.clear()
     case_name_256 = "A" * 256
     
     with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
-        Case(CaseCreator="alice_dev", CaseName=case_name_256)
+        Case(case_creator="alice_dev", case_name=case_name_256)
 
 def test_case_stores_description():
     client.cookies.clear()
     case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case",
-        CaseDescription="This is a test description"
+        case_creator="alice_dev",
+        case_name="Test Case",
+        case_description="This is a test description"
     )
 
-    assert case.CaseDescription == "This is a test description"
+    assert case.case_description == "This is a test description"
 
 
 def test_case_to_json_before_create():
     client.cookies.clear()
     case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case",
-        CaseDescription="This is a test description",
+        case_creator="alice_dev",
+        case_name="Test Case",
+        case_description="This is a test description",
     )
 
     result = case.to_json()
@@ -133,14 +133,14 @@ def test_case_to_json_before_create():
 def test_case_to_json_after_create_values_set():
     client.cookies.clear()
     case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case",
-        CaseDescription="This is a test description",
+        case_creator="alice_dev",
+        case_name="Test Case",
+        case_description="This is a test description",
     )
 
-    case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
-    case.CaseClosed = True
-    case.CaseCreationDate = datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+    case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    case.case_closed = True
+    case.case_creation_date = datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
 
     result = case.to_json()
 
@@ -156,8 +156,8 @@ def test_case_to_json_after_create_values_set():
 def test_case_to_json_with_no_description_or_reviews():
     client.cookies.clear()
     case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case"
+        case_creator="alice_dev",
+        case_name="Test Case"
     )
 
     assert case.to_json() == {
@@ -174,9 +174,9 @@ def test_case_to_json_with_no_description_or_reviews():
 async def test_create_case_with_mock(mock_connect):
     client.cookies.clear()
     case = Case(
-        CaseCreator="alice_dev",
-        CaseName="Test Case",
-        CaseDescription="Mock description"
+        case_creator="alice_dev",
+        case_name="Test Case",
+        case_description="Mock description"
     )
 
     fake_db_uuid = "12345678-abcd-ef01-2345-6789abcdef01"
@@ -196,18 +196,18 @@ async def test_create_case_with_mock(mock_connect):
     assert case_id == fake_db_uuid
     assert isinstance(case_id, str)
 
-    assert str(case.CaseId) == fake_db_uuid
-    assert case.CaseCreationDate == fake_creation_date
+    assert str(case.case_id) == fake_db_uuid
+    assert case.case_creation_date == fake_creation_date
 
     called_args = mock_connection.fetchrow.call_args[0]
 
     params = called_args[1:]
 
     assert params == (
-        case.CaseCreator,
-        case.CaseName,
-        case.CaseDescription,
-        case.CaseClosed
+        case.case_creator,
+        case.case_name,
+        case.case_description,
+        case.case_closed
     )
 
     mock_connect.assert_called_once()
@@ -218,8 +218,8 @@ async def test_create_case_with_mock(mock_connect):
 @patch("asyncpg.connect")
 async def test_create_case_cannot_be_called_twice(mock_connect):
     client.cookies.clear()
-    case = Case(CaseCreator="alice_dev", CaseName="Test Case")
-    case.CaseId = "12345678-abcd-ef01-2345-6789abcdef01"
+    case = Case(case_creator="alice_dev", case_name="Test Case")
+    case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
     with pytest.raises(ValueError, match="This case already exists"):
         await case.create()
@@ -1216,8 +1216,8 @@ async def test_get_comment_missing_case_id():
     Verifies that the case.get_comments(self) will throw an error if there is no caseId defined
     """
     test_case=Case(
-        CaseCreator="Billy Jean",
-        CaseName="Billy Jean's not my Son"
+        case_creator="Billy Jean",
+        case_name="Billy Jean's not my Son"
     )
 
     with pytest.raises(HTTPException) as exeInfo:
@@ -1245,7 +1245,7 @@ Return a dict of the comments belonging to the case id
     mock_connection.fetch.return_value = fake_record
     
     test_case = Case(
-        CaseID=fake_case_id
+        case_id=fake_case_id
     )
 
     with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
@@ -1276,7 +1276,7 @@ Raises an error due to the database going down
     
 
     test_case=Case(
-        CaseID=fake_case_id
+        case_id=fake_case_id
     )
 
     with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
@@ -1583,8 +1583,8 @@ async def test_add_comment_case_not_found():
     connection = AsyncMock()
     connection.fetchrow = AsyncMock(return_value=None)
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
-    case.CaseId = uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
+    case.case_id = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
         await case.add_comment(connection, "someone", "comment_ig", "USER")
@@ -1606,8 +1606,8 @@ async def test_add_comment_user_blocked_on_open_case():
         "comment_inserted": False
     })
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
-    case.CaseId = uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
+    case.case_id = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
         await case.add_comment(connection, "someone", "comment_ig", "USER")

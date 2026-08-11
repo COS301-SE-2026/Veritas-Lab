@@ -50,7 +50,7 @@ async def test_images_upload_success(mockUuid, mockget_object, mockDbConnect):
     mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
     mockget_object.return_value = mockStorageClient
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
     result = await case.add_evidence(media=mockMedia, case_id=test_case_id)
@@ -79,7 +79,7 @@ async def test_invalid_file_type(mockDbConnect):
     mockDbConnection.fetchrow.return_value = None
     mockDbConnection.close = AsyncMock()
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
@@ -145,7 +145,7 @@ async def test_same_image_different_name(mockUuid, mockget_object, mockDbConnect
     mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
     mockget_object.return_value = mockStorageClient
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id_1 = uuid.uuid4()
     test_case_id_2 = uuid.uuid4()
 
@@ -229,7 +229,7 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     mockStorageClient.generate_presigned_url = MagicMock(return_value="https://example.com/fake-url")
     mockget_object.return_value = mockStorageClient
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
     result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id)
@@ -262,8 +262,8 @@ An investigator deletes a duplicate. Only the report is deleted.
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = uuid.uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
@@ -298,8 +298,8 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = uuid.uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
@@ -328,8 +328,8 @@ An admin deletes a duplicate. Therefore only the report is deleted
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = uuid.uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
     result = await case.delete_evidence(media_id=test_media_id)
@@ -361,8 +361,8 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = uuid.uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
     result = await case.delete_evidence(media_id=test_media_id)
@@ -378,8 +378,8 @@ async def test_delete_evidence_missing_case_id_400():
     """
     A missing Media_id should raise an exception
     """
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = None
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = None
 
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
@@ -401,8 +401,8 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
     
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = uuid.uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     test_user = "Hacker_Eve"
 
@@ -424,8 +424,8 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
     
-    case = Case(CaseCreator="New_Dev", CaseName="The Jones v Smith")
-    case.CaseId = uuid.uuid4()
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
@@ -445,7 +445,7 @@ async def test_add_evidence_invalid_case_id_uuid():
         headers={"content-type": "image/png"}
     )
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
 
     with pytest.raises(HTTPException) as excInfo:
         await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid")
@@ -472,7 +472,7 @@ async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
     mockReader.trailer = {"/Root": mockRootIndirect}
     mockPdfReaderClass.return_value = mockReader
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
@@ -503,7 +503,7 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
     mockReader.trailer = {"/Root": mockRootIndirect}
     mockPdfReaderClass.return_value = mockReader
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as exc_info:
@@ -555,7 +555,7 @@ async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClas
     mock_s3_client.generate_presigned_url.return_value = "https://fake-presigned-url"
     mockget_object.return_value = mock_s3_client
 
-    case = Case(CaseCreator="New_Dev", CaseName="The Reciepts exposed")
+    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
 
     result = await case.add_evidence(media=mockMedia, case_id=test_case_id)

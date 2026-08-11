@@ -164,14 +164,14 @@ def transform_to_uuid(changer:str)->UUID:
 
 def  _row_to_case(row: dict) -> Case:
     case = Case(
-        CaseCreator=row["casecreator"],
-        CaseName=row["casename"],
-        CaseDescription=row["casedescription"]
+        case_creator=row["casecreator"],
+        case_name=row["casename"],
+        case_description=row["casedescription"]
     )
 
-    case.CaseId = row["caseid"]
-    case.CaseClosed = row["caseclosed"]
-    case.CaseCreationDate = row["casecreationdate"]
+    case.case_id = row["caseid"]
+    case.case_closed = row["caseclosed"]
+    case.case_creation_date = row["casecreationdate"]
 
     return case
 
@@ -239,9 +239,9 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
     try:
         case = Case(
-            CaseName=case_request.title, 
-            CaseCreator=payload.get("username"), 
-            CaseDescription=case_request.description
+            case_name=case_request.title, 
+            case_creator=payload.get("username"), 
+            case_description=case_request.description
         )
     except ValueError as e:
         return JSONResponse(
@@ -319,71 +319,32 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
     }
 )
 async def get_cases(request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
-    
+  
+    payload = verify_jwt(request)
+
     connection = None
 
     try:
         connection = await get_connection()
 
-        if payload.get("role") == "USER":
-            rows = await connection.fetch(
-                """
-                SELECT *
-                FROM "Cases_DB"."Cases"
-                WHERE caseclosed = TRUE
-                ORDER BY casecreationdate DESC
-                """
-            )
-        else:
-            rows = await connection.fetch(
-                """
-                SELECT *
-                FROM "Cases_DB"."Cases"
-                ORDER BY casecreationdate DESC
-                """
-            )
+        is_standard_user = payload.get("role") == "USER"
 
+        rows = await connection.fetch(GET_CASES_SQL, is_standard_user)
 
-        cases = []
+        return {
+            "status": "success",
+            "cases": [jsonable_encoder(_row_to_case(row).to_json()) for row in rows]
+        }
 
-        for row in rows:
-            case = Case(
-                CaseCreator=row["casecreator"],
-                CaseName=row["casename"],
-                CaseDescription=row["casedescription"]
-            )
-
-            case.CaseId = row["caseid"]
-            case.CaseClosed = row["caseclosed"]
-            case.CaseCreationDate = row["casecreationdate"]
-
-            cases.append(case.to_json())
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "cases": cases
-            }
-        )
     except asyncpg.PostgresError:
-        return JSONResponse(
+        return HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
     finally:
         if connection is not None:
             await connection.close()
@@ -476,15 +437,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 }
             )
 
-        case = Case(
-            CaseCreator=row["casecreator"],
-            CaseName=row["casename"],
-            CaseDescription=row["casedescription"]
-        )
-
-        case.CaseId = row["caseid"]
-        case.CaseClosed = row["caseclosed"]
-        case.CaseCreationDate = row["casecreationdate"]
+        case = _row_to_case(row)
 
         evidence_rows = await connection.fetch(
             """
@@ -572,7 +525,7 @@ async def upload_evidence(
 
     verify_not_user(payload.get("role"))
 
-    CaseCreator=payload["username"]
+    case_creator = payload["username"]
 
     try:
         case_uuid = UUID(case_id)
@@ -595,7 +548,7 @@ async def upload_evidence(
             AND "caseclosed" = false;
             """, 
             case_uuid,
-            CaseCreator
+            case_creator
         )
         
         if row is None:
@@ -607,15 +560,7 @@ async def upload_evidence(
                 }
             )
 
-        case = Case(
-            CaseCreator=row["casecreator"],
-            CaseName=row["casename"],
-            CaseDescription=row["casedescription"]
-        )
-
-        case.CaseId = row["caseid"]
-        case.CaseClosed = row["caseclosed"]
-        case.CaseCreationDate = row["casecreationdate"]
+        case = _row_to_case(row)
 
         result = await case.add_evidence(media, case_uuid)
 
@@ -772,7 +717,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
     validated_name = None
     if case_request.CaseName is not None:
         try:
-            validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
+            validated_name = Case(case_name=case_request.CaseName).case_name  # This will raise ValueError if invalid
         except ValueError as e:
             return JSONResponse(
                 status_code=400, 
@@ -991,7 +936,7 @@ async def retreive_comments(
     verify_not_user(user_role) 
 
     try:
-        case = Case(CaseID=case_id)
+        case = Case(case_id=case_id)
         comments_data= await case.get_comments()
 
         return JSONResponse(
@@ -1054,7 +999,7 @@ async def delete_evidence(
         )
         
     try:
-        case = Case(CaseID=case_id)
+        case = Case(case_id=case_id)
         username=payload.get("username") if user_role == "INVESTIGATOR" else None
         response=await case.delete_evidence(media_id=media_id, JWT_username=username)
 
@@ -1112,7 +1057,7 @@ async def create_comment(body: CreateCommentRequest, req: Request):
     connection = await get_connection()
 
     try:
-        case = Case(CaseID=str(body.case_id))
+        case = Case(case_id=str(body.case_id))
 
         new_comment = await case.add_comment(
             connection, 
