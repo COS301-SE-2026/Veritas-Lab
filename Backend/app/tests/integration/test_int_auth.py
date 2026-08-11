@@ -1,16 +1,18 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.api.main import app
-from app.core.env import User_Settings, Postgres_Settings
+from app.core.env import User_Settings, Postgres_Settings, Auth_Settings
 import asyncpg
 from datetime import datetime, timedelta, timezone
 import uuid as uuidlib
-from app.auth.auth import create_token, COOKIE_NAME
+from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN
 import asyncio
+from jose import jwt
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SEETTINGS=Postgres_Settings()
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
+AUTH_SETTINGS = Auth_Settings()
 
 ADMIN_USER = None
 
@@ -970,11 +972,192 @@ async def test_integration_delete_user_non_admin(client):
     finally:
         await delete_user_by_email(email)
 
-def test_integration_delete_user_no_auth(client):
+@pytest.mark.asyncio
+async def test_integration_delete_user_no_auth(client):
     client.cookies.clear()
 
     response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
     assert response.status_code == 401
 
+@pytest.mark.asyncio
+async def test_integration_refresh_token_not_needed(client):
+    user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
 
+    token = create_token(user)
 
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Token does not need refreshing"
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_near_expiry(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN",
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=30)
+    }
+
+    old_token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        old_token
+    )
+
+    response = client.post("/api/refreshToken")
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Token refreshed"
+    }
+
+    assert COOKIE_NAME in response.cookies
+
+    new_token = response.cookies.get(COOKIE_NAME)
+    assert new_token is not None
+    assert new_token != old_token
+
+@pytest.mark.asyncio
+async def test_integration_refresh_expired_token(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN",
+        "exp": datetime.now(timezone.utc) - timedelta(minutes=1)
+    }
+
+    expired_token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        expired_token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Token refreshed"
+    }
+
+    assert COOKIE_NAME in response.cookies
+
+    new_token = response.cookies.get(COOKIE_NAME)
+
+    assert new_token is not None
+    assert new_token != expired_token
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_no_auth(client):
+    client.cookies.clear()
+    response = client.post("/api/refreshToken")
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Not authenticated"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_invalid_token(client):
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        "this-is-not-a-valid-jwt"
+    )
+
+    response = client.post("/api/refreshToken")
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": INVALID_TOKEN
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_missing_expiry(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Token missing expiry"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_missing_required_fields(client):
+    payload = {
+        "sub": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=30)
+    }
+
+    token = jwt.encode(
+        payload,
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post("/api/refreshToken")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Token missing required fields"
+        }
+    }
