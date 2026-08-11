@@ -965,75 +965,202 @@ async def change_user_role(change_role_request: ChangeRoleRequest, request: Requ
         if connection is not None:
             await connection.close()
 
-@router.delete("/users/{user_id}")
-async def delete_user(user_id: str, request: Request):
-    try:
-        #Verify the JWT for security
-        payload = verify_jwt(request)
-        user_id = user_id.strip()
-
-        #Authorization. Only Admins can delete
-        if payload.get("role") != "ADMIN":
-            return JSONResponse(
-                status_code = 403,
-                content = {"status": "error", "message": "User is unauthorized."}
-            )
-
-        #Validate input. This rejects improper UUIDs before touching the DB
-        if not validate_uuid(user_id):
-            return JSONResponse(
-                status_code = 400,
-                content = {"status": "error", "message": "Invalid User ID format."}
-            )
-
-        #An admin cannot delete themselves
-        caller_id = payload.get("sub")
-        if caller_id == user_id:
-            return JSONResponse(
-                status_code = 400,
-                content = {"status": "error", "message": "Admins cannot delete themselves."}
-            )
-
-        #Now delete
-        try:
-            deleted = await delete_user_by_id(user_id)
-        except asyncpg.PostgresError:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status":"error",
-                    "message":"Database error"
-                }
-            )
-        
-        #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
-        if not deleted:
-            return JSONResponse(
-                status_code = 404,
-                content = {
-                    "status": "error", 
-                    "message": "No user found with the provided ID."
+@router.delete(
+    "/users/{user_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete User",
+    description="Deletes a registered user by their user ID. Only an admin can use this endpoint and they cannot delete themselves.",
+    responses={
+        200: {
+            "description": "User successfully deleted",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "User deleted successfully."
                     }
-            )
-
-        return JSONResponse(
-            status_code = 200,
-            content = {
-                "status": "success", 
-                "message": "User deleted successfully."
                 }
-        )
+            }
+        },
 
-        #safety net for unexpected errors
-    except ValueError as e:
-        #Errors from Jwt.
-        return JSONResponse(
-            status_code = 401,
-            content = {
+        400: {
+            "description": "Invalid delete request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidUserId": {
+                            "summary": "Invalid user ID",
+                            "description": "Triggered when the provided user ID is not a valid UUID.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid User ID format."
+                                }
+                            }
+                        },
+
+                        "DeleteSelf": {
+                            "summary": "Admin tries to delete themselves",
+                            "description": "Triggered when an admin tries to delete their own account.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Admins cannot delete themselves."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when no JWT authentication cookie is provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User does not have permission to delete users",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User is unauthorized."
+                        }
+                    }
+                }
+            }
+        },
+
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "No user found with the provided ID."
+                        }
+                    }
+                }
+            }
+        },
+
+        500 : {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Database error"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def delete_user(user_id: str, request: Request): 
+    #Verify the JWT for security
+    payload = verify_jwt(request)
+    user_id = user_id.strip()
+
+    #Authorization. Only Admins can delete
+    if payload.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code = 403,
+            detail= {
                 "status": "error", 
-                "message": str(e)
-                }
+                "message": "User is unauthorized."
+            }
         )
+
+    #Validate input. This rejects improper UUIDs before touching the DB
+    if not validate_uuid(user_id):
+        raise HTTPException(
+            status_code = 400,
+            detail= {
+                "status": "error",
+                "message": "Invalid User ID format."
+            }
+        )
+
+    #An admin cannot delete themselves
+    caller_id = payload.get("sub")
+    if caller_id == user_id:
+        raise HTTPException(
+            status_code = 400,
+            detail= {
+                "status": "error",
+                "message": "Admins cannot delete themselves."
+            }
+        )
+
+    #Now delete
+    try:
+        deleted = await delete_user_by_id(user_id)
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
+        
+    #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
+    if not deleted:
+        raise HTTPException(
+            status_code = 404,
+            detail= {
+                "status": "error", 
+                "message": "No user found with the provided ID."
+            }
+        )
+
+    return {
+        "status": "success", 
+        "message": "User deleted successfully."
+    }
 
 @router.post("/refreshToken")
 async def refresh_token(request: Request, response: Response):
