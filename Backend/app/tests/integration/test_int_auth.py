@@ -4,6 +4,7 @@ from app.api.main import app
 from app.core.env import User_Settings, Postgres_Settings
 import asyncpg
 from datetime import datetime, timedelta, timezone
+import uuid as uuidlib
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SEETTINGS=Postgres_Settings()
@@ -389,3 +390,148 @@ async def test_integration_register_persists_user(client):
         await connection.close()
 
     await delete_user_by_email(payload["email"])
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_success(client):
+    email = "rolechange@example.com"
+
+    await delete_user_by_email(email)
+
+    try:
+        register_payload = {
+            "email": email,
+            "username": "rolechange_user",
+            "password": "ValidPassword!123"
+        }
+
+        register_response = client.post(
+            "/api/register",
+            json=register_payload
+        )
+
+        assert register_response.status_code == 201
+
+        connection = await get_connection()
+
+        try:
+            target_user = await connection.fetchrow(
+                """
+                SELECT userid
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                register_payload["email"]
+            )
+        finally:
+            await connection.close()
+
+        assert target_user is not None
+
+        target_user_id = str(target_user["userid"])
+
+        admin_login = {
+            "email": USER_SETTINGS.ADMIN_EMAIL,
+            "password": USER_SETTINGS.ADMIN_PASSWORD
+        }
+
+        login_response = client.post(
+            "/api/login",
+            json=admin_login
+        )
+
+        assert login_response.status_code == 200
+
+        response = client.post(
+            "/api/changeUserRole",
+            json={
+                "userId": target_user_id,
+                "NewRole": "INVESTIGATOR"
+            }
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "success",
+            "message": "User role updated to INVESTIGATOR successfully"
+        }
+
+        connection = await get_connection()
+
+        try:
+            updated_user = await connection.fetchrow(
+                """
+                SELECT userrole
+                FROM "Users_DB"."Users"
+                WHERE userid = $1
+                """,
+                uuidlib.UUID(target_user_id)
+            )
+        finally:
+            await connection.close()
+
+        assert updated_user is not None
+        assert updated_user["userrole"] == "INVESTIGATOR"
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_user_role_non_admin(client):
+    email = "normaluser@example.com"
+    await delete_user_by_email(email)
+
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "normal_user",
+                "password": "ValidPassword!123"
+            }
+        )
+
+        assert register_response.status_code == 201
+        response = client.post(
+            "/api/changeUserRole",
+            json={
+                "userId": "550e8400-e29b-41d4-a716-446655440000",
+                "NewRole": "INVESTIGATOR"
+            }
+        )
+
+        assert response.status_code == 403
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+async def test_integration_change_user_role_invalid_user_id(client):
+    login_response = client.post(
+        "/api/login",
+        json={
+            "email": USER_SETTINGS.ADMIN_EMAIL,
+            "password": USER_SETTINGS.ADMIN_PASSWORD
+        }
+    )
+
+    assert login_response.status_code == 200
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "invalid-id",
+            "NewRole": "INVESTIGATOR"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Invalid userId format."
+        }
+    }
+
