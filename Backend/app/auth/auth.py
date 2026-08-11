@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header, Response, Request, status
+from fastapi import APIRouter, HTTPException, Header, Response, Request, status, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import re as regex
@@ -9,12 +9,18 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
 from app.core.env import Postgres_Settings, Auth_Settings
+from fastapi.security import APIKeyCookie
 
 COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
 EXPIRED_TOKEN = "Token has expired"
+
+COOKIE_SCHEME = APIKeyCookie(
+    name=COOKIE_NAME,
+    auto_error=False
+)
 
 postgres_settings = Postgres_Settings()
 auth_settings = Auth_Settings()
@@ -586,6 +592,7 @@ async def register(request: RegisterRequest, response: Response):
 @router.post(
     "/fetchUsers",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
     summary="Fetch Users",
     description="Returns all registered users if the user is an admin.",
     responses={
@@ -716,6 +723,7 @@ async def fetch_users(request: Request):
 @router.post(
     "/changeUserRole",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
     summary="Change User Role",
     description="Changes the role of a registered user. The endpoint requires a valid JWT and can only be accessed by an ADMIN user. An admin cannot change their own role.",
     responses={
@@ -968,6 +976,7 @@ async def change_user_role(change_role_request: ChangeRoleRequest, request: Requ
 @router.delete(
     "/users/{user_id}",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
     summary="Delete User",
     description="Deletes a registered user by their user ID. Only an admin can use this endpoint and they cannot delete themselves.",
     responses={
@@ -1165,6 +1174,7 @@ async def delete_user(user_id: str, request: Request):
 @router.post(
     "/refreshToken",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
     summary="Refresh JWT Token",
     description="Refreshes the user's JWT when the token has expired or has 1 minute left. Otherwise, no token is created.",
     responses={
