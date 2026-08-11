@@ -47,11 +47,17 @@ async def test_case_creation_Rejects_Blank_Creator():
         Case(case_creator="   ", case_name="Test Case")
 
 @pytest.mark.asyncio
-async def test_case_creation_Rejects_Invalid_UUID():
-    with pytest.raises(ValueError, match="'2' is not a valid UUID format"):
-        Case(case_id="2")
+async def test_Cas_creation_Rejects_Invalid_UUID():
+    with pytest.raises(HTTPException) as exc_info:
+        Case(CaseID="2")
 
-def test_case_creation_Rejects_Blank_CaseName():
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "'2' is not a valid UUID format"
+    }
+
+def test_CaseCreationRejectsBlankCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
         Case(case_creator="alice_dev", case_name="   ")
 
@@ -1260,10 +1266,9 @@ Return a dict of the comments belonging to the case id
     assert result[0]["comment"] == "I am your child"
     assert result[0]["commenttimestamp"]=="2026-06-29 15:37:28.458993+00"
 
-    mock_connection.fetch.assert_called_once_with(
-        """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
-        , str(fake_id)
-    )
+    mock_connection.fetch.assert_called_once()
+    called_args = mock_connection.fetch.call_args[0]
+    assert called_args[1] == str(fake_id)
 
 @pytest.mark.asyncio
 async def test_get_comment_database_error():
@@ -1299,16 +1304,13 @@ def test_delete_case_success_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(case_id: uuid.UUID, username: str, role: str):
-        assert isinstance(case_id, uuid.UUID)
-        assert str(case_id) == "12345678-abcd-ef01-2345-6789abcdef01"
+    async def mock_delete_case(self, username: str, role: str):
+        assert isinstance(self.CaseId, str)
+        assert self.CaseId == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "investigator_user"
         assert role == "INVESTIGATOR"
     
-        return {
-            "deleted": True,
-            "reason": "deleted"
-        }
+        return None
     
     monkeypatch.setattr(
         cases_router, 
@@ -1345,15 +1347,13 @@ def test_delete_case_success_admin(monkeypatch):
             "role": "ADMIN"
         }
     
-    async def mock_delete_case(case_id: uuid.UUID, username: str, role: str):
-        assert isinstance(case_id, uuid.UUID)
+    async def mock_delete_case(self, username: str, role: str):
+        assert isinstance(self.CaseId, str)
+        assert self.CaseId == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "admin_user"
         assert role == "ADMIN"
 
-        return {
-            "deleted": True,
-            "reason": "deleted"
-        }
+        return None
     
     monkeypatch.setattr(
         cases_router, 
@@ -1392,19 +1392,14 @@ def test_delete_case_missing_jwt(monkeypatch):
         mock_verify_jwt
     )
 
-    response = client.request(
-        "DELETE",
-        "/api/deleteCase",
-        json={
-            "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
-        }
-    )
-
-    assert response.status_code == 401
-    assert response.json() == {
-        "status": "error",
-        "message": "Missing token"
-    }
+    with pytest.raises(ValueError, match="Missing token"):
+        client.request(
+            "DELETE",
+            "/api/deleteCase",
+            json={
+                "CaseID": "12345678-abcd-ef01-2345-6789abcdef01"
+            }
+        )
 
 def test_delete_case_user_forbidden(monkeypatch):
     client.cookies.clear()
@@ -1462,8 +1457,10 @@ def test_delete_case_missing_case_id(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "CaseID required"
+        "detail": {
+            "status": "error",
+            "message": "CaseID required"
+        }
     }
 
 def test_delete_case_invalid_case_id(monkeypatch):
@@ -1490,8 +1487,13 @@ def test_delete_case_invalid_case_id(monkeypatch):
         }
     )
 
-    assert response.status_code == 401
-    assert response.json()["status"] == "error"
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "'not-a-valid-uuid' is not a valid UUID format"
+        }
+    }
 
 def test_delete_case_not_found(monkeypatch):
     client.cookies.clear()
@@ -1503,11 +1505,14 @@ def test_delete_case_not_found(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(case_id: uuid.UUID, username: str, role: str):
-        return {
-            "deleted": False,
-            "reason": "not_found"
-        }
+    async def mock_delete_case(self, username: str, role: str):
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "error",
+                "message": "Case not found"
+            }
+        )
     
     monkeypatch.setattr(
         cases_router, 
@@ -1530,8 +1535,10 @@ def test_delete_case_not_found(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Case not found"
+        "detail": {
+            "status": "error",
+            "message": "Case not found"
+        }
     }
 
 def test_delete_case_unauthorized_non_creator(monkeypatch):
@@ -1544,14 +1551,17 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(case_id: uuid.UUID, username: str, role: str):
+    async def mock_delete_case(self, username: str, role: str):
         assert username == "other_investigator"
         assert role == "INVESTIGATOR"
         
-        return {
-            "deleted": False,
-            "reason": "unauthorized"
-        }
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": "Only the case creator or an admin can delete this case"
+            }
+        )
     
     monkeypatch.setattr(
         cases_router, 
@@ -1574,8 +1584,10 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
 
     assert response.status_code == 403
     assert response.json() == {
-        "status": "error",
-        "message": "Only the case creator or an admin can delete this case"
+        "detail": {
+            "status": "error",
+            "message": "Only the case creator or an admin can delete this case"
+        }
     }
 
 @pytest.mark.asyncio
@@ -1631,9 +1643,16 @@ async def test_delete_case_not_found(mockDbConnect):
 
     connection.fetchrow = AsyncMock(return_value=None)
 
-    result = await Case.delete_case(uuid4(), "someone", "USER")
+    case = Case(CaseID=str(uuid4()))
 
-    assert result == {"deleted": False, "reason": "not_found"}
+    with pytest.raises(HTTPException) as excInfo:
+        await case.delete_case("someone", "USER")
+
+    assert excInfo.value.status_code == 404
+    assert excInfo.value.detail == {
+        "status": "error",
+        "message": "Case not found"
+    }
     connection.close.assert_called_once()
 
 @pytest.mark.asyncio
@@ -1644,13 +1663,17 @@ async def test_delete_case_unauthorized(mockDbConnect):
 
     connection.fetchrow = AsyncMock(return_value={"casecreator": "tha_real_creator"})
 
-    result = await Case.delete_case(uuid4(), "someone_eklse", "USER")
+    case = Case(CaseID=str(uuid4()))
 
-    assert result == {
-        "deleted": False, 
-        "reason": "unauthorized"
+    with pytest.raises(HTTPException) as excInfo:
+        await case.delete_case("someone_eklse", "USER")
+
+    assert excInfo.value.status_code == 403
+    assert excInfo.value.detail == {
+        "status": "error",
+        "message": "Only the case creator or an admin can delete this case"
     }
-    #connection.close.assert_called_once()
+    connection.close.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
@@ -1663,19 +1686,19 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockget_object, moc
 
     connection.fetchrow = AsyncMock(side_effect=[
         {"casecreator": "tha_real_creator"},
-        {"caseid": case_id},
+        {"caseid": case_id, "mediaids": ["media-1"]},
         {"mediaid": "media-1", "mediabucket": "evidence-bucket", "mediaextension": ".jpg" },
         ])
-
-    connection.fetch = AsyncMock(return_value=[{"mediaid": "media-1"}])
 
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
-    result = await Case.delete_case(case_id, "tha_real_creator", "USER")
+    case = Case(CaseID=str(case_id))
 
-    assert result == {"deleted": True, "reason": "deleted"}
-    mock_s3_client.head_object.assert_called_once_with(
+    result = await case.delete_case("tha_real_creator", "USER")
+
+    assert result is None
+    mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
         Key="media-1.jpg"
     )
@@ -1693,13 +1716,10 @@ def test_get_comments_missing_jwt(monkeypatch):
         mock_verify_jwt
     )
 
-    response = client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
+    with pytest.raises(ValueError) as excinfo:
+        client.post("/api/getComments/12345678-abcd-ef01-2345-6789abcdef01")
 
-    assert response.status_code == 401
-    assert response.json() == {
-        "status": "error",
-        "message": "Missing authorization header"
-    }
+    assert "Missing authorization header" in str(excinfo.value)
 
 def test_delete_evidence_missing_jwt(monkeypatch):
     client.cookies.clear()

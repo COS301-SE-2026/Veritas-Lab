@@ -1,11 +1,12 @@
 import json
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.security import APIKeyCookie
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Annotated
 from app.core.cases import Case
-from app.auth.auth import verify_jwt
+from app.auth.auth import verify_jwt, COOKIE_NAME
 import asyncpg
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,7 @@ DATABASE_ERROR_MESSAGE="Database error"
 CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
+COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescrition, caseclosed, casecreationdate
@@ -130,7 +132,7 @@ class save_snnotations_payload(BaseModel):
     annotations: List[Dict[str, Any]]
     model_config = ConfigDict(populate_by_name=True)
 
-class SuccessResponse(BaseModel):
+class success_response(BaseModel):
     status: str = Field(..., examples=["success"])
 
 class error_response(BaseModel):
@@ -910,28 +912,132 @@ async def delete_comment(request: Request, comment_id: int):
 
 @router.post(
     "/getComments/{case_id}",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Retrieve comments",
+    description="Fetches comments for a specific case.",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Retrieval of comments was successful.",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "comments": [
+                            {
+                                "commentid": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+                                "username": "TestInvestigator",
+                                "comment": "Reviewed section 3. Everything looks consistent with the report.",
+                                "commenttimestamp": "2026-08-10T14:30:00Z"
+                            },
+                            {
+                                "commentid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                                "username": "LeadAnalyst",
+                                "comment": "Additional context required for media hash verification.",
+                                "commenttimestamp": "2026-08-10T15:15:00Z"
+                            }
+                        ]
+                    }
+                }
+            },
         },
+        404: {
+            "description": "Not found - Missing case Id"
+        },
+        400: {
+            "description": "Bad request- Poorly formatted UUID",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail":{
+                            "status": "error",
+                            "message": "fake-uuid is not a valid UUID format"
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Signature has expired."
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - User lacks sufficient permissions",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail":{
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Database connection or unexpected server failure",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "PostgreSQL Exception",
+                            "value": {
+                                "detail": "Database connection failure. Internal Server Error."
+                            }
+                        },
+                        "Unhandled Exception": {
+                            "summary": "General Server Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "An unexpected error occurred."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def retreive_comments(
     case_id: str,
     request: Request
 ):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
 
+    payload = verify_jwt(request)
     user_role=payload.get("role")
     verify_not_user(user_role) 
 
@@ -950,9 +1056,9 @@ async def retreive_comments(
     except HTTPException:
         raise
     except Exception as e:
-        return JSONResponse(
+        return HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error", 
                 "message": str(e)
             }
@@ -1079,71 +1185,183 @@ async def create_comment(body: CreateCommentRequest, req: Request):
           
 @router.delete(
     "/deleteCase",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Deletes a case",
+    description="Deletes a specific case and all attached elements within reason",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Deletion of the case was successful.",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case deleted successfully"
+                    }
+                }
+            },
         },
+        400:{
+            "description": "Bad request - Missing Case id",
+            "content":{
+                "application/json":{
+                    "examples":{
+                        "Missing Payload ID": {
+                            "summary": "Missing Case ID in Request Body",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Case id is missing"
+                                }
+                            }
+                        },
+                        "Poorly formated case id": {
+                            "summary": "The case id is not a uuid",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "fake-uuid is not a valid UUID format"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Signature has expired."
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - User lacks sufficient permissions",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Role Forbidden": {
+                            "summary": "Standard User Role Blocked",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "User unauthorized"
+                                }
+                            }
+                        },
+                        "Not Owner or Admin": {
+                            "summary": "User is neither Case Creator nor Admin",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Only the case creator or an admin can delete this case"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Case Not Found": {
+                            "summary": "Target Case ID Not Found",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Case not found"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Infrastructure failures",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "PostgreSQL Query Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Database query failed"
+                                }
+                            }
+                        },
+                        "Storage Error": {
+                            "summary": "S3 / MinIO Storage Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Object storage Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+
+    payload = verify_jwt(request)
     
     verify_not_user(payload.get("role"))
     
     if not case_request.CaseID:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": CASE_ID_REQUIRED
             }
         )
-    
-    try:
-        case_id = uuid.UUID(case_request.CaseID)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+
+    # Checkiing the uuid in constructor and keep object orientation.
+    delete_case=Case(CaseID=case_request.CaseID) 
 
     try:
-        result = await Case.delete_case(
-            case_id=case_id,
+        await delete_case.delete_case(
             username=payload.get("username"),
             role=payload.get("role")
         )
 
-        if result["reason"] == "not_found":
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "status": "error",
-                    "message": "Case not found"
-                }
-            )
-        
-        if result["reason"] == "unauthorized":
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "status": "error",
-                    "message": "Only the case creator or an admin can delete this case"
-                }
-            )
         
         return JSONResponse(
             status_code=200,
@@ -1154,9 +1372,9 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
     
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
@@ -1199,13 +1417,14 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
 
 @router.post("/saveAnnotations", 
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
     summary="Save Report Annotations",
     description="Updates the JSONB media annotations for a specific report/evidence item in PostgreSQL.",
-    response_model=SuccessResponse,
+    response_model=success_response,
     responses={
         200: {
             "description": "Annotations successfully saved.",
-            "model": SuccessResponse,
+            "model": success_response,
             "content": {
                 "application/json": {
                     "example": {
@@ -1215,16 +1434,29 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
             },
         },
         401: {
-            "description": "Unauthorized - Missing/Invalid JWT cookie or non-UUID report ID format.",
-            "model": error_response,
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
             "content": {
                 "application/json": {
                     "examples": {
-                        "Invalid JWT": {
-                            "summary": "Invalid JWT Token",
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
                             "value": {
-                                "status": "error", 
+                                "status": "error",
                                 "message": "Signature has expired."
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "status": "error",
+                                "message": "Not authenticated"
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "status": "error",
+                                "message": "Invalid token"
                             }
                         },
                         "Invalid UUID": {

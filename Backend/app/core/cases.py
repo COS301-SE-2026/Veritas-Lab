@@ -108,7 +108,13 @@ class Case:
                 uuid.UUID(cleaned_id)
                 self.case_id  = cleaned_id
             except ValueError:
-                raise ValueError(f"'{case_id}' is not a valid UUID format")
+                raise HTTPException(
+                    status_code= 400,
+                    detail={
+                        "status": "error",
+                        "message": f"'{CaseID}' is not a valid UUID format"
+                    } 
+                )
         else:
             self.case_id = None
         self.case_creation_date = None
@@ -514,7 +520,7 @@ class Case:
 
             rows = await connection.fetch(
             """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
-            , self.case_id
+            , self.CaseId
         )
 
             return [dict(row) for row in rows]
@@ -609,12 +615,20 @@ class Case:
             "timestamp": row["commenttimestamp"].isoformat() if row["commenttimestamp"] else None,
         }
 
-    @staticmethod
+
     async def delete_case(
-        case_id: uuid.UUID, 
+        self,
         username: str, 
         role: str
     ):
+        if self.CaseId is None:
+            raise HTTPException(
+                status_code=400, 
+                detail=MISSING_CASE_ID
+            )
+
+        case_id=self.CaseId
+        
         connection = await get_connection()
 
         orphan_media = []
@@ -631,45 +645,57 @@ class Case:
                 )
 
                 if case_row is None:
-                    return {
-                        "deleted": False,
-                        "reason": "not_found"
-                    }
+                    raise HTTPException(
+                        status_code=404,
+                        detail={
+                            "status": "error",
+                            "message": "Case not found"
+                        }
+                    )
                 
                 case_creator = case_row["casecreator"]
 
                 if role != "ADMIN" and username != case_creator:
-                    return {
-                        "deleted": False,
-                        "reason": "unauthorized"
-                    }
+                    raise HTTPException(
+                        status_code=403,
+                        detail={
+                            "status": "error",
+                            "message": "Only the case creator or an admin can delete this case"
+                        }
+                    )
 
-                media_rows = await connection.fetch(
+                result = await connection.fetchrow(
                     """
-                    SELECT DISTINCT MediaId AS "mediaid"
-                    FROM "Cases_DB"."Reports"
-                    WHERE CaseId = $1
+                    WITH target_media AS (
+                        SELECT COALESCE(array_agg(DISTINCT MediaId), '{}') AS mediaids
+                        FROM "Cases_DB"."Reports"
+                        WHERE CaseId = $1
+                    ),
+                    deleted_case AS (
+                        DELETE FROM "Cases_DB"."Cases"
+                        WHERE CaseId = $1
+                        RETURNING CaseId AS caseid
+                    )
+                    SELECT d.caseid, m.mediaids
+                    FROM deleted_case d
+                    CROSS JOIN target_media m
                     """,
                     case_id
                 )
 
-                deleted_case = await connection.fetchrow(
-                    """
-                    DELETE FROM "Cases_DB"."Cases"
-                    WHERE caseid = $1
-                    RETURNING caseid
-                    """,
-                    case_id
-                )
-
-                if deleted_case is None:
-                    return {
-                        "deleted": False,
-                        "reason": "not_found"
-                    }
+                # returned caseid only serves for deleteion detection.
+                if result is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail={
+                            "status": "error",
+                            "message": "Case not found"
+                        }
+                    )
+                
+                media_rows = result["mediaids"]
             
-                for media_row in media_rows:
-                    media_id = media_row["mediaid"]
+                for media_id in media_rows:
 
                     deleted_media = await connection.fetchrow(
                         """
@@ -704,17 +730,16 @@ class Case:
 
                 try:
                     #$414
-                    storage_client.head_object(
+                    storage_client.delete_object(
                         Bucket=media["mediabucket"], 
                         Key=object_name
                     )
-                except Exception as e:
-                    print(f"Failed to delete stored object {object_name}: {e}")
+                except Exception:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Object storage Error"
+                    )
 
-            return {
-                "deleted": True,
-                "reason": "deleted"
-            }
         finally:
             await connection.close()
 
