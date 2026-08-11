@@ -713,27 +713,175 @@ async def fetch_users(request: Request):
         if connection is not None:
             await connection.close()
 
-@router.post("/changeUserRole")
-async def change_user_role(
-    change_role_request: ChangeRoleRequest,
-    request: Request
-):
-    connection = None
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
+@router.post(
+    "/changeUserRole",
+    status_code=status.HTTP_200_OK,
+    summary="Change User Role",
+    description="Changes the role of a registered user. The endpoint requires a valid JWT and can only be accessed by an ADMIN user. An admin cannot change their own role.",
+    responses={
+        200: {
+            "description": "User role successfully updated",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "User role updated to INVESTIGATOR successfully"
+                    }
+                }
             }
-        )
+        },
+
+        400: {
+            "description": "Invalid role change request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingFields": {
+                            "summary": "Missing user ID or role",
+                            "description": "Triggered when userId or NewRole is missing.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Missing userId or NewRole field."
+                                }
+                            }
+                        },
+
+                        "InvalidUserId": {
+                            "summary": "Invalid user ID",
+                            "description": "Triggered when userID is not a valid UUID.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid userId format."
+                                }
+                            }
+                        },
+
+                        "InvalidRole": {
+                            "summary": "Invalid new role",
+                            "description": "Triggered when NewRole is not USER, ADMIN, or INVESTIGATOR.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing NewRole field."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when no JWT authentication cookie is provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid Token",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User does not have permission to perform this action",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "UnauthorizedUser": {
+                            "summary": "User is not an admin",
+                            "description": "Triggered when the authenticated user is not an ADMIN.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "User unauthorized"
+                                }
+                            }
+                        },
+
+                        "ChangeOwnRole": {
+                            "summary": "Attempt to change own role",
+                            "description": "Triggered when an admin tries to change their own role.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Not allowed to change own role"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "No user found with the provided user ID"
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Database error"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def change_user_role(change_role_request: ChangeRoleRequest, request: Request):
+    payload = verify_jwt(request)
 
     if payload.get("role") != "ADMIN":
-        return JSONResponse(
+        raise HTTPException(
             status_code=403,
-            content={
+            detail={
                 "status":"error",
                 "message": "User unauthorized"
             }
@@ -743,38 +891,38 @@ async def change_user_role(
     new_role = change_role_request.NewRole
 
     if not user_id or not new_role:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Missing userId or NewRole field."
             }
         )
     
     if payload.get("sub") == user_id:
-        return JSONResponse(
+        raise HTTPException(
             status_code=403,
-            content={
+            detail={
                 "status": "error",
-               "message": "Not allowed to change own role"
-           }
+                "message": "Not allowed to change own role"
+            }
         )
 
     try:
         user_id = uuidlib.UUID(user_id)
     except ValueError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status":"error",
                 "message":"Invalid userId format."
             }
         )
 
     if new_role not in ["USER", "ADMIN", "INVESTIGATOR"]:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing NewRole field."
             }
@@ -793,25 +941,22 @@ async def change_user_role(
         )
 
         if result == "UPDATE 0":
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": "No user found with the provided user ID"
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status":"success",
-                "message": f"User role updated to {new_role} successfully"
-            }
-        )
+        return {
+            "status":"success",
+            "message": f"User role updated to {new_role} successfully"
+        }
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status":"error",
                 "message":"Database error"
             }
