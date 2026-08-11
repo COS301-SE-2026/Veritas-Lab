@@ -1177,71 +1177,183 @@ async def create_comment(body: CreateCommentRequest, req: Request):
           
 @router.delete(
     "/deleteCase",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Deletes a case",
+    description="Deletes a specific case and all attached elements within reason",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Deletion of the case was successful.",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case deleted successfully"
+                    }
+                }
+            },
         },
+        400:{
+            "description": "Bad request - Missing Case id",
+            "content":{
+                "application/json":{
+                    "examples":{
+                        "Missing Payload ID": {
+                            "summary": "Missing Case ID in Request Body",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Case id is missing"
+                                }
+                            }
+                        },
+                        "Poorly formated case id": {
+                            "summary": "The case id is not a uuid",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "fake-uuid is not a valid UUID format"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Signature has expired."
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - User lacks sufficient permissions",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Role Forbidden": {
+                            "summary": "Standard User Role Blocked",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "User unauthorized"
+                                }
+                            }
+                        },
+                        "Not Owner or Admin": {
+                            "summary": "User is neither Case Creator nor Admin",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Only the case creator or an admin can delete this case"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not Found - Resource does not exist",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Case Not Found": {
+                            "summary": "Target Case ID Not Found",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Case not found"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Infrastructure failures",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "PostgreSQL Query Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Database query failed"
+                                }
+                            }
+                        },
+                        "Storage Error": {
+                            "summary": "S3 / MinIO Storage Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Object storage Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+
+    payload = verify_jwt(request)
     
     verify_not_user(payload.get("role"))
     
     if not case_request.CaseID:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": CASE_ID_REQUIRED
             }
         )
-    
-    try:
-        case_id = uuid.UUID(case_request.CaseID)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+
+    # Checkiing the uuid in constructor and keep object orientation.
+    delete_case=Case(CaseID=case_request.CaseID) 
 
     try:
-        result = await Case.delete_case(
-            case_id=case_id,
+        await delete_case.delete_case(
             username=payload.get("username"),
             role=payload.get("role")
         )
 
-        if result["reason"] == "not_found":
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "status": "error",
-                    "message": "Case not found"
-                }
-            )
-        
-        if result["reason"] == "unauthorized":
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "status": "error",
-                    "message": "Only the case creator or an admin can delete this case"
-                }
-            )
         
         return JSONResponse(
             status_code=200,
@@ -1252,9 +1364,9 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
     
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
