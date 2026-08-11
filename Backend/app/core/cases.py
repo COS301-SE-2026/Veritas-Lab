@@ -108,7 +108,13 @@ class Case:
                 uuid.UUID(cleaned_id)
                 self.CaseId = cleaned_id
             except ValueError:
-                raise ValueError(f"'{CaseID}' is not a valid UUID format")
+                raise HTTPException(
+                    status_code= 400,
+                    detail={
+                        "status": "error",
+                        "message": f"'{CaseID}' is not a valid UUID format"
+                    } 
+                )
         else:
             self.CaseId = None
         self.CaseCreationDate = None

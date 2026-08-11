@@ -1,11 +1,12 @@
 import json
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Header, Response, status, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.security import APIKeyCookie
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Annotated
 from app.core.cases import Case
-from app.auth.auth import verify_jwt
+from app.auth.auth import verify_jwt, COOKIE_NAME
 import asyncpg
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,7 @@ DATABASE_ERROR_MESSAGE="Database error"
 CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
+COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -902,6 +904,9 @@ async def delete_comment(request: Request, comment_id: int):
 
 @router.post(
     "/getComments/{case_id}",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Retrieve comments",
+    description="Fetches comments for a specific case.",
     responses={
         200: {
             "description": "Retrieval of comments was successful.",
@@ -928,12 +933,18 @@ async def delete_comment(request: Request, comment_id: int):
                 }
             },
         },
+        404: {
+            "description": "Not found - Missing case Id"
+        },
         400: {
-            "description": "Bad Request - Missing or invalid case ID",
+            "description": "Bad request- Poorly formatted UUID",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Missing case ID."
+                        "detail":{
+                            "status": "error",
+                            "message": "fake-uuid is not a valid UUID format"
+                        }
                     }
                 }
             }
@@ -946,22 +957,28 @@ async def delete_comment(request: Request, comment_id: int):
                         "Expired JWT": {
                             "summary": "JWT Token Expired",
                             "value": {
-                                "status": "error",
-                                "message": "Signature has expired."
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Signature has expired."
+                                }
                             }
                         },
                         "No authorization": {
                             "summary": "Missing JWT Cookie or Header",
                             "value": {
-                                "status": "error",
-                                "message": "Not authenticated"
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
                             }
                         },
                         "Invalid token": {
                             "summary": "Invalid JWT Signature/Malformed",
                             "value": {
-                                "status": "error",
-                                "message": "Invalid token"
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
                             }
                         }
                     }
@@ -973,8 +990,10 @@ async def delete_comment(request: Request, comment_id: int):
             "content": {
                 "application/json": {
                     "example": {
-                        "status": "error",
-                        "message": "User unauthorized"
+                        "detail":{
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
                     }
                 }
             }
@@ -993,8 +1012,10 @@ async def delete_comment(request: Request, comment_id: int):
                         "Unhandled Exception": {
                             "summary": "General Server Failure",
                             "value": {
-                                "status": "error",
-                                "message": "An unexpected error occurred."
+                                "detail": {
+                                    "status": "error",
+                                    "message": "An unexpected error occurred."
+                                }
                             }
                         }
                     }
@@ -1027,9 +1048,9 @@ async def retreive_comments(
     except HTTPException:
         raise
     except Exception as e:
-        return JSONResponse(
+        return HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error", 
                 "message": str(e)
             }
@@ -1276,6 +1297,7 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
 
 @router.post("/saveAnnotations", 
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
     summary="Save Report Annotations",
     description="Updates the JSONB media annotations for a specific report/evidence item in PostgreSQL.",
     response_model=success_response,

@@ -48,8 +48,14 @@ async def test_Case_Creation_Rejects_Blank_Creator():
 
 @pytest.mark.asyncio
 async def test_Cas_creation_Rejects_Invalid_UUID():
-    with pytest.raises(ValueError, match="'2' is not a valid UUID format"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(CaseID="2")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "'2' is not a valid UUID format"
+    }
 
 def test_CaseCreationRejectsBlankCaseName():
     with pytest.raises(ValueError, match="CaseName is required"):
