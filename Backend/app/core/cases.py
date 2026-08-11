@@ -112,7 +112,7 @@ class Case:
                     status_code= 400,
                     detail={
                         "status": "error",
-                        "message": f"'{CaseID}' is not a valid UUID format"
+                        "message": f"'{case_id}' is not a valid UUID format"
                     } 
                 )
         else:
@@ -520,7 +520,7 @@ class Case:
 
             rows = await connection.fetch(
             """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
-            , self.CaseId
+            , self.case_id
         )
 
             return [dict(row) for row in rows]
@@ -621,13 +621,13 @@ class Case:
         username: str, 
         role: str
     ):
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=MISSING_CASE_ID
             )
 
-        case_id=self.CaseId
+        case_id=self.case_id
         
         connection = await get_connection()
 

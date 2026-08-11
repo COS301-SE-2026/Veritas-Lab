@@ -32,9 +32,9 @@ CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 
 GET_CASES_SQL = """
-    SELECT caseid, casecreator, casename, casedescrition, caseclosed, casecreationdate
+    SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
     FROM "Cases_DB"."Cases"
-    where $1::boolean IS FALSE OR caseclosed IS TRUE
+    WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
     ORDER BY casecreationdate DESC
     """ 
 
@@ -266,10 +266,11 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
 @router.post(
     "/getCases",
+    dependencies=[Depends(COOKIE_SCHEME)],
     status_code=status.HTTP_200_OK,
     summary='List Cases',
     description=(
-        "Returns cases cisible to the caller. INVESTIGATOR and ADMIN see every case."
+        "Returns cases visible to the caller. INVESTIGATOR and ADMIN see every case. "
         "USER role sees only closed cases."
     ),
     responses={
@@ -299,8 +300,10 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
             "content": {
                 "application/json": {
                     "example": {
-                        "status": "error",
-                        "message": "Unauthorized - Missing or invalid JWT token"
+                        "detail": {
+                            "status": "error",
+                            "message": "Not authenticated"
+                        }
                     }
                 }
             }
@@ -312,8 +315,10 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
             "content": {
                 "application/json": {
                     "example": {
-                        "status": "error",
-                        "message": DATABASE_ERROR_MESSAGE
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
                     }
                 }
             }
@@ -339,7 +344,7 @@ async def get_cases(request: Request):
         }
 
     except asyncpg.PostgresError:
-        return HTTPException(
+        raise HTTPException(
             status_code=500,
             detail={
                 "status": "error",
@@ -1056,7 +1061,7 @@ async def retreive_comments(
     except HTTPException:
         raise
     except Exception as e:
-        return HTTPException(
+        raise HTTPException(
             status_code=500,
             detail={
                 "status": "error", 
@@ -1354,7 +1359,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
     # Checkiing the uuid in constructor and keep object orientation.
-    delete_case=Case(CaseID=case_request.CaseID) 
+    delete_case=Case(case_id=case_request.CaseID)
 
     try:
         await delete_case.delete_case(

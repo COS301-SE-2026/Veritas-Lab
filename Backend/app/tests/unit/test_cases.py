@@ -49,7 +49,7 @@ async def test_case_creation_Rejects_Blank_Creator():
 @pytest.mark.asyncio
 async def test_Cas_creation_Rejects_Invalid_UUID():
     with pytest.raises(HTTPException) as exc_info:
-        Case(CaseID="2")
+        Case(case_id="2")
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == {
@@ -235,10 +235,16 @@ async def test_create_case_cannot_be_called_twice(mock_connect):
 def test_get_cases_missing_jwt(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
-        raise ValueError("Missing Authorization header")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Missing Authorization header"
+            }
+        )
 
     monkeypatch.setattr(
-        cases_router, 
+        cases_router,
         "verify_jwt",
         mock_verify_jwt
     )
@@ -247,17 +253,25 @@ def test_get_cases_missing_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Missing Authorization header"
+        "detail": {
+            "status": "error",
+            "message": "Missing Authorization header"
+        }
     }
 
 def test_get_cases_invalid_jwt(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Invalid token"
+            }
+        )
 
     monkeypatch.setattr(
-        cases_router, 
+        cases_router,
         "verify_jwt",
         mock_verify_jwt
     )
@@ -269,8 +283,10 @@ def test_get_cases_invalid_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
 
 def test_get_cases_admin_returns_cases(monkeypatch):
@@ -1305,8 +1321,8 @@ def test_delete_case_success_creator(monkeypatch):
         }
     
     async def mock_delete_case(self, username: str, role: str):
-        assert isinstance(self.CaseId, str)
-        assert self.CaseId == "12345678-abcd-ef01-2345-6789abcdef01"
+        assert isinstance(self.case_id, str)
+        assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "investigator_user"
         assert role == "INVESTIGATOR"
     
@@ -1348,8 +1364,8 @@ def test_delete_case_success_admin(monkeypatch):
         }
     
     async def mock_delete_case(self, username: str, role: str):
-        assert isinstance(self.CaseId, str)
-        assert self.CaseId == "12345678-abcd-ef01-2345-6789abcdef01"
+        assert isinstance(self.case_id, str)
+        assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "admin_user"
         assert role == "ADMIN"
 
@@ -1643,7 +1659,7 @@ async def test_delete_case_not_found(mockDbConnect):
 
     connection.fetchrow = AsyncMock(return_value=None)
 
-    case = Case(CaseID=str(uuid4()))
+    case = Case(case_id=str(uuid4()))
 
     with pytest.raises(HTTPException) as excInfo:
         await case.delete_case("someone", "USER")
@@ -1663,7 +1679,7 @@ async def test_delete_case_unauthorized(mockDbConnect):
 
     connection.fetchrow = AsyncMock(return_value={"casecreator": "tha_real_creator"})
 
-    case = Case(CaseID=str(uuid4()))
+    case = Case(case_id=str(uuid4()))
 
     with pytest.raises(HTTPException) as excInfo:
         await case.delete_case("someone_eklse", "USER")
@@ -1693,7 +1709,7 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockget_object, moc
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
-    case = Case(CaseID=str(case_id))
+    case = Case(case_id=str(case_id))
 
     result = await case.delete_case("tha_real_creator", "USER")
 
