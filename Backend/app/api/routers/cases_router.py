@@ -1168,21 +1168,6 @@ def validate_comment_length(comment: str) -> bool:
                                 "status": "error", 
                                 "message": "Comment must be a non-empty string"
                             }
-                        },
-                        "Missing Case ID": {
-                            "summary": "Case ID is missing",
-                            "value": {
-                                "detail": MISSING_CASE_ID
-                            }
-                        },
-                        "Poorly formated case id": {
-                            "summary": "The case id is not a uuid",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "fake-uuid is not a valid UUID format"
-                                }
-                            }
                         }
                     }
                 }
@@ -1254,7 +1239,20 @@ def validate_comment_length(comment: str) -> bool:
                     }
                 }
             }
-        }
+        },
+        422: {
+            "description": "Validation error - badly formatted request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Invalid CommenCaseID": {
+                            "summary": "If the Case id is missing or not a uuid"
+                        }
+                    }
+                }
+            }
+        },
+
     }
 )
 async def create_comment(body: create_comment_request, req: Request):

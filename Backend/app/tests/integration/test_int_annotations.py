@@ -588,9 +588,70 @@ async def test_integration_create_comment_success(client,fake_comment_context):
     finally:
         await conn.close()
 
-
+async def assert_against_comment_table(user_name):
+    conn = await get_connection()
+    try:
+        db_row = await conn.fetchrow(
+            'SELECT * FROM "Cases_DB"."Comments" WHERE Username = $1',
+            user_name
+        )
+        
+        assert db_row is None, f"There exists a comment in the database from {user_name}."
+    finally:
+        await conn.close()
 
 #400
+@pytest.mark.asyncio
+async def test_integration_create_comment_empty_string(client,fake_comment_context):
+    case_id=fake_comment_context["case_id1"]
+    user_name="MRBeast"
+    mock_invest = mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": user_name,
+        "role": "INVESTIGATOR"
+    }
+
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+    comment=""
+    payload={
+        "case_id": case_id,
+        "comment": comment
+    }
+    response = client.post(
+        "/api/cases/comments",
+        json=payload
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Comment must be a non-empty string"
+    await assert_against_comment_table(user_name)
+
+@pytest.mark.asyncio
+async def test_integration_create_comment_invalid_case_id(client,fake_comment_context):
+    case_id=""
+    user_name="MRBeast"
+    mock_invest = mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": user_name,
+        "role": "INVESTIGATOR"
+    }
+
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+    comment="Beans"
+    payload={
+        "case_id": case_id,
+        "comment": comment
+    }
+    response = client.post(
+        "/api/cases/comments",
+        json=payload
+    )
+
+    assert response.status_code == 422
+    await assert_against_comment_table(user_name)
+
+
 
 #403
 
