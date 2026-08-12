@@ -19,6 +19,17 @@ export type EvidenceCardProps = {
     mediaUrl: string;
     mediaExtension: string;
     href?: string;
+    mediaId?: string;
+    caseId?: string;
+    canDelete?: boolean;
+    onDeleted?: () => void | Promise<void>;
+};
+//case evidence delete
+export type EvidenceDeleteButtonProps = {
+    caseId: string;
+    mediaId: string;
+    mediaName: string;
+    onDeleted?: () => void | Promise<void>;
 };
 
 export type DashboardModalProps = {
