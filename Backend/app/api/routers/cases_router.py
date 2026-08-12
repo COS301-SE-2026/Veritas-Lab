@@ -24,12 +24,15 @@ other_settings = Other_Settings()
 r2_settings = R2_Settings()
 minio_settings = Minio_Settings()
 
+CASE_NOT_FOUND="Case not found"
+MISSING_CASE_ID = "Case id is missing"
 NOT_USER= ["INVESTIGATOR", "ADMIN"]
 DATABASE_ERROR_MESSAGE="Database error"
 CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
+
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -114,7 +117,7 @@ class UpdateCaseRequest(BaseModel):
     CaseName: str | None = None
     CaseDescription: str | None = None
 
-class CreateCommentRequest(BaseModel):
+class create_comment_request(BaseModel):
     case_id: UUID
     comment: str | None = None
 
@@ -1125,28 +1128,146 @@ async def delete_evidence(
             }
         )
 
+def validate_comment_length(comment: str) -> bool:
+        if not isinstance(comment, str):
+            return False
+        return len(comment.strip()) > 0
 
-@router.post("/cases/comments", status_code=201)
-async def create_comment(body: CreateCommentRequest, req: Request):
-
-    try:
-        payload = verify_jwt(req)
-    except Exception as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
+@router.post(
+    "/cases/comments",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Create comments",
+    description="Creates a comment from the specific request body",
+    status_code=201,
+    responses={
+        201: {
+            "description": "Comment successfully created.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "comment": {
+                            "commentId": 105,
+                            "caseId": "123e4567-e89b-12d3-a456-426614174000",
+                            "username": "InvestigatorJane",
+                            "comment": "Reviewed the attached documents.",
+                            "timestamp": "2026-08-12T11:01:30"
+                        }
+                    }
+                }
             }
-        )
+        },
+        400: {
+            "description": "Bad Request - Validation errors.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Invalid Comment": {
+                            "summary": "Empty or invalid comment length",
+                            "value": {
+                                "status": "error", 
+                                "message": "Comment must be a non-empty string"
+                            }
+                        },
+                        "Missing Case ID": {
+                            "summary": "Case ID is missing",
+                            "value": {
+                                "detail": MISSING_CASE_ID
+                            }
+                        },
+                        "Poorly formated case id": {
+                            "summary": "The case id is not a uuid",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "fake-uuid is not a valid UUID format"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Signature has expired."
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - Role-based access restrictions.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "User Open Case Restriction": {
+                            "summary": "USER role attempting to comment on an open case",
+                            "value": {
+                                "detail": "Users may only comment on closed cases"
+                            }
+                        },
+                        "General Permission Denied": {
+                            "summary": "Role lacks commenting privileges entirely",
+                            "value": {
+                                "detail": "Permission denied"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not Found - The requested case does not exist.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": CASE_NOT_FOUND
+                    }
+                }
+            }
+        }
+    }
+)
+async def create_comment(body: create_comment_request, req: Request):
+    payload = verify_jwt(req)
+    # Need to document 
 
     role = payload.get("role")
     username = payload.get("username")
 
-    if not body.comment or not Case.validate_comment_length(body.comment):
-        return JSONResponse(
+    if not body.comment or not validate_comment_length(body.comment):
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error", 
                 "message": "Comment must be a non-empty string"
             }

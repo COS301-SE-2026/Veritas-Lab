@@ -12,6 +12,7 @@ from botocore.client import Config
 from app.core.env import Postgres_Settings, Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
 
+CASE_NOT_FOUND="Case not found"
 MISSING_CASE_ID = "Case id is missing"
 postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
@@ -537,12 +538,6 @@ class Case:
             if connection is not None:
                 await connection.close()
 
-    @staticmethod
-    def validate_comment_length(comment: str) -> bool:
-        if not isinstance(comment, str):
-            return False
-        return len(comment.strip()) > 0
-
     async def add_comment(
         self, 
         connection: asyncpg.Connection, 
@@ -595,7 +590,7 @@ class Case:
         if row is None or not row["case_exists"]:
             raise HTTPException(
                 status_code=404, 
-                detail="Case not found"
+                detail=CASE_NOT_FOUND
             )
 
         if not row["comment_inserted"]:
@@ -651,7 +646,7 @@ class Case:
                         status_code=404,
                         detail={
                             "status": "error",
-                            "message": "Case not found"
+                            "message": CASE_NOT_FOUND
                         }
                     )
                 
@@ -691,7 +686,7 @@ class Case:
                         status_code=404,
                         detail={
                             "status": "error",
-                            "message": "Case not found"
+                            "message": CASE_NOT_FOUND
                         }
                     )
                 
