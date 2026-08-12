@@ -590,18 +590,27 @@ class Case:
         if row is None or not row["case_exists"]:
             raise HTTPException(
                 status_code=404, 
-                detail=CASE_NOT_FOUND
+                detail={
+                    "status":"error",
+                    "message":CASE_NOT_FOUND
+                }
             )
 
         if not row["comment_inserted"]:
             if role == "USER":
                 raise HTTPException(
                     status_code=403, 
-                    detail="Users may only comment on closed cases"
+                    detail={
+                        "status":"error",
+                        "message":"Users may only comment on closed cases"
+                    }
                 )
             raise HTTPException(
                 status_code=403, 
-                detail="Permission denied"
+                detail={
+                    "status":"error",
+                    "message":"Permission denied"
+                }
             )
 
         return {

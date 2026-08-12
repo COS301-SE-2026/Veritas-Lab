@@ -1217,13 +1217,19 @@ def validate_comment_length(comment: str) -> bool:
                         "User Open Case Restriction": {
                             "summary": "USER role attempting to comment on an open case",
                             "value": {
-                                "detail": "Users may only comment on closed cases"
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Users may only comment on closed cases"
+                                }
                             }
                         },
                         "General Permission Denied": {
                             "summary": "Role lacks commenting privileges entirely",
                             "value": {
-                                "detail": "Permission denied"
+                                "detail":{
+                                    "status": "error",
+                                    "message":"Permission denied"
+                                } 
                             }
                         }
                     }
@@ -1235,7 +1241,11 @@ def validate_comment_length(comment: str) -> bool:
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": CASE_NOT_FOUND
+                        
+                        "detail":{
+                            "status": "error",
+                            "message": CASE_NOT_FOUND
+                        }
                     }
                 }
             }

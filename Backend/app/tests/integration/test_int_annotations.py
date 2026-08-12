@@ -651,8 +651,31 @@ async def test_integration_create_comment_invalid_case_id(client,fake_comment_co
     assert response.status_code == 422
     await assert_against_comment_table(user_name)
 
-
-
 #403
+@pytest.mark.asyncio
+async def test_integration_create_comment_lack_perm(client,fake_comment_context):
+    case_id=fake_comment_context["case_id1"]
+    user_name="MRBeast"
+    mock_invest = mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": user_name,
+        "role": "Fred"
+    }
+
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+    comment="Good day"
+    payload={
+        "case_id": case_id,
+        "comment": comment
+    }
+    response = client.post(
+        "/api/cases/comments",
+        json=payload
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Permission denied"
+    await assert_against_comment_table(user_name)
 
 #404
