@@ -1618,7 +1618,10 @@ async def test_add_comment_case_not_found():
         await case.add_comment(connection, "someone", "comment_ig", "USER")
 
     assert excInfo.value.status_code == 404
-    assert excInfo.value.detail == "Case not found"
+    assert excInfo.value.detail == {
+        "status": "error",
+        "message": "Case not found"
+    }
 
 @pytest.mark.asyncio
 async def test_add_comment_user_blocked_on_open_case():
@@ -1641,7 +1644,10 @@ async def test_add_comment_user_blocked_on_open_case():
         await case.add_comment(connection, "someone", "comment_ig", "USER")
         
     assert excInfo.value.status_code == 403
-    assert excInfo.value.detail == "Users may only comment on closed cases"
+    assert excInfo.value.detail == {
+        "status": "error",
+        "message": "Users may only comment on closed cases"
+    }
 
 def make_mock_connection_with_transaction():
     connection = AsyncMock()

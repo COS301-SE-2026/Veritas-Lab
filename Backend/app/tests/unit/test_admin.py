@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 from app.api.main import app
 import app.auth.auth as auth
@@ -28,7 +29,8 @@ class MockConnection:
 async def mock_connect(*args, **kwargs):
     return MockConnection()
 
-def test_fetch_users_success(monkeypatch):
+@pytest.mark.asyncio
+async def test_fetch_users_success(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
         return{
@@ -72,7 +74,8 @@ def test_fetch_users_success(monkeypatch):
         "role":"USER"
     }
 
-def test_fetch_users_not_admin(monkeypatch):
+@pytest.mark.asyncio
+async def test_fetch_users_not_admin(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
         return{
@@ -97,14 +100,23 @@ def test_fetch_users_not_admin(monkeypatch):
     data = response.json()
 
     assert data == {
-        "status": "error",
-        "message": "User unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
     }
 
-def test_fetch_users_invalid_token(monkeypatch):
+@pytest.mark.asyncio
+async def test_fetch_users_invalid_token(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Invalid token"
+            }
+        )
     
     monkeypatch.setattr(
         auth, 
@@ -117,16 +129,19 @@ def test_fetch_users_invalid_token(monkeypatch):
         json={}
     )
 
-    assert response.status_code  == 401
+    assert response.status_code == 401
 
     data=response.json()
 
     assert data == {
-        "status":"error",
-        "message": "Invalid token" 
+        "detail": {
+            "status":"error",
+            "message": "Invalid token" 
+        }
     }
 
-def test_fetch_users_no_users(monkeypatch):
+@pytest.mark.asyncio
+async def test_fetch_users_no_users(monkeypatch):
     client.cookies.clear()
     class EmptyMockConnection:
         async def fetch(self, query):
@@ -170,7 +185,8 @@ def test_fetch_users_no_users(monkeypatch):
         "users":[]
     }
 
-def test_change_user_role_success(monkeypatch):
+@pytest.mark.asyncio
+async def test_change_user_role_success(monkeypatch):
     client.cookies.clear()
     class MockConnection:
         async def execute(self, query, *args):
@@ -217,7 +233,8 @@ def test_change_user_role_success(monkeypatch):
         "message": "User role updated to INVESTIGATOR successfully"
     }
 
-def test_change_user_role_not_admin(monkeypatch):
+@pytest.mark.asyncio
+async def test_change_user_role_not_admin(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
         return{
@@ -242,11 +259,14 @@ def test_change_user_role_not_admin(monkeypatch):
     data = response.json()
 
     assert data == {
-        "status": "error",
-        "message": "User unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
     }
 
-def test_change_user_role_no_user(monkeypatch):
+@pytest.mark.asyncio
+async def test_change_user_role_no_user(monkeypatch):
     client.cookies.clear()
     class MockConnection:
         async def execute(self, query, *args):
@@ -289,11 +309,14 @@ def test_change_user_role_no_user(monkeypatch):
     data = response.json()
     
     assert data == {
-        "status": "error",
-        "message": "No user found with the provided user ID"
+        "detail": {
+            "status": "error",
+            "message": "No user found with the provided user ID"
+        }
     }
 
-def test_change_user_role_invalid_role(monkeypatch):
+@pytest.mark.asyncio
+async def test_change_user_role_invalid_role(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
         return {
@@ -321,11 +344,14 @@ def test_change_user_role_invalid_role(monkeypatch):
     data = response.json()
     
     assert data == {
-        "status": "error",
-        "message": "Invalid or missing NewRole field."
+        "detail": {
+            "status": "error",
+            "message": "Invalid or missing NewRole field."
+        }
     }
 
-def test_admin_cannot_change_self(monkeypatch):
+@pytest.mark.asyncio
+async def test_admin_cannot_change_self(monkeypatch):
     """Test that the admin cannot change their own role"""
     client.cookies.clear()
     class MockConnection:
@@ -371,6 +397,8 @@ def test_admin_cannot_change_self(monkeypatch):
     data = response.json()
     
     assert data == {
-        "status": "error",
-        "message": "Not allowed to change own role"
+        "detail": {
+            "status": "error",
+            "message": "Not allowed to change own role"
+        }
     }
