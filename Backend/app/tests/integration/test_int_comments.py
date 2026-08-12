@@ -14,6 +14,7 @@ POSTGRES_SEETTINGS=Postgres_Settings()
 AUTH_SETTINGS = Auth_Settings()
 
 INVEST_USER = None
+ADMIN_USER = None
 
 @pytest.fixture
 def client():
@@ -51,6 +52,28 @@ def load_investigator_user():
     
     INVEST_USER = asyncio.run(fetch_investigator())
     assert INVEST_USER is not None
+
+@pytest.fixture(scope="session", autouse=True)
+def load_admin_user():
+    global ADMIN_USER
+
+    async def fetch_admin():
+        connection = await get_connection()
+
+        try:
+            return await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                USER_SETTINGS.ADMIN_EMAIL
+            )
+        finally:
+            await connection.close()
+
+    ADMIN_USER = asyncio.run(fetch_admin())
+    assert ADMIN_USER is not None
 
 @pytest.mark.asyncio
 async def test_integration_delete_comment_success(client):
@@ -173,8 +196,83 @@ async def test_integration_delete_comment_invalid_token(client):
         }
     }
 
+@pytest.mark.asyncio
+async def test_integration_delete_comment_not_owner(client):
+    investigator = {
+        "id": str(INVEST_USER["userid"]),
+        "username": INVEST_USER["username"],
+        "role": "INVESTIGATOR"
+    }
 
+    investigator_token = create_token(investigator)
 
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        investigator_token
+    )
 
+    case_response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Delete Comment Ownership Test",
+            "description": "Temporary case for ownership integration test"
+        }
+    )
 
+    assert case_response.status_code == 201
 
+    case_id = case_response.json()["CaseId"]
+
+    comment_response = client.post(
+        "/api/cases/comments",
+        json={
+            "case_id": case_id,
+            "comment": "Investigator owns this comment"
+        }
+    )
+
+    assert comment_response.status_code == 201
+
+    comment_id = comment_response.json()["comment"]["commentId"]
+
+    admin = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.delete(f"/api/deleteComment/comment/{comment_id}")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Comment not found or user unauthorized"
+        }
+    }
+
+    connection = await get_connection()
+
+    try:
+        comment = await connection.fetchrow(
+            """
+            SELECT commentid
+            FROM "Cases_DB"."Comments"
+            WHERE commentid = $1
+            """,
+            comment_id
+        )
+
+        assert comment is not None
+
+    finally:
+        await connection.close()
