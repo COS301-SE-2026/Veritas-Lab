@@ -519,8 +519,10 @@ class Case:
             connection = await get_connection()
 
             rows = await connection.fetch(
-            """SELECT CommentID, Username, Comment, CommentTimestamp from "Cases_DB"."Comments" WHERE CaseId = $1"""
-            , self.case_id
+            """SELECT CommentID,
+            Username, Comment, CommentTimestamp
+            from "Cases_DB"."Comments" WHERE CaseId = $1""",
+            self.case_id
         )
 
             return [dict(row) for row in rows]

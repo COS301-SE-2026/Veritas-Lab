@@ -164,7 +164,7 @@ def transform_to_uuid(changer:str)->UUID:
         )
     
 
-def  _row_to_case(row: dict) -> Case:
+def _row_to_case(row: dict) -> Case:
     case = Case(
         case_creator=row["casecreator"],
         case_name=row["casename"],
