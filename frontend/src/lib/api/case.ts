@@ -102,3 +102,21 @@ export async function closeCase(caseId: string): Promise<{ status: string; messa
         throw error;
     }
 }
+
+export async function deleteEvidence(caseId: string, mediaId: string): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/delete/case/${caseId}/evidence/${mediaId}`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to delete evidence');
+        }
+        return data;
+    }
+    catch (error) {
+        console.error('Error deleting evidence:', error);
+        throw error;
+    }
+}
