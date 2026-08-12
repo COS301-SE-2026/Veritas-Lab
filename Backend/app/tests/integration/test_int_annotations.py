@@ -41,10 +41,14 @@ async def fake_report_context():
         
         await conn.execute(
             """
-            INSERT INTO "Cases_DB"."MediaType" (MediaTypeId, MediaName, MediaBucket, MediaExtension)
+            INSERT INTO "Cases_DB"."MediaType" 
+            (MediaTypeId, MediaName, MediaBucket, MediaExtension)
             VALUES ($1, $2, $3, $4)
             """,
-            uuid.UUID(media_type_id), media_name, "test-bucket", ".tester"
+            uuid.UUID(media_type_id), 
+            media_name, 
+            "test-bucket", 
+            ".tester"
         )
         created_ids["media_type_id"] = media_type_id
 
@@ -53,20 +57,28 @@ async def fake_report_context():
 
         await conn.execute(
             """
-            INSERT INTO "Cases_DB"."Media" (MediaId, MediaType, MediaHash)
+            INSERT INTO "Cases_DB"."Media" 
+            (MediaId, MediaType, MediaHash)
             VALUES ($1, $2, $3)
             """,
-            uuid.UUID(media_id), uuid.UUID(media_type_id), media_hash
+            uuid.UUID(media_id), 
+            uuid.UUID(media_type_id), 
+            media_hash
         )
         created_ids["media_id"] = media_id
 
         case_id = str(uuid.uuid4())
         await conn.execute(
             """
-            INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
+            INSERT INTO "Cases_DB"."Cases" 
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
             VALUES ($1, $2, $3, $4, $5)
             """,
-            uuid.UUID(case_id), "Integration Test Investigation Case", "TestInvest", "Integration test case description", False
+            uuid.UUID(case_id), 
+            "Integration Test Investigation Case", 
+            "TestInvest", 
+            "Integration test case description", 
+            False
         )
         created_ids["case_id"] = case_id
 
@@ -90,19 +102,22 @@ async def fake_report_context():
     finally:
         if "case_id" in created_ids:
             await conn.execute(
-                'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
+                """DELETE FROM "Cases_DB"."Cases" 
+                WHERE CaseId = $1""",
                 uuid.UUID(created_ids["case_id"])
             )
 
         if "media_id" in created_ids:
             await conn.execute(
-                'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
+                """DELETE FROM "Cases_DB"."Media" 
+                WHERE MediaId = $1""",
                 uuid.UUID(created_ids["media_id"])
             )
 
         if "media_type_id" in created_ids:
             await conn.execute(
-                'DELETE FROM "Cases_DB"."MediaType" WHERE MediaTypeId = $1',
+                """DELETE FROM "Cases_DB"."MediaType" 
+                WHERE MediaTypeId = $1""",
                 uuid.UUID(created_ids["media_type_id"])
             )
 
@@ -321,13 +336,18 @@ async def fake_comment_context():
     try:
         case_id1=str(uuid.uuid4())
         case_creation_literal="""
-        INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
+        INSERT INTO "Cases_DB"."Cases" 
+        (CaseId, CaseName, 
+        CaseCreator, CaseDescription, CaseClosed)
         VALUES ($1, $2, $3, $4, $5)
         """
 
         await conn.execute(
             case_creation_literal,
-            uuid.UUID(case_id1), "Test Case","Creator","To test comments", False
+            uuid.UUID(case_id1), 
+            "Test Case","Creator",
+            "To test comments", 
+            False
         )
 
         created_ids["case_id1"]=case_id1
@@ -335,7 +355,11 @@ async def fake_comment_context():
         case_id2=str(uuid.uuid4())
         await conn.execute(
             case_creation_literal,
-            uuid.UUID(case_id2), "Test separation", "TestInvest", "For more Tests", True
+            uuid.UUID(case_id2), 
+            "Test separation", 
+            "TestInvest", 
+            "For more Tests", 
+            True
         )
 
         comment_creation_literal="""
@@ -518,5 +542,56 @@ async def test_integration_get_comment_invalid_cookie_error(client, fake_comment
     assert response.status_code == 403
     assert response.json()["detail"]["status"]=="error"
     assert response.json()["detail"]["message"]== "User unauthorized"
-    
 
+#201
+@pytest.mark.asyncio
+async def test_integration_create_comment_success(client,fake_comment_context):
+    case_id=fake_comment_context["case_id1"]
+    mock_invest = mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": "TestInvest",
+        "role": "INVESTIGATOR"
+    }
+
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+    comment="Help me tests my limits"
+    payload={
+        "case_id": case_id,
+        "comment": comment
+    }
+    response = client.post(
+        "/api/cases/comments",
+        json=payload
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "success"
+    response_data = response.json()["comment"]
+    assert response_data["comment"] == comment
+    assert response_data["username"] == "TestInvest"
+
+    comment_id = response_data["commentId"]
+
+    conn = await get_connection()
+    try:
+        db_row = await conn.fetchrow(
+            'SELECT * FROM "Cases_DB"."Comments" WHERE CommentId = $1',
+            comment_id
+        )
+        
+        assert db_row is not None, f"There doesn't exist a {comment_id} comment in the database."
+
+        assert db_row["comment"] == comment
+        assert db_row["username"] == "TestInvest"
+        assert str(db_row["caseid"]) == case_id
+        
+    finally:
+        await conn.close()
+
+
+
+#400
+
+#403
+
+#404
