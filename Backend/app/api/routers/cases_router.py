@@ -6,7 +6,7 @@ from fastapi.security import APIKeyCookie
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Annotated
 from app.core.cases import Case
-from app.auth.auth import verify_jwt, COOKIE_NAME
+from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN
 import asyncpg
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -32,7 +32,6 @@ CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
-
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
@@ -95,12 +94,10 @@ def get_object(for_presign: bool = False) -> S3Client:
             ),
         )
 
-
 router = APIRouter(
     prefix="/api",
     tags=["Cases"]
 )
-
 
 class CreateCaseRequest(BaseModel):
     title: str | None = None
@@ -159,7 +156,6 @@ def transform_to_uuid(changer:str)->UUID:
             }
         )
     
-
 def _format_case_evidence(row: dict, user : bool) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
@@ -847,18 +843,99 @@ async def update_comment(
         if connection is not None:
             await connection.close()
 
-@router.delete("/deleteComment/comment/{comment_id}")
-async def delete_comment(request: Request, comment_id: int):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
+@router.delete(
+    "/deleteComment/comment/{comment_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Delete comment",
+    description="An authenticated user is able to delete their own comment.",
+    responses={
+        200: {
+            "description": "Comment deleted successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Comment deleted successfully."
+                    }
+                }
             }
-        )
+        },
+
+        401: {
+            "description": "Token authentication or validation failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "NotAuthenticated": {
+                            "summary": "Not authenticated",
+                            "description": "Triggered when the authentication cookie is not provided or does not contain a JWT.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when the JWT cannot be decoded or fails validation.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        404: {
+            "description": "Comment could not be deleted",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Comment not found or user unauthorized"
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Comment could not be deleted",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def delete_comment(request: Request, comment_id: int):
+    payload = verify_jwt(request)
+    username = payload.get("username")
     
     connection = None
     try:
@@ -872,30 +949,27 @@ async def delete_comment(request: Request, comment_id: int):
             RETURNING commentid
             """,
             comment_id,
-            payload.get("username")
+            username
         )
 
         if row is None:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status":"error",
                     "message": "Comment not found or user unauthorized"
                 }
             )
             
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Comment deleted successfully."
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Comment deleted successfully."
+        }
     
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
