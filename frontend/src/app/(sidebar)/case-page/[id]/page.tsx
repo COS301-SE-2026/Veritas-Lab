@@ -74,6 +74,7 @@ export default function CasePage() {
     const caseComments = caseData?.comments ?? [];
     const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
     const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed;
+    const canDeleteEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') //role of admin needs to be discussed and reviewed on frontend but for now giving it access.
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
@@ -120,6 +121,10 @@ export default function CasePage() {
                                         mediaUrl={evidence.mediaUrl}
                                         mediaExtension={evidence.mediaExtension}
                                         href={`/case-page/${id}/workbench/${evidence.reportId}`}
+                                        mediaId={evidence.mediaId}
+                                        caseId={id}
+                                        canDelete={canDeleteEvidence}
+                                        onDeleted={reloadCaseData}
                                     />
                                 )) : (
                                     <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
