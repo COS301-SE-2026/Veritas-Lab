@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
@@ -34,6 +34,7 @@ app.add_middleware(
 app.include_router(cases_router)
 
 app.include_router(auth_router)
+
 
 @app.get("/")
 def root():

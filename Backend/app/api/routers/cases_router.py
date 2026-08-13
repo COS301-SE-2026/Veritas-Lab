@@ -298,13 +298,36 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
         401: {
             "model": error_response,
-            "description": "Unauthorized - Missing or invalid JWT token",
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": "Not authenticated"
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Token has expired"
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
+                            }
                         }
                     }
                 }
