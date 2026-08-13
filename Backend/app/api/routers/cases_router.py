@@ -33,6 +33,13 @@ INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 
+GET_CASES_SQL = """
+    SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+    FROM "Cases_DB"."Cases"
+    WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
+    ORDER BY casecreationdate DESC
+    """ 
+
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
         user=postgres_settings.DB_USER,
@@ -156,6 +163,20 @@ def transform_to_uuid(changer:str)->UUID:
             }
         )
     
+
+def _row_to_case(row: dict) -> Case:
+    case = Case(
+        case_creator=row["casecreator"],
+        case_name=row["casename"],
+        case_description=row["casedescription"]
+    )
+
+    case.case_id = row["caseid"]
+    case.case_closed = row["caseclosed"]
+    case.case_creation_date = row["casecreationdate"]
+
+    return case
+
 def _format_case_evidence(row: dict, user : bool) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
@@ -220,9 +241,9 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
     try:
         case = Case(
-            CaseName=case_request.title, 
-            CaseCreator=payload.get("username"), 
-            CaseDescription=case_request.description
+            case_name=case_request.title, 
+            case_creator=payload.get("username"), 
+            case_description=case_request.description
         )
     except ValueError as e:
         return JSONResponse(
@@ -245,83 +266,115 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
 @router.post(
     "/getCases",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    status_code=status.HTTP_200_OK,
+    summary='List Cases',
+    description=(
+        "Returns cases visible to the caller. INVESTIGATOR and ADMIN see every case. "
+        "USER role sees only closed cases."
+    ),
     responses={
+        200: {
+            "description": "Cases retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "cases": [
+                            {
+                                "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                "caseName": "Reciepts sus",
+                                "caseDescription": "Sus receipts case",
+                                "caseClosed": False,
+                                "caseCreationDate": "2026-05-20T19:43:02+00:00",
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+
         401: {
-            "model": error_response, 
-            "description": "Unauthorized - Invalid or missing token"
+            "model": error_response,
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Token has expired"
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid token"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         },
+
         500: {
-            "model": error_response, 
-            "description": "Internal Server Error - Database error"
-        },
+            "model": error_response,
+            "description": "Internal server error " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def get_cases(request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
-    
+  
+    payload = verify_jwt(request)
+
     connection = None
 
     try:
         connection = await get_connection()
 
-        if payload.get("role") == "USER":
-            rows = await connection.fetch(
-                """
-                SELECT *
-                FROM "Cases_DB"."Cases"
-                WHERE caseclosed = TRUE
-                ORDER BY casecreationdate DESC
-                """
-            )
-        else:
-            rows = await connection.fetch(
-                """
-                SELECT *
-                FROM "Cases_DB"."Cases"
-                ORDER BY casecreationdate DESC
-                """
-            )
+        is_standard_user = payload.get("role") == "USER"
 
+        rows = await connection.fetch(GET_CASES_SQL, is_standard_user)
 
-        cases = []
+        return {
+            "status": "success",
+            "cases": [jsonable_encoder(_row_to_case(row).to_json()) for row in rows]
+        }
 
-        for row in rows:
-            case = Case(
-                CaseCreator=row["casecreator"],
-                CaseName=row["casename"],
-                CaseDescription=row["casedescription"]
-            )
-
-            case.CaseId = row["caseid"]
-            case.CaseClosed = row["caseclosed"]
-            case.CaseCreationDate = row["casecreationdate"]
-
-            cases.append(case.to_json())
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "cases": cases
-            }
-        )
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
     finally:
         if connection is not None:
             await connection.close()
@@ -414,15 +467,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 }
             )
 
-        case = Case(
-            CaseCreator=row["casecreator"],
-            CaseName=row["casename"],
-            CaseDescription=row["casedescription"]
-        )
-
-        case.CaseId = row["caseid"]
-        case.CaseClosed = row["caseclosed"]
-        case.CaseCreationDate = row["casecreationdate"]
+        case = _row_to_case(row)
 
         evidence_rows = await connection.fetch(
             """
@@ -510,7 +555,7 @@ async def upload_evidence(
 
     verify_not_user(payload.get("role"))
 
-    CaseCreator=payload["username"]
+    case_creator = payload["username"]
 
     try:
         case_uuid = UUID(case_id)
@@ -533,7 +578,7 @@ async def upload_evidence(
             AND "caseclosed" = false;
             """, 
             case_uuid,
-            CaseCreator
+            case_creator
         )
         
         if row is None:
@@ -545,15 +590,7 @@ async def upload_evidence(
                 }
             )
 
-        case = Case(
-            CaseCreator=row["casecreator"],
-            CaseName=row["casename"],
-            CaseDescription=row["casedescription"]
-        )
-
-        case.CaseId = row["caseid"]
-        case.CaseClosed = row["caseclosed"]
-        case.CaseCreationDate = row["casecreationdate"]
+        case = _row_to_case(row)
 
         result = await case.add_evidence(media, case_uuid)
 
@@ -710,7 +747,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
     validated_name = None
     if case_request.CaseName is not None:
         try:
-            validated_name = Case(CaseName=case_request.CaseName).CaseName  # This will raise ValueError if invalid
+            validated_name = Case(case_name=case_request.CaseName).case_name  # This will raise ValueError if invalid
         except ValueError as e:
             return JSONResponse(
                 status_code=400, 
@@ -1111,7 +1148,7 @@ async def retreive_comments(
     verify_not_user(user_role) 
 
     try:
-        case = Case(CaseID=case_id)
+        case = Case(case_id=case_id)
         comments_data= await case.get_comments()
 
         return JSONResponse(
@@ -1125,7 +1162,7 @@ async def retreive_comments(
     except HTTPException:
         raise
     except Exception as e:
-        return HTTPException(
+        raise HTTPException(
             status_code=500,
             detail={
                 "status": "error", 
@@ -1174,7 +1211,7 @@ async def delete_evidence(
         )
         
     try:
-        case = Case(CaseID=case_id)
+        case = Case(case_id=case_id)
         username=payload.get("username") if user_role == "INVESTIGATOR" else None
         response=await case.delete_evidence(media_id=media_id, JWT_username=username)
 
@@ -1358,7 +1395,7 @@ async def create_comment(body: create_comment_request, req: Request):
     connection = await get_connection()
 
     try:
-        case = Case(CaseID=str(body.case_id))
+        case = Case(case_id=str(body.case_id))
 
         new_comment = await case.add_comment(
             connection, 
@@ -1549,7 +1586,7 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
     # Checkiing the uuid in constructor and keep object orientation.
-    delete_case=Case(CaseID=case_request.CaseID) 
+    delete_case=Case(case_id=case_request.CaseID)
 
     try:
         await delete_case.delete_case(
