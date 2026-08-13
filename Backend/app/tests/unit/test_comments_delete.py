@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock
 import asyncpg
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
+from app.auth.auth import INVALID_TOKEN
+from fastapi import HTTPException
 
 client = TestClient(app)
 
@@ -65,7 +67,13 @@ def test_delete_comment_invalid_jwt(monkeypatch):
     client.cookies.clear()
 
     def mock_verify_jwt(request):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+        status_code=401,
+        detail={
+            "status": "error",
+            "message": INVALID_TOKEN
+        }
+    )
     
     monkeypatch.setattr(
         cases_router, 
@@ -77,15 +85,23 @@ def test_delete_comment_invalid_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
 
 def test_delete_comment_missing_jwt_cookie(monkeypatch):
     client.cookies.clear()
 
     def mock_verify_jwt(request):
-        raise ValueError("Missing authentication cookie")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Missing authentication cookie"
+            }
+        )
     
     monkeypatch.setattr(
         cases_router, 
@@ -97,8 +113,10 @@ def test_delete_comment_missing_jwt_cookie(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Missing authentication cookie"
+        "detail": {
+            "status": "error",
+            "message": "Missing authentication cookie"
+        }
     }
 
 def test_delete_comment_not_found(monkeypatch):
@@ -126,8 +144,10 @@ def test_delete_comment_not_found(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Comment not found or user unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "Comment not found or user unauthorized"
+        }
     }
 
 def test_delete_comment_unauthorized_user(monkeypatch):
@@ -155,8 +175,10 @@ def test_delete_comment_unauthorized_user(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Comment not found or user unauthorized"
+        "detail": {
+            "status": "error",
+            "message": "Comment not found or user unauthorized"
+        }
     }
 
 def test_delete_comment_database_error(monkeypatch):
@@ -184,8 +206,10 @@ def test_delete_comment_database_error(monkeypatch):
 
     assert response.status_code == 500
     assert response.json() == {
-        "status": "error",
-        "message": "Database error"
+        "detail": {
+            "status": "error",
+            "message": "Database error"
+        }
     }
 
 def test_delete_comment_invalid_comment_id_type():
