@@ -200,7 +200,7 @@ async def test_integration_delete_evidence_400_case_id(client, fake_evidence_con
 
 #200
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_success(client, fake_evidence_context):
+async def test_integration_delete_evidence_investigator_success(client, fake_evidence_context):
     case_id = fake_evidence_context["case_id"]
     media_id = fake_evidence_context["media_id"]
     creator = fake_evidence_context["creator"]
@@ -227,3 +227,75 @@ async def test_integration_delete_evidence_success(client, fake_evidence_context
             Bucket=fake_evidence_context["bucket"],
             Key=fake_evidence_context["file_key"]
         )
+
+#200
+@pytest.mark.asyncio
+async def test_integration_delete_evidence_admin_success(client, fake_evidence_context):
+    case_id = fake_evidence_context["case_id"]
+    media_id = fake_evidence_context["media_id"]
+    creator = "freckles"
+
+    mock_investigator = {
+        "id": str(uuid.uuid4()),
+        "username": creator,
+        "role": "ADMIN"
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_investigator))
+
+    response = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
+
+    assert response.status_code == 200
+    assert response.json()=={
+        "status":"success",
+        "deleted":media_id
+    }
+
+
+    s3_client = get_object()
+    with pytest.raises(ClientError):
+        s3_client.get_object(
+            Bucket=fake_evidence_context["bucket"],
+            Key=fake_evidence_context["file_key"]
+        )
+
+#404: No media
+@pytest.mark.asyncio
+async def test_integration_delete_evidence_404_no_media(client, fake_evidence_context):
+    case_id = fake_evidence_context["case_id"]
+    media_id = str(uuid.uuid4())
+    creator = fake_evidence_context["creator"]
+
+    mock_investigator = {
+        "id": str(uuid.uuid4()),
+        "username": creator,
+        "role": "ADMIN"
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_investigator))
+
+    response = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] =="Media not found."
+    await assert_object_storage_not_deleted(fake_evidence_context["media_id"],fake_evidence_context["case_id"],fake_evidence_context)
+
+#404: No Case
+@pytest.mark.asyncio
+async def test_integration_delete_evidence_404_no_case(client, fake_evidence_context):
+    case_id = str(uuid.uuid4())
+    media_id = fake_evidence_context["media_id"]
+    creator = "testerAdmin"
+
+    mock_investigator = {
+        "id": str(uuid.uuid4()),
+        "username": creator,
+        "role": "ADMIN"
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_investigator))
+
+    response = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] =="Media not found."
+    await assert_object_storage_not_deleted(fake_evidence_context["media_id"],fake_evidence_context["case_id"],fake_evidence_context)

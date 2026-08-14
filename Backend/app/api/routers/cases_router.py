@@ -1181,10 +1181,15 @@ async def retreive_comments(
             "description": "Not Found - Target case or evidence item does not exist.",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": CASE_NOT_FOUND
+                    "examples": {
+                        "Media Not Found": {
+                            "summary": "Target evidence item does not exist as while as if the case does not exist",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Media not found."
+                                }
+                            }
                         }
                     }
                 }
