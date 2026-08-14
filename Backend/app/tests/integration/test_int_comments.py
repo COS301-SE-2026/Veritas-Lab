@@ -99,7 +99,7 @@ async def test_integration_delete_comment_success(client):
         }
     )
 
-    assert case_response.status_code == 200
+    assert case_response.status_code == 201
 
     case_id = case_response.json()["CaseId"]
 
@@ -220,7 +220,7 @@ async def test_integration_delete_comment_not_owner(client):
         }
     )
 
-    assert case_response.status_code == 200
+    assert case_response.status_code == 201
 
     case_id = case_response.json()["CaseId"]
 

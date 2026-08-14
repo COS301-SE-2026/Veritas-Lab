@@ -220,10 +220,11 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 @router.post(
     "/createCase",
     summary="Create a Case",
+    status_code=201,
     dependencies=[Depends(COOKIE_SCHEME)],
     description="Creates a new case for an authenticated user. Those with the role 'USER' cannot use this endpoint.",
     responses={
-        200: {
+        201: {
             "description": "Case created successfully",
             "content": {
                 "application/json": {

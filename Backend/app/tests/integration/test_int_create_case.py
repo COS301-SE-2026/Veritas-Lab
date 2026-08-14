@@ -82,7 +82,7 @@ async def test_integration_create_case_success(client):
             }
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         response_data = response.json()
 
         assert response_data["status"] == "success"
