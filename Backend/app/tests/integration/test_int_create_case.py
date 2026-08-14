@@ -15,6 +15,29 @@ AMBIGUOUS_ERROR= "The email and/or password are invalid"
 AUTH_SETTINGS = Auth_Settings()
 
 ADMIN_USER = None
+E2E_USER = None
+
+@pytest.fixture(scope="session", autouse=True)
+def load_e2e_user():
+    global E2E_USER
+
+    async def fetch_user():
+        connection = await get_connection()
+
+        try:
+            return await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                USER_SETTINGS.E2E_USER_EMAIL
+            )
+        finally:
+            await connection.close()
+
+    E2E_USER = asyncio.run(fetch_user())
+    assert E2E_USER is not None
 
 @pytest.fixture(scope="session", autouse=True)
 def load_admin_user():
@@ -128,3 +151,82 @@ async def test_integration_create_case_success(client):
                 )
             finally:
                 await connection.close()
+
+@pytest.mark.asyncio
+async def test_integration_create_case_missing_jwt(client):
+    client.cookies.clear()
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Test case",
+            "description": "Test description"
+        }
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": NOT_AUTH
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_create_case_invalid_jwt(client):
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        "invalid-token"
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Test Case",
+            "description": "Test description"
+        }
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": INVALID_TOKEN
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_create_case_expired_jwt(client):
+    expired_token = jwt.encode(
+        {
+            "sub": str(ADMIN_USER["userid"]),
+            "username": ADMIN_USER["username"],
+            "role": "ADMIN",
+            "exp": datetime.now(timezone.utc) - timedelta(minutes=10)
+        },
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        expired_token
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Test Case",
+            "description": "Test description"
+        }
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": EXPIRED_TOKEN
+        }
+    }
