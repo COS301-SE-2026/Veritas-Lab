@@ -239,10 +239,24 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
             "description": "Bad Request - Invalid case data",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": "Case name cannot be empty"
+                    "examples": {
+                        "MissingCaseName": {
+                            "summary": "Missing case name",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName is required"
+                                }
+                            }
+                        },
+                        "CaseNameTooLong": {
+                            "summary": "Case name too long",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName must be 255 characters or less"
+                                }
+                            }
                         }
                     }
                 }

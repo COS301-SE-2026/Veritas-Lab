@@ -230,3 +230,99 @@ async def test_integration_create_case_expired_jwt(client):
             "message": EXPIRED_TOKEN
         }
     }
+
+@pytest.mark.asyncio
+async def test_integration_create_case_user_unauthorized(client):
+    user = {
+        "id": str(uuidlib.uuid4()),
+        "username": "integration_user",
+        "role": "USER"
+    }
+
+    token = create_token(user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        token
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Unauthorized Case",
+            "description": "This case should not be created."
+        }
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_create_case_empty_name(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "",
+            "description": "Test description"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "CaseName is required"
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_create_case_name_too_long(client):
+    admin_user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    admin_token = create_token(admin_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        admin_token
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "A" * 256,
+            "description": "Test description"
+        }
+    )
+
+    assert response.status_code == 400
+
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "CaseName must be 255 characters or less"
+        }
+    }
