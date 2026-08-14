@@ -18,6 +18,7 @@ import boto3
 from botocore.client import Config
 from mypy_boto3_s3 import S3Client
 from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_Settings
+from app.core.cases import get_object, get_connection
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -39,67 +40,6 @@ GET_CASES_SQL = """
     WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
     ORDER BY casecreationdate DESC
     """ 
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=postgres_settings.DB_USER,
-        password=postgres_settings.DB_PASSWORD,
-        database=postgres_settings.DB_NAME,
-        host=postgres_settings.DB_HOST,
-        port=postgres_settings.DB_PORT,
-        ssl="require" if postgres_settings.DB_SSL else None,
-    )
-
-def get_object(for_presign: bool = False) -> S3Client:
-    if other_settings.ENVIRONMENT == "development":
-
-        if for_presign:
-            minio_domain = minio_settings.MINIO_EXTERNAL_URL
-        else:
-            minio_domain = minio_settings.STORAGE_URL
-        
-        
-        if not minio_domain.startswith(("http://", "https://")):
-            minio_domain = f"http://{minio_domain}"
-
-        return boto3.client(
-            "s3",
-            endpoint_url=minio_domain,
-            aws_access_key_id=minio_settings.MINIO_ROOT_USER,
-            aws_secret_access_key=minio_settings.MINIO_ROOT_PASSWORD,
-            region_name=minio_settings.AWS_REGION,
-            config=Config(
-                signature_version="s3v4",
-                s3={
-                    "addressing_style": "path"
-                }
-            ),
-        )
-
-    else:
-        cloud_url = r2_settings.R2_URL
-        
-        if not cloud_url.startswith(("http://", "https://")):
-            cloud_url = f"https://{cloud_url}"
-
-        key_id=r2_settings.R2_ACCESS_KEY_ID
-        secret=r2_settings.R2_SECRET_ACCESS_KEY
-        print(f"Key ID: {repr(key_id)}")
-        print(f"Secret Length: {len(secret) if secret else 'None'}")
-
-        return boto3.client(
-            "s3",
-            endpoint_url=cloud_url,
-            aws_access_key_id=key_id,
-            aws_secret_access_key=secret,
-            region_name="auto",
-            config=Config(
-                signature_version="s3v4",
-                s3={
-                    "addressing_style": "path"
-                }
-            ),
-        )
 
 router = APIRouter(
     prefix="/api",

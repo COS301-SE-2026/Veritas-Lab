@@ -9,45 +9,14 @@ from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN, NOT_AUTH, EX
 import asyncio
 from jose import jwt
 from test_int_auth import delete_user_by_email
+from app.tests.integration.test_int_auth import client, get_connection, load_admin_user # for sonar
+import app.tests.integration.test_int_auth as auth_tests # for sonar
+
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SETTINGS=Postgres_Settings()
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 AUTH_SETTINGS = Auth_Settings()
-
-ADMIN_USER = None
-
-@pytest.fixture(scope="session", autouse=True)
-def load_admin_user():
-    global ADMIN_USER
-
-    async def fetch_admin():
-        connection = await get_connection()
-
-        try:
-            return await connection.fetchrow(
-                """
-                SELECT userid, username
-                FROM "Users_DB"."Users"
-                WHERE useremail = $1
-                """,
-                USER_SETTINGS.ADMIN_EMAIL
-            )
-        finally:
-            await connection.close()
-
-    ADMIN_USER = asyncio.run(fetch_admin())
-    assert ADMIN_USER is not None
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=POSTGRES_SETTINGS.DB_USER,
-        password=POSTGRES_SETTINGS.DB_PASSWORD,
-        database=POSTGRES_SETTINGS.DB_NAME,
-        host=POSTGRES_SETTINGS.DB_HOST,
-        port=POSTGRES_SETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SETTINGS.DB_SSL else None,
-    )
 
 @pytest.fixture
 def client():
@@ -61,8 +30,8 @@ async def test_integration_create_case_success(client):
 
     try:
         admin_user = {
-            "id": str(ADMIN_USER["userid"]),
-            "username": ADMIN_USER["username"],
+            "id": str(auth_tests.ADMIN_USER["userid"]),
+            "username": auth_tests.ADMIN_USER["username"],
             "role": "ADMIN"
         }
 
@@ -111,7 +80,7 @@ async def test_integration_create_case_success(client):
 
         assert created_case is not None
         assert str(created_case["caseid"]) == case_id
-        assert created_case["casecreator"] == ADMIN_USER["username"]
+        assert created_case["casecreator"] == auth_tests.ADMIN_USER["username"]
         assert created_case["casename"] == case_name
         assert created_case["casedescription"] == "Case created during integration testing."
         assert created_case["caseclosed"] is False
@@ -178,8 +147,8 @@ async def test_integration_create_case_invalid_jwt(client):
 async def test_integration_create_case_expired_jwt(client):
     expired_token = jwt.encode(
         {
-            "sub": str(ADMIN_USER["userid"]),
-            "username": ADMIN_USER["username"],
+            "sub": str(auth_tests.ADMIN_USER["userid"]),
+            "username": auth_tests.ADMIN_USER["username"],
             "role": "ADMIN",
             "exp": datetime.now(timezone.utc) - timedelta(minutes=10)
         },
@@ -251,8 +220,8 @@ async def test_integration_create_case_user_unauthorized(client):
 @pytest.mark.asyncio
 async def test_integration_create_case_empty_name(client):
     admin_user = {
-        "id": str(ADMIN_USER["userid"]),
-        "username": ADMIN_USER["username"],
+        "id": str(auth_tests.ADMIN_USER["userid"]),
+        "username": auth_tests.ADMIN_USER["username"],
         "role": "ADMIN"
     }
 
@@ -282,8 +251,8 @@ async def test_integration_create_case_empty_name(client):
 @pytest.mark.asyncio
 async def test_integration_create_case_name_too_long(client):
     admin_user = {
-        "id": str(ADMIN_USER["userid"]),
-        "username": ADMIN_USER["username"],
+        "id": str(auth_tests.ADMIN_USER["userid"]),
+        "username": auth_tests.ADMIN_USER["username"],
         "role": "ADMIN"
     }
 
