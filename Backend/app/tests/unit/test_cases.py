@@ -227,10 +227,14 @@ async def test_create_case_cannot_be_called_twice(mock_connect):
     case = Case(case_creator="alice_dev", case_name="Test Case")
     case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
 
-    with pytest.raises(ValueError, match="This case already exists"):
+    with pytest.raises(HTTPException) as exc_info:
         await case.create()
 
-    mock_connect.assert_not_called()
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "This case already exists"
+    }
 
 def test_get_cases_missing_jwt(monkeypatch):
     client.cookies.clear()

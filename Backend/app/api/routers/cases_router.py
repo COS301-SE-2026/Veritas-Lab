@@ -6,7 +6,7 @@ from fastapi.security import APIKeyCookie
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Annotated
 from app.core.cases import Case
-from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN
+from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
 import asyncpg
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -18,6 +18,7 @@ import boto3
 from botocore.client import Config
 from mypy_boto3_s3 import S3Client
 from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_Settings
+from app.core.cases import get_object, get_connection
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -39,67 +40,6 @@ GET_CASES_SQL = """
     WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
     ORDER BY casecreationdate DESC
     """ 
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=postgres_settings.DB_USER,
-        password=postgres_settings.DB_PASSWORD,
-        database=postgres_settings.DB_NAME,
-        host=postgres_settings.DB_HOST,
-        port=postgres_settings.DB_PORT,
-        ssl="require" if postgres_settings.DB_SSL else None,
-    )
-
-def get_object(for_presign: bool = False) -> S3Client:
-    if other_settings.ENVIRONMENT == "development":
-
-        if for_presign:
-            minio_domain = minio_settings.MINIO_EXTERNAL_URL
-        else:
-            minio_domain = minio_settings.STORAGE_URL
-        
-        
-        if not minio_domain.startswith(("http://", "https://")):
-            minio_domain = f"http://{minio_domain}"
-
-        return boto3.client(
-            "s3",
-            endpoint_url=minio_domain,
-            aws_access_key_id=minio_settings.MINIO_ROOT_USER,
-            aws_secret_access_key=minio_settings.MINIO_ROOT_PASSWORD,
-            region_name=minio_settings.AWS_REGION,
-            config=Config(
-                signature_version="s3v4",
-                s3={
-                    "addressing_style": "path"
-                }
-            ),
-        )
-
-    else:
-        cloud_url = r2_settings.R2_URL
-        
-        if not cloud_url.startswith(("http://", "https://")):
-            cloud_url = f"https://{cloud_url}"
-
-        key_id=r2_settings.R2_ACCESS_KEY_ID
-        secret=r2_settings.R2_SECRET_ACCESS_KEY
-        print(f"Key ID: {repr(key_id)}")
-        print(f"Secret Length: {len(secret) if secret else 'None'}")
-
-        return boto3.client(
-            "s3",
-            endpoint_url=cloud_url,
-            aws_access_key_id=key_id,
-            aws_secret_access_key=secret,
-            region_name="auto",
-            config=Config(
-                signature_version="s3v4",
-                s3={
-                    "addressing_style": "path"
-                }
-            ),
-        )
 
 router = APIRouter(
     prefix="/api",
@@ -231,24 +171,84 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 
 @router.post(
     "/createCase",
+    summary="Create a Case",
+    status_code=201,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    description="Creates a new case for an authenticated user. Those with the role 'USER' cannot use this endpoint.",
     responses={
-        403: {
-            "model": error_response,
-            "description": "Forbidden - User unauthorized"
+        201: {
+            "description": "Case created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "CaseId": "550e8400-e29b-41d4-a716-676767676767"
+                    }
+                }
+            }
         },
+
+        400: {
+            "description": "Bad Request - Invalid case data",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingCaseName": {
+                            "summary": "Missing case name",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName is required"
+                                }
+                            }
+                        },
+                        "CaseNameTooLong": {
+                            "summary": "Case name too long",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName must be 255 characters or less"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: {
+            "description": "Forbidden - User unauthorized",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        },
+
+        409: {
+            "description": "Conflict - Case already exists",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "This case already exists"
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def create_case(case_request: CreateCaseRequest, request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+    payload = verify_jwt(request)
     verify_not_user(payload.get("role"))
 
     try:
@@ -258,9 +258,9 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
             case_description=case_request.description
         )
     except ValueError as e:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": str(e)
             }
@@ -268,13 +268,10 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
     case_id = await case.create()
 
-    return JSONResponse(
-        status_code=201,
-        content={
-            "status": "success",
-            "CaseId": case_id
-        }
-    )
+    return {
+        "status": "success",
+        "CaseId": case_id
+    }
 
 @router.post(
     "/getCases",
