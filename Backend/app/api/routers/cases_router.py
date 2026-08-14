@@ -1185,11 +1185,152 @@ async def retreive_comments(
 
 @router.post(
     "/delete/case/{case_id}/evidence/{media_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Delete case evidence",
+    description="Deletes a specific evidence item/media attached to a case. Investigators can only delete evidence from cases they created, while Admins can delete any evidence.",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Evidence deleted successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "deleted": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+                    }
+                }
+            }
         },
+        400: {
+            "description": "Bad Request - Invalid UUID format or missing ID.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Invalid Media UUID": {
+                            "summary": "Invalid Media ID format",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Media is an invalid uuid"
+                                }
+                            }
+                        },
+                        "Invalid Case UUID": {
+                            "summary": "Invalid Case ID format",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_CASE_ID
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - User lacks permission or is standard USER role.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Role Forbidden": {
+                            "summary": "Standard USER Role Blocked",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "User unauthorized"
+                                }
+                            }
+                        },
+                        "Not Owner": {
+                            "summary": "Investigator is not the Case Creator or the case doesn't exist",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Unauthorized to delete this evidence or record not found."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not Found - Target case or evidence item does not exist.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Storage or Database failure.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": DATABASE_ERROR_MESSAGE
+                                }
+                            }
+                        },
+                        "Storage Error": {
+                            "summary": "S3 / Object Storage Error",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Failed to delete stored object: ClientError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def delete_evidence(
@@ -1217,10 +1358,7 @@ async def delete_evidence(
         response=await case.delete_evidence(media_id=media_id, jwt_username=username)
         #
         
-        return JSONResponse(
-            status_code=200,
-            content=response
-        )
+        return response
         
     except Exception as e:
         return HTTPException(
