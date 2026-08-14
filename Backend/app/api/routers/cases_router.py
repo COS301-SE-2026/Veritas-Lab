@@ -908,48 +908,7 @@ async def update_comment(
             }
         },
 
-        401: {
-            "description": "Token authentication or validation failed",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "NotAuthenticated": {
-                            "summary": "Not authenticated",
-                            "description": "Triggered when the authentication cookie is not provided or does not contain a JWT.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": NOT_AUTH
-                                }
-                            }
-                        },
-
-                        "ExpiredToken": {
-                            "summary": "Expired JWT",
-                            "description": "Triggered when the provided JWT has expired.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": EXPIRED_TOKEN
-                                }
-                            }
-                        },
-
-                        "InvalidToken": {
-                            "summary": "Invalid JWT",
-                            "description": "Triggered when the JWT cannot be decoded or fails validation.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": INVALID_TOKEN
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-
+        401: INVALID_TOKEN_401,
         404: {
             "description": "Comment could not be deleted",
             "content": {
@@ -1072,42 +1031,7 @@ async def delete_comment(request: Request, comment_id: int):
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Signature has expired."
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Not authenticated"
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Invalid token"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - User lacks sufficient permissions",
             "content": {
@@ -1225,42 +1149,7 @@ async def retreive_comments(
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": EXPIRED_TOKEN
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": NOT_AUTH
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": INVALID_TOKEN
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - User lacks permission or is standard USER role.",
             "content": {
@@ -1356,7 +1245,8 @@ async def delete_evidence(
         #
         
         return response
-        
+    except HTTPException:
+        raise
     except Exception as e:
         return HTTPException(
             status_code=500,
@@ -1411,42 +1301,7 @@ def validate_comment_length(comment: str) -> bool:
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Signature has expired."
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Not authenticated"
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Invalid token"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - Role-based access restrictions.",
             "content": {
@@ -1587,42 +1442,7 @@ async def create_comment(body: create_comment_request, req: Request):
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Signature has expired."
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Not authenticated"
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Invalid token"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - User lacks sufficient permissions",
             "content": {

@@ -1,6 +1,7 @@
 import uuid
 from uuid import uuid4
 import asyncpg
+import asyncio
 import io
 import hashlib
 from fastapi import UploadFile, HTTPException
@@ -465,7 +466,6 @@ class Case:
                         Key=object_name
                     )
                     
-                        
                 except Exception as e:
                     raise HTTPException(
                         status_code=500,
@@ -476,8 +476,8 @@ class Case:
                     )
         
             return {
-                "Status" : "success",
-                "Deleted" : media_id
+                "status" : "success",
+                "deleted" : media_id
             }   
         except asyncpg.PostgresError:
             raise HTTPException(

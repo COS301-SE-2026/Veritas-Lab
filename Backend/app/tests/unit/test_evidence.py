@@ -276,8 +276,8 @@ An investigator deletes a duplicate. Only the report is deleted.
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
-    assert result["Status"] == "success"
-    assert result["Deleted"] == test_media_id
+    assert result["status"] == "success"
+    assert result["deleted"] == test_media_id
 
 
 @pytest.mark.asyncio
@@ -317,7 +317,7 @@ An investigator deletes the only entry for that evidence.The report is deleted a
         Bucket="evidence-bucket",
         Key="mocked-uuid.jpg"
     )
-    assert result["Status"] == "success"
+    assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
@@ -344,7 +344,7 @@ An admin deletes a duplicate. Therefore only the report is deleted
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
-    assert result["Status"] == "success"
+    assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
@@ -382,7 +382,7 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
         Bucket="evidence-bucket",
         Key="admin-mocked-uuid.png"
     )
-    assert result["Status"] == "success"
+    assert result["status"] == "success"
 
 @pytest.mark.asyncio
 async def test_delete_evidence_missing_case_id_400():
@@ -399,7 +399,10 @@ async def test_delete_evidence_missing_case_id_400():
         await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
 
     assert excInfo.value.status_code == 400
-    assert excInfo.value.detail == {"status": "error", "message": "Case id is missing"}
+    assert excInfo.value.detail == {
+        "status": "error", 
+        "message": "Case id is missing"
+    }
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
