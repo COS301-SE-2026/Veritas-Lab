@@ -1,12 +1,17 @@
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 import io
 import uuid
 import asyncpg
 
+from app.api.main import app
 from app.core.cases import Case
+import app.api.routers.cases_router as cases_router
 from starlette.datastructures import UploadFile
+
+client = TestClient(app)
 
 
 @pytest.mark.asyncio
@@ -267,18 +272,19 @@ An investigator deletes a duplicate. Only the report is deleted.
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
-    result = await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
+    result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
-    assert result["Status"] == "success"
-    assert result["Deleted"] == test_media_id
+    assert result["status"] == "success"
+    assert result["deleted"] == test_media_id
 
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 @patch("app.core.cases.get_object")
-async def test_delete_evidence_investigator_only_entry(mockget_object, mockDbConnect):
+@patch("app.core.cases.asyncio", create=True)
+async def test_delete_evidence_investigator_only_entry(mock_asyncio, mockget_object, mockDbConnect):
     """
 An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
     """
@@ -294,6 +300,7 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
     mockDbConnection.close = AsyncMock()
+    mock_asyncio.to_thread = AsyncMock()
 
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
@@ -303,13 +310,14 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
-    result = await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
+    result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
 
-    mock_s3_client.delete_object.assert_called_once_with(
+    mock_asyncio.to_thread.assert_awaited_once_with(
+        mock_s3_client.delete_object,
         Bucket="evidence-bucket",
         Key="mocked-uuid.jpg"
     )
-    assert result["Status"] == "success"
+    assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
@@ -336,13 +344,14 @@ An admin deletes a duplicate. Therefore only the report is deleted
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
-    assert result["Status"] == "success"
+    assert result["status"] == "success"
 
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 @patch("app.core.cases.get_object")
-async def test_delete_evidence_admin_only_entry(mockget_object, mockDbConnect):
+@patch("app.core.cases.asyncio", create=True)
+async def test_delete_evidence_admin_only_entry(mock_asyncio, mockget_object, mockDbConnect):
     """
 An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
     """
@@ -357,6 +366,7 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
     mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+    mock_asyncio.to_thread = AsyncMock()
 
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
@@ -367,11 +377,12 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     
     result = await case.delete_evidence(media_id=test_media_id)
 
-    mock_s3_client.delete_object.assert_called_once_with(
+    mock_asyncio.to_thread.assert_awaited_once_with(
+        mock_s3_client.delete_object,
         Bucket="evidence-bucket",
         Key="admin-mocked-uuid.png"
     )
-    assert result["Status"] == "success"
+    assert result["status"] == "success"
 
 @pytest.mark.asyncio
 async def test_delete_evidence_missing_case_id_400():
@@ -385,10 +396,13 @@ async def test_delete_evidence_missing_case_id_400():
     test_user = "Investigator_Bob"
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
+        await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
 
     assert excInfo.value.status_code == 400
-    assert excInfo.value.detail == "Case id is missing"
+    assert excInfo.value.detail == {
+        "status": "error", 
+        "message": "Case id is missing"
+    }
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
@@ -407,10 +421,10 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
     test_user = "Hacker_Eve"
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id, JWT_username=test_user)
+        await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
 
     assert excInfo.value.status_code == 403
-    assert "Unauthorized" in excInfo.value.detail
+    assert excInfo.value.detail["message"] == "Unauthorized to delete this evidence or record not found."
 
 
 @pytest.mark.asyncio
@@ -432,7 +446,7 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
         await case.delete_evidence(media_id=test_media_id)
 
     assert excInfo.value.status_code == 404
-    assert excInfo.value.detail == "Media not found."
+    assert excInfo.value.detail == {"status": "error", "message": "Media not found."}
 
 @pytest.mark.asyncio
 async def test_add_evidence_invalid_case_id_uuid():
@@ -562,3 +576,119 @@ async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClas
 
     assert result is not None 
     assert result["url"] == "https://fake-presigned-url"
+
+def test_delete_evidence_missing_jwt(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verify_jwt(request):
+        raise HTTPException(
+            status_code=401,
+            detail={"status": "error", "message": "Missing authorization header"}
+        )
+
+    monkeypatch.setattr(
+        cases_router,
+        "verify_jwt",
+        mock_verify_jwt
+    )
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Missing authorization header"
+        }
+    }
+
+def test_delete_evidence_success(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verify_jwt(request):
+        return {
+            "sub": "admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    fake_result = {
+        "Status": "success",
+        "Deleted": "22222222-abcd-ef01-2345-6789abcdef01"
+    }
+
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+    monkeypatch.setattr(
+        cases_router.Case, 
+        "delete_evidence", 
+        AsyncMock(return_value=fake_result)
+    )
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == fake_result
+
+def test_delete_evidence_invalid_media_id(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verify_jwt(request):
+        return {
+            "sub": "admin-id",
+            "username": "admin_user",
+            "role": "ADMIN"
+        }
+
+    monkeypatch.setattr(
+        cases_router,
+        "verify_jwt",
+        mock_verify_jwt
+    )
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/not-a-valid-uuid"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Media is an invalid uuid"
+        }
+    }
+
+def test_delete_evidence_user_forbidden(monkeypatch):
+    client.cookies.clear()
+
+    def mock_verify_jwt(request):
+        return {
+            "sub": "user-id",
+            "username": "some_user",
+            "role": "USER"
+        }
+
+    monkeypatch.setattr(
+        cases_router, 
+        "verify_jwt", 
+        mock_verify_jwt
+    )
+
+    response = client.post(
+        "/api/delete/case/12345678-abcd-ef01-2345-6789abcdef01/evidence/22222222-abcd-ef01-2345-6789abcdef01"
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "User unauthorized"
+        }
+    }

@@ -102,6 +102,18 @@ def transform_to_uuid(changer:str)->UUID:
                 "message": str(e)
             }
         )
+
+def media_id_valid_uuid(media_id)->UUID:
+    try:
+        return UUID(media_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error", 
+                "message": "Media is an invalid uuid"
+            }
+        )
     
 
 def _row_to_case(row: dict) -> Case:
@@ -896,48 +908,7 @@ async def update_comment(
             }
         },
 
-        401: {
-            "description": "Token authentication or validation failed",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "NotAuthenticated": {
-                            "summary": "Not authenticated",
-                            "description": "Triggered when the authentication cookie is not provided or does not contain a JWT.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": NOT_AUTH
-                                }
-                            }
-                        },
-
-                        "ExpiredToken": {
-                            "summary": "Expired JWT",
-                            "description": "Triggered when the provided JWT has expired.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": EXPIRED_TOKEN
-                                }
-                            }
-                        },
-
-                        "InvalidToken": {
-                            "summary": "Invalid JWT",
-                            "description": "Triggered when the JWT cannot be decoded or fails validation.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": INVALID_TOKEN
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-
+        401: INVALID_TOKEN_401,
         404: {
             "description": "Comment could not be deleted",
             "content": {
@@ -1060,42 +1031,7 @@ async def delete_comment(request: Request, comment_id: int):
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Signature has expired."
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Not authenticated"
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Invalid token"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - User lacks sufficient permissions",
             "content": {
@@ -1167,13 +1103,125 @@ async def retreive_comments(
             }
         )
 
+
 @router.post(
     "/delete/case/{case_id}/evidence/{media_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Delete case evidence",
+    description="Deletes a specific evidence item/media attached to a case. Investigators can only delete evidence from cases they created, while Admins can delete any evidence.",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Evidence deleted successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "deleted": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+                    }
+                }
+            }
         },
+        400: {
+            "description": "Bad Request - Invalid UUID format or missing ID.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Invalid Media UUID": {
+                            "summary": "Invalid Media ID format",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Media is an invalid uuid"
+                                }
+                            }
+                        },
+                        "Invalid Case UUID": {
+                            "summary": "Invalid Case ID format",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "'fake-uuid' is not a valid UUID format"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: INVALID_TOKEN_401,
+        403: {
+            "description": "Forbidden - User lacks permission or is standard USER role.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Role Forbidden": {
+                            "summary": "Standard USER Role Blocked",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "User unauthorized"
+                                }
+                            }
+                        },
+                        "Not Owner": {
+                            "summary": "Investigator is not the Case Creator or the case doesn't exist",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Unauthorized to delete this evidence or record not found."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not Found - Target case or evidence item does not exist.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Media Not Found": {
+                            "summary": "Target evidence item does not exist as while as if the case does not exist",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Media not found."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Storage or Database failure.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": DATABASE_ERROR_MESSAGE
+                                }
+                            }
+                        },
+                        "Storage Error": {
+                            "summary": "S3 / Object Storage Error",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Failed to delete stored object: ClientError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def delete_evidence(
@@ -1181,56 +1229,33 @@ async def delete_evidence(
     media_id:str,
     request: Request
 ):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
+    payload = verify_jwt(request)
+    #Can raise the 401 errors
+    
 
     user_role=payload.get("role")
 
     verify_not_user(user_role)
+    #can raise HTTPException 403
 
-    try:
-        media_id = uuid.UUID(media_id)
-    except ValueError:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error", 
-                "message": "Invalid UUID format for media_id."
-            }
-        )
+    media_id = media_id_valid_uuid(media_id)
+    # can raise HTTPException 400 
         
     try:
+
         case = Case(case_id=case_id)
+        #raises 400 for bad case id format
         username=payload.get("username") if user_role == "INVESTIGATOR" else None
-        response=await case.delete_evidence(media_id=media_id, JWT_username=username)
-
-        return JSONResponse(
-            status_code=200,
-            content=response
-        )
+        response=await case.delete_evidence(media_id=media_id, jwt_username=username)
+        #
         
+        return response
     except HTTPException:
         raise
-    except ValueError as e:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error", 
-                "message": f"Invalid case_id: {str(e)}"
-            }
-        )
     except Exception as e:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error", 
                 "message": str(e)
             }
@@ -1281,42 +1306,7 @@ def validate_comment_length(comment: str) -> bool:
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Signature has expired."
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Not authenticated"
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Invalid token"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - Role-based access restrictions.",
             "content": {
@@ -1457,42 +1447,7 @@ async def create_comment(body: create_comment_request, req: Request):
                 }
             }
         },
-        401: {
-            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "Expired JWT": {
-                            "summary": "JWT Token Expired",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Signature has expired."
-                                }
-                            }
-                        },
-                        "No authorization": {
-                            "summary": "Missing JWT Cookie or Header",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Not authenticated"
-                                }
-                            }
-                        },
-                        "Invalid token": {
-                            "summary": "Invalid JWT Signature/Malformed",
-                            "value": {
-                                "detail":{
-                                    "status": "error",
-                                    "message": "Invalid token"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "description": "Forbidden - User lacks sufficient permissions",
             "content": {
