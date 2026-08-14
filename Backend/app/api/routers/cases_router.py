@@ -219,24 +219,95 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 
 @router.post(
     "/createCase",
+    summary="Create a Case",
+    dependencies=[Depends(COOKIE_SCHEME)],
+    description="Creates a new case for an authenticated user. Those with the role 'USER' cannot use this endpoint.",
     responses={
-        403: {
-            "model": error_response,
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Case created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "CaseId": "550e8400-e29b-41d4-a716-676767676767"
+                    }
+                }
+            }
         },
+
+        400: {
+            "description": "Bad Request - Invalid case data",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Case name cannot be empty"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when no JWT authentication cookie is provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+        
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+        
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "Forbidden - User unauthorized",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def create_case(case_request: CreateCaseRequest, request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+    payload = verify_jwt(request)
     verify_not_user(payload.get("role"))
 
     try:
@@ -246,9 +317,9 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
             case_description=case_request.description
         )
     except ValueError as e:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": str(e)
             }
@@ -256,13 +327,10 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
 
     case_id = await case.create()
 
-    return JSONResponse(
-        status_code=201,
-        content={
-            "status": "success",
-            "CaseId": case_id
-        }
-    )
+    return {
+        "status": "success",
+        "CaseId": case_id
+    }
 
 @router.post(
     "/getCases",
