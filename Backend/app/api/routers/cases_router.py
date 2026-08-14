@@ -162,6 +162,18 @@ def transform_to_uuid(changer:str)->UUID:
                 "message": str(e)
             }
         )
+
+def media_id_valid_uuid(media_id)->UUID:
+    try:
+        return UUID(media_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error", 
+                "message": "Media is an invalid uuid"
+            }
+        )
     
 
 def _row_to_case(row: dict) -> Case:
@@ -1170,6 +1182,7 @@ async def retreive_comments(
             }
         )
 
+
 @router.post(
     "/delete/case/{case_id}/evidence/{media_id}",
     responses={
@@ -1184,56 +1197,35 @@ async def delete_evidence(
     media_id:str,
     request: Request
 ):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
+    payload = verify_jwt(request)
+    #Can raise the 401 errors
+    
 
     user_role=payload.get("role")
 
     verify_not_user(user_role)
+    #can raise HTTPException 403
 
-    try:
-        media_id = uuid.UUID(media_id)
-    except ValueError:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error", 
-                "message": "Invalid UUID format for media_id."
-            }
-        )
+    media_id = media_id_valid_uuid(media_id)
+    # can raise HTTPException 400 
         
     try:
-        case = Case(case_id=case_id)
-        username=payload.get("username") if user_role == "INVESTIGATOR" else None
-        response=await case.delete_evidence(media_id=media_id, JWT_username=username)
 
+        case = Case(case_id=case_id)
+        #raises 400 for bad case id format
+        username=payload.get("username") if user_role == "INVESTIGATOR" else None
+        response=await case.delete_evidence(media_id=media_id, jwt_username=username)
+        #
+        
         return JSONResponse(
             status_code=200,
             content=response
         )
         
-    except HTTPException:
-        raise
-    except ValueError as e:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error", 
-                "message": f"Invalid case_id: {str(e)}"
-            }
-        )
     except Exception as e:
-        return JSONResponse(
+        return HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error", 
                 "message": str(e)
             }
