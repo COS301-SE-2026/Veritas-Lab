@@ -1253,7 +1253,7 @@ async def delete_evidence(
     except HTTPException:
         raise
     except Exception as e:
-        return HTTPException(
+        raise HTTPException(
             status_code=500,
             detail={
                 "status": "error", 
