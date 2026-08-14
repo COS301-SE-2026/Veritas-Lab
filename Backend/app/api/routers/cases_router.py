@@ -303,6 +303,20 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
                     }
                 }
             }
+        },
+
+        409: {
+            "description": "Conflict - Case already exists",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "This case already exists"
+                        }
+                    }
+                }
+            }
         }
     }
 )

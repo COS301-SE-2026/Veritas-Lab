@@ -122,7 +122,13 @@ class Case:
 
     async def create(self):
         if self.case_id  is not None:
-            raise ValueError("This case already exists")
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "status": "error",
+                    "message": "This case already exists"
+                }
+            )
         
         connection = await get_connection()
 
