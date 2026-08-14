@@ -6,7 +6,7 @@ from fastapi.security import APIKeyCookie
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Annotated
 from app.core.cases import Case
-from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN
+from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
 import asyncpg
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
@@ -204,47 +204,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
             }
         },
 
-        401: {
-            "description": "Authentication failed",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "MissingToken": {
-                            "summary": "Missing JWT",
-                            "description": "Triggered when no JWT authentication cookie is provided.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": NOT_AUTH
-                                }
-                            }
-                        },
-        
-                        "ExpiredToken": {
-                            "summary": "Expired JWT",
-                            "description": "Triggered when the provided JWT has expired.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": EXPIRED_TOKEN
-                                }
-                            }
-                        },
-        
-                        "InvalidToken": {
-                            "summary": "Invalid JWT",
-                            "description": "Triggered when JWT verification fails.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": INVALID_TOKEN
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
 
         403: {
             "description": "Forbidden - User unauthorized",
