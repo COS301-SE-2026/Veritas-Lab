@@ -8,6 +8,7 @@ import uuid as uuidlib
 from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN, NOT_AUTH, EXPIRED_TOKEN
 import asyncio
 from jose import jwt
+from test_int_auth import delete_user_by_email
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SETTINGS=Postgres_Settings()
@@ -15,29 +16,6 @@ AMBIGUOUS_ERROR= "The email and/or password are invalid"
 AUTH_SETTINGS = Auth_Settings()
 
 ADMIN_USER = None
-E2E_USER = None
-
-@pytest.fixture(scope="session", autouse=True)
-def load_e2e_user():
-    global E2E_USER
-
-    async def fetch_user():
-        connection = await get_connection()
-
-        try:
-            return await connection.fetchrow(
-                """
-                SELECT userid, username
-                FROM "Users_DB"."Users"
-                WHERE useremail = $1
-                """,
-                USER_SETTINGS.E2E_USER_EMAIL
-            )
-        finally:
-            await connection.close()
-
-    E2E_USER = asyncio.run(fetch_user())
-    assert E2E_USER is not None
 
 @pytest.fixture(scope="session", autouse=True)
 def load_admin_user():
@@ -129,7 +107,7 @@ async def test_integration_create_case_success(client):
                 uuidlib.UUID(case_id)
             )
         finally:
-            connection.close()
+            await connection.close()
 
         assert created_case is not None
         assert str(created_case["caseid"]) == case_id
@@ -233,35 +211,42 @@ async def test_integration_create_case_expired_jwt(client):
 
 @pytest.mark.asyncio
 async def test_integration_create_case_user_unauthorized(client):
-    user = {
-        "id": str(uuidlib.uuid4()),
-        "username": "integration_user",
-        "role": "USER"
-    }
+    email = "create_case_unauthorized@example.com"
 
-    token = create_token(user)
+    await delete_user_by_email(email)
 
-    client.cookies.clear()
-    client.cookies.set(
-        COOKIE_NAME,
-        token
-    )
+    try:
+        client.cookies.clear()
 
-    response = client.post(
-        "/api/createCase",
-        json={
-            "title": "Unauthorized Case",
-            "description": "This case should not be created."
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "create_case_unauthorized",
+                "password": USER_SETTINGS.ADMIN_PASSWORD
+            }
+        )
+        assert register_response.status_code == 201
+        assert COOKIE_NAME in client.cookies
+
+        response = client.post(
+            "/api/createCase",
+            json={
+                "title": "Unauthorized Case",
+                "description": "This case should not be created."
+            }
+        )
+
+        assert response.status_code == 401
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": NOT_AUTH
+            }
         }
-    )
 
-    assert response.status_code == 403
-    assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": "User unauthorized"
-        }
-    }
+    finally:
+        await delete_user_by_email(email)
 
 @pytest.mark.asyncio
 async def test_integration_create_case_empty_name(client):
