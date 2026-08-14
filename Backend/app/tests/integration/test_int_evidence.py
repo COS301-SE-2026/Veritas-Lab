@@ -156,8 +156,46 @@ async def test_integration_delete_evidence_403_not_creator(client, fake_evidence
     assert response.json()["detail"]["message"] =="Unauthorized to delete this evidence or record not found."
     await assert_object_storage_not_deleted(media_id,case_id,fake_evidence_context)
     
+#403: USER deleting
+@pytest.mark.asyncio
+async def test_integration_delete_evidence_403_user(client, fake_evidence_context):
+    case_id = fake_evidence_context["case_id"]
+    media_id = fake_evidence_context["media_id"]
+
+    unauthorized_investigator = {
+        "id": str(uuid.uuid4()),
+        "username": "UnauthorizedUser",
+        "role": "USER"
+    }
+    client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
+
+    response = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] =="User unauthorized"
+    await assert_object_storage_not_deleted(media_id,case_id,fake_evidence_context)
+
 
 #400: invalid Case Id
+@pytest.mark.asyncio
+async def test_integration_delete_evidence_400_case_id(client, fake_evidence_context):
+    case_id = "invalid case id"
+    media_id = fake_evidence_context["media_id"]
+
+    unauthorized_investigator = {
+        "id": str(uuid.uuid4()),
+        "username": "UnauthorizedUser",
+        "role": "INVESTIGATOR"
+    }
+    client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
+
+    response = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] ==f"'{case_id}' is not a valid UUID format"
+    await assert_object_storage_not_deleted(media_id,fake_evidence_context["case_id"],fake_evidence_context)
 
 
 #200

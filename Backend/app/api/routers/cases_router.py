@@ -1141,7 +1141,7 @@ async def retreive_comments(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": INVALID_CASE_ID
+                                    "message": "'fake-uuid' is not a valid UUID format"
                                 }
                             }
                         }
