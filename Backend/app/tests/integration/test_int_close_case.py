@@ -11,7 +11,9 @@ from jose import jwt
 from test_int_auth import delete_user_by_email
 from app.tests.integration.test_int_auth import client, get_connection, load_admin_user # for sonar
 import app.tests.integration.test_int_auth as auth_tests # for sonar
-from app.api.routers.cases_router import CASE_ID_REQUIRED
+from app.api.routers.cases_router import CASE_ID_REQUIRED, INVALID_CASE_ID, CASE_NOT_FOUND_OR_UNAUTHORIZED
+
+USER_SETTINGS = User_Settings()
 
 @pytest.mark.asyncio
 async def test_integration_close_case_success(client, load_admin_user):
@@ -77,7 +79,7 @@ async def test_integration_close_case_success(client, load_admin_user):
             try:
                 await connection.execute(
                     """
-                    DELETE FROM "CasesDB"."Cases"
+                    DELETE FROM "Cases_DB"."Cases"
                     WHERE caseid = $1
                     """,
                     uuidlib.UUID(case_id)
@@ -112,5 +114,122 @@ async def test_integration_close_case_missing_case_id(client, load_admin_user):
         "detail": {
             "status": "error",
             "message": CASE_ID_REQUIRED
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_close_case_invalid_case_id(client, load_admin_user):
+    admin_user = {
+        "id": str(auth_tests.ADMIN_USER["userid"]),
+        "username": auth_tests.ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token(admin_user)
+    )
+
+    response = client.post(
+        "/api/closeCase",
+        json={
+            "CaseID": "not-a-valid-uuid"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": INVALID_CASE_ID
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_integration_close_case_missing_jwt(client):
+    client.cookies.clear()
+
+    response = client.post(
+        "/api/closeCase",
+        json={
+            "CaseID": str(uuidlib.uuid4())
+        }
+    )
+
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_integration_close_case_invalid_jwt(client):
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        "invalid-token"
+    )
+
+    response = client.post(
+        "/api/closeCase",
+        json={
+            "CaseID": str(uuidlib.uuid4())
+        }
+    )
+
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_integration_close_case_user_unauthorized(client):
+    email = "close_case_user@example.com"
+    await delete_user_by_email(email)
+
+    try: 
+        client.cookies.clear()
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "close_case_user",
+                "password": USER_SETTINGS.ADMIN_PASSWORD
+            }
+        )
+
+        assert register_response.status_code == 201
+        response = client.post(
+            "/api/closeCase",
+            json={
+                "CaseID": str(uuidlib.uuid4())
+            }
+        )
+
+        assert response.status_code == 401
+
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_close_case_not_found(client, load_admin_user):
+    admin_user = {
+        "id": str(auth_tests.ADMIN_USER["userid"]),
+        "username": auth_tests.ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token(admin_user)
+    )
+
+    response = client.post(
+        "/api/closeCase",
+        json={
+            "CaseID": str(uuidlib.uuid4())
+        }
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
         }
     }
