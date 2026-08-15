@@ -411,19 +411,10 @@ async def get_cases(request: Request):
     }
 )
 async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
-    
+    payload = verify_jwt(request)
+
     if not case_request.CaseID:
-        raise HTTPException(
+        raise GHTTPException(
             status_code=400,
             detail={
                 "status": "error",
@@ -431,108 +422,62 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             }
         )
 
-    try:
-        case_id = UUID(case_request.CaseID)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+        case_id = Case(case_id=case_request.CaseID).case_id
 
-    connection = None
-    is_user= None
-    try:
-        connection = await get_connection()
-        is_user = payload.get("role") != "USER"
-        if is_user:
-            row= await connection.fetchrow(
-                """
-                SELECT *
-                FROM "Cases_DB"."Cases"
-                WHERE caseid = $1
-                """,
-                case_id
+        connection = None
+
+        try:
+            connection = await get_connection()
+
+            is_standard_user = payload.get("role") == "USER"
+
+            row = await connection.fetchrow(
+                GET_SING_CASE_SQL,
+                case_id,
+                is_standard_user
             )
-        else:
-            row= await connection.fetchrow(
-                """
-                SELECT *
-                FROM "Cases_DB"."Cases"
-                WHERE caseid = $1
-                AND caseclosed = TRUE
-                """,
-                case_id
-            )
-    
-        if row is None:
+
+            if row is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "status": "error",
+                        "message": CASE_NOT_FOUND
+                    }
+                )
+
+                case = _row_ro_case(row)
+
+                evidence_rows = await connection.fetch(
+                    CASE_EVIDENCE_SQL,
+                    case_id,
+                )
+
+                return jsonable_encoder({
+                    "status": "success",
+                    "case": case.to_json(),
+                    "comments": await case.get_comments(),
+                    "evidence": [
+                        _format_case_evidence(evidence_row, not is_standard_user)
+                        for evidence_row in evidence_rows
+                    ]
+                })
+
+        except async.PostGesError:
             raise HTTPException(
-                status_code=404,
+                status_code=500,
                 detail={
                     "status": "error",
-                    "message": "Case not found"
+                    "message": DATABASE_ERRO_MESSAGE
                 }
             )
+        
+        except HTTPException
+            raise
 
-        case = _row_to_case(row)
-
-        evidence_rows = await connection.fetch(
-            """
-            SELECT
-                r.ReportId AS "reportid",
-                r.CaseId AS "caseid",
-                r.MediaId AS "mediaid",
-                r.ReportArtifacts AS "reportartifacts",
-                r.imagetitle AS "mediatitle",
-                r.ReportFindings AS "reportfindings",
-                r.ReportComments AS "reportcomments",
-                r.ReportCertainty AS "reportcertainty",
-                r.ReportDateCreation AS "reportdatecreation",
-                m.MediaTypeId AS "mediatypeid",
-                m.MediaBucket AS "mediabucket",
-                m.MediaExtension AS "mediaextension",
-                media.MediaAnnotations AS "annotations"
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" media ON r.MediaId = media.MediaId
-            JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
-            WHERE r.CaseId = $1
-            ORDER BY r.ReportDateCreation DESC
-            """,
-            case_id
-        )
-
-        return JSONResponse(
-            status_code=200,
-            content=jsonable_encoder({
-                "status": "success",
-                "case": case.to_json(),
-                "comments": await case.get_comments(),
-                "evidence": [_format_case_evidence(row,is_user) for row in evidence_rows]
-            })
-        )
-    except asyncpg.PostgresError:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status":"error",
-                "message":DATABASE_ERROR_MESSAGE
-            }
-        )
-    except HTTPException:
-        raise #so the dumb Exception doesn't override the error message
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "message": f"Internal Server Error: {type(e).__name__} - {str(e)}"
-            }
-        )
-    finally:
-        if connection is not None:
-            await connection.close()
+        finally:
+            ifconnection is not None:
+                await connection.close()
 
 
 @router.post(
