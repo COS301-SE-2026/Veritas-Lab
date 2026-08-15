@@ -62,7 +62,7 @@ CASE_EVIDENCE_SQL = """
         m.MediatypeId AS "mediatypeid",
         m.MediaExtension AS "mediaextension",
         m.MediaBucket AS "mediabucket",
-        media.MediaAnnotations AS "annotations",
+        media.MediaAnnotations AS "annotations"
     FROM "Cases_DB"."Reports" r
     JOIN "Cases_DB"."Media" media ON r.MediaID = media.MediaID
     JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
