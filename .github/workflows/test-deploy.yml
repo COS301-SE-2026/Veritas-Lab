@@ -1,0 +1,41 @@
+name: Test Full Deployment on Azure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./Backend
+          push: true
+          tags: |
+          ghcr.io/cos301-se-2026/veritas-lab-backend:latest
+          ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./Frontend
+          push: true
+          tags: |
+          ghcr.io/cos301-se-2026/veritas-lab-frontend:latest
+          ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: veritas-lab-api
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          images: |
+            ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
+            ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
