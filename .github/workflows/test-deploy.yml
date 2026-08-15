@@ -27,7 +27,7 @@ jobs:
             ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
       - uses: docker/build-push-action@v6
         with:
-          context: ./Frontend
+          context: ./frontend
           push: true
           tags: |
             ghcr.io/cos301-se-2026/veritas-lab-frontend:latest
