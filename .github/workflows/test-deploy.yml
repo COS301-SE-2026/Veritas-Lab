@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   deploy:
@@ -22,20 +23,38 @@ jobs:
         with:
           context: ./Backend
           push: true
-          tags: |
-            ghcr.io/cos301-se-2026/veritas-lab-backend:latest
-            ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
+          tags: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
-          tags: |
-            ghcr.io/cos301-se-2026/veritas-lab-frontend:latest
-            ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+          tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_02B6A6C1098B4F408E9DEBBC5971A95D }}
       - uses: azure/webapps-deploy@v3
         with:
           app-name: veritas-lab-api
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: |
-            ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
-            ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+          sitecontainers-config: >-
+            [
+              {
+                "name": "main",
+                "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}",
+                "targetPort": 3000,
+                "isMain": true,
+                "authType": "UserCredentials",
+                "username": "${{ secrets.GHCR_USERNAME }}",
+                "passwordSecret": "${{ secrets.GHCR_PAT}}"
+              },
+              {
+                "name": "backend",
+                "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}",
+                "targetPort": 8000,
+                "isMain": false,
+                "authType": "UserCredentials",
+                "username": "${{ secrets.GHCR_USERNAME }}",
+                "passwordSecret": "${{ secrets.GHCR_PAT}}"
+              }
+            ]
