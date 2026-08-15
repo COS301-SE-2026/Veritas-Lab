@@ -39,7 +39,36 @@ GET_CASES_SQL = """
     FROM "Cases_DB"."Cases"
     WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
     ORDER BY casecreationdate DESC
-    """ 
+    """
+
+GET_SINGLE_CASE_SQL = """
+SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+FROM "Cases_DB"."Cases"
+WHERE caseid = $1 
+    AND ($2::boolean IS FALSE OR caseclosed IS TRUE)
+"""
+
+CASE_EVIDENCE_SQL = """
+    SELECT
+        r.ReportID AS "reportid",
+        r.CaseID AS "caseid",
+        r.MediaID AS "mediaid",
+        r.ReportArtifacts AS "reportartifacts",
+        r.imagetitle AS "mediatitle",
+        r.ReportFindings AS "reportfindings",
+        r.ReportComments AS "reportcomments",
+        r.ReportCertainty AS "reportcertainty",
+        r.ReportDateCreation AS "reportdatecreation",
+        m.MediatypeId AS "mediatypeid",
+        m.MediaExtension AS "mediaextension",
+        m.MediaBucket AS "mediabucket",
+        media.MediaAnnotations AS "annotations",
+    FROM "Cases_DB"."Reports" r
+    JOIN "Cases_DB"."Media" media ON r.MediaID = media.MediaID
+    JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
+    WHERE r.CaseID = $1
+    ORDER BY r.ReportDateCreation DESC
+    """
 
 router = APIRouter(
     prefix="/api",
@@ -390,31 +419,99 @@ async def get_cases(request: Request):
     
 @router.post(
     "/getSingleCase",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Get a single case",
+    description=(
+        "Returns one case with its comments and evidence. INVESTIGATOR and ADMIN can "
+        "get any case and receive presigned media URLs. The USER role can only "
+        "get closed cases, and their evidence is returned with an empty mediaUrl."
+    ),
     responses={
+        200: {
+            "description": "Case retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "case":{
+                            "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                            "caseName": "Flood in Westville",
+                            "caseCreator": "investigator_user",
+                            "caseDescription": "Flood investigation case",
+                            "caseClosed": False,
+                            "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                        },
+                        "comments": [],
+                        "evidence": []
+                    }
+                }
+            }
+        },
+        400: {
+            "model": error_response,
+            "description": "Bad Request - Missing or malformed CaseID",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Missing CaseID": {
+                            "summary": "No CaseID supplied",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+                        "Invalid CaseID": {
+                            "summary": "CaseID is not a valid UUID",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "'not-a-valid-uuid' is not a valid UUID format"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: INVALID_TOKEN_401,
+        404: {
+            "model": error_response,
+            "description": "Not Found - Case does not exist or USER requested on open case.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND
+                        }
+                    }
+                }
+            }
+        },
         500: {
             "model": error_response,
-            "description": DATABASE_ERROR_MESSAGE
-        },
-        401: {
-            "model": error_response,
-            "description": "Unauthorized - Missing or invalid JWT token",
-        },
-        404:{
-            "model": error_response,
-            "description": " Case not found"
-        },
-        400:{
-            "model": error_response,
-            "description": CASE_ID_REQUIRED
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
         }
-
     }
 )
 async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
     payload = verify_jwt(request)
 
     if not case_request.CaseID:
-        raise GHTTPException(
+        raise HTTPException(
             status_code=400,
             detail={
                 "status": "error",
@@ -422,62 +519,62 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             }
         )
 
-        case_id = Case(case_id=case_request.CaseID).case_id
+    case_id = Case(case_id=case_request.CaseID).case_id
 
-        connection = None
+    connection = None
 
-        try:
-            connection = await get_connection()
+    try:
+        connection = await get_connection()
 
-            is_standard_user = payload.get("role") == "USER"
+        is_standard_user = payload.get("role") == "USER"
 
-            row = await connection.fetchrow(
-                GET_SING_CASE_SQL,
-                case_id,
-                is_standard_user
-            )
+        row = await connection.fetchrow(
+            GET_SINGLE_CASE_SQL,
+            case_id,
+            is_standard_user
+        )
 
-            if row is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail={
-                        "status": "error",
-                        "message": CASE_NOT_FOUND
-                    }
-                )
-
-                case = _row_ro_case(row)
-
-                evidence_rows = await connection.fetch(
-                    CASE_EVIDENCE_SQL,
-                    case_id,
-                )
-
-                return jsonable_encoder({
-                    "status": "success",
-                    "case": case.to_json(),
-                    "comments": await case.get_comments(),
-                    "evidence": [
-                        _format_case_evidence(evidence_row, not is_standard_user)
-                        for evidence_row in evidence_rows
-                    ]
-                })
-
-        except async.PostGesError:
+        if row is None:
             raise HTTPException(
-                status_code=500,
+                status_code=404,
                 detail={
                     "status": "error",
-                    "message": DATABASE_ERRO_MESSAGE
+                    "message": CASE_NOT_FOUND
                 }
             )
-        
-        except HTTPException
-            raise
 
-        finally:
-            ifconnection is not None:
-                await connection.close()
+        case = _row_to_case(row)
+
+        evidence_rows = await connection.fetch(
+            CASE_EVIDENCE_SQL,
+            case_id,
+        )
+
+        return jsonable_encoder({
+            "status": "success",
+            "case": case.to_json(),
+            "comments": await case.get_comments(),
+            "evidence": [
+                _format_case_evidence(evidence_row, not is_standard_user)
+                for evidence_row in evidence_rows
+            ]
+        })
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    
+    except HTTPException:
+        raise
+
+    finally:
+        if connection is not None:
+            await connection.close()
 
 
 @router.post(
