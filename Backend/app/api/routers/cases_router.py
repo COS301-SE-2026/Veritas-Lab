@@ -568,9 +568,6 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-    
-    except HTTPException:
-        raise
 
     finally:
         if connection is not None:
