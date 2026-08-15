@@ -23,15 +23,15 @@ jobs:
           context: ./Backend
           push: true
           tags: |
-          ghcr.io/cos301-se-2026/veritas-lab-backend:latest
-          ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
+            ghcr.io/cos301-se-2026/veritas-lab-backend:latest
+            ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
       - uses: docker/build-push-action@v6
         with:
           context: ./Frontend
           push: true
           tags: |
-          ghcr.io/cos301-se-2026/veritas-lab-frontend:latest
-          ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+            ghcr.io/cos301-se-2026/veritas-lab-frontend:latest
+            ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
       - uses: azure/webapps-deploy@v3
         with:
           app-name: veritas-lab-api
