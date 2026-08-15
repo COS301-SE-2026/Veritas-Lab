@@ -45,7 +45,7 @@ jobs:
                 "targetPort": 3000,
                 "isMain": true,
                 "authType": "UserCredentials",
-                "username": "${{ secrets.GHCR_USERNAME }}",
+                "userName": "${{ secrets.GHCR_USERNAME }}",
                 "passwordSecret": "${{ secrets.GHCR_PAT}}"
               },
               {
@@ -54,7 +54,7 @@ jobs:
                 "targetPort": 8000,
                 "isMain": false,
                 "authType": "UserCredentials",
-                "username": "${{ secrets.GHCR_USERNAME }}",
+                "userName": "${{ secrets.GHCR_USERNAME }}",
                 "passwordSecret": "${{ secrets.GHCR_PAT}}"
               }
             ]
