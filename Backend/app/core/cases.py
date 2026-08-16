@@ -13,8 +13,16 @@ from botocore.client import Config
 from app.core.env import Postgres_Settings, Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
 
-CASE_NOT_FOUND="Case not found"
+CASE_NOT_FOUND = "Case not found"
 MISSING_CASE_ID = "Case id is missing"
+CASE_ALREADY_EXISTS = "This case already exists"
+PDF_SCRIPTS_NOT_ALLOWED = "We don't allow scripts in pdfs. They are a security concern."
+PDF_VERIFICATION_FAILED = "Could not verify PDF security. File rejected."
+INVALID_PDF_PREFIX = "Invalid or corrupted PDF file: "
+INVALID_CASE_ID_UUID = "Invalid case_id UUID"
+UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
+MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
+INTERNAL_SERVER_ERROR = "Internal server error"
 postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
@@ -127,7 +135,7 @@ class Case:
                 status_code=409,
                 detail={
                     "status": "error",
-                    "message": "This case already exists"
+                    "message": CASE_ALREADY_EXISTS
                 }
             )
         
@@ -175,7 +183,7 @@ class Case:
                                 status_code=400, 
                                 detail={
                                     "status": "error",
-                                    "message": "We don't allow scripts in pdfs. They are a security concern."
+                                    "message": PDF_SCRIPTS_NOT_ALLOWED
                                 }
                             )
 
@@ -186,7 +194,7 @@ class Case:
                                     status_code=400,
                                     detail={
                                         "status": "error",
-                                        "message": "We don't allow scripts in pdfs. They are a security concern."
+                                        "message": PDF_SCRIPTS_NOT_ALLOWED
                                     }
                                 )
                 except HTTPException:
@@ -198,7 +206,7 @@ class Case:
                         status_code=400,
                         detail={
                             "status": "error",
-                            "message": "Could not verify PDF security. File rejected."
+                            "message": PDF_VERIFICATION_FAILED
                         }
                     )  
                      
@@ -209,7 +217,7 @@ class Case:
                     status_code=400, 
                     detail={
                         "status": "error",
-                        "message": f"Invalid or corrupted PDF file: {str(e)}"
+                        "message": f"{INVALID_PDF_PREFIX}{str(e)}"
                     }
                 )
         # validate case_id is a UUID
@@ -220,7 +228,7 @@ class Case:
                 status_code=400, 
                 detail={
                     "status": "error",
-                    "message": "Invalid case_id UUID"
+                    "message": INVALID_CASE_ID_UUID
                 }
             )
 
@@ -244,7 +252,7 @@ class Case:
                     status_code=400,
                     detail={
                         "status": "error",
-                        "message": f"Unsupported file extension: {localExtension}"
+                        "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{localExtension}"
                     }
                 )
 
@@ -307,7 +315,7 @@ class Case:
                         status_code=409, 
                         detail={
                             "status": "error",
-                            "message": "Image already associated with this case"
+                            "message": MEDIA_ALREADY_ON_CASE
                         }
                     )
                 except Exception:
@@ -358,7 +366,7 @@ class Case:
                         status_code=409, 
                         detail={
                             "status": "error",
-                            "message": "Image already associated with this case"
+                            "message": MEDIA_ALREADY_ON_CASE
                         }
                     )
                 except Exception:
@@ -390,7 +398,7 @@ class Case:
                 status_code=500,
                 detail={
                     "status": "error",
-                    "message": "Internal server error"
+                    "message": INTERNAL_SERVER_ERROR
                 }
                 )
 
