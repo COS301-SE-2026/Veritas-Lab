@@ -89,6 +89,99 @@ async def test_integration_close_case_success(client, load_admin_user):
                 await connection.close()
 
 @pytest.mark.asyncio
+async def test_integration_close_case_success_investigator(client):
+    case_id = None
+
+    connection = await get_connection()
+
+    try:
+        investigator = await connection.fetchrow(
+            """
+            SELECT userid, username
+            FROM "Users_DB"."Users"
+            WHERE useremail = $1
+            """,
+            USER_SETTINGS.E2E_INVESTIGATOR_EMAIL
+        )
+    finally:
+        await connection.close()
+
+    assert investigator is not None
+
+    investigator_user = {
+        "id": str(investigator["userid"]),
+        "username": investigator["username"],
+        "role": "INVESTIGATOR"
+    }
+
+    investigator_token = create_token(investigator_user)
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        investigator_token
+    )
+
+    try:
+        create_response = client.post(
+            "/api/createCase",
+            json={
+                "title": "Investigator Close Case Integration Test",
+                "description": "Case created by an investigator for closeCase integration testing."
+            }
+        )
+
+        assert create_response.status_code == 201
+
+        case_id = create_response.json()["CaseId"]
+        response = client.post(
+            "/api/closeCase",
+            json={
+                "CaseID": case_id
+            }
+        )
+
+        assert response.status_code == 200
+
+        assert response.json() == {
+            "status": "success",
+            "message": "Case closed successfully."
+        }
+
+        connection = await get_connection()
+
+        try:
+            row = await connection.fetchrow(
+                """
+                SELECT caseclosed
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                """,
+                uuidlib.UUID(case_id)
+            )
+        finally:
+            await connection.close()
+
+        assert row is not None
+        assert row["caseclosed"] is True
+
+    finally:
+        if case_id is not None:
+            connection = await get_connection()
+
+            try:
+                await connection.execute(
+                    """
+                    DELETE FROM "Cases_DB"."Cases"
+                    WHERE caseid = $1
+                    """,
+                    uuidlib.UUID(case_id)
+                )
+
+            finally:
+                await connection.close()
+
+@pytest.mark.asyncio
 async def test_integration_close_case_missing_case_id(client, load_admin_user):
     admin_user = {
         "id": str(auth_tests.ADMIN_USER["userid"]),
