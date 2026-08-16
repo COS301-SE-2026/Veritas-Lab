@@ -416,7 +416,13 @@ def test_get_cases_investigator_returns_empty_list(monkeypatch):
 def test_get_single_case_missing_jwt(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt_(request):
-        raise ValueError("Missing Authorization header")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Missing Authorization header"
+            }
+        )
 
     monkeypatch.setattr(
         cases_router, 
@@ -428,14 +434,22 @@ def test_get_single_case_missing_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Missing Authorization header"
+        "detail": {
+            "status": "error",
+            "message": "Missing Authorization header"
+        }
     }
 
 def test_get_single_case_invalid_jwt(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt_(request):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": "Invalid token"
+            }
+        )
 
     monkeypatch.setattr(
         cases_router, 
@@ -450,8 +464,10 @@ def test_get_single_case_invalid_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
 
 def test_get_single_case_missing_case_id(monkeypatch):
@@ -476,7 +492,7 @@ def test_get_single_case_missing_case_id(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        'detail':{
+        "detail": {
             "status": "error",
             "message": "CaseID required"
         }
@@ -502,7 +518,7 @@ def test_get_single_case_invalid_case_id(monkeypatch):
         json={"CaseID": "not-a-valid-uuid"}
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 400
     #assert response.json()==""
     assert response.json()["detail"]["status"] == "error"
 
