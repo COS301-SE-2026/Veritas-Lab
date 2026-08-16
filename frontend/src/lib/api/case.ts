@@ -143,3 +143,39 @@ export async function updateCase(caseId: string, updates: { caseName?: string; c
         throw error;
     }
 }
+
+export async function editComment(caseId: string, commentId: number, comment: string): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/editComment/case/${caseId}/comment/${commentId}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to edit comment');
+        }
+        return data;
+    } catch (error) {
+        console.error('Error editing comment:', error);
+        throw error;
+    }
+}
+
+export async function deleteComment(commentId: number): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/deleteComment/comment/${commentId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to delete comment');
+        }
+        return data;
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        throw error;
+    }
+}
