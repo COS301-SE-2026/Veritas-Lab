@@ -173,16 +173,22 @@ class Case:
                         if "/OpenAction" in root or "/AA" in root:
                             raise HTTPException(
                                 status_code=400, 
-                                detail="We don't allow scripts in pdfs. They are a security concern."
+                                detail={
+                                    "status": "error",
+                                    "message": "We don't allow scripts in pdfs. They are a security concern."
+                                }
                             )
 
                         if "/Names" in root:
                             names=root["/Names"].get_object()
                             if "/JavaScript" in names:
                                 raise HTTPException(
-                                        status_code=400,
-                                        detail="We don't allow scripts in pdfs. They are a security concern."
-                                    )
+                                    status_code=400,
+                                    detail={
+                                        "status": "error",
+                                        "message": "We don't allow scripts in pdfs. They are a security concern."
+                                    }
+                                )
                 except HTTPException:
                     raise
                 except KeyError :
@@ -190,7 +196,10 @@ class Case:
                 except Exception :
                     raise HTTPException(
                         status_code=400,
-                        detail="Could not verify PDF security. File rejected."
+                        detail={
+                            "status": "error",
+                            "message": "Could not verify PDF security. File rejected."
+                        }
                     )  
                      
             except HTTPException:
@@ -198,7 +207,10 @@ class Case:
             except Exception as e:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Invalid or corrupted PDF file: {str(e)}"
+                    detail={
+                        "status": "error",
+                        "message": f"Invalid or corrupted PDF file: {str(e)}"
+                    }
                 )
         # validate case_id is a UUID
         try:
@@ -206,7 +218,10 @@ class Case:
         except Exception:
             raise HTTPException(
                 status_code=400, 
-                detail="Invalid case_id UUID"
+                detail={
+                    "status": "error",
+                    "message": "Invalid case_id UUID"
+                }
             )
 
         connection = await get_connection()
@@ -225,7 +240,13 @@ class Case:
             )
 
             if not typeRecord:
-                raise HTTPException(status_code=400, detail=f"Unsupported file extension: {localExtension}")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": f"Unsupported file extension: {localExtension}"
+                    }
+                )
 
             mediaTypeId = typeRecord["MediaTypeId"]
             bucketName = typeRecord["MediaBucket"]
@@ -284,7 +305,10 @@ class Case:
                 except asyncpg.UniqueViolationError:
                     raise HTTPException(
                         status_code=409, 
-                        detail="Image already associated with this case"
+                        detail={
+                            "status": "error",
+                            "message": "Image already associated with this case"
+                        }
                     )
                 except Exception:
                     pass
@@ -332,7 +356,10 @@ class Case:
                 except asyncpg.UniqueViolationError:
                     raise HTTPException(
                         status_code=409, 
-                        detail="Image already associated with this case"
+                        detail={
+                            "status": "error",
+                            "message": "Image already associated with this case"
+                        }
                     )
                 except Exception:
                     pass
@@ -361,7 +388,10 @@ class Case:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Internal Server Error: {str(e)}"
+                detail={
+                    "status": "error",
+                    "message": "Internal server error"
+                }
                 )
 
         finally:
