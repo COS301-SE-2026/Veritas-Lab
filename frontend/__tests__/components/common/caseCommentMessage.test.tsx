@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import CaseReviewMessage from '@/components/common/caseReviewMessage';
+import CaseCommentMessage from '@/components/common/caseCommentMessage';
 import type { CaseComment } from '@/types/api';
 
-describe('CaseReviewMessage', () => {
+describe('CaseCommentMessage', () => {
     const comment: CaseComment = {
         commentId: 1,
         caseId: 'case-1',
@@ -21,7 +21,7 @@ describe('CaseReviewMessage', () => {
     });
     
     it('renders comment details for another user', () => {
-        render(<CaseReviewMessage comment={comment} isMine={false} />);
+        render(<CaseCommentMessage comment={comment} isMine={false} />);
         expect(screen.getByText('jane.doe')).toBeInTheDocument();
         expect(screen.getByText('comment test')).toBeInTheDocument();
         expect(screen.getByText('1 May 2026, 09:00')).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe('CaseReviewMessage', () => {
 
     it('renders a fallback timestamp and own message', () => {
         render(
-            <CaseReviewMessage
+            <CaseCommentMessage
                 comment={{ ...comment, username: ' investigator ', timestamp: null }}
                 isMine
             />

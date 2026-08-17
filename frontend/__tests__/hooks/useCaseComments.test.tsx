@@ -1,12 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import useCaseReviews from '@/lib/hooks/useCaseReviews';
+import useCaseComments from '@/lib/hooks/useCaseComments';
 import { addComment } from '@/lib/api/case';
 import type { CaseComment } from '@/types/api';
 jest.mock('@/lib/api/case', () => ({
     addComment: jest.fn(),
 }));
 //hook tests (these will need to be reviewed when i add the edit and delete functionality to frontend)
-describe('useCaseReviews', () => {
+describe('useCaseComments', () => {
     const initialComments: CaseComment[] = [
         {
             commentId: 1,
@@ -21,7 +21,7 @@ describe('useCaseReviews', () => {
     });
 
     it('renders existing comments and draft state', () => {
-        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
         expect(result.current.comments).toEqual(initialComments);
         expect(result.current.draft).toBe('');
         expect(result.current.error).toBeNull();
@@ -34,17 +34,17 @@ describe('useCaseReviews', () => {
             commentId: 2,
             caseId: 'case-1',
             username: 'alpha.user',
-            comment: 'New review note',
+            comment: 'New comment note',
             timestamp: '2026-05-02T10:30:00.000Z',
         });
-        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
         act(() => {
-            result.current.setDraft('  New review note  ');
+            result.current.setDraft('  New comment note  ');
         });
         await act(async () => {
             await result.current.submitComment();
         });
-        expect(mockedAddComment).toHaveBeenCalledWith('case-1', 'New review note');
+        expect(mockedAddComment).toHaveBeenCalledWith('case-1', 'New comment note');
         await waitFor(() => {
             expect(result.current.comments).toHaveLength(2);
         });
@@ -55,7 +55,7 @@ describe('useCaseReviews', () => {
 
     it('ignore blank drafts and block duplicates', async () => {
         const mockedAddComment = addComment as jest.MockedFunction<typeof addComment>;
-        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
         await act(async () => {
             await result.current.submitComment();
         });
@@ -68,11 +68,11 @@ describe('useCaseReviews', () => {
             commentId: 2,
             caseId: 'case-1',
             username: 'alpha.user',
-            comment: 'New review note',
+            comment: 'New comment note',
             timestamp: '2026-05-02T10:30:00.000Z',
         });
         act(() => {
-            result.current.setDraft('New review note');
+            result.current.setDraft('New comment note');
         });
 
         mockedAddComment.mockReturnValueOnce(pendingComment as Promise<Awaited<ReturnType<typeof addComment>>>);
@@ -87,7 +87,7 @@ describe('useCaseReviews', () => {
             commentId: 2,
             caseId: 'case-1',
             username: 'alpha.user',
-            comment: 'New review note',
+            comment: 'New comment note',
             timestamp: '2026-05-02T10:30:00.000Z',
         });
         await act(async () => {
@@ -100,9 +100,9 @@ describe('useCaseReviews', () => {
     it('stores an error when adding a comment fails', async () => {
         const mockedAddComment = addComment as jest.MockedFunction<typeof addComment>;
         mockedAddComment.mockRejectedValue(new Error('Unable to save comment'));
-        const { result } = renderHook(() => useCaseReviews({ caseId: 'case-1', initialComments }));
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
         act(() => {
-            result.current.setDraft('Needs review');
+            result.current.setDraft('Needs comment');
         });
         await act(async () => {
             await result.current.submitComment();
