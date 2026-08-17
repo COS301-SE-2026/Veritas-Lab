@@ -5,7 +5,14 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.security import APIKeyCookie
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Annotated
-from app.core.cases import Case
+from app.core.cases import (
+    Case,
+    CASE_NOT_FOUND,
+    MISSING_CASE_ID,
+    PDF_SCRIPTS_NOT_ALLOWED,
+    UNSUPPORTED_EXTENSION_PREFIX,
+    MEDIA_ALREADY_ON_CASE,
+)
 from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
 import asyncpg
 from uuid import UUID
@@ -25,8 +32,6 @@ other_settings = Other_Settings()
 r2_settings = R2_Settings()
 minio_settings = Minio_Settings()
 
-CASE_NOT_FOUND="Case not found"
-MISSING_CASE_ID = "Case id is missing"
 NOT_USER= ["INVESTIGATOR", "ADMIN"]
 DATABASE_ERROR_MESSAGE="Database error"
 CASE_ID_REQUIRED = "CaseID required"
@@ -69,6 +74,14 @@ CASE_EVIDENCE_SQL = """
     WHERE r.CaseID = $1
     ORDER BY r.ReportDateCreation DESC
     """
+
+OPEN_CASE_FOR_CREATOR_SQL = """
+        SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+            AND casecreator = $2
+            AND caseclosed = FALSE
+        """
 
 router = APIRouter(
     prefix="/api",
@@ -576,90 +589,193 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
 
 @router.post(
     "/cases/evidence",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Upload case evidence",
+    description=(
+        "Uploads a media file as evidence against an open case. Only the "
+        "INVESTIGATOR or ADMIN who created the case may upload to it. The file is "
+        "stored in object storage and queued for AI analysis."
+    ),
     responses={
+        201: {
+            "description": "Evidence uploaded successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "evidence": {
+                            "MediaId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                            "Filename": "evidence.png",
+                            "url": "https://localhost:9000/images/aaaaaaaa.png",
+                            "Status": "uploaded"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "model": error_response,
+            "description": "Bad Request - malformed case id, unsupported file, or unsafe PDF.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Invalid Case UUID": {
+                            "summary": "case_id is not a valid UUID",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "'fake-uuid' is not a valid UUID format"
+                                }
+                            }
+                        },
+                        "Unsupported extension": {
+                            "summary": "File type not allowed",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": f"{UNSUPPORTED_EXTENSION_PREFIX}.exe"
+                                }
+                            }
+                        },
+                        "Unsafe PDF": {
+                            "summary": "PDF contains scripts",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": PDF_SCRIPTS_NOT_ALLOWED
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         401: {
             "model": error_response,
-            "description": "Unauthorized - Missing or invalid JWT token",
+            "description": "Unauthorized - Missing or invalid JWT token"
         },
         403: {
             "model": error_response,
-            "description": "Forbidden - User lacks required investigator/admin permissions",
+            "description": "Forbidden - standard USER role cannot upload evidence.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
         },
         404: {
             "model": error_response,
-            "description": "Case not found or user lacks permission",
+            "description": "Not Found - no open case with that id created by this user.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+        409: {
+            "model": error_response,
+            "description": "Conflict - this media is already attached to the case.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": MEDIA_ALREADY_ON_CASE
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
         },
     },
 )
 async def upload_evidence(
-    request: Request, 
-    background_task: BackgroundTasks, 
-    case_id: Annotated[str, Form()], 
+    request: Request,
+    background_task: BackgroundTasks,
+    case_id: Annotated[str, Form()],
     media: Annotated[UploadFile, File()]
 ):
-
     payload = verify_jwt(request)
-
 
     verify_not_user(payload.get("role"))
 
     case_creator = payload["username"]
 
-    try:
-        case_uuid = UUID(case_id)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
+    # Case.__init__ validates the UUID and raises a 400 on a malformed value
+    validated_case_id = Case(case_id=case_id).case_id
 
-    connection = await get_connection()
+    connection = None
 
     try:
-        row = await connection.fetchrow("""
-            SELECT * FROM "Cases_DB"."Cases" 
-            WHERE caseid = $1 
-            AND "casecreator" = $2
-            AND "caseclosed" = false;
-            """, 
-            case_uuid,
+        connection = await get_connection()
+
+        row = await connection.fetchrow(
+            OPEN_CASE_FOR_CREATOR_SQL,
+            validated_case_id,
             case_creator
         )
-        
+
         if row is None:
-            return JSONResponse(
-                status_code=404, 
-                content={
+            raise HTTPException(
+                status_code=404,
+                detail={
                     "status": "error", 
-                    "message": "Case not found/ Nor permissions"
+                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
         case = _row_to_case(row)
 
-        result = await case.add_evidence(media, case_uuid)
+        result = await case.add_evidence(media, validated_case_id)
 
-        # start pipeline here
+        # start the media pipeline
         extension = Path(result["Filename"]).suffix.lower()
         media_id = UUID(result["MediaId"])
 
         media_relay = MediaRelay(media_id=media_id, extension=extension)
-
         background_task.add_task(media_relay.relay_to_service)
 
-        return JSONResponse(
-            status_code=201, 
-            content={
-                "status": "success", 
-                "evidence": result
+        return {
+            "status": "success",
+            "evidence": result
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
 
     finally:
-        await connection.close()
+        if connection is not None:
+            await connection.close()
 
 @router.post("/closeCase",
     responses={
