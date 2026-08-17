@@ -12,6 +12,7 @@ from app.core.cases import (
     PDF_SCRIPTS_NOT_ALLOWED,
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
+    STORAGE_UNAVAILABLE,
 )
 from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
 import asyncpg
@@ -38,6 +39,7 @@ CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
+USER_UNAUTHORIZED = "User unauthorized"
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -128,7 +130,7 @@ def verify_not_user(user_role:str):
             status_code=403,
             detail={
                 "status": "error", 
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
@@ -267,7 +269,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "User unauthorized"
+                            "message": USER_UNAUTHORIZED
                         }
                     }
                 }
@@ -651,10 +653,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 }
             }
         },
-        401: {
-            "model": error_response,
-            "description": "Unauthorized - Missing or invalid JWT token"
-        },
+        401: INVALID_TOKEN_401,
         403: {
             "model": error_response,
             "description": "Forbidden - standard USER role cannot upload evidence.",
@@ -663,7 +662,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "User unauthorized"
+                            "message": USER_UNAUTHORIZED
                         }
                     }
                 }
@@ -711,6 +710,20 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                 }
             }
         },
+        503: {
+            "model": error_response,
+            "description": "Service Unavailable - object storage could not be reached.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": STORAGE_UNAVAILABLE
+                        }
+                    }
+                }
+            }
+        }
     },
 )
 async def upload_evidence(
