@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { CaseCardProps } from '@/types/components';
+import CaseDeleteButton from './caseDeleteButton';
 
-export default function CaseCard({ caseTitle, caseDescription, caseStatus, href }: CaseCardProps) {
+export default function CaseCard({ caseTitle, caseDescription, caseStatus, href, caseId, canDelete, onDeleted }: CaseCardProps) {
     const cardContent = (
         <div className="border rounded-lg p-4 shadow-md transition duration-150 hover:shadow-lg hover:border-[var(--color-primary)]">
             <div className="text-lg font-bold text-[var(--color-text)]">{caseTitle}</div>
@@ -11,14 +12,31 @@ export default function CaseCard({ caseTitle, caseDescription, caseStatus, href 
             </div>
         </div>
     );
+    //this will work similar to how the evidence delete worked
+    const showDelete = canDelete && caseId;
+    const deleteButton = showDelete ? (
+        <div className="absolute top-3 right-3 z-10">
+            <CaseDeleteButton caseId={caseId} caseTitle={caseTitle} onDeleted={onDeleted} />
+        </div>
+    ) : null;
 
     if (href) {
         return (
-            <Link href={href} className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2">
-                {cardContent}
-            </Link>
+            <div className="relative">
+                <Link
+                    href={href}
+                    className="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
+                >
+                    {cardContent}
+                </Link>
+                {deleteButton}
+            </div>
         );
     }
-
-    return cardContent;
+    return (
+        <div className="relative">
+            {cardContent}
+            {deleteButton}
+        </div>
+    );
 }
