@@ -40,8 +40,8 @@ INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
-CASES_UPDATED_SUCCESS = "Cases updated successfully"
-UPDATE_FIELDS_REQUIRED = "At least one update field is required"
+CASE_UPDATED_SUCCESS = "Case updated successfully."
+UPDATE_FIELDS_REQUIRED = "At least one update field is required or CaseDescription must be provided"
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -991,7 +991,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": UPDATE_FIELDS_REQUIREDM
+                                    "message": UPDATE_FIELDS_REQUIRED
                                 }
                             }
                         },
@@ -1020,7 +1020,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
 
         401: INVALID_TOKEN_401,
 
-        403: USER_UNAUTHORIZED,
+        403: USER_UNAUTHORIZED_403,
 
         404: {
             "model": error_response,
