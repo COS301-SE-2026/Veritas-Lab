@@ -70,6 +70,8 @@ CASE_EVIDENCE_SQL = """
     ORDER BY r.ReportDateCreation DESC
     """
 
+
+
 router = APIRouter(
     prefix="/api",
     tags=["Cases"]
@@ -747,63 +749,174 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         if connection is not None:
             await connection.close()
 
-@router.post("/updateCase")
-async def update_case(case_request: UpdateCaseRequest, request: Request):
-    connection = None
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401, 
-            content={
-                "status": "error", 
-                "message": str(e)
+@router.post(
+    "/updateCase",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Update a Case",
+    description=(
+        "Updates the name and/or the description of a case. Only INVESTIGATOR and "
+        "ADMIN roles may call this endpoint, and a case can only be updated by the "
+        "user who created it. Fields that are omitted are left unchanged, so either "
+        "CaseName or CaseDescription must be supplied."
+    ),
+    responses={
+        200: {
+            "description": "Case updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case updated successfully."
+                    }
+                }
             }
-        )
+        },
+
+        400: {
+            "model": error_response,
+            "description": "Bad Request - Missing/malformed CaseID or invalid update fields",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Missing CaseID": {
+                            "summary": "No CaseID supplied",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+                        "Invalid CaseID": {
+                            "summary": "CaseID is not a valid UUID",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "'not-a-valid-uuid' is not a valid UUID format"
+                                }
+                            }
+                        },
+                        "No fields": {
+                            "summary": "Neither CaseName nor CaseDescription supplied",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "At least one of CaseName or CaseDescription must be provided"
+                                }
+                            }
+                        },
+                        "Blank CaseName": {
+                            "summary": "CaseName is empty or whitespace",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName is required"
+                                }
+                            }
+                        },
+                        "CaseName too long": {
+                            "summary": "CaseName exceeds 255 characters",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName must be 255 characters or less"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: {
+            "model": error_response,
+            "description": "Forbidden - User unauthorized",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        },
+
+        404: {
+            "model": error_response,
+            "description": "Not Found - Case does not exist or the caller is not its creator",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def update_case(case_request: UpdateCaseRequest, request: Request):
+    payload = verify_jwt(request)
 
     verify_not_user(payload.get("role"))
 
     if not case_request.CaseID:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
                 "message": CASE_ID_REQUIRED
             }
         )
 
-    try:
-        case_uuid = UUID(case_request.CaseID)
-    except ValueError:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
-                "message": INVALID_CASE_ID
-            }
-        )
+    case_id = Case(case_id=case_request.CaseID).case_id
 
     if case_request.CaseName is None and case_request.CaseDescription is None:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
                 "message": "At least one of CaseName or CaseDescription must be provided"
             }
         )
 
     validated_name = None
+
     if case_request.CaseName is not None:
         try:
-            validated_name = Case(case_name=case_request.CaseName).case_name  # This will raise ValueError if invalid
+            validated_name = Case(case_name=case_request.CaseName).case_name
         except ValueError as e:
-            return JSONResponse(
-                status_code=400, 
-                content={
-                    "status": "error", 
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
                     "message": str(e)
                 }
             )
+
+    connection = None
 
     try:
         connection = await get_connection()
@@ -811,39 +924,36 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
-            set casename = COALESCE($3, casename),
+            SET casename = COALESCE($3, casename),
                 casedescription = COALESCE($4, casedescription)
             WHERE caseid = $1
             AND casecreator = $2
             RETURNING caseid
             """,
-            case_uuid,
+            case_id,
             payload.get("username"),
             validated_name,
             case_request.CaseDescription
         )
 
         if row is None:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Case updated successfully."
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Case updated successfully."
+        }
 
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
