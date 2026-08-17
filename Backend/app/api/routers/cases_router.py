@@ -41,7 +41,7 @@ CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
 CASE_UPDATED_SUCCESS = "Case updated successfully."
-UPDATE_FIELDS_REQUIRED = "At least one update field is required or CaseDescription must be provided"
+UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
