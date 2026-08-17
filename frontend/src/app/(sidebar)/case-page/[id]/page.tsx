@@ -9,7 +9,8 @@ import MediaUploadModal from "@/components/common/mediaUploadModal";
 import CaseCloseButton from "@/components/common/caseCloseButton";
 import useCase from "@/lib/hooks/useCase";
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
-import CaseReviewsPanel from '@/components/common/caseReviewsPanel';
+import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
+import CaseEditButton from "@/components/common/caseEditButton";
 
 const TABS = ['Evidence', 'Reviews'] as const;
 export default function CasePage() {
@@ -75,6 +76,7 @@ export default function CasePage() {
     const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
     const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed;
     const canDeleteEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') //role of admin needs to be discussed and reviewed on frontend but for now giving it access.
+    const canEditCase = userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username; //agaian might need to review these permissions
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
@@ -96,9 +98,20 @@ export default function CasePage() {
                         </p>
                         {error ? <p className="text-sm text-red-500 mt-2">{error}</p> : null}
                     </div>
-                    {canUploadEvidence ? (
-                        <div className="w-1/5 flex items-end justify-end">
-                            <Button variant="submit" className="py-4" text="Upload Evidence" onClick={openModal} disabled={!caseDetails} />
+                    {(canUploadEvidence || canEditCase) ? (
+                        <div className="w-1/5 flex items-end justify-end gap-2">
+                            {canEditCase ? (
+                                <CaseEditButton
+                                    caseId={id}
+                                    initialName={caseDetails?.caseName ?? ''}
+                                    initialDescription={caseDetails?.caseDescription ?? ''}
+                                    onUpdated={reloadCaseData}
+                                    className="py-4"
+                                />
+                            ) : null}
+                            {canUploadEvidence ? (
+                                <Button variant="submit" className="py-4" text="Upload Evidence" onClick={openModal} disabled={!caseDetails} />
+                            ) : null}
                         </div>
                     ) : null}
                 </div>
@@ -131,7 +144,7 @@ export default function CasePage() {
                                 )}
                             </div>
                         ) : activeTab === 'Reviews' ? (
-                            <CaseReviewsPanel
+                            <CaseCommentsPanel
                                 caseId={id}
                                 initialComments={caseComments}
                                 currentUsername={currentUser?.username ?? ''}
