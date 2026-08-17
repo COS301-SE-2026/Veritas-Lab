@@ -276,19 +276,6 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 
         401: INVALID_TOKEN_401,
 
-        403: {
-            "description": "Forbidden - User unauthorized",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": USER_UNAUTHORIZED
-                        }
-                    }
-                }
-            }
-        },
         403: USER_UNAUTHORIZED_403,
 
         409: {
@@ -669,20 +656,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             }
         },
         401: INVALID_TOKEN_401,
-        403: {
-            "model": error_response,
-            "description": "Forbidden - standard USER role cannot upload evidence.",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": USER_UNAUTHORIZED
-                        }
-                    }
-                }
-            }
-        },
+        403: USER_UNAUTHORIZED_403,
         404: {
             "model": error_response,
             "description": "Not Found - no open case with that id created by this user.",
