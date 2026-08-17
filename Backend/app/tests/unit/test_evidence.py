@@ -7,9 +7,16 @@ import uuid
 import asyncpg
 
 from app.api.main import app
-from app.core.cases import Case
+from app.core.cases import (
+    Case,
+    UNSUPPORTED_EXTENSION_PREFIX,
+    MEDIA_ALREADY_ON_CASE,
+    PDF_SCRIPTS_NOT_ALLOWED,
+    INVALID_CASE_ID_UUID
+)
 import app.api.routers.cases_router as cases_router
 from starlette.datastructures import UploadFile
+
 
 client = TestClient(app)
 
@@ -91,7 +98,7 @@ async def test_invalid_file_type(mockDbConnect):
         await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert excInfo.value.status_code == 400
-    assert "Unsupported file extension: .food" in excInfo.value.detail    
+    assert excInfo.value.detail["message"] == f"{UNSUPPORTED_EXTENSION_PREFIX}.food"
 
     mockDbConnection.close.assert_called_once()
 
@@ -246,7 +253,7 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
         await case.add_evidence(media=mockMedia2, case_id=test_case_id)
     
     assert excInfo.value.status_code == 409
-    assert "already associated with this case" in excInfo.value.detail
+    assert excInfo.value.detail["message"] == MEDIA_ALREADY_ON_CASE
 
 #Tests for deleting the Evidence
 
@@ -465,7 +472,7 @@ async def test_add_evidence_invalid_case_id_uuid():
         await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid")
 
     assert excInfo.value.status_code == 400
-    assert excInfo.value.detail == "Invalid case_id UUID"
+    assert excInfo.value.detail["message"] == INVALID_CASE_ID_UUID
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
@@ -493,7 +500,7 @@ async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
         await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert excInfo.value.status_code == 400
-    assert "security concern" in excInfo.value.detail
+    assert excInfo.value.detail["message"] == PDF_SCRIPTS_NOT_ALLOWED
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
@@ -524,8 +531,8 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
         await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert exc_info.value.status_code == 400
-    assert "security concern" in exc_info.value.detail
-    
+    assert exc_info.value.detail["message"] == PDF_SCRIPTS_NOT_ALLOWED
+
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
 @patch("app.core.cases.get_object")
