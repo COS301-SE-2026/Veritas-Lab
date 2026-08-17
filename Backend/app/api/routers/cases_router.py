@@ -40,6 +40,8 @@ INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
+CASES_UPDATED_SUCCESS = "Cases updated successfully"
+UPDATE_FIELDS_REQUIRED = "At least one update field is required"
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -84,6 +86,15 @@ OPEN_CASE_FOR_CREATOR_SQL = """
             AND casecreator = $2
             AND caseclosed = FALSE
         """
+
+UPDATE_CASE_SQL = """
+    UPDATE "Cases_DB"."Cases"
+    SET casename = COALESCE($3, casename),
+        casedescription = COALESCE($4, casedescription)
+    WHERE caseid = $1
+        AND casecreator = $2
+    RETURNING caseid
+    """
 
 USER_UNAUTHORIZED_403 = {
             "description": "Forbidden - User unauthorized",
@@ -945,7 +956,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 "application/json": {
                     "example": {
                         "status": "success",
-                        "message": "Case updated successfully."
+                        "message": CASE_UPDATED_SUCCESS
                     }
                 }
             }
@@ -980,7 +991,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "At least one of CaseName or CaseDescription must be provided"
+                                    "message": UPDATE_FIELDS_REQUIREDM
                                 }
                             }
                         },
@@ -1009,20 +1020,7 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
 
         401: INVALID_TOKEN_401,
 
-        403: {
-            "model": error_response,
-            "description": "Forbidden - User unauthorized",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": "User unauthorized"
-                        }
-                    }
-                }
-            }
-        },
+        403: USER_UNAUTHORIZED,
 
         404: {
             "model": error_response,
@@ -1076,7 +1074,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
             status_code=400,
             detail={
                 "status": "error",
-                "message": "At least one of CaseName or CaseDescription must be provided"
+                "message": UPDATE_FIELDS_REQUIRED
             }
         )
 
@@ -1100,14 +1098,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         connection = await get_connection()
 
         row = await connection.fetchrow(
-            """
-            UPDATE "Cases_DB"."Cases"
-            SET casename = COALESCE($3, casename),
-                casedescription = COALESCE($4, casedescription)
-            WHERE caseid = $1
-            AND casecreator = $2
-            RETURNING caseid
-            """,
+            UPDATE_CASE_SQL,
             case_id,
             payload.get("username"),
             validated_name,
@@ -1125,7 +1116,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
 
         return {
             "status": "success",
-            "message": "Case updated successfully."
+            "message": CASE_UPDATED_SUCCESS 
         }
 
     except asyncpg.PostgresError:
