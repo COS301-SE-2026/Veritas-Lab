@@ -9,6 +9,7 @@ import asyncpg
 from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
+from app.auth.auth import NOT_AUTH, INVALID_TOKEN
 
 import uuid
 from uuid import uuid4
@@ -1045,8 +1046,10 @@ def test_update_case_missing_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Missing Authorization header"
+        "detail": {
+            "status": "error",
+            "message": NOT_AUTH
+        }
     }
 
 def test_update_case_invalid_jwt(monkeypatch):
@@ -1060,8 +1063,10 @@ def test_update_case_invalid_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": INVALID_TOKEN
+        }
     }
 
 def test_update_case_user_unauthorized(monkeypatch):
@@ -1077,7 +1082,7 @@ def test_update_case_user_unauthorized(monkeypatch):
     assert response.json() == {
         "detail": {
             "status": "error",
-            "message": "User unauthorized"
+            "message": cases_router.USER_UNAUTHORIZED
         }
     }
 

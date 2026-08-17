@@ -70,6 +70,14 @@ CASE_EVIDENCE_SQL = """
     ORDER BY r.ReportDateCreation DESC
     """
 
+UPDATE_CASE_SQL = """
+    UPDATE "Cases_DB"."Cases"
+    SET casename = COALESCE($3M casename),
+        casedescription = COALESCE($4, casedescription)
+    WHERE caseid = $1
+        AND casecreator = $2
+    RETURNING caseid
+    """
 
 
 router = APIRouter(
@@ -112,12 +120,12 @@ class error_response(BaseModel):
   
 
 def verify_not_user(user_role:str):
-    if  user_role not in NOT_USER: #This solves for it being blank and non sense roles.
+    if  user_role  not in NOT_USER: #This solves for it being blank and non sense roles.
         raise HTTPException(
             status_code=403,
             detail={
                 "status": "error", 
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
