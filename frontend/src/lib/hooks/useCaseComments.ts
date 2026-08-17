@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react';
 import { addComment, editComment as editCommentRequest, deleteComment as deleteCommentRequest } from '@/lib/api/case';
 import type { CaseComment } from '@/types/api';
 
-type UseCaseReviewsOptions = {
+type UseCaseCommentsOptions = {
     caseId: string;
     initialComments: CaseComment[];
 };
-export default function useCaseReviews({ caseId, initialComments }: UseCaseReviewsOptions) {
+export default function useCaseComments({ caseId, initialComments }: UseCaseCommentsOptions) {
     const [comments, setComments] = useState<CaseComment[]>(initialComments);
     const [draft, setDraft] = useState('');
     const [error, setError] = useState<string | null>(null);
