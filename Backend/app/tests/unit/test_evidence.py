@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 import io
 import uuid
 import asyncpg
+from botocore.exceptions import EndpointConnectionError
 
 from app.api.main import app
 from app.core.cases import (
@@ -12,7 +13,8 @@ from app.core.cases import (
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
     PDF_SCRIPTS_NOT_ALLOWED,
-    INVALID_CASE_ID_UUID
+    INVALID_CASE_ID_UUID,
+    STORAGE_UNAVAILABLE
 )
 import app.api.routers.cases_router as cases_router
 from starlette.datastructures import UploadFile
@@ -699,3 +701,40 @@ def test_delete_evidence_user_forbidden(monkeypatch):
             "message": "User unauthorized"
         }
     }
+
+@pytest.mark.asyncio
+@patch("app.core.cases.get_object")
+@patch("asyncpg.connect")
+async def test_add_evidence_storage_failure_returns_503(mockDbConnect, mockget_object):
+    fileContent = b"A fake binary for a png"
+    testContent = io.BytesIO(fileContent)
+
+    mockMedia = UploadFile(
+        file=testContent,
+        filename="storage_fail.png",
+        headers={"content-type": "image/png"}
+    )
+
+    mockMediaTypeRecord = {
+        "MediaTypeId": "type-111", 
+        "MediaBucket": "images",
+        "MediaExtension": ".png"
+    }
+
+    mockDbConnection = AsyncMock()
+    mockDbConnect.return_value = mockDbConnection
+    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaTypeRecord)
+    mockDbConnection.close = AsyncMock()
+
+    mockget_object.side_effect = EndpointConnectionError(
+        endpoint_url="http://minio:9000",
+    )
+
+    case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
+    test_case_id = uuid.uuid4()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await case.add_evidence(media=mockMedia, case_id=test_case_id)
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["message"] == STORAGE_UNAVAILABLE

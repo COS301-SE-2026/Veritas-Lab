@@ -4,6 +4,7 @@ import asyncpg
 import asyncio
 import io
 import hashlib
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from pypdf import PdfReader
@@ -23,6 +24,7 @@ INVALID_CASE_ID_UUID = "Invalid case_id UUID"
 UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
 MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
 INTERNAL_SERVER_ERROR = "Internal server error"
+STORAGE_UNAVAILABLE = "Evidence storage is temporarily unavailable. Please try again."
 postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
@@ -393,6 +395,16 @@ class Case:
         
         except HTTPException as e:
             raise e
+
+        except (BotoCoreError, ClientError):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": STORAGE_UNAVAILABLE
+                }
+            )
+
         except Exception as e:
             raise HTTPException(
                 status_code=500,
