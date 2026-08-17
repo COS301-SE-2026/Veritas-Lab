@@ -85,6 +85,20 @@ OPEN_CASE_FOR_CREATOR_SQL = """
             AND caseclosed = FALSE
         """
 
+USER_UNAUTHORIZED_403 = {
+            "description": "Forbidden - User unauthorized",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        }
+
 router = APIRouter(
     prefix="/api",
     tags=["Cases"]
@@ -275,6 +289,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
                 }
             }
         },
+        403: USER_UNAUTHORIZED_403,
 
         409: {
             "description": "Conflict - Case already exists",
@@ -790,33 +805,97 @@ async def upload_evidence(
         if connection is not None:
             await connection.close()
 
-@router.post("/closeCase",
+@router.post(
+    "/closeCase",
+    summary="Close a case",
+    status_code=200,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    description="The creator of a case can close the case.",
     responses={
-        403: {
-            "model": error_response, 
-            "description": "Forbidden - User unauthorized"
+        200: {
+            "description": "Case closed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case closed successfully."
+                    }
+                }
+            }
         },
+
+        400: {
+            "description": "Bad Request - Invalid case ID",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingCaseID": {
+                            "summary": "Missing case ID",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+
+                        "InvalidCaseID": {
+                            "summary": "Invalid case ID",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_CASE_ID
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: USER_UNAUTHORIZED_403,
+
+        404: {
+            "description": "Case not found or user unauthorized",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     connection = None
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
+    payload = verify_jwt(request)
 
     verify_not_user(payload.get("role"))
     
     if not case_request.CaseID:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": CASE_ID_REQUIRED
             }
@@ -825,9 +904,9 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
         case_uuid = UUID(case_request.CaseID)
     except ValueError as e:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400, 
-            content={
+            detail={
                 "status": "error", 
                 "message": INVALID_CASE_ID
             }
@@ -849,25 +928,23 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
         if row is None:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Case closed successfully."
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Case closed successfully."
+        }
+    
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
