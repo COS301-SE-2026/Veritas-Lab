@@ -797,8 +797,10 @@ def test_close_case_not_found(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Case not found or user unauthorized."
+        "detail": {
+            "status": "error",
+            "message": "Case not found or user unauthorized."
+        }
     }
 
     mock_connect.assert_called_once()
@@ -813,7 +815,6 @@ def test_close_case_not_case_creator(monkeypatch):
             "username": "different_user",
             "role": "INVESTIGATOR"
         }
-
 
     mock_connection = AsyncMock()
     mock_connection.fetchrow = AsyncMock(return_value=None)
@@ -839,8 +840,10 @@ def test_close_case_not_case_creator(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Case not found or user unauthorized."
+        "detail": {
+            "status": "error",
+            "message": "Case not found or user unauthorized."
+        }
     }
 
     mock_connect.assert_called_once()
@@ -992,8 +995,10 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Case not found or user unauthorized."
+        "detail": {
+            "status": "error",
+            "message": "Case not found or user unauthorized."
+        }
     }
 
     mock_connect.assert_called_once()

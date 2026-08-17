@@ -4,6 +4,7 @@ import asyncpg
 import asyncio
 import io
 import hashlib
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from pypdf import PdfReader
@@ -13,8 +14,17 @@ from botocore.client import Config
 from app.core.env import Postgres_Settings, Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
 
-CASE_NOT_FOUND="Case not found"
+CASE_NOT_FOUND = "Case not found"
 MISSING_CASE_ID = "Case id is missing"
+CASE_ALREADY_EXISTS = "This case already exists"
+PDF_SCRIPTS_NOT_ALLOWED = "We don't allow scripts in pdfs. They are a security concern."
+PDF_VERIFICATION_FAILED = "Could not verify PDF security. File rejected."
+INVALID_PDF_PREFIX = "Invalid or corrupted PDF file: "
+INVALID_CASE_ID_UUID = "Invalid case_id UUID"
+UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
+MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
+INTERNAL_SERVER_ERROR = "Internal server error"
+STORAGE_UNAVAILABLE = "Evidence storage is temporarily unavailable. Please try again."
 postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
@@ -127,7 +137,7 @@ class Case:
                 status_code=409,
                 detail={
                     "status": "error",
-                    "message": "This case already exists"
+                    "message": CASE_ALREADY_EXISTS
                 }
             )
         
@@ -173,16 +183,22 @@ class Case:
                         if "/OpenAction" in root or "/AA" in root:
                             raise HTTPException(
                                 status_code=400, 
-                                detail="We don't allow scripts in pdfs. They are a security concern."
+                                detail={
+                                    "status": "error",
+                                    "message": PDF_SCRIPTS_NOT_ALLOWED
+                                }
                             )
 
                         if "/Names" in root:
                             names=root["/Names"].get_object()
                             if "/JavaScript" in names:
                                 raise HTTPException(
-                                        status_code=400,
-                                        detail="We don't allow scripts in pdfs. They are a security concern."
-                                    )
+                                    status_code=400,
+                                    detail={
+                                        "status": "error",
+                                        "message": PDF_SCRIPTS_NOT_ALLOWED
+                                    }
+                                )
                 except HTTPException:
                     raise
                 except KeyError :
@@ -190,7 +206,10 @@ class Case:
                 except Exception :
                     raise HTTPException(
                         status_code=400,
-                        detail="Could not verify PDF security. File rejected."
+                        detail={
+                            "status": "error",
+                            "message": PDF_VERIFICATION_FAILED
+                        }
                     )  
                      
             except HTTPException:
@@ -198,7 +217,10 @@ class Case:
             except Exception as e:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Invalid or corrupted PDF file: {str(e)}"
+                    detail={
+                        "status": "error",
+                        "message": f"{INVALID_PDF_PREFIX}{str(e)}"
+                    }
                 )
         # validate case_id is a UUID
         try:
@@ -206,7 +228,10 @@ class Case:
         except Exception:
             raise HTTPException(
                 status_code=400, 
-                detail="Invalid case_id UUID"
+                detail={
+                    "status": "error",
+                    "message": INVALID_CASE_ID_UUID
+                }
             )
 
         connection = await get_connection()
@@ -225,7 +250,13 @@ class Case:
             )
 
             if not typeRecord:
-                raise HTTPException(status_code=400, detail=f"Unsupported file extension: {localExtension}")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{localExtension}"
+                    }
+                )
 
             mediaTypeId = typeRecord["MediaTypeId"]
             bucketName = typeRecord["MediaBucket"]
@@ -284,7 +315,10 @@ class Case:
                 except asyncpg.UniqueViolationError:
                     raise HTTPException(
                         status_code=409, 
-                        detail="Image already associated with this case"
+                        detail={
+                            "status": "error",
+                            "message": MEDIA_ALREADY_ON_CASE
+                        }
                     )
                 except Exception:
                     pass
@@ -332,7 +366,10 @@ class Case:
                 except asyncpg.UniqueViolationError:
                     raise HTTPException(
                         status_code=409, 
-                        detail="Image already associated with this case"
+                        detail={
+                            "status": "error",
+                            "message": MEDIA_ALREADY_ON_CASE
+                        }
                     )
                 except Exception:
                     pass
@@ -358,10 +395,23 @@ class Case:
         
         except HTTPException as e:
             raise e
+
+        except (BotoCoreError, ClientError):
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": STORAGE_UNAVAILABLE
+                }
+            )
+
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Internal Server Error: {str(e)}"
+                detail={
+                    "status": "error",
+                    "message": INTERNAL_SERVER_ERROR
+                }
                 )
 
         finally:
