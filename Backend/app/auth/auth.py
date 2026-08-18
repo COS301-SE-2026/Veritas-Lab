@@ -17,6 +17,48 @@ INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
 EXPIRED_TOKEN = "Token has expired"
 
+INVALID_TOKEN_401 = {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        },
+
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when the request does not contain a valid authentication token.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
 COOKIE_SCHEME = APIKeyCookie(
     name=COOKIE_NAME,
     auto_error=False
@@ -619,47 +661,7 @@ async def register(request: RegisterRequest, response: Response):
             }
         },
 
-        401: {
-            "description": "Authentication failed",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "InvalidToken": {
-                            "summary": "Invalid JWT",
-                            "description": "Triggered when JWT verification fails.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": INVALID_TOKEN
-                                }
-                            }
-                        },
-
-                        "MissingToken": {
-                            "summary": "Missing JWT",
-                            "description": "Triggered when the request does not contain a valid authentication token.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": NOT_AUTH
-                                }
-                            }
-                        },
-
-                        "ExpiredToken": {
-                            "summary": "Expired JWT",
-                            "description": "Triggered when the provided JWT has expired.",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": EXPIRED_TOKEN
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        401: INVALID_TOKEN_401,
 
         403: {
             "description": "User does not have permission to access this endpoint",

@@ -1,8 +1,10 @@
 import uuid
 from uuid import uuid4
 import asyncpg
+import asyncio
 import io
 import hashlib
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from pypdf import PdfReader
@@ -12,7 +14,17 @@ from botocore.client import Config
 from app.core.env import Postgres_Settings, Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
 
+CASE_NOT_FOUND = "Case not found"
 MISSING_CASE_ID = "Case id is missing"
+CASE_ALREADY_EXISTS = "This case already exists"
+PDF_SCRIPTS_NOT_ALLOWED = "We don't allow scripts in pdfs. They are a security concern."
+PDF_VERIFICATION_FAILED = "Could not verify PDF security. File rejected."
+INVALID_PDF_PREFIX = "Invalid or corrupted PDF file: "
+INVALID_CASE_ID_UUID = "Invalid case_id UUID"
+UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
+MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
+INTERNAL_SERVER_ERROR = "Internal server error"
+INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Please try again."
 postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
@@ -82,46 +94,52 @@ def get_object(for_presign: bool = False) -> S3Client:
 class Case:
     def __init__(
         self, 
-        CaseCreator: str = None, 
-        CaseName: str = None, 
-        CaseDescription: str=None, 
-        CaseID: str=None
+        case_creator: str = None, 
+        case_name: str = None, 
+        case_description: str=None, 
+        case_id: str=None
     ):
-        if  (CaseCreator is not None):
-            if not CaseCreator.strip():
+        if  (case_creator is not None):
+            if not case_creator.strip():
                 raise ValueError("CaseCreator is required")
-            if  len(CaseCreator) > 100:
+            if  len(case_creator) > 100:
                 raise ValueError("Name is too long. Must be 100 characters or less")
-        if  (CaseName is not None):
-            if not CaseName.strip():
+        if  (case_name is not None):
+            if not case_name.strip():
                 raise ValueError("CaseName is required")
-            if len(CaseName) > 255:
+            if len(case_name) > 255:
                 raise ValueError("CaseName must be 255 characters or less")
         
-        self.CaseCreator = None if CaseCreator is None else CaseCreator.strip()
-        self.CaseName = None if CaseName is None else CaseName.strip()
-        self.CaseDescription = CaseDescription
-        self.CaseClosed = False
-        if CaseID is not None:
-            cleaned_id = CaseID.strip()
+        self.case_creator = None if case_creator is None else case_creator.strip()
+        self.case_name = None if case_name is None else case_name.strip()
+        self.case_description = case_description
+        self.case_closed = False
+        if case_id is not None:
+            cleaned_id = case_id.strip()
             try:
                 uuid.UUID(cleaned_id)
-                self.CaseId = cleaned_id
+                self.case_id  = cleaned_id
             except ValueError:
                 raise HTTPException(
                     status_code= 400,
                     detail={
                         "status": "error",
-                        "message": f"'{CaseID}' is not a valid UUID format"
+                        "message": f"'{case_id}' is not a valid UUID format"
                     } 
                 )
         else:
-            self.CaseId = None
-        self.CaseCreationDate = None
+            self.case_id = None
+        self.case_creation_date = None
 
     async def create(self):
-        if self.CaseId is not None:
-            raise ValueError("This case already exists")
+        if self.case_id  is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "status": "error",
+                    "message": CASE_ALREADY_EXISTS
+                }
+            )
         
         connection = await get_connection()
 
@@ -133,14 +151,14 @@ class Case:
                 VALUES ($1, $2, $3, $4)
                 RETURNING caseid, casecreationdate
                 """,
-                self.CaseCreator,
-                self.CaseName,
-                self.CaseDescription,
-                self.CaseClosed
+                self.case_creator,
+                self.case_name,
+                self.case_description,
+                self.case_closed
             )
 
-            self.CaseId=row["caseid"]
-            self.CaseCreationDate=row["casecreationdate"]
+            self.case_id=row["caseid"]
+            self.case_creation_date=row["casecreationdate"]
             return str(row["caseid"])
 
         finally:
@@ -165,16 +183,22 @@ class Case:
                         if "/OpenAction" in root or "/AA" in root:
                             raise HTTPException(
                                 status_code=400, 
-                                detail="We don't allow scripts in pdfs. They are a security concern."
+                                detail={
+                                    "status": "error",
+                                    "message": PDF_SCRIPTS_NOT_ALLOWED
+                                }
                             )
 
                         if "/Names" in root:
                             names=root["/Names"].get_object()
                             if "/JavaScript" in names:
                                 raise HTTPException(
-                                        status_code=400,
-                                        detail="We don't allow scripts in pdfs. They are a security concern."
-                                    )
+                                    status_code=400,
+                                    detail={
+                                        "status": "error",
+                                        "message": PDF_SCRIPTS_NOT_ALLOWED
+                                    }
+                                )
                 except HTTPException:
                     raise
                 except KeyError :
@@ -182,7 +206,10 @@ class Case:
                 except Exception :
                     raise HTTPException(
                         status_code=400,
-                        detail="Could not verify PDF security. File rejected."
+                        detail={
+                            "status": "error",
+                            "message": PDF_VERIFICATION_FAILED
+                        }
                     )  
                      
             except HTTPException:
@@ -190,7 +217,10 @@ class Case:
             except Exception as e:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Invalid or corrupted PDF file: {str(e)}"
+                    detail={
+                        "status": "error",
+                        "message": f"{INVALID_PDF_PREFIX}{str(e)}"
+                    }
                 )
         # validate case_id is a UUID
         try:
@@ -198,7 +228,10 @@ class Case:
         except Exception:
             raise HTTPException(
                 status_code=400, 
-                detail="Invalid case_id UUID"
+                detail={
+                    "status": "error",
+                    "message": INVALID_CASE_ID_UUID
+                }
             )
 
         connection = await get_connection()
@@ -217,7 +250,13 @@ class Case:
             )
 
             if not typeRecord:
-                raise HTTPException(status_code=400, detail=f"Unsupported file extension: {localExtension}")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{localExtension}"
+                    }
+                )
 
             mediaTypeId = typeRecord["MediaTypeId"]
             bucketName = typeRecord["MediaBucket"]
@@ -276,7 +315,10 @@ class Case:
                 except asyncpg.UniqueViolationError:
                     raise HTTPException(
                         status_code=409, 
-                        detail="Image already associated with this case"
+                        detail={
+                            "status": "error",
+                            "message": MEDIA_ALREADY_ON_CASE
+                        }
                     )
                 except Exception:
                     pass
@@ -324,7 +366,10 @@ class Case:
                 except asyncpg.UniqueViolationError:
                     raise HTTPException(
                         status_code=409, 
-                        detail="Image already associated with this case"
+                        detail={
+                            "status": "error",
+                            "message": MEDIA_ALREADY_ON_CASE
+                        }
                     )
                 except Exception:
                     pass
@@ -350,21 +395,39 @@ class Case:
         
         except HTTPException as e:
             raise e
+
+        except (BotoCoreError, ClientError):
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "message": INTERNAL_SERVER_ERROR_STORAGE
+                }
+            )
+
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Internal Server Error: {str(e)}"
+                detail={
+                    "status": "error",
+                    "message": INTERNAL_SERVER_ERROR
+                }
                 )
 
         finally:
             await connection.close()
             await media.close()
 
-    async def delete_evidence(self, media_id: uuid.UUID, JWT_username: str = None):
-        if self.CaseId is None:
+    
+
+    async def delete_evidence(self, media_id: uuid.UUID, jwt_username: str = None):
+        if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
-                detail=MISSING_CASE_ID
+                detail={
+                    "status":"error",
+                    "message":MISSING_CASE_ID
+                }
             )
 
         connection = None
@@ -372,71 +435,42 @@ class Case:
         try:
             connection=await get_connection()
 
-            if JWT_username is not None:
+            if jwt_username is not None:
 
                 status=await connection.execute(
                     """
-                    DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c WHERE r."CaseId" = c."CaseId"
-                    AND r."CaseId" = $1
-                    AND r."MediaId" = $2
-                    AND c."CaseCreator" = $3;
+                    DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c 
+                    WHERE r.CaseId = c.CaseId
+                        AND r.CaseId = $1
+                        AND r.MediaId = $2
+                        AND c.CaseCreator = $3;
                     """,
-                    self.CaseId,
+                    self.case_id,
                     media_id,
-                    JWT_username
+                    jwt_username
                 )
 
                 rows_deleted = int(status.split(" ")[1])
+
                 if rows_deleted == 0:
                     raise HTTPException(
                         status_code=403, 
-                        detail="Unauthorized to delete this evidence or record not found."
+                        detail={
+                            "status":"error",
+                            "message":"Unauthorized to delete this evidence or record not found."
+                        }
                     )
 
-                deleted_media = await connection.fetchrow(
-                        """
-                        DELETE FROM "Cases_DB"."Media" media
-                        USING "Cases_DB"."MediaType" mt
-                        WHERE media.MediaId = $1
-                        AND media.MediaType = mt.MediaTypeId
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM "Cases_DB"."Reports" r
-                            WHERE r.MediaId = media.MediaId
-                        )
-                        RETURNING 
-                            media.MediaId AS "mediaid",
-                            mt.MediaBucket AS "mediabucket",
-                            mt.MediaExtension AS "mediaextension"
-                        """,
-                        media_id
-                    )
-
-                if deleted_media is not None:
-                    
-
-                    storage_client = get_object()
-
-                    object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
-
-                    try:
-                        storage_client.delete_object(
-                            Bucket=deleted_media["mediabucket"], 
-                            Key=object_name
-                        )
-                        
-                    except Exception as e:
-                        print(f"Failed to delete stored object {object_name}: {e}")
         # Above this is the normal investigator deleting something
             else:
                 # This block contain the logic for the Admin deleting
                 status=await connection.execute(
                     """
                     DELETE FROM "Cases_DB"."Reports" r WHERE
-                    r."CaseId" = $1
-                    AND r."MediaId" = $2;
+                    r.CaseId = $1
+                    AND r.MediaId = $2;
                     """,
-                    self.CaseId,
+                    self.case_id,
                     media_id
                 )
 
@@ -444,52 +478,64 @@ class Case:
                 if rows_deleted == 0:
                     raise HTTPException(
                         status_code=404, 
-                        detail="Media not found."
+                        detail={
+                            "status":"error",
+                            "message": "Media not found."
+                        }
                     )
 
-                deleted_media = await connection.fetchrow(
-                        """
-                        DELETE FROM "Cases_DB"."Media" media
-                        USING "Cases_DB"."MediaType" mt
-                        WHERE media.MediaId = $1
-                        AND media.MediaType = mt.MediaTypeId
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM "Cases_DB"."Reports" r
-                            WHERE r.MediaId = media.MediaId
-                        )
-                        RETURNING 
-                            media.MediaId AS "mediaid",
-                            mt.MediaBucket AS "mediabucket",
-                            mt.MediaExtension AS "mediaextension"
-                        """,
-                        media_id
-                    )
+            deleted_media = await connection.fetchrow(
+                """
+                DELETE FROM "Cases_DB"."Media" media
+                USING "Cases_DB"."MediaType" mt
+                WHERE media.MediaId = $1
+                AND media.MediaType = mt.MediaTypeId
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM "Cases_DB"."Reports" r
+                    WHERE r.MediaId = media.MediaId
+                )
+                    RETURNING 
+                    media.MediaId,
+                    mt.MediaBucket,
+                    mt.MediaExtension
+                """,
+                    media_id
+                )
 
-                if deleted_media is not None:
+            if deleted_media is not None:
                     
-                    storage_client = get_object()
+                storage_client = get_object()
 
-                    object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
+                object_name = f"{deleted_media['mediaid']}{deleted_media['mediaextension']}"
 
-                    try:
-                        storage_client.delete_object(
-                            Bucket=deleted_media["mediabucket"], 
-                            Key=object_name
-                        )
-                        
-                        
-                    except Exception as e:
-                        print(f"Failed to delete stored object {object_name}: {e}")
+                try:
+                    await asyncio.to_thread(
+                        storage_client.delete_object,
+                        Bucket=deleted_media["mediabucket"], 
+                        Key=object_name
+                    )
+                    
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail={
+                            "status":"error",
+                            "message":f"Failed to delete stored object {object_name}: {e}"
+                        }
+                    )
         
             return {
-                "Status" : "success",
-                "Deleted" : media_id
+                "status" : "success",
+                "deleted" : media_id
             }   
         except asyncpg.PostgresError:
             raise HTTPException(
                 status_code=500, 
-                detail="Database connection failure. Internal Server Error."
+                detail={
+                    "status":"error",
+                    "message":"Database connection failure. Internal Server Error."
+                }
             )
 
         finally:
@@ -499,16 +545,16 @@ class Case:
 
     def to_json(self):
         return {
-            "caseId": str(self.CaseId) if self.CaseId is not None else None,
-            "caseName": self.CaseName,
-            "caseCreator": self.CaseCreator,
-            "caseDescription": self.CaseDescription,
-            "caseClosed": self.CaseClosed,
-            "caseCreationDate": self.CaseCreationDate.isoformat() if self.CaseCreationDate else None
+            "caseId": str(self.case_id) if self.case_id is not None else None,
+            "caseName": self.case_name,
+            "caseCreator": self.case_creator,
+            "caseDescription": self.case_description,
+            "caseClosed": self.case_closed,
+            "caseCreationDate": self.case_creation_date.isoformat() if self.case_creation_date else None
         }
 
     async def get_comments(self):
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
@@ -519,10 +565,10 @@ class Case:
             connection = await get_connection()
 
             rows = await connection.fetch(
-            """SELECT CommentID, 
-            Username, Comment, CommentTimestamp 
+            """SELECT CommentID,
+            Username, Comment, CommentTimestamp
             from "Cases_DB"."Comments" WHERE CaseId = $1""",
-            self.CaseId
+            self.case_id
         )
 
             return [dict(row) for row in rows]
@@ -537,12 +583,6 @@ class Case:
             if connection is not None:
                 await connection.close()
 
-    @staticmethod
-    def validate_comment_length(comment: str) -> bool:
-        if not isinstance(comment, str):
-            return False
-        return len(comment.strip()) > 0
-
     async def add_comment(
         self, 
         connection: asyncpg.Connection, 
@@ -550,7 +590,7 @@ class Case:
         comment: str, 
         role: str
     ) -> dict:
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
@@ -586,7 +626,7 @@ class Case:
             FROM case_check c
             LEFT JOIN inserted i ON true
             """,
-            self.CaseId,
+            self.case_id,
             username,
             comment.strip(),
             role,
@@ -595,18 +635,27 @@ class Case:
         if row is None or not row["case_exists"]:
             raise HTTPException(
                 status_code=404, 
-                detail="Case not found"
+                detail={
+                    "status":"error",
+                    "message":CASE_NOT_FOUND
+                }
             )
 
         if not row["comment_inserted"]:
             if role == "USER":
                 raise HTTPException(
                     status_code=403, 
-                    detail="Users may only comment on closed cases"
+                    detail={
+                        "status":"error",
+                        "message":"Users may only comment on closed cases"
+                    }
                 )
             raise HTTPException(
                 status_code=403, 
-                detail="Permission denied"
+                detail={
+                    "status":"error",
+                    "message":"Permission denied"
+                }
             )
 
         return {
@@ -623,13 +672,13 @@ class Case:
         username: str, 
         role: str
     ):
-        if self.CaseId is None:
+        if self.case_id is None:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=MISSING_CASE_ID
             )
 
-        case_id=self.CaseId
+        case_id=self.case_id
         
         connection = await get_connection()
 
@@ -651,7 +700,7 @@ class Case:
                         status_code=404,
                         detail={
                             "status": "error",
-                            "message": "Case not found"
+                            "message": CASE_NOT_FOUND
                         }
                     )
                 
@@ -691,7 +740,7 @@ class Case:
                         status_code=404,
                         detail={
                             "status": "error",
-                            "message": "Case not found"
+                            "message": CASE_NOT_FOUND
                         }
                     )
                 

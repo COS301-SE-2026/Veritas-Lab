@@ -7,7 +7,7 @@ Create TABLE IF NOT EXISTS "Cases_DB"."MediaType"(
     MediaTypeId UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
     MediaName varchar(100) UNIQUE NOT NULL,
     MediaBucket varchar(255) NOT NULL,
-    MediaExtension varchar(10) UNIQUE
+    MediaExtension varchar(10) UNIQUE 
 );
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
@@ -50,5 +50,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Comments"(
 
 create UNIQUE INDEX CaseImage ON "Cases_DB"."Reports"(CaseId, MediaId);
 
-
+-- Database adjustment scripts start here
+ALTER TABLE "Cases_DB"."MediaType" 
+ALTER COLUMN MediaExtension SET NOT NULL;
 
