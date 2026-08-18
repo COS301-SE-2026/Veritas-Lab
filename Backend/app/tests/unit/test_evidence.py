@@ -14,7 +14,7 @@ from app.core.cases import (
     MEDIA_ALREADY_ON_CASE,
     PDF_SCRIPTS_NOT_ALLOWED,
     INVALID_CASE_ID_UUID,
-    STORAGE_UNAVAILABLE
+    INTERNAL_SERVER_ERROR_STORAGE
 )
 import app.api.routers.cases_router as cases_router
 from starlette.datastructures import UploadFile
@@ -737,4 +737,4 @@ async def test_add_evidence_storage_failure_returns_500(mockDbConnect, mockget_o
         await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
     assert exc_info.value.status_code == 500
-    assert exc_info.value.detail["message"] == STORAGE_UNAVAILABLE
+    assert exc_info.value.detail["message"] == INTERNAL_SERVER_ERROR_STORAGE
