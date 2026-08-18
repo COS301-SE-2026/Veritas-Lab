@@ -300,7 +300,13 @@ def test_update_comment_success(monkeypatch):
 
 def test_update_comment_invalid_token_returns_401(monkeypatch):
     def mock_verify_jwt(_):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "status": "error",
+                "message": "Invalid token"
+            }
+        )
 
     monkeypatch.setattr(
         cases_router, 
@@ -315,8 +321,10 @@ def test_update_comment_invalid_token_returns_401(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error", 
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
 
 
@@ -334,8 +342,10 @@ def test_update_comment_invalid_case_id_returns_400(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error", 
-        "message": "Invalid CaseID"
+        "detail": {
+            "status": "error", 
+            "message": "'not-a-valid-uuid' is not a valid UUID format"
+        }
     }
 
 
@@ -358,6 +368,8 @@ def test_update_comment_not_found_returns_404(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error", 
-        "message": "Case not found or user unauthorized."
+       "detail": {
+           "status": "error",
+           "message": "Case not found or user unauthorized."
+       }
     }

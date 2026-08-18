@@ -276,3 +276,118 @@ async def test_integration_delete_comment_not_owner(client):
 
     finally:
         await connection.close()
+
+@pytest.mark.asyncio
+async def test_integration_edit_comment_success(client):
+    investigator = {
+        "id": str(INVEST_USER["userid"]),
+        "username": INVEST_USER["username"],
+        "role": "INVESTIGATOR"
+    }
+
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token(investigator)
+    )
+
+    case_response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Edit Comment Integration Test",
+            "description": "Temp case"
+        }
+    )
+    assert case_response.status_code == 201
+    case_id = case_response.json()["CaseId"]
+
+    comment_response = client.post(
+        "/api/cases/comments",
+        json={
+            "case_id": case_id,
+            "comment": "Original comment"
+        }
+    )
+    assert comment_response.status_code == 201
+    comment_id = comment_response.json()["comment"]["commentId"]
+
+    edit_response = client.post(
+        f"/api/editComment/case/{case_id}/comment/{comment_id}",
+        json={"comment": "Edited comment"}
+    )
+    assert edit_response.status_code == 200
+    assert edit_response.json() == {
+        "status": "success",
+        "message": "Comment edit successfully.",
+    }
+
+    connection = await get_connection()
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT comment
+            FROM "Cases_DB"."Comments"
+            WHERE commentid = $1
+            """,
+            comment_id
+        )
+        assert row is not None
+        assert row["comment"] == "Edited comment"
+    finally:
+        await connection.close()
+
+@pytest.mark.asyncio
+async def test_integration_edit_comment_not_owner(client):
+    inverstigator = {
+        "id": str(INVEST_USER["userid"]),
+        "username": INVEST_USER["username"],
+        "role": "INVESTIGATOR"
+    }
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token(inverstigator)
+    )
+
+    case_response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Edit Comment Not Owner Test",
+            "description": "Temp case"
+        }
+    )
+    case_id = case_response.json()["CaseId"]
+
+    comment_response = client.post(
+        "/api/cases/comments",
+        json={
+            "case_id": case_id,
+            "comment": "Comment by investigator as the owner"
+        }
+    )
+    comment_id = comment_response.json()["comment"]["commentId"]
+
+    admin = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+    client.cookies.clear()
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token(admin)
+    )
+
+    #this is to attaempt to edit an investigator's comment as an admin, which should fail
+    edit_response = client.post(
+        f"/api/editComment/case/{case_id}/comment/{comment_id}",
+        json={"comment": "Attempt to edit a comment not made by admin"}
+    )
+
+    assert edit_response.status_code == 404
+    assert edit_response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Case not found or user unauthorized."
+        }
+    }
