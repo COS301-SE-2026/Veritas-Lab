@@ -42,6 +42,7 @@ COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
 CASE_UPDATED_SUCCESS = "Case updated successfully."
 UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
+COMMENT_UPDATED_SUCCESS = "Comment edit successfully."
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -94,6 +95,15 @@ UPDATE_CASE_SQL = """
     WHERE caseid = $1
         AND casecreator = $2
     RETURNING caseid
+    """
+
+UPDATE_COMMENT_SQL = """
+    UPDATE "Cases_DB"."Comments"
+    SET Comment = $3
+    WHERE caseid = $1
+        AND username = $2
+        AND commentid = $4
+    RETURNING commentid
     """
 
 USER_UNAUTHORIZED_403 = {
@@ -1135,47 +1145,97 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         if connection is not None:
             await connection.close()
 
-@router.post("/editComment/case/{case_id}/comment/{comment_id}")
+@router.post(
+    "/editComment/case/{case_id}/comment/{comment_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Edit a Comment",
+    description=(
+        "Edits the text of a comment. Any authenticated role may call this endpoint, "
+        "but a comment can only be edited by the user who wrote it, on the case it "
+        "was written on."
+    ),
+    responses={
+        200: {
+            "description": "Comment updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": COMMENT_UPDATED_SUCCESS
+                    }
+                }
+            }
+        },
+
+        400: {
+            "model": error_response,
+            "description": "Bad Request - Malformed CaseID",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        404: {
+            "model": error_response,
+            "description": (
+                "Not Found - The comment does not exist, is not on this case, "
+                "or was not written by the caller."
+            ),
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    },
+)
 async def update_comment(
     case_id: str,
     comment_id: int,
     update_data: UpdateCommentRequest,
     request: Request
 ):
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": str(e)
-            }
-        )
+    payload = verify_jwt(request)
 
+    case_uuid = Case(case_id=case_id).case_id
 
-    try:
-        case_uuid = UUID(case_id)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
-                "message": INVALID_CASE_ID
-            }
-        )
+    connection = None
+
     try:
         connection = await get_connection()
 
         row = await connection.fetchrow(
-            """
-            UPDATE "Cases_DB"."Comments"
-            SET Comment = $3
-            WHERE caseid = $1
-            AND username = $2
-            AND commentid = $4
-            RETURNING commentid
-            """,
+            UPDATE_COMMENT_SQL,
             case_uuid,
             payload.get("username"),
             update_data.comment,
@@ -1183,24 +1243,23 @@ async def update_comment(
         )
 
         if row is None:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Comment edit successfully."
-            }
-        )
+        return {
+            "status": "success",
+            "message": COMMENT_UPDATED_SUCCESS
+        }
+
     except asyncpg.PostgresError:
-        return JSONResponse(
-            status_code=500,content={
+        raise HTTPException(
+            status_code=500,
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
