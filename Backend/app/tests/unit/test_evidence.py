@@ -705,7 +705,7 @@ def test_delete_evidence_user_forbidden(monkeypatch):
 @pytest.mark.asyncio
 @patch("app.core.cases.get_object")
 @patch("asyncpg.connect")
-async def test_add_evidence_storage_failure_returns_503(mockDbConnect, mockget_object):
+async def test_add_evidence_storage_failure_returns_500(mockDbConnect, mockget_object):
     fileContent = b"A fake binary for a png"
     testContent = io.BytesIO(fileContent)
 
@@ -736,5 +736,5 @@ async def test_add_evidence_storage_failure_returns_503(mockDbConnect, mockget_o
     with pytest.raises(HTTPException) as exc_info:
         await case.add_evidence(media=mockMedia, case_id=test_case_id)
 
-    assert exc_info.value.status_code == 503
+    assert exc_info.value.status_code == 500
     assert exc_info.value.detail["message"] == STORAGE_UNAVAILABLE

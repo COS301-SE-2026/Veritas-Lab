@@ -24,7 +24,7 @@ INVALID_CASE_ID_UUID = "Invalid case_id UUID"
 UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
 MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
 INTERNAL_SERVER_ERROR = "Internal server error"
-STORAGE_UNAVAILABLE = "Evidence storage is temporarily unavailable. Please try again."
+INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Please try again."
 postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
@@ -398,10 +398,10 @@ class Case:
 
         except (BotoCoreError, ClientError):
             raise HTTPException(
-                status_code=503,
+                status_code=500,
                 detail={
                     "status": "error",
-                    "message": STORAGE_UNAVAILABLE
+                    "message": INTERNAL_SERVER_ERROR_STORAGE
                 }
             )
 

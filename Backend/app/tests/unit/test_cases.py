@@ -9,6 +9,7 @@ import asyncpg
 from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
+from app.auth.auth import NOT_AUTH, INVALID_TOKEN
 
 import uuid
 from uuid import uuid4
@@ -1023,7 +1024,14 @@ def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="inve
 
 def _mock_jwt_failure(monkeypatch, message):
     def mock_verify_jwt(request):
-        raise ValueError(message)
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": message
+            }
+        )
+
     monkeypatch.setattr(
         cases_router, 
         "verify_jwt", 
@@ -1044,14 +1052,16 @@ def _mock_db_connect(monkeypatch, *, fetchrow_return=None):
 
 def test_update_case_missing_jwt(monkeypatch):
     client.cookies.clear()
-    _mock_jwt_failure(monkeypatch, "Missing Authorization header")
+    _mock_jwt_failure(monkeypatch, NOT_AUTH)
 
     response = client.post("/api/updateCase", json={})
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Missing Authorization header"
+        "detail": {
+            "status": "error",
+            "message": NOT_AUTH
+        }
     }
 
 def test_update_case_invalid_jwt(monkeypatch):
@@ -1065,8 +1075,10 @@ def test_update_case_invalid_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": INVALID_TOKEN
+        }
     }
 
 def test_update_case_user_unauthorized(monkeypatch):
@@ -1082,7 +1094,7 @@ def test_update_case_user_unauthorized(monkeypatch):
     assert response.json() == {
         "detail": {
             "status": "error",
-            "message": "User unauthorized"
+            "message": cases_router.USER_UNAUTHORIZED
         }
     }
 
@@ -1097,8 +1109,10 @@ def test_update_case_missing_case_id(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "CaseID required"
+        "detail": {
+            "status": "error",
+            "message": cases_router.CASE_ID_REQUIRED
+        }
     }
 
 def test_update_case_invalid_case_id(monkeypatch):
@@ -1112,8 +1126,10 @@ def test_update_case_invalid_case_id(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid CaseID"
+        "detail": {
+            "status": "error",
+            "message": "'not-a-valid-uuid' is not a valid UUID format"
+        }
     }
 
 def test_update_case_no_fields_provided(monkeypatch):
@@ -1128,8 +1144,10 @@ def test_update_case_no_fields_provided(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "At least one of CaseName or CaseDescription must be provided"
+        "detail": {
+            "status": "error",
+            "message": cases_router.UPDATE_FIELDS_REQUIRED
+        }
     }
 
 #when case name is CaseName" ""
@@ -1147,8 +1165,10 @@ def test_update_case_invalid_name_blank(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "CaseName is required"
+        "detail": {
+            "status": "error",
+            "message": "CaseName is required"
+        }
     }
 
 def test_update_case_name_too_long(monkeypatch):
@@ -1167,8 +1187,10 @@ def test_update_case_name_too_long(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "CaseName must be 255 characters or less"
+        "detail": {
+            "status": "error",
+            "message": "CaseName must be 255 characters or less"
+        }
     }
 
 def test_update_case_not_found(monkeypatch):
@@ -1183,8 +1205,10 @@ def test_update_case_not_found(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Case not found or user unauthorized."
+        "detail": {
+            "status": "error",
+            "message": cases_router.CASE_NOT_FOUND_OR_UNAUTHORIZED
+        }
     }
 
     mock_connect.assert_called_once()
@@ -1203,8 +1227,10 @@ def test_update_case_not_case_creator(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error",
-        "message": "Case not found or user unauthorized."
+        "detail": {
+            "status": "error",
+            "message": cases_router.CASE_NOT_FOUND_OR_UNAUTHORIZED
+        }
     }
 
     mock_connect.assert_called_once()
@@ -1256,6 +1282,27 @@ def test_update_case_success_description_only(monkeypatch):
         "status": "success",
         "message": "Case updated successfully."
     }
+
+def test_update_case_database_error(monkeypatch):
+    client.cookies.clear()
+    _mock_jwt_success(monkeypatch)
+    mock_connection, mock_connect = _mock_db_connect(monkeypatch)
+    mock_connection.fetchrow = AsyncMock(side_effect=asyncpg.PostgresError("boom"))
+
+    response = client.post(
+        "/api/updateCase",
+        json={"CaseID":"12345678-abcd-ef01-2345-6789abcdef01", "CaseName": "Updated Case Name"}
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": cases_router.DATABASE_ERROR_MESSAGE
+        }
+    }
+
+    mock_connection.close.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_get_comment_missing_case_id():

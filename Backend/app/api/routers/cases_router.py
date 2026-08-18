@@ -40,6 +40,8 @@ INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
+CASE_UPDATED_SUCCESS = "Case updated successfully."
+UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 
 GET_CASES_SQL = """
     SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -84,6 +86,15 @@ OPEN_CASE_FOR_CREATOR_SQL = """
             AND casecreator = $2
             AND caseclosed = FALSE
         """
+
+UPDATE_CASE_SQL = """
+    UPDATE "Cases_DB"."Cases"
+    SET casename = COALESCE($3, casename),
+        casedescription = COALESCE($4, casedescription)
+    WHERE caseid = $1
+        AND casecreator = $2
+    RETURNING caseid
+    """
 
 USER_UNAUTHORIZED_403 = {
             "description": "Forbidden - User unauthorized",
@@ -139,7 +150,7 @@ class error_response(BaseModel):
   
 
 def verify_not_user(user_role:str):
-    if  user_role not in NOT_USER: #This solves for it being blank and non sense roles.
+    if  user_role  not in NOT_USER: #This solves for it being blank and non sense roles.
         raise HTTPException(
             status_code=403,
             detail={
@@ -687,27 +698,30 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         },
         500: {
             "model": error_response,
-            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "description": (
+                "Internal Server Error - " + DATABASE_ERROR_MESSAGE
+                + " or object storage could not be reached."
+            ),
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": DATABASE_ERROR_MESSAGE
-                        }
-                    }
-                }
-            }
-        },
-        503: {
-            "model": error_response,
-            "description": "Service Unavailable - object storage could not be reached.",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": STORAGE_UNAVAILABLE
+                    "examples": {
+                        "Database error": {
+                            "summary": "Database failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": DATABASE_ERROR_MESSAGE
+                                }
+                            }
+                        },
+                        "Storage unavailable": {
+                            "summary": "Object storage could not be reached",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INTERNAL_SERVER_ERROR_STORAGE
+                                }
+                            }
                         }
                     }
                 }
@@ -927,103 +941,191 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         if connection is not None:
             await connection.close()
 
-@router.post("/updateCase")
-async def update_case(case_request: UpdateCaseRequest, request: Request):
-    connection = None
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401, 
-            content={
-                "status": "error", 
-                "message": str(e)
+@router.post(
+    "/updateCase",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Update a Case",
+    description=(
+        "Updates the name and/or the description of a case. Only INVESTIGATOR and "
+        "ADMIN roles may call this endpoint, and a case can only be updated by the "
+        "user who created it. Fields that are omitted are left unchanged, so either "
+        "CaseName or CaseDescription must be supplied."
+    ),
+    responses={
+        200: {
+            "description": "Case updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": CASE_UPDATED_SUCCESS
+                    }
+                }
             }
-        )
+        },
+
+        400: {
+            "model": error_response,
+            "description": "Bad Request - Missing/malformed CaseID or invalid update fields",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Missing CaseID": {
+                            "summary": "No CaseID supplied",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+                        "Invalid CaseID": {
+                            "summary": "CaseID is not a valid UUID",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "'not-a-valid-uuid' is not a valid UUID format"
+                                }
+                            }
+                        },
+                        "No fields": {
+                            "summary": "Neither CaseName nor CaseDescription supplied",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": UPDATE_FIELDS_REQUIRED
+                                }
+                            }
+                        },
+                        "Blank CaseName": {
+                            "summary": "CaseName is empty or whitespace",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName is required"
+                                }
+                            }
+                        },
+                        "CaseName too long": {
+                            "summary": "CaseName exceeds 255 characters",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "CaseName must be 255 characters or less"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: USER_UNAUTHORIZED_403,
+
+        404: {
+            "model": error_response,
+            "description": "Not Found - Case does not exist or the caller is not its creator",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def update_case(case_request: UpdateCaseRequest, request: Request):
+    payload = verify_jwt(request)
 
     verify_not_user(payload.get("role"))
 
     if not case_request.CaseID:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
                 "message": CASE_ID_REQUIRED
             }
         )
 
-    try:
-        case_uuid = UUID(case_request.CaseID)
-    except ValueError:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
-                "message": INVALID_CASE_ID
-            }
-        )
+    case_id = Case(case_id=case_request.CaseID).case_id
 
     if case_request.CaseName is None and case_request.CaseDescription is None:
-        return JSONResponse(
-            status_code=400, 
-            content={
-                "status": "error", 
-                "message": "At least one of CaseName or CaseDescription must be provided"
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": UPDATE_FIELDS_REQUIRED
             }
         )
 
     validated_name = None
+
     if case_request.CaseName is not None:
         try:
-            validated_name = Case(case_name=case_request.CaseName).case_name  # This will raise ValueError if invalid
+            validated_name = Case(case_name=case_request.CaseName).case_name
         except ValueError as e:
-            return JSONResponse(
-                status_code=400, 
-                content={
-                    "status": "error", 
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
                     "message": str(e)
                 }
             )
+
+    connection = None
 
     try:
         connection = await get_connection()
 
         row = await connection.fetchrow(
-            """
-            UPDATE "Cases_DB"."Cases"
-            set casename = COALESCE($3, casename),
-                casedescription = COALESCE($4, casedescription)
-            WHERE caseid = $1
-            AND casecreator = $2
-            RETURNING caseid
-            """,
-            case_uuid,
+            UPDATE_CASE_SQL,
+            case_id,
             payload.get("username"),
             validated_name,
             case_request.CaseDescription
         )
 
         if row is None:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Case updated successfully."
-            }
-        )
+        return {
+            "status": "success",
+            "message": CASE_UPDATED_SUCCESS 
+        }
 
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status": "error",
                 "message": DATABASE_ERROR_MESSAGE
             }
