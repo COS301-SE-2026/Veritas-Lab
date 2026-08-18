@@ -698,27 +698,30 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         },
         500: {
             "model": error_response,
-            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "description": (
+                "Internal Server Error - " + DATABASE_ERROR_MESSAGE
+                + " or object storage could not be reached."
+            ),
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": DATABASE_ERROR_MESSAGE
-                        }
-                    }
-                }
-            }
-        },
-        503: {
-            "model": error_response,
-            "description": "Service Unavailable - object storage could not be reached.",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": {
-                            "status": "error",
-                            "message": STORAGE_UNAVAILABLE
+                    "examples": {
+                        "Database error": {
+                            "summary": "Database failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": DATABASE_ERROR_MESSAGE
+                                }
+                            }
+                        },
+                        "Storage unavailable": {
+                            "summary": "Object storage could not be reached",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": STORAGE_UNAVAILABLE
+                                }
+                            }
                         }
                     }
                 }

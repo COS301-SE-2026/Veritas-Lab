@@ -398,7 +398,7 @@ class Case:
 
         except (BotoCoreError, ClientError):
             raise HTTPException(
-                status_code=503,
+                status_code=500,
                 detail={
                     "status": "error",
                     "message": STORAGE_UNAVAILABLE
