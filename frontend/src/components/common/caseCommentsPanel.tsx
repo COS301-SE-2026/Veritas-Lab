@@ -27,7 +27,7 @@ export default function CaseCommentsPanel({ caseId, initialComments, currentUser
         <div className="rounded-[28px] border border-[var(--color-light)]/30 bg-white p-4 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)]">
             <div className="flex items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-bold text-[var(--color-text)]">Reviews</h2>
+                    <h2 className="text-xl font-bold text-[var(--color-text)]">Comments</h2>
                     <p className="mt-1 text-sm text-[var(--color-light)]">
                         Comments for the current case, please leave issues or concerns here.
                     </p>
@@ -52,7 +52,7 @@ export default function CaseCommentsPanel({ caseId, initialComments, currentUser
                         ))
                     ) : (
                         <div className="flex h-full items-center justify-center rounded-[24px] border border-dashed border-[var(--color-light)]/30 text-sm text-[var(--color-light)]">
-                            No reviews yet. Start the conversation below.
+                            No comments yet. Start the conversation below.
                         </div>
                     )}
                 </div>

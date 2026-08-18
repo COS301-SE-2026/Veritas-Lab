@@ -12,7 +12,7 @@ import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
 import CaseEditButton from "@/components/common/caseEditButton";
 
-const TABS = ['Evidence', 'Reviews'] as const;
+const TABS = ['Evidence', 'Comments'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -143,7 +143,7 @@ export default function CasePage() {
                                     <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
                                 )}
                             </div>
-                        ) : activeTab === 'Reviews' ? (
+                        ) : activeTab === 'Comments' ? (
                             <CaseCommentsPanel
                                 caseId={id}
                                 initialComments={caseComments}

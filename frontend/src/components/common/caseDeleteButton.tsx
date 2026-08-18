@@ -47,7 +47,7 @@ export default function CaseDeleteButton({ caseId, caseTitle, onDeleted }: Reado
                 <div className="p-2">
                     <h2 className="text-lg font-bold text-[var(--color-text)]">Delete case?</h2>
                     <p className="mt-2 text-sm text-(--color-light)">
-                        This will permanently remove &ldquo;{caseTitle}&rdquo; and all attached evidence and reviews. This action cannot be undone.
+                        This will permanently remove &ldquo;{caseTitle}&rdquo; and all attached evidence and comments. This action cannot be undone.
                     </p>
                     {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
                     <div className="mt-6 flex justify-end gap-3">
