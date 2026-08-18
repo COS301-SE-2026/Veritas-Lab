@@ -719,7 +719,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": STORAGE_UNAVAILABLE
+                                    "message": INTERNAL_SERVER_ERROR_STORAGE
                                 }
                             }
                         }
