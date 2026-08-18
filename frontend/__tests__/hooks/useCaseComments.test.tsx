@@ -1,11 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import useCaseComments from '@/lib/hooks/useCaseComments';
-import { addComment } from '@/lib/api/case';
+import { addComment, deleteComment, editComment } from '@/lib/api/case';
 import type { CaseComment } from '@/types/api';
 jest.mock('@/lib/api/case', () => ({
     addComment: jest.fn(),
+    editComment: jest.fn(),
+    deleteComment: jest.fn(),//hook tests for edit and delete
 }));
-//hook tests (these will need to be reviewed when i add the edit and delete functionality to frontend)
+//hook tests - now reviewed and updated!
 describe('useCaseComments', () => {
     const initialComments: CaseComment[] = [
         {
@@ -111,4 +113,38 @@ describe('useCaseComments', () => {
         expect(result.current.error).toBe('Unable to save comment');
         expect(result.current.isSubmitting).toBe(false);
     });
+    //edit tests
+    it('updates a comment in place after a successful edit', async () => {
+        const mockedEditComment = editComment as jest.MockedFunction<typeof editComment>;
+        mockedEditComment.mockResolvedValue({ status: 'success' });
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
+        await act(async () => {
+            await result.current.updateComment(1, 'Edited comment text');
+        });
+        expect(mockedEditComment).toHaveBeenCalledWith('case-1', 1, 'Edited comment text');
+        expect(result.current.comments[0].comment).toBe('Edited comment text');
+    });
+    it('passes an error when editing a comment fails', async () => {
+        const mockedEditComment = editComment as jest.MockedFunction<typeof editComment>;
+        mockedEditComment.mockRejectedValue(new Error('Failed to edit comment'));
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
+        await expect(
+            act(async () => {
+                await result.current.updateComment(1, 'Edited comment text');
+            })
+        ).rejects.toThrow('Failed to edit comment');
+        expect(result.current.comments[0].comment).toBe('Existing comment');
+    });
+    //delete tests
+    it('removes a comment after a successful delete', async () => {
+        const mockedDeleteComment = deleteComment as jest.MockedFunction<typeof deleteComment>;
+        mockedDeleteComment.mockResolvedValue({ status: 'success' });
+        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
+        await act(async () => {
+            await result.current.removeComment(1);
+        });
+        expect(mockedDeleteComment).toHaveBeenCalledWith(1);
+        expect(result.current.comments).toHaveLength(0);
+    });
+
 });
