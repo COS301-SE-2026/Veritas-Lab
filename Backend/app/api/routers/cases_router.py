@@ -44,49 +44,6 @@ CASE_UPDATED_SUCCESS = "Case updated successfully."
 UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 COMMENT_UPDATED_SUCCESS = "Comment edit successfully."
 
-GET_CASES_SQL = """
-    SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
-    FROM "Cases_DB"."Cases"
-    WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
-    ORDER BY casecreationdate DESC
-    """
-
-GET_SINGLE_CASE_SQL = """
-SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
-FROM "Cases_DB"."Cases"
-WHERE caseid = $1 
-    AND ($2::boolean IS FALSE OR caseclosed IS TRUE)
-"""
-
-CASE_EVIDENCE_SQL = """
-    SELECT
-        r.ReportID AS "reportid",
-        r.CaseID AS "caseid",
-        r.MediaID AS "mediaid",
-        r.ReportArtifacts AS "reportartifacts",
-        r.imagetitle AS "mediatitle",
-        r.ReportFindings AS "reportfindings",
-        r.ReportComments AS "reportcomments",
-        r.ReportCertainty AS "reportcertainty",
-        r.ReportDateCreation AS "reportdatecreation",
-        m.MediatypeId AS "mediatypeid",
-        m.MediaExtension AS "mediaextension",
-        m.MediaBucket AS "mediabucket",
-        media.MediaAnnotations AS "annotations"
-    FROM "Cases_DB"."Reports" r
-    JOIN "Cases_DB"."Media" media ON r.MediaID = media.MediaID
-    JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
-    WHERE r.CaseID = $1
-    ORDER BY r.ReportDateCreation DESC
-    """
-
-OPEN_CASE_FOR_CREATOR_SQL = """
-        SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
-        FROM "Cases_DB"."Cases"
-        WHERE caseid = $1
-            AND casecreator = $2
-            AND caseclosed = FALSE
-        """
 
 UPDATE_CASE_SQL = """
     UPDATE "Cases_DB"."Cases"
@@ -95,15 +52,6 @@ UPDATE_CASE_SQL = """
     WHERE caseid = $1
         AND casecreator = $2
     RETURNING caseid
-    """
-
-UPDATE_COMMENT_SQL = """
-    UPDATE "Cases_DB"."Comments"
-    SET Comment = $3
-    WHERE caseid = $1
-        AND username = $2
-        AND commentid = $4
-    RETURNING commentid
     """
 
 USER_UNAUTHORIZED_403 = {
@@ -435,7 +383,15 @@ async def get_cases(request: Request):
 
         is_standard_user = payload.get("role") == "USER"
 
-        rows = await connection.fetch(GET_CASES_SQL, is_standard_user)
+        rows = await connection.fetch(
+            """
+            SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+            FROM "Cases_DB"."Cases"
+            WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
+            ORDER BY casecreationdate DESC
+            """,
+            is_standard_user
+        )
 
         return {
             "status": "success",
@@ -567,7 +523,12 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         is_standard_user = payload.get("role") == "USER"
 
         row = await connection.fetchrow(
-            GET_SINGLE_CASE_SQL,
+            """
+            SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+            FROM "Cases_DB"."Cases"
+            WHERE caseid = $1
+                AND ($2::boolean IS FALSE OR caseclosed IS TRUE)
+            """,
             case_id,
             is_standard_user
         )
@@ -584,7 +545,27 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         case = _row_to_case(row)
 
         evidence_rows = await connection.fetch(
-            CASE_EVIDENCE_SQL,
+             """
+            SELECT
+                r.ReportID AS "reportid",
+                r.CaseID AS "caseid",
+                r.MediaID AS "mediaid",
+                r.ReportArtifacts AS "reportartifacts",
+                r.imagetitle AS "mediatitle",
+                r.ReportFindings AS "reportfindings",
+                r.ReportComments AS "reportcomments",
+                r.ReportCertainty AS "reportcertainty",
+                r.ReportDateCreation AS "reportdatecreation",
+                m.MediatypeId AS "mediatypeid",
+                m.MediaExtension AS "mediaextension",
+                m.MediaBucket AS "mediabucket",
+                media.MediaAnnotations AS "annotations"
+            FROM "Cases_DB"."Reports" r
+            JOIN "Cases_DB"."Media" media ON r.MediaID = media.MediaID
+            JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
+            WHERE r.CaseID = $1
+            ORDER BY r.ReportDateCreation DESC
+            """,
             case_id,
         )
 
@@ -760,7 +741,13 @@ async def upload_evidence(
         connection = await get_connection()
 
         row = await connection.fetchrow(
-            OPEN_CASE_FOR_CREATOR_SQL,
+            """
+            SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+            FROM "Cases_DB"."Cases"
+            WHERE caseid = $1
+                AND casecreator = $2
+                AND caseclosed = FALSE
+            """,
             validated_case_id,
             case_creator
         )
@@ -1111,7 +1098,14 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
         connection = await get_connection()
 
         row = await connection.fetchrow(
-            UPDATE_CASE_SQL,
+            """
+            UPDATE "Cases_DB"."Cases"
+            SET casename = COALESCE($3, casename),
+                casedescription = COALESCE($4, casedescription)
+            WHERE caseid = $1
+                AND casecreator = $2
+            RETURNING caseid
+            """,
             case_id,
             payload.get("username"),
             validated_name,
@@ -1235,7 +1229,14 @@ async def update_comment(
         connection = await get_connection()
 
         row = await connection.fetchrow(
-            UPDATE_COMMENT_SQL,
+            """
+            UPDATE "Cases_DB"."Comments"
+            SET comment = $3
+            WHERE caseid = $1
+                AND username = $2
+                AND commentid = $4
+            RETURNING commentid
+            """,
             case_uuid,
             payload.get("username"),
             update_data.comment,
