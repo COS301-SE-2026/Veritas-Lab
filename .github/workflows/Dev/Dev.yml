@@ -1,0 +1,66 @@
+name: Dev CI-CD
+
+on:
+    pull_request:
+        branches: ["dev"]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    packages: write
+    id-token: write
+
+jobs:
+    tests:
+        uses: ./.github/workflows/Dev/Dev-Tests.yml
+        secrets: inherit
+    deploy-azure:
+        needs: tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - uses: actions/checkout@v7
+            - uses: docker/login-action@v4
+              with:
+                    registry: ghcr.io
+                    username: ${{ github.actor }}
+                    password: ${{ secrets.GITHUB_TOKEN }}
+            - uses: docker/build-push-action@v7
+              with:
+                    context: ./Backend
+                    push: true
+                    tags: ghcr.io/cos301-se-2026/veritas-lab-backend:dev-${{ github.sha }}
+            - uses: docker/build-push-action@v7
+              with:
+                    context: ./frontend
+                    push: true
+                    tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:dev-${{ github.sha }}
+            - uses: azure/login@v3
+              with:
+                    client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_DEV }}
+                    tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DEV }}
+                    subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DEV }}
+            - uses: azure/webapps-deploy@v3
+              with:
+                app-name: veritas-lab-dev
+                sitecontainers-config: >-
+                    [
+                        {
+                            "name": "main",
+                            "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:dev-${{ github.sha }}",
+                            "targetPort": 3000,
+                            "isMain": true,
+                            "authType": "UserCredentials",
+                            "userName": "${{ secrets.GHCR_USERNAME }}",
+                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                        },
+                        {
+                            "name": "backend",
+                            "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:dev-${{ github.sha }}",
+                            "targetPort": 8000,
+                            "isMain": false,
+                            "authType": "UserCredentials",
+                            "userName": "${{ secrets.GHCR_USERNAME }}",
+                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                        }
+                    ]
