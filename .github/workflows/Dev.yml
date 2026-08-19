@@ -12,7 +12,7 @@ permissions:
 
 jobs:
     tests:
-        uses: ./.github/workflows/Dev/Dev-Tests.yml
+        uses: ./.github/workflows/Dev-Tests.yml
         secrets: inherit
     deploy-azure:
         needs: tests
