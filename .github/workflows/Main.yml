@@ -7,6 +7,7 @@ on:
 
 permissions:
     contents: read
+    packages: write
 
 jobs:
     #This runs the tests again when anything gets on main not just when we do PR's
@@ -19,8 +20,6 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 15
         permissions:
-            contents: read
-            packages: write
             id-token: write
         steps:
             - uses: actions/checkout@v7
