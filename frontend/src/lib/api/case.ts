@@ -8,7 +8,7 @@ function normalizeComment(comment: Record<string, unknown>) {
         timestamp: (comment.timestamp ?? comment.commenttimestamp ?? null) as string | null,
     };
 }
-
+//conirfmed that all endpoints match the API service contract
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     try {
         const res = await fetch(`/api/getSingleCase`, {
@@ -99,6 +99,83 @@ export async function closeCase(caseId: string): Promise<{ status: string; messa
     }
     catch (error) {
         console.error(`Error closing case with ID ${caseId}:`, error);
+        throw error;
+    }
+}
+
+export async function deleteEvidence(caseId: string, mediaId: string): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/delete/case/${caseId}/evidence/${mediaId}`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to delete evidence');
+        }
+        return data;
+    }
+    catch (error) {
+        console.error('Error deleting evidence:', error);
+        throw error;
+    }
+}
+
+export async function updateCase(caseId: string, updates: { caseName?: string; caseDescription?: string }): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/updateCase`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                CaseID: caseId,
+                CaseName: updates.caseName ?? null,
+                CaseDescription: updates.caseDescription ?? null,
+            }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to update case');
+        }
+        return data;
+    } catch (error) {
+        console.error('Error updating case:', error);
+        throw error;
+    }
+}
+
+export async function editComment(caseId: string, commentId: number, comment: string): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/editComment/case/${caseId}/comment/${commentId}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to edit comment');
+        }
+        return data;
+    } catch (error) {
+        console.error('Error editing comment:', error);
+        throw error;
+    }
+}
+
+export async function deleteComment(commentId: number): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/deleteComment/comment/${commentId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to delete comment');
+        }
+        return data;
+    } catch (error) {
+        console.error('Error deleting comment:', error);
         throw error;
     }
 }

@@ -1,20 +1,20 @@
 'use client';
 import Button from '@/components/ui/button';
 
-type CaseReviewComposerProps = {
+type CaseCommentComposerProps = {
     draft: string;
     isSubmitting: boolean;
     onDraftChange: (value: string) => void;
     onSubmit: () => void;
 };
-export default function CaseReviewComposer({ draft, isSubmitting, onDraftChange, onSubmit }: CaseReviewComposerProps) {
+export default function CaseCommentComposer({ draft, isSubmitting, onDraftChange, onSubmit }: CaseCommentComposerProps) {
     return (
         <div className="mt-4 rounded-[24px] border border-[var(--color-light)]/30 bg-white p-4 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)]">
-            <label htmlFor="case-review-message" className="sr-only">
+            <label htmlFor="case-comment-message" className="sr-only">
                 Add a comment
             </label>
             <textarea
-                id="case-review-message"
+                id="case-comment-message"
                 value={draft}
                 onChange={(event) => onDraftChange(event.target.value)}
                 placeholder="Write your comment here"
@@ -27,7 +27,7 @@ export default function CaseReviewComposer({ draft, isSubmitting, onDraftChange,
                     onClick={onSubmit}
                     disabled={isSubmitting || draft.trim().length === 0}
                     className="px-6 py-3"
-                    text={isSubmitting ? 'Sending' : 'Send Review'}
+                    text={isSubmitting ? 'Sending' : 'Send Comment'}
                 />
             </div>
         </div>

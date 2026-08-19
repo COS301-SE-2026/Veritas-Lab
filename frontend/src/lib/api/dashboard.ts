@@ -47,3 +47,22 @@ export async function createCase(title: string, description?: string): Promise<{
 		throw error;
 	}
 }
+
+export async function deleteCase(caseId: string): Promise<{ status: string; message?: string }> {
+    try {
+        const res = await fetch(`/api/deleteCase`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ CaseID: caseId }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            throw new Error(data?.message ?? 'Failed to delete case');
+        }
+        return data;
+    } catch (error) {
+        console.error('Error deleting case:', error);
+        throw error;
+    }
+}

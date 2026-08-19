@@ -4,6 +4,7 @@ from app.auth.auth import (
     verify_jwt,
     ALGORITHM
 )
+from fastapi import HTTPException
 
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -46,8 +47,11 @@ class TestVerifyJWT:
     def test_missing_cookie(self):
         request = make_request(None)
 
-        with pytest.raises(ValueError, match="Not authenticated"):
+        with pytest.raises(HTTPException) as excinfo:
             verify_jwt(request)
+
+        assert excinfo.value.status_code == 401
+        assert excinfo.value.detail["message"] == "Not authenticated"
 
     def test_expired_token(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
@@ -55,16 +59,22 @@ class TestVerifyJWT:
         token = make_token({"exp": datetime.now(timezone.utc) - timedelta(minutes=10)})
         request = make_request(token)
 
-        with pytest.raises(ValueError, match="Token has expired"):
+        with pytest.raises(HTTPException) as excinfo:
             verify_jwt(request)
+
+        assert excinfo.value.status_code == 401
+        assert excinfo.value.detail["message"] == "Token has expired"
 
     def test_invalid_token(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
 
         request = make_request("this.is.not.valid")
 
-        with pytest.raises(ValueError, match="Invalid token"):
+        with pytest.raises(HTTPException) as excinfo:
             verify_jwt(request)
+
+        assert excinfo.value.status_code == 401
+        assert excinfo.value.detail["message"] == "Invalid token"
 
     def test_wrong_secret(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
@@ -72,8 +82,11 @@ class TestVerifyJWT:
         token = make_token(secret="wrong-secret")
         request = make_request(token)
 
-        with pytest.raises(ValueError, match="Invalid token"):
+        with pytest.raises(HTTPException) as excinfo:
             verify_jwt(request)
+
+        assert excinfo.value.status_code == 401
+        assert excinfo.value.detail["message"] == "Invalid token"
 
 class TestValidateEmail:
     def test_valid_email(self):

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 from fastapi import HTTPException
 
 from app.api.main import app
+from app.auth.auth import COOKIE_NAME
 import app.api.routers.cases_router as cases_router
 from app.core.cases import Case
 
@@ -84,14 +85,7 @@ def _edit_comment_connection(fetchrow_result):
 # Auth tests
 
 def test_create_comment_missing_jwt(monkeypatch):
-    def mock_verify_jwt(req):
-        raise Exception("Missing Authorization header")
-
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
+    client.cookies.clear()
 
     response = client.post("/api/cases/comments", 
         json={
@@ -102,25 +96,22 @@ def test_create_comment_missing_jwt(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error", 
-        "message": "Missing Authorization header"
+        "detail": {
+            "status": "error", 
+            "message": "Not authenticated"
+        }
     }
 
 
 def test_create_comment_invalid_jwt(monkeypatch):
-    def mock_verify_jwt(req):
-        raise ValueError("Invalid token")
-
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
+    client.cookies.set(COOKIE_NAME, "invalid-token")
 
     response = _post_comment({"case_id": VALID_CASE_ID, "comment": VALID_COMMENT})
 
     assert response.status_code == 401
-    assert response.json() == {"status": "error", "message": "Invalid token"}
+    assert response.json() == {
+        "detail": {"status": "error", "message": "Invalid token"}
+    }
 
 
 # Input validation tests
@@ -159,7 +150,8 @@ def test_create_comment_missing_comment(monkeypatch):
     response = _post_comment({"case_id": VALID_CASE_ID})
 
     assert response.status_code == 400
-    assert response.json()["status"] == "error"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Comment must be a non-empty string"
 
 
 def test_create_comment_blank_comment(monkeypatch):
@@ -172,7 +164,8 @@ def test_create_comment_blank_comment(monkeypatch):
     response = _post_comment({"case_id": VALID_CASE_ID, "comment": "   "})
 
     assert response.status_code == 400
-    assert response.json()["status"] == "error"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Comment must be a non-empty string"
 
 
 # Case existence and role-based access tests
@@ -307,7 +300,13 @@ def test_update_comment_success(monkeypatch):
 
 def test_update_comment_invalid_token_returns_401(monkeypatch):
     def mock_verify_jwt(_):
-        raise ValueError("Invalid token")
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "status": "error",
+                "message": "Invalid token"
+            }
+        )
 
     monkeypatch.setattr(
         cases_router, 
@@ -322,8 +321,10 @@ def test_update_comment_invalid_token_returns_401(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error", 
-        "message": "Invalid token"
+        "detail": {
+            "status": "error",
+            "message": "Invalid token"
+        }
     }
 
 
@@ -341,8 +342,10 @@ def test_update_comment_invalid_case_id_returns_400(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error", 
-        "message": "Invalid CaseID"
+        "detail": {
+            "status": "error", 
+            "message": "'not-a-valid-uuid' is not a valid UUID format"
+        }
     }
 
 
@@ -365,6 +368,8 @@ def test_update_comment_not_found_returns_404(monkeypatch):
 
     assert response.status_code == 404
     assert response.json() == {
-        "status": "error", 
-        "message": "Case not found or user unauthorized."
+       "detail": {
+           "status": "error",
+           "message": "Case not found or user unauthorized."
+       }
     }

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import CaseReviewComposer from '@/components/common/caseReviewComposer';
+import CaseCommentComposer from '@/components/common/caseCommentComposer';
 //test that the reviews/comments input and submit sections work.
-describe('CaseReviewComposer', () => {
+describe('CaseCommentComposer', () => {
     const onDraftChange = jest.fn();
     const onSubmit = jest.fn();
     beforeEach(() => {
@@ -9,9 +9,9 @@ describe('CaseReviewComposer', () => {
         onSubmit.mockClear();
     });
 
-    it('renders the review composer controls', () => {
+    it('renders the comment composer controls', () => {
         render(
-            <CaseReviewComposer
+            <CaseCommentComposer
                 draft=""
                 isSubmitting={false}
                 onDraftChange={onDraftChange}
@@ -20,12 +20,12 @@ describe('CaseReviewComposer', () => {
         );
         expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
         expect(screen.getByPlaceholderText('Write your comment here')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Send Review' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Send Comment' })).toBeInTheDocument();
     });
 
-    it('updates the draft and submits the review', () => {
+    it('updates the draft and submits the comment', () => {
         render(
-            <CaseReviewComposer
+            <CaseCommentComposer
                 draft="Needs follow up"
                 isSubmitting={false}
                 onDraftChange={onDraftChange}
@@ -33,24 +33,24 @@ describe('CaseReviewComposer', () => {
             />
         );
         fireEvent.change(screen.getByPlaceholderText('Write your comment here'), {
-            target: { value: 'Updated review text' },
+            target: { value: 'Updated comment text' },
         });
-        fireEvent.click(screen.getByRole('button', { name: 'Send Review' }));
-        expect(onDraftChange).toHaveBeenCalledWith('Updated review text');
+        fireEvent.click(screen.getByRole('button', { name: 'Send Comment' }));
+        expect(onDraftChange).toHaveBeenCalledWith('Updated comment text');
         expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
     it('disables submission button whehn empty or submitting', () => {
         const { rerender } = render(
-            <CaseReviewComposer
+            <CaseCommentComposer
                 draft="   "
                 isSubmitting={false}
                 onDraftChange={onDraftChange}
                 onSubmit={onSubmit}
             />
         );
-        expect(screen.getByRole('button', { name: 'Send Review' })).toBeDisabled();
-        rerender(<CaseReviewComposer draft="Ready to send" isSubmitting onDraftChange={onDraftChange} onSubmit={onSubmit}/>);
+        expect(screen.getByRole('button', { name: 'Send Comment' })).toBeDisabled();
+        rerender(<CaseCommentComposer draft="Ready to send" isSubmitting onDraftChange={onDraftChange} onSubmit={onSubmit}/>);
         expect(screen.getByRole('button', { name: 'Sending' })).toBeDisabled();
     });
 });

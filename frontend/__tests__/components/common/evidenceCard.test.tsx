@@ -10,6 +10,13 @@ jest.mock('next/dynamic', () => ({
         return PdfThumbnailStub;
     },
 }));
+//need to add the new delete tests
+jest.mock('@/components/common/caseEvidenceDeleteButton', () => ({
+    __esModule: true,
+    default: ({ caseId, mediaId }: { caseId: string; mediaId: string }) => (
+        <button data-testid="delete-button" data-case-id={caseId} data-media-id={mediaId} />
+    ),
+}));
 
 describe('EvidenceCard', () => {
     it('renders file details', () => {
@@ -22,6 +29,7 @@ describe('EvidenceCard', () => {
         );
         expect(screen.getByText('EvidenceA')).toBeInTheDocument();
         expect(screen.getByText('.pdf')).toBeInTheDocument();
+        expect(screen.queryByTestId('delete-button')).not.toBeInTheDocument();//added delete button check to the card
     });
 
     it('links to the workbench when href is provided', () => {
@@ -48,5 +56,47 @@ describe('EvidenceCard', () => {
         );
 
         expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('renders the delete button when canDelete, mediaId, and caseId are all provided', () => {
+        render(
+            <EvidenceCard
+                mediaName="EvidenceD"
+                mediaUrl="/evidence-d.png"
+                mediaExtension=".png"
+                mediaId="media-1"
+                caseId="case-1"
+                canDelete
+            />
+        );
+        const deleteButton = screen.getByTestId('delete-button');
+        expect(deleteButton).toHaveAttribute('data-case-id', 'case-1');
+        expect(deleteButton).toHaveAttribute('data-media-id', 'media-1');
+    });
+
+    it('does not render the delete button when canDelete is false', () => {
+        render(
+            <EvidenceCard
+                mediaName="EvidenceE"
+                mediaUrl="/evidence-e.png"
+                mediaExtension=".png"
+                mediaId="media-1"
+                caseId="case-1"
+                canDelete={false}
+            />
+        );
+        expect(screen.queryByTestId('delete-button')).not.toBeInTheDocument();
+    });
+
+    it('does not render the delete button when mediaId or caseId is missing', () => {
+        render(
+            <EvidenceCard
+                mediaName="EvidenceF"
+                mediaUrl="/evidence-f.png"
+                mediaExtension=".png"
+                canDelete
+            />
+        );
+        expect(screen.queryByTestId('delete-button')).not.toBeInTheDocument();
     });
 });

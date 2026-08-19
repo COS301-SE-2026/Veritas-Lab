@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Header, Response, Request
+from fastapi import APIRouter, HTTPException, Header, Response, Request, status, Depends
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re as regex
 import bcrypt
 import uuid as uuidlib
@@ -8,43 +8,100 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
-from app.core.env import ENVLoader
+from app.core.env import Postgres_Settings, Auth_Settings
+from fastapi.security import APIKeyCookie
 
-env = ENVLoader()
-
-DB_USER= env.getRequiredEnv("DB_USER")
-DB_PASSWORD= env.getRequiredEnv("DB_PASSWORD")
-DB_HOST= env.getRequiredEnv("DB_HOST")
-DB_PORT= env.getRequiredIntEnv("DB_PORT")
-DB_NAME= env.getRequiredEnv("DB_NAME")
-DB_SSL = env.getRequiredEnv("DB_SSL").strip().lower() in ("1", "true")
-SECRET_KEY = env.getRequiredEnv("JWT_SECRET")
-ALGORITHM = env.getRequiredEnv("HASH").replace("_", "").upper()
-ACCESS_TOKEN_EXPIRE_MINUTES = env.getRequiredIntEnv("TOKEN_EXPIRE")
 COOKIE_NAME = "JWT_token"
-AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
+NOT_AUTH = "Not authenticated"
+EXPIRED_TOKEN = "Token has expired"
+
+INVALID_TOKEN_401 = {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        },
+
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when the request does not contain a valid authentication token.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+COOKIE_SCHEME = APIKeyCookie(
+    name=COOKIE_NAME,
+    auto_error=False
+)
+
+postgres_settings = Postgres_Settings()
+auth_settings = Auth_Settings()
+
+SECRET_KEY = auth_settings.JWT_SECRET
+ALGORITHM = auth_settings.HASH
 
 async def get_connection() -> asyncpg.Connection:
     return await asyncpg.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        host=DB_HOST,
-        port=DB_PORT,
-        ssl="require" if DB_SSL else None,
+        user=postgres_settings.DB_USER,
+        password=postgres_settings.DB_PASSWORD,
+        database=postgres_settings.DB_NAME,
+        host=postgres_settings.DB_HOST,
+        port=postgres_settings.DB_PORT,
+        ssl="require" if postgres_settings.DB_SSL else None,
     )
+
 router = APIRouter(
     prefix="/api",
     tags=["Auth"]
 )
 
+class success_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+
+class error_response(BaseModel):
+    status: str = Field(..., examples=["error"])
+    message: str = Field(..., examples=["Invalid token or database failure"])
+
 def verify_jwt(request: Request) -> dict:
-
-
     token = request.cookies.get(COOKIE_NAME)
     if not token:
-        raise ValueError("Not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": NOT_AUTH
+            }
+        )
 
     try:
         payload = jwt.decode(
@@ -56,10 +113,22 @@ def verify_jwt(request: Request) -> dict:
         return payload
 
     except ExpiredSignatureError:
-        raise ValueError("Token has expired")
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": EXPIRED_TOKEN
+            }
+        ) 
 
     except JWTError:
-        raise ValueError(INVALID_TOKEN)
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
@@ -115,11 +184,11 @@ def verify_password(password: str, hashed_password: str) ->bool:
 
 # Reason for allowing None: FastAPI/Pydantic have their own error reponses which undesired.
 # So we allow None and validate missing fields in the endpoint.
-class LoginRequest(BaseModel):
+class login_request(BaseModel):
     email: str | None=None
     password: str | None=None
 
-class RegisterRequest(LoginRequest):
+class RegisterRequest(login_request):
     username: str | None = None
 
 class ChangeRoleRequest(BaseModel):
@@ -255,7 +324,7 @@ async def insert_user(
         await connection.close()
 
 def create_token(user: dict) ->str:
-    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expiry_time = datetime.now(timezone.utc) + timedelta(minutes=auth_settings.TOKEN_EXPIRE)
 
     payload = {
         "sub": user["id"],
@@ -264,25 +333,90 @@ def create_token(user: dict) ->str:
         "exp": expiry_time
     }
 
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM) # the signature is made from SECRET_KEY and ALGORITHM
+    token = jwt.encode(payload, auth_settings.JWT_SECRET, algorithm=auth_settings.HASH) # the signature is made from SECRET_KEY and ALGORITHM
     return token
 
 # POST /api/login
-@router.post("/login")
-async def login(request: LoginRequest, response: Response):
+@router.post(
+    "/login",
+    status_code=status.HTTP_200_OK,
+    summary="User Login",
+    description="Logs the user in and produces a JWT for the authorization of the user.",
+    responses={
+        200: {
+            "description": "User successfully logged in",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Logged in successfully"
+                    }
+                }
+            }
+        },
+        400:{
+            "model" : error_response,
+            "description": "Validation Error (Invalid email or failed password rules)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidEmail": {
+                            "summary": "Invalid or Missing Email",
+                            "description": "Triggered when the email fails format validation.",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+                                }
+                            }
+                        },
+                        "InvalidPassword": {
+                            "summary": "Invalid or Missing Password",
+                            "description": "Triggered when the password fails the rule validation.",
+                            "value": {
+                                "detail":{
+                                    "status": "error",
+                                    "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "model": error_response,
+            "summary": "Password and/or Email were not found",
+            "description": "Trigger when credentials used in the login were not found.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail":{
+                            "status": "error",
+                            "message": AMBIGUOUS_ERROR
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+)
+async def login(request: login_request, response: Response):
     if not validate_email(request.email):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
             }
         )
 
     if not validate_password(request.password):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
@@ -291,18 +425,18 @@ async def login(request: LoginRequest, response: Response):
     user = await search_users_via_email(request.email.strip())
 
     if user is None:
-        return JSONResponse(
-            status_code=404,
-            content={
+        raise HTTPException(
+            status_code=401,
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
         )
     
     if not verify_password(request.password, user["password"]):
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
@@ -327,30 +461,123 @@ async def login(request: LoginRequest, response: Response):
     }
 
 # POST /api/register
-@router.post("/register", status_code=201)
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    summary="Register User",
+    description="Registers a new user account and produces a JWT for the authorization of the user.",
+    responses={
+        201: {
+            "description": "Account successfully created",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Account created successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Invalid registration information",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidEmail": {
+                            "summary": "Invalid or missing email",
+                            "description": "Triggered when the provided email address fails email validation.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+                                }
+                            }
+                        },
+
+                        "InvalidPassword": {
+                            "summary": "Invalid or missing password",
+                            "description": "Triggered when the provided password does not meet the password requirements.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+                                }
+                            }
+                        },
+
+                        "InvalidUsername": {
+                            "summary": "Invalid or missing username",
+                            "description": "Triggered when the username is missing, empty, or contains only whitespace.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing username"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        409: {
+            "description": "Email or username already exists",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "EmailAlreadyExists": {
+                            "summary": "Email already registered",
+                            "description": "Triggered when the provided email address is already associated with an account.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": AMBIGUOUS_ERROR
+                                }
+                            }
+                        },
+
+                        "UsernameAlreadyExists": {
+                            "summary": "Username already registered",
+                            "description": "Triggered when the provided username is already associated with an account.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": AMBIGUOUS_ERROR
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def register(request: RegisterRequest, response: Response):
     if not validate_email(request.email):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
             }
         )
 
     if not validate_password(request.password):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
             }
         )
 
     if not request.username or not request.username.strip():
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing username"
             }
@@ -359,9 +586,9 @@ async def register(request: RegisterRequest, response: Response):
     existing_user = await search_users_via_email(request.email.strip())
 
     if existing_user is not None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=409,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
@@ -370,9 +597,9 @@ async def register(request: RegisterRequest, response: Response):
     existing_username = await search_users_via_username(request.username.strip())
     
     if existing_username is not None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=409,
-            content={
+            detail={
                 "status": "error",
                 "message": AMBIGUOUS_ERROR
             }
@@ -400,11 +627,58 @@ async def register(request: RegisterRequest, response: Response):
     )
 
     return {
-            "status": "success",
-            "message": "Account created successfully"
+        "status": "success",
+        "message": "Account created successfully"
     }
 
-@router.post("/fetchUsers")
+@router.post(
+    "/fetchUsers",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Fetch Users",
+    description="Returns all registered users if the user is an admin.",
+    responses={
+        200: {
+            "description": "Users successfully fetched",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "users": [
+                            {
+                                "id": "550e8400-e29b-41d4-a716-446655440000",
+                                "username": "example_user",
+                                "role": "USER"
+                            },
+                            {
+                                "id": "123e4567-e89b-12d3-a456-426614174000",
+                                "username": "example_investigator",
+                                "role": "INVESTIGATOR"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: {
+            "description": "User does not have permission to access this endpoint",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User unauthorized"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+)
 async def fetch_users(request: Request):
     connection = None
 
@@ -412,9 +686,9 @@ async def fetch_users(request: Request):
         payload = verify_jwt(request)
 
         if payload.get("role") != "ADMIN":
-            return JSONResponse(
+            raise HTTPException(
                 status_code=403,
-                content={
+                detail={
                     "status":"error",
                     "message": "User unauthorized"
                 }
@@ -440,46 +714,184 @@ async def fetch_users(request: Request):
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status":"success",
-                "users": users
-            }
-        )
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+        return {
+            "status":"success",
+            "users": users
+        }
     finally:
         if connection is not None:
             await connection.close()
 
-@router.post("/changeUserRole")
-async def change_user_role(
-    change_role_request: ChangeRoleRequest,
-    request: Request
-):
-    connection = None
-    try:
-        payload = verify_jwt(request)
-    except ValueError as e:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": str(e)
+@router.post(
+    "/changeUserRole",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Change User Role",
+    description="Changes the role of a registered user. The endpoint requires a valid JWT and can only be accessed by an ADMIN user. An admin cannot change their own role.",
+    responses={
+        200: {
+            "description": "User role successfully updated",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "User role updated to INVESTIGATOR successfully"
+                    }
+                }
             }
-        )
+        },
+
+        400: {
+            "description": "Invalid role change request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingFields": {
+                            "summary": "Missing user ID or role",
+                            "description": "Triggered when userId or NewRole is missing.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Missing userId or NewRole field."
+                                }
+                            }
+                        },
+
+                        "InvalidUserId": {
+                            "summary": "Invalid user ID",
+                            "description": "Triggered when userID is not a valid UUID.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid userId format."
+                                }
+                            }
+                        },
+
+                        "InvalidRole": {
+                            "summary": "Invalid new role",
+                            "description": "Triggered when NewRole is not USER, ADMIN, or INVESTIGATOR.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing NewRole field."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when no JWT authentication cookie is provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid Token",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User does not have permission to perform this action",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "UnauthorizedUser": {
+                            "summary": "User is not an admin",
+                            "description": "Triggered when the authenticated user is not an ADMIN.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "User unauthorized"
+                                }
+                            }
+                        },
+
+                        "ChangeOwnRole": {
+                            "summary": "Attempt to change own role",
+                            "description": "Triggered when an admin tries to change their own role.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Not allowed to change own role"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "No user found with the provided user ID"
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Database error"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def change_user_role(change_role_request: ChangeRoleRequest, request: Request):
+    payload = verify_jwt(request)
 
     if payload.get("role") != "ADMIN":
-        return JSONResponse(
+        raise HTTPException(
             status_code=403,
-            content={
+            detail={
                 "status":"error",
                 "message": "User unauthorized"
             }
@@ -489,38 +901,38 @@ async def change_user_role(
     new_role = change_role_request.NewRole
 
     if not user_id or not new_role:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Missing userId or NewRole field."
             }
         )
     
     if payload.get("sub") == user_id:
-        return JSONResponse(
+        raise HTTPException(
             status_code=403,
-            content={
+            detail={
                 "status": "error",
-               "message": "Not allowed to change own role"
-           }
+                "message": "Not allowed to change own role"
+            }
         )
 
     try:
         user_id = uuidlib.UUID(user_id)
     except ValueError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status":"error",
                 "message":"Invalid userId format."
             }
         )
 
     if new_role not in ["USER", "ADMIN", "INVESTIGATOR"]:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={
+            detail={
                 "status": "error",
                 "message": "Invalid or missing NewRole field."
             }
@@ -539,25 +951,22 @@ async def change_user_role(
         )
 
         if result == "UPDATE 0":
-            return JSONResponse(
+            raise HTTPException(
                 status_code=404,
-                content={
+                detail={
                     "status": "error",
                     "message": "No user found with the provided user ID"
                 }
             )
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status":"success",
-                "message": f"User role updated to {new_role} successfully"
-            }
-        )
+        return {
+            "status":"success",
+            "message": f"User role updated to {new_role} successfully"
+        }
     except asyncpg.PostgresError:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status":"error",
                 "message":"Database error"
             }
@@ -566,102 +975,345 @@ async def change_user_role(
         if connection is not None:
             await connection.close()
 
-@router.delete("/users/{user_id}")
-async def delete_user(user_id: str, request: Request):
-    try:
-        #Verify the JWT for security
-        payload = verify_jwt(request)
-        user_id = user_id.strip()
-
-        #Authorization. Only Admins can delete
-        if payload.get("role") != "ADMIN":
-            return JSONResponse(
-                status_code = 403,
-                content = {"status": "error", "message": "User is unauthorized."}
-            )
-
-        #Validate input. This rejects improper UUIDs before touching the DB
-        if not validate_uuid(user_id):
-            return JSONResponse(
-                status_code = 400,
-                content = {"status": "error", "message": "Invalid User ID format."}
-            )
-
-        #An admin cannot delete themselves
-        caller_id = payload.get("sub")
-        if caller_id == user_id:
-            return JSONResponse(
-                status_code = 400,
-                content = {"status": "error", "message": "Admins cannot delete themselves."}
-            )
-
-        #Now delete
-        try:
-            deleted = await delete_user_by_id(user_id)
-        except asyncpg.PostgresError:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status":"error",
-                    "message":"Database error"
-                }
-            )
-        
-        #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
-        if not deleted:
-            return JSONResponse(
-                status_code = 404,
-                content = {
-                    "status": "error", 
-                    "message": "No user found with the provided ID."
+@router.delete(
+    "/users/{user_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Delete User",
+    description="Deletes a registered user by their user ID. Only an admin can use this endpoint and they cannot delete themselves.",
+    responses={
+        200: {
+            "description": "User successfully deleted",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "User deleted successfully."
                     }
-            )
-
-        return JSONResponse(
-            status_code = 200,
-            content = {
-                "status": "success", 
-                "message": "User deleted successfully."
                 }
-        )
+            }
+        },
 
-        #safety net for unexpected errors
-    except ValueError as e:
-        #Errors from Jwt.
-        return JSONResponse(
-            status_code = 401,
-            content = {
+        400: {
+            "description": "Invalid delete request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "InvalidUserId": {
+                            "summary": "Invalid user ID",
+                            "description": "Triggered when the provided user ID is not a valid UUID.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid User ID format."
+                                }
+                            }
+                        },
+
+                        "DeleteSelf": {
+                            "summary": "Admin tries to delete themselves",
+                            "description": "Triggered when an admin tries to delete their own account.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Admins cannot delete themselves."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT",
+                            "description": "Triggered when no JWT authentication cookie is provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "ExpiredToken": {
+                            "summary": "Expired JWT",
+                            "description": "Triggered when the provided JWT has expired.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": EXPIRED_TOKEN
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when JWT verification fails.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User does not have permission to delete users",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User is unauthorized."
+                        }
+                    }
+                }
+            }
+        },
+
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "No user found with the provided ID."
+                        }
+                    }
+                }
+            }
+        },
+
+        500 : {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Database error"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def delete_user(user_id: str, request: Request): 
+    #Verify the JWT for security
+    payload = verify_jwt(request)
+    user_id = user_id.strip()
+
+    #Authorization. Only Admins can delete
+    if payload.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code = 403,
+            detail= {
                 "status": "error", 
-                "message": str(e)
-                }
+                "message": "User is unauthorized."
+            }
         )
 
-@router.post("/refreshToken")
+    #Validate input. This rejects improper UUIDs before touching the DB
+    if not validate_uuid(user_id):
+        raise HTTPException(
+            status_code = 400,
+            detail= {
+                "status": "error",
+                "message": "Invalid User ID format."
+            }
+        )
+
+    #An admin cannot delete themselves
+    caller_id = payload.get("sub")
+    if caller_id == user_id:
+        raise HTTPException(
+            status_code = 400,
+            detail= {
+                "status": "error",
+                "message": "Admins cannot delete themselves."
+            }
+        )
+
+    #Now delete
+    try:
+        deleted = await delete_user_by_id(user_id)
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status":"error",
+                "message":"Database error"
+            }
+        )
+        
+    #did the delete actually remove someone or quitly did nothing (no existing user or role was admin)
+    if not deleted:
+        raise HTTPException(
+            status_code = 404,
+            detail= {
+                "status": "error", 
+                "message": "No user found with the provided ID."
+            }
+        )
+
+    return {
+        "status": "success", 
+        "message": "User deleted successfully."
+    }
+
+@router.post(
+    "/refreshToken",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Refresh JWT Token",
+    description="Refreshes the user's JWT when the token has expired or has 1 minute left. Otherwise, no token is created.",
+    responses={
+        200: {
+            "description": "Token is valid or successfully refreshed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "TokenNotRefreshed": {
+                            "summary": "Token does not need refreshing",
+                            "description": "Triggered when the current JWT has more than 1 minute left before expiry.",
+                            "value": {
+                                "status": "success",
+                                "message": "Token does not need refreshing"
+                            }
+                        },
+
+                        "TokenRefreshed": {
+                            "summary": "Token successfully refreshed",
+                            "description": "Triggered when a new JWT is generated and stored in the authentication cookie.",
+                            "value": {
+                                "status": "success",
+                                "message": "Token refreshed"
+                            }
+                        }
+
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Token authentication or validation failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingToken": {
+                            "summary": "Missing JWT token",
+                            "description": "Triggered when the authentication cookie exists but contains an empty JWT.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Missing JWT token"
+                                }
+                            }
+                        },
+
+                        "NotAuthenticated": {
+                            "summary": "Not authenticated",
+                            "description": "Triggered when the authentication cookie is not provided.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Not authenticated"
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when the JWT cannot be decoded or fails validation.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        },
+
+                        "MissingExpiry": {
+                            "summary": "Token missing expiry",
+                            "description": "Triggered when the JWT does not contain an exp field.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Token missing expiry"
+                                }
+                            }
+                        },
+
+                        "MissingRequiredFields": {
+                            "summary": "Token missing required fields",
+                            "description": "Triggered when the JWT does not contain sub, username, or role.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Token missing required fields"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Failed to update token issue time",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Failed to update token issue time"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def refresh_token(request: Request, response: Response):
     token = request.cookies.get(COOKIE_NAME)
-    if not token:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error", 
-                "message": "Not authenticated"
-                }
-        )
 
     if token == "":
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error", 
                 "message": "Missing JWT token"
-                }
+            }
         )
+
+    if not token:
+        raise HTTPException (
+            status_code=401,
+            detail={
+                "status": "error", 
+                "message": "Not authenticated"
+            }
+        )
+
 
     try:
         payload = jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
+            auth_settings.JWT_SECRET,
+            algorithms=[auth_settings.HASH]
         )
 
     except ExpiredSignatureError:
@@ -669,55 +1321,53 @@ async def refresh_token(request: Request, response: Response):
         try:
             payload = jwt.decode(
                 token,
-                SECRET_KEY,
-                algorithms=[ALGORITHM],
+                auth_settings.JWT_SECRET,
+                algorithms=[auth_settings.HASH],
                 options={"verify_exp": False}
             )
         except JWTError:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=401,
-                content={
+                detail={
                     "status": "error", 
                     "message": INVALID_TOKEN
-                    }
+                }
             )
 
     except JWTError:
-        return JSONResponse(
+        raise HTTPException(
                 status_code=401,
-                content={
+                detail={
                     "status": "error", 
                     "message": INVALID_TOKEN
-                    }
+                }
             )
     
     expiry = payload.get("exp")
 
     if expiry is None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error", 
                 "message": "Token missing expiry"
-                }
+            }
         )
 
     current_time = datetime.now(timezone.utc).timestamp()
     seconds_until_expiry = expiry - current_time
 
     if seconds_until_expiry > 60:
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Token does not need refreshing"
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Token does not need refreshing"
+        }
+        
     
     if "sub" not in payload or "username" not in payload or "role" not in payload:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={
+            detail={
                 "status": "error",
                 "message": "Token missing required fields"
             }
@@ -734,23 +1384,15 @@ async def refresh_token(request: Request, response: Response):
     try:
         await update_user_jwt_issued_via_user(user)
     except Exception:
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "status":"error",
                 "message": "Failed to update token issue time"
             }
         )
 
-    final_response = JSONResponse(
-        status_code=200,
-        content={
-            "status":"success",
-            "message": "Token refreshed"
-        }
-    )
-
-    final_response.set_cookie(
+    response.set_cookie(
         key=COOKIE_NAME,
         value=new_token,
         httponly=True,
@@ -758,5 +1400,8 @@ async def refresh_token(request: Request, response: Response):
         samesite="none",
         max_age=1800
     )
-    
-    return final_response
+
+    return {
+        "status":"success",
+        "message": "Token refreshed"
+    }

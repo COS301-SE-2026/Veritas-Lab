@@ -7,12 +7,13 @@ import CaseCard from '@/components/common/caseCard';
 import DashboardModal from '@/components/common/dashboardModal';
 import DashboardCards from '@/components/common/dashboardCards';
 import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
-import { useUserRole } from '@/context/UserRoleContext';
+import { useUserRole, useCurrentUser } from '@/context/UserRoleContext';
 //type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 
 export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const userRole = useUserRole();
+    const currentUser = useCurrentUser();
     const {
         searchQuery,
         setSearchQuery,
@@ -70,15 +71,21 @@ export default function Dashboard() {
                     ) : visibleCases.length === 0 ? (
                         <div className="text-sm text-(--color-light)">No cases found.</div>
                     ) : (
-                        visibleCases.map((item) => (
-                            <CaseCard
-                                key={item.caseId}
-                                caseTitle={item.caseName}
-                                caseDescription={`Created by ${item.caseCreator}`}
-                                caseStatus={item.caseClosed ? 'Closed' : 'Open'}
-                                href={`/case-page/${item.caseId}`}
-                            />
-                        ))
+                        visibleCases.map((item) => {
+                            const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' && item.caseCreator === currentUser?.username);
+                            return (
+                                <CaseCard
+                                    key={item.caseId}
+                                    caseTitle={item.caseName}
+                                    caseDescription={`Created by ${item.caseCreator}`}
+                                    caseStatus={item.caseClosed ? 'Closed' : 'Open'}
+                                    href={`/case-page/${item.caseId}`}
+                                    caseId={item.caseId}
+                                    canDelete={canDeleteCase}
+                                    onDeleted={refreshCases}
+                                />
+                            );
+                        })
                     )}
                 </div>
             </div>

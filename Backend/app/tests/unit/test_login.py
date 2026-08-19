@@ -5,7 +5,7 @@ from app.auth.auth import hash_password
 
 client = TestClient(app)
 
-AMBIGUOUS_ERROR= "The email and/or passwordare invalid"
+AMBIGUOUS_ERROR= "The email and/or password are invalid"
 
 def test_successful_login(monkeypatch):
     client.cookies.clear()
@@ -88,8 +88,10 @@ def test_login_incorrect_password(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": AMBIGUOUS_ERROR
+        "detail":{
+            "status": "error",
+            "message": AMBIGUOUS_ERROR
+        }
     }
 
     assert auth.COOKIE_NAME not in response.cookies
@@ -113,10 +115,12 @@ def test_login_user_does_not_exist(monkeypatch):
         }
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 401
     assert response.json() == {
-        "status": "error",
-        "message": AMBIGUOUS_ERROR
+        "detail":{
+            "status": "error",
+            "message": AMBIGUOUS_ERROR
+        }
     }
     assert auth.COOKIE_NAME not in response.cookies
 
@@ -144,8 +148,10 @@ def test_login_incorrect_email():
 
     assert response.status_code == 400
     assert response.json() == {
-        "status": "error",
-        "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+        "detail":{
+            "status": "error",
+            "message": "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
+        }
     }
     assert auth.COOKIE_NAME not in response.cookies
 

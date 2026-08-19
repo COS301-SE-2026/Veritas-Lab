@@ -6,13 +6,14 @@ import dynamic from "next/dynamic";
 import Card from "../ui/card";
 import { getMediaKind } from "@/lib/media";
 import type { EvidenceCardProps } from "@/types/components";
+import DeleteEvidence from "./caseEvidenceDeleteButton"
 
 const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
     ssr: false,
     loading: () => <span className="text-xs text-(--color-light)">Loading…</span>,
 });
 
-export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension, href }: Readonly<EvidenceCardProps>) {
+export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension, href, mediaId, caseId, canDelete, onDeleted}: Readonly<EvidenceCardProps>) {
     const mediaKind = getMediaKind(mediaExtension);
 
     let preview: ReactNode;
@@ -49,16 +50,31 @@ export default function EvidenceCard({ mediaName, mediaUrl, mediaExtension, href
         />
     );
 
+    const showDelete = canDelete && mediaId && caseId;
+    const deleteButton = showDelete ? (
+        <div className="absolute top-3 right-3 z-10">
+            <DeleteEvidence caseId={caseId} mediaId={mediaId} mediaName={mediaName} onDeleted={onDeleted} />
+        </div>
+    ) : null;
+    //keeping same structure as much as possible (i dont want to create errors out of nowhere in the tests or rendering) hence might look messy.
     if (href) {
         return (
-            <Link
-                href={href}
-                className="block rounded-[21px] transition hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
-            >
-                {card}
-            </Link>
+            <div className="relative">
+                <Link
+                    href={href}
+                    className="block rounded-[21px] transition hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
+                >
+                    {card}
+                </Link>
+                {deleteButton}
+            </div>
         );
     }
 
-    return card;
+    return (
+        <div className="relative">
+            {card}
+            {deleteButton}
+        </div>
+    )
 }
