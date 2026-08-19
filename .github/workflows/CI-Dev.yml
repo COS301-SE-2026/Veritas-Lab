@@ -48,13 +48,13 @@ jobs:
                   AWS_REGION: af-south-1
                   E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
                   E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
-                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
                   ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
                   ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
                   ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
                   E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
                   E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-                  E2E_USER_NAME: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
                   NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
                   R2_URL: ${{ secrets.R2_URL }}
                   R2_TOKEN_VALUE: ${{ secrets.R2_TOKEN_VALUE }}
