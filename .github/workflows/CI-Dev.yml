@@ -8,7 +8,7 @@ on:
     workflow_dispatch:
 #similar to main but added timeout.
 jobs:
-    backend-tests:
+    backend-unit-tests:
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
@@ -65,9 +65,9 @@ jobs:
                   AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
               run: |
                   cd Backend
-                  python -m pytest app/tests/ --asyncio-mode=auto --cov=app
+                  python -m pytest app/tests/unit --asyncio-mode=auto --cov=app
 
-    frontend-tests:
+    frontend-unit-tests:
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
@@ -88,6 +88,6 @@ jobs:
                   cd frontend
                   npx jest
     deploy:
-        needs: [backend-tests, frontend-tests]
+        needs: [backend-unit-tests, frontend-unit-tests]
         uses: ./.github/workflows/CD-Dev.yml
         secrets: inherit
