@@ -5,12 +5,17 @@ on:
         branches: ["dev"]
     workflow_dispatch:
 
+permissions:
+    contents: read
+    packages: write
+    id-token: write
+
 jobs:
     tests:
         uses: ./.github/workflows/Dev/Dev-Tests.yml
         secrets: inherit
     deploy-azure:
-
+        needs: tests
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
