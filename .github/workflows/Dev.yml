@@ -16,6 +16,7 @@ jobs:
         secrets: inherit
     deploy-azure:
         needs: tests
+        environment: Dev
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
