@@ -8,6 +8,7 @@ on:
 permissions:
     contents: read
     packages: write
+    id-token: write
 
 jobs:
     #This runs the tests again when anything gets on main not just when we do PR's
@@ -19,8 +20,6 @@ jobs:
         needs: tests
         runs-on: ubuntu-latest
         timeout-minutes: 15
-        permissions:
-            id-token: write
         steps:
             - uses: actions/checkout@v7
             - uses: docker/login-action@v4
@@ -73,9 +72,6 @@ jobs:
         if: failure()
         runs-on: ubuntu-latest
         timeout-minutes: 20
-        permissions:
-            packages: read
-            id-token: write
         environment:
             name: Prod
         steps:
