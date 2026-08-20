@@ -266,7 +266,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 async def create_case(
     case_request: CreateCaseRequest,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
     verify_not_user(payload.get("role"))
@@ -377,7 +377,7 @@ async def create_case(
         }
     }
 )
-async def get_cases(request: Request, connection: asyncpg.Connection = Depends(get_connection)):
+async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
   
     payload = verify_jwt(request)
 
@@ -499,7 +499,7 @@ async def get_cases(request: Request, connection: asyncpg.Connection = Depends(g
         }
     }
 )
-async def get_single_case(case_request: CreateSingleCaseRequest, request: Request, connection: asyncpg.Connection = Depends(get_connection)):
+async def get_single_case(case_request: CreateSingleCaseRequest, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
     payload = verify_jwt(request)
 
     if not case_request.CaseID:
@@ -716,7 +716,7 @@ async def upload_evidence(
     background_task: BackgroundTasks,
     case_id: Annotated[str, Form()],
     media: Annotated[UploadFile, File()],
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
 
@@ -858,7 +858,7 @@ async def upload_evidence(
 async def close_case(
     case_request: CreateSingleCaseRequest,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
 
@@ -875,7 +875,7 @@ async def close_case(
     
     try:
         case_uuid = UUID(case_request.CaseID)
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(
             status_code=400, 
             detail={
@@ -1037,7 +1037,7 @@ async def close_case(
 async def update_case(
     case_request: UpdateCaseRequest,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
 
@@ -1195,7 +1195,7 @@ async def update_comment(
     comment_id: int,
     update_data: UpdateCommentRequest,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
 
@@ -1292,7 +1292,7 @@ async def update_comment(
 async def delete_comment(
     request: Request,
     comment_id: int,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
     username = payload.get("username")
@@ -1422,7 +1422,7 @@ async def delete_comment(
 async def retreive_comments(
     case_id: str,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
 
     payload = verify_jwt(request)
@@ -1577,7 +1577,7 @@ async def delete_evidence(
     case_id:str, 
     media_id:str,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
     #Can raise the 401 errors
@@ -1720,7 +1720,7 @@ def validate_comment_length(comment: str) -> bool:
 async def create_comment(
     body: create_comment_request,
     req: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(req)
     # Need to document 
@@ -1877,7 +1877,7 @@ async def create_comment(
 async def delete_case(
     case_request: CreateSingleCaseRequest,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
 
     payload = verify_jwt(request)
@@ -2055,7 +2055,7 @@ async def _save_annotations(
 async def save_annotations(
     payload: save_snnotations_payload,
     request: Request,
-    connection: asyncpg.Connection = Depends(get_connection)
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     cookie=verify_jwt(request)
     user_role=cookie.get("role")
