@@ -293,47 +293,35 @@ class Case:
                 target_filename = f"{media_id}{db_extension}"
                 # Need to reproduce the same db report for this case.
 
-                try:
+
                     # Insert into the Reports table allowing the report to have the image's name in the image title column
 
-                   await connection.execute(
-                        """
-                        INSERT INTO "Cases_DB"."Reports" (
-                            CaseId, 
-                            MediaId, 
-                            ImageTitle, 
-                            ReportArtifacts, 
-                            ReportFindings, 
-                            ReportComments
-                        )
-                        SELECT 
-                            $1,
-                            $2,
-                            $3,
-                            ReportArtifacts, 
-                            ReportFindings, 
-                            ReportComments
-                        FROM "Cases_DB"."Reports"
-                        WHERE MediaId = $2
-                        LIMIT 1;
-                        """,
-                        case_id,
-                        media_id,
-                        filename
+                await connection.execute(
+                    """
+                    INSERT INTO "Cases_DB"."Reports" (
+                        CaseId, 
+                        MediaId, 
+                        ImageTitle, 
+                        ReportArtifacts, 
+                        ReportFindings, 
+                        ReportComments
                     )
+                    SELECT 
+                        $1,
+                        $2,
+                        $3,
+                        ReportArtifacts, 
+                        ReportFindings, 
+                        ReportComments
+                    FROM "Cases_DB"."Reports"
+                    WHERE MediaId = $2
+                    LIMIT 1;
+                    """,
+                    case_id,
+                    media_id,
+                    filename
+                )
 
-                except asyncpg.UniqueViolationError:
-                    raise HTTPException(
-                        status_code=409, 
-                        detail={
-                            "status": "error",
-                            "message": MEDIA_ALREADY_ON_CASE
-                        }
-                    )
-                except HTTPException:
-                    raise
-                except Exception:
-                    pass
             else: 
                 new_media_uuid = uuid.uuid4()
 
@@ -359,34 +347,22 @@ class Case:
                     ContentType=media.content_type
                 )
 
-                try:
                     # Insesrt into the Reports table allowing the report to have the image's name in the image title column
 
-                    await connection.execute(
-                        """
-                        INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                        """,
-                        case_id,
-                        media_id,
-                        filename,
-                        None,
-                        None,
-                        None
-                    )
+                await connection.execute(
+                    """
+                    INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    """,
+                    case_id,
+                    media_id,
+                    filename,
+                    None,
+                    None,
+                    None
+                )
 
-                except asyncpg.UniqueViolationError:
-                    raise HTTPException(
-                        status_code=409, 
-                        detail={
-                            "status": "error",
-                            "message": MEDIA_ALREADY_ON_CASE
-                        }
-                    )
-                except HTTPException:
-                    raise
-                except Exception:
-                    pass
+                
 
             #Creation of presigned URL below
             presign_client = get_object(for_presign=True)# function to get the client until we do the pools
@@ -406,6 +382,15 @@ class Case:
                 "url": file_url,
                 "Status": "existing" if existing_media else "uploaded"
             }
+
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(
+                status_code=409, 
+                detail={
+                    "status": "error",
+                    "message": MEDIA_ALREADY_ON_CASE
+                }
+            )
         
         except HTTPException as e:
             raise e
