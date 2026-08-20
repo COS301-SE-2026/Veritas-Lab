@@ -1320,11 +1320,13 @@ async def test_get_comment_missing_case_id():
         case_name="Billy Jean's not my Son"
     )
 
-    with pytest.raises(HTTPException) as exeInfo:
-        await test_case.get_comments(AsyncMock())
+    connection = AsyncMock()
 
-    assert exeInfo.value.status_code == 400
-    assert "Case id is missing" in exeInfo.value.detail  
+    with pytest.raises(HTTPException) as exc_info:
+        await test_case.get_comments(connection)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Case id is missing"
 
 @pytest.mark.asyncio
 async def test_get_comment_successful():
