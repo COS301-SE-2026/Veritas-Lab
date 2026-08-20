@@ -40,7 +40,7 @@ export default function useCaseComments({ caseId, initialComments }: UseCaseComm
             await editCommentRequest(caseId, commentId, newComment);
             setComments((current) => current.map((c) => (c.commentId === commentId ? { ...c, comment: newComment } : c)));
         } catch (updateError) {
-            setError(updateError instanceof Error ? updateError.message : 'Failed to update comment');
+            setError(updateError instanceof Error ? updateError.message : 'Failed to edit comment');
         }
     };
     const removeComment = async (commentId: number) => {
