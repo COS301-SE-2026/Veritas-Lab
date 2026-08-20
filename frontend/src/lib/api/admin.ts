@@ -1,5 +1,4 @@
-import type { AdminUser } from '@/types/api';
-import type { ApiError } from '@/types/api';
+import type { AdminUser, ApiError } from '@/types/api';
 type ApiResult = {
     status?: 'success' | 'error';
     message?: string;

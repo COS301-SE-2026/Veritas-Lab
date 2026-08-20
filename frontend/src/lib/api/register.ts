@@ -1,5 +1,4 @@
-import type { RegisterResponse } from '@/types/api';
-import type { ApiError } from '@/types/api';
+import type { ApiError, RegisterResponse } from '@/types/api';
 
 export async function register(username: string, email: string, password: string): Promise<RegisterResponse> {
     const res = await fetch(`/api/register`, {

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { CircleX, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import Modal from '@/components/ui/modal';
 import Button from '@/components/ui/button';
 import useCase from '@/lib/hooks/useCase';

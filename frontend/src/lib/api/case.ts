@@ -1,6 +1,5 @@
-import type { ApiError } from '@/types/api';
+import type { ApiError, CaseResponse } from '@/types/api';
 
-import type { CaseResponse } from '@/types/api';
 function normalizeComment(comment: Record<string, unknown>) {
     return {
         commentId: Number(comment.commentId ?? comment.commentid ?? 0),

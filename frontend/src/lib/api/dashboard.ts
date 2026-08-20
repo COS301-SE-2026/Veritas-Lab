@@ -1,5 +1,5 @@
-import type { DashboardCase } from '@/types/api';
-import type { ApiError } from '@/types/api';
+import type { ApiError, DashboardCase } from '@/types/api';
+
 export async function fetchCases(): Promise<DashboardCase[]> {
 	const res = await fetch(`/api/getCases`, {
 		method: 'POST',
