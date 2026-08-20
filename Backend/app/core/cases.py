@@ -11,7 +11,7 @@ from pypdf import PdfReader
 from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.client import Config
-from app.core.env import Postgres_Settings, Other_Settings, Minio_Settings, R2_Settings
+from app.core.env import Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
 
 CASE_NOT_FOUND = "Case not found"
@@ -25,20 +25,9 @@ UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
 MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
 INTERNAL_SERVER_ERROR = "Internal server error"
 INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Please try again."
-postgres_settings = Postgres_Settings()
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
 r2_settings= R2_Settings()
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=postgres_settings.DB_USER,
-        password=postgres_settings.DB_PASSWORD,
-        database=postgres_settings.DB_NAME,
-        host=postgres_settings.DB_HOST,
-        port=postgres_settings.DB_PORT,
-        ssl="require" if postgres_settings.DB_SSL else None,
-    )
 
 def get_object(for_presign: bool = False) -> S3Client:
     if other_settings.ENVIRONMENT == "development":
@@ -131,7 +120,7 @@ class Case:
             self.case_id = None
         self.case_creation_date = None
 
-    async def create(self):
+    async def create(self, connection: asyncpg.Connection):
         if self.case_id  is not None:
             raise HTTPException(
                 status_code=409,
@@ -141,43 +130,41 @@ class Case:
                 }
             )
         
-        connection = await get_connection()
+        row = await connection.fetchrow(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+            (casecreator, casename, casedescription, caseclosed)
+            VALUES ($1, $2, $3, $4)
+            RETURNING caseid, casecreationdate
+            """,
+            self.case_creator,
+            self.case_name,
+            self.case_description,
+            self.case_closed
+        )
 
-        try:
-            row = await connection.fetchrow(
-                """
-                INSERT INTO "Cases_DB"."Cases"
-                (casecreator, casename, casedescription, caseclosed)
-                VALUES ($1, $2, $3, $4)
-                RETURNING caseid, casecreationdate
-                """,
-                self.case_creator,
-                self.case_name,
-                self.case_description,
-                self.case_closed
-            )
+        self.case_id=row["caseid"]
+        self.case_creation_date=row["casecreationdate"]
+        return str(row["caseid"])
 
-            self.case_id=row["caseid"]
-            self.case_creation_date=row["casecreationdate"]
-            return str(row["caseid"])
-
-        finally:
-            await connection.close()
-
-    async def add_evidence(self, media: UploadFile, case_id: uuid.UUID):
+    async def add_evidence(
+        self,
+        media: UploadFile,
+        case_id: uuid.UUID,
+        connection: asyncpg.Connection
+    ):
         filename = media.filename
-        localExtension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
-        fileBytes = await media.read()
+        local_extension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
+        file_bytes = await media.read()
         await media.seek(0)
         #script detection
-        if localExtension == ".pdf":
-
+        if local_extension == ".pdf":
             try:
-                pdfFile = io.BytesIO(fileBytes)
-                reader = PdfReader(pdfFile)
+                pdf_file = io.BytesIO(file_bytes)
+                reader = PdfReader(pdf_file)
 
                 try: 
-                    root = reader.trailer.get("/Root", {}) #checcking for automatic triggers
+                    root = reader.trailer.get("/Root", {}) #checking for automatic triggers
                     if root:
                         root = root.get_object()
                         if "/OpenAction" in root or "/AA" in root:
@@ -234,10 +221,8 @@ class Case:
                 }
             )
 
-        connection = await get_connection()
-
         try:
-            typeRecord = await connection.fetchrow(
+            type_record = await connection.fetchrow(
                 """
                 SELECT 
                     MediaTypeId AS "MediaTypeId",
@@ -246,41 +231,41 @@ class Case:
                     FROM "Cases_DB"."MediaType"
                 WHERE MediaExtension = $1
                 """,
-                localExtension
+                local_extension
             )
 
-            if not typeRecord:
+            if not type_record:
                 raise HTTPException(
                     status_code=400,
                     detail={
                         "status": "error",
-                        "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{localExtension}"
+                        "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{local_extension}"
                     }
                 )
 
-            mediaTypeId = typeRecord["MediaTypeId"]
-            bucketName = typeRecord["MediaBucket"]
-            dbExtension = typeRecord["MediaExtension"] 
+            media_typ_id = type_record["MediaTypeId"]
+            bucket_name = type_record["MediaBucket"]
+            db_extension = type_record["MediaExtension"] 
             
                 #Hash the image for uniqueness
-            mediaHash = hashlib.sha256(fileBytes).hexdigest()
+            media_hash = hashlib.sha256(file_bytes).hexdigest()
 
             storage_client = get_object()
 
             
             #checking for a duplicate
-            existingMedia = await connection.fetchrow(
+            existing_media = await connection.fetchrow(
                 """
                 SELECT MediaId  AS "MediaId" 
                 FROM "Cases_DB"."Media" 
                 WHERE MediaHash = $1
                 """,
-                mediaHash
+                media_hash
             )
 
-            if existingMedia:
-                mediaId=existingMedia["MediaId"]
-                targetFilename = f"{mediaId}{dbExtension}"
+            if existing_media:
+                media_id=existing_media["MediaId"]
+                target_filename = f"{media_id}{db_extension}"
                 # Need to reproduce the same db report for this case.
 
                 try:
@@ -308,7 +293,7 @@ class Case:
                         LIMIT 1;
                         """,
                         case_uuid,
-                        mediaId,
+                        media_id,
                         filename
                     )
 
@@ -320,30 +305,32 @@ class Case:
                             "message": MEDIA_ALREADY_ON_CASE
                         }
                     )
+                except HTTPException:
+                    raise
                 except Exception:
                     pass
             else: 
-                newMediaUuid = uuid.uuid4()
+                new_media_uuid = uuid.uuid4()
 
-                mediaId = await connection.fetchval(
+                media_id = await connection.fetchval(
                     """
                     INSERT INTO "Cases_DB"."Media" (MediaId, MediaType, MediaHash)
                     VALUES ($1, $2, $3)
                     RETURNING MediaId
                     """,
-                    newMediaUuid,
-                    mediaTypeId,
-                    mediaHash
+                    new_media_uuid,
+                    media_typ_id,
+                    media_hash
                 )
-                targetFilename = f"{mediaId}{dbExtension}"
+                target_filename = f"{media_id}{db_extension}"
 
                 await media.seek(0)
                 
-                fileStream = io.BytesIO(fileBytes)
+                file_stream = io.BytesIO(file_bytes)
                 storage_client.put_object(
-                    Bucket=bucketName,
-                    Key=targetFilename,
-                    Body=fileStream,
+                    Bucket=bucket_name,
+                    Key=target_filename,
+                    Body=file_stream,
                     ContentType=media.content_type
                 )
 
@@ -356,7 +343,7 @@ class Case:
                         VALUES ($1, $2, $3, $4, $5, $6)
                         """,
                         case_uuid,
-                        mediaId,
+                        media_id,
                         filename,
                         None,
                         None,
@@ -371,26 +358,28 @@ class Case:
                             "message": MEDIA_ALREADY_ON_CASE
                         }
                     )
+                except HTTPException:
+                    raise
                 except Exception:
                     pass
 
             #Creation of presigned URL below
             presign_client = get_object(for_presign=True)# function to get the client until we do the pools
 
-            fileUrl = presign_client.generate_presigned_url(
+            file_url = presign_client.generate_presigned_url(
                 'get_object',
                 Params={
-                    'Bucket': bucketName,
-                    'Key': targetFilename
+                    'Bucket': bucket_name,
+                    'Key': target_filename
                 },
                 ExpiresIn=3600 
             )
 
             return{
-                "MediaId": str(mediaId),
+                "MediaId": str(media_id),
                 "Filename": filename,
-                "url": fileUrl,
-                "Status": "existing" if existingMedia else "uploaded"
+                "url": file_url,
+                "Status": "existing" if existing_media else "uploaded"
             }
         
         except HTTPException as e:
@@ -412,15 +401,19 @@ class Case:
                     "status": "error",
                     "message": INTERNAL_SERVER_ERROR
                 }
-                )
+            )
 
         finally:
-            await connection.close()
             await media.close()
 
     
 
-    async def delete_evidence(self, media_id: uuid.UUID, jwt_username: str = None):
+    async def delete_evidence(
+        self,
+        media_id: uuid.UUID,
+        connection: asyncpg.Connection,
+        jwt_username: str = None
+    ):
         if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
@@ -430,11 +423,7 @@ class Case:
                 }
             )
 
-        connection = None
-
         try:
-            connection=await get_connection()
-
             if jwt_username is not None:
 
                 status=await connection.execute(
@@ -516,6 +505,8 @@ class Case:
                         Key=object_name
                     )
                     
+                except HTTPException:
+                    raise
                 except Exception as e:
                     raise HTTPException(
                         status_code=500,
@@ -538,11 +529,6 @@ class Case:
                 }
             )
 
-        finally:
-            if connection is not None:
-                await connection.close()
-        
-
     def to_json(self):
         return {
             "caseId": str(self.case_id) if self.case_id is not None else None,
@@ -553,17 +539,14 @@ class Case:
             "caseCreationDate": self.case_creation_date.isoformat() if self.case_creation_date else None
         }
 
-    async def get_comments(self):
+    async def get_comments(self, connection: asyncpg.Connection):
         if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
             )
 
-        connection = None
         try:
-            connection = await get_connection()
-
             rows = await connection.fetch(
             """SELECT CommentID,
             Username, Comment, CommentTimestamp
@@ -578,10 +561,6 @@ class Case:
                 status_code=500, 
                 detail="Database connection failure. Internal Server Error."
             )
-
-        finally:
-            if connection is not None:
-                await connection.close()
 
     async def add_comment(
         self, 
@@ -670,7 +649,8 @@ class Case:
     async def delete_case(
         self,
         username: str, 
-        role: str
+        role: str,
+        connection: asyncpg.Connection
     ):
         if self.case_id is None:
             raise HTTPException(
@@ -680,8 +660,6 @@ class Case:
 
         case_id=self.case_id
         
-        connection = await get_connection()
-
         orphan_media = []
 
         try:
@@ -785,12 +763,21 @@ class Case:
                         Bucket=media["mediabucket"], 
                         Key=object_name
                     )
+                except HTTPException:
+                    raise
                 except Exception:
                     raise HTTPException(
                         status_code=500,
                         detail="Object storage Error"
                     )
 
-        finally:
-            await connection.close()
+        except asyncpg.PostgresError:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "message": "Database error"
+                }
+            )
+
 
