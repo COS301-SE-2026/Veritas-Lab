@@ -1,8 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
 import torch
-from Backend.app.training.image.model import AIImageDetector as TrainedAIImageDetector
-from Backend.app.training.image.prediction import predict_and_explain
+from app.training.image.model import AIImageDetector as TrainedAIImageDetector
+from app.training.image.prediction import predict_and_explain
 
 MODEL_PATH = Path("app/ai/best_model.pth")
 

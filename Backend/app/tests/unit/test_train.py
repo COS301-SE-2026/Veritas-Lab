@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock, patch
 
-from Backend.app.training.image.train import parse_arguments, main
+from app.training.image.train import parse_arguments, main
 
 def test_parse_arguments_returns_default_data_dir() -> None:
     with patch("sys.argv", ["train.py"]):
@@ -114,12 +114,12 @@ def train_mocks():
     mock_validation_result = _make_mock_validation_result()
 
     with (
-        patch("app.training.train.create_data_loaders") as mock_loaders,
-        patch("app.training.train.AIImageDetector") as mock_model_class,
-        patch("app.training.train.Adam") as mock_adam,
-        patch("app.training.train.train_one_epoch") as mock_train_epoch,
-        patch("app.training.train.evaluate_model") as mock_evaluate_model,
-        patch("app.training.train.torch.save") as mock_torch_save,
+        patch("app.training.image.train.create_data_loaders") as mock_loaders,
+        patch("app.training.image.train.AIImageDetector") as mock_model_class,
+        patch("app.training.image.train.Adam") as mock_adam,
+        patch("app.training.image.train.train_one_epoch") as mock_train_epoch,
+        patch("app.training.image.train.evaluate_model") as mock_evaluate_model,
+        patch("app.training.image.train.torch.save") as mock_torch_save,
     ):
         mock_loaders.return_value = (
             mock_train_loader, 

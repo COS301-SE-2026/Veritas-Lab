@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 from torchvision.models import EfficientNet_B0_Weights
 
-from Backend.app.training.image.explanation import (
+from app.training.image.explanation import (
     GradCAM,
     analyse_metadata,
     calculate_attention_statistics,
@@ -18,8 +18,8 @@ from Backend.app.training.image.explanation import (
     generate_probability_reason,
     generate_statistical_reasons
 )
-from Backend.app.training.image.model import AIImageDetector
-from Backend.app.training.image.scoring import probability_to_risk_level, risk_level_to_classification
+from app.training.image.model import AIImageDetector
+from app.training.image.scoring import probability_to_risk_level, risk_level_to_classification
 
 def predict_and_explain(
     model: AIImageDetector,

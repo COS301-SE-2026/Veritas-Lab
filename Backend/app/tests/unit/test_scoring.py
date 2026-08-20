@@ -1,5 +1,5 @@
 import pytest
-from Backend.app.training.image.scoring import probability_to_risk_level, risk_level_to_classification
+from app.training.image.scoring import probability_to_risk_level, risk_level_to_classification
 
 @pytest.mark.parametrize(
     ("probability", "expected_risk"),

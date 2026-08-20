@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from Backend.app.training.image.model import AIImageDetector
+from app.training.image.model import AIImageDetector
 from pathlib import Path
 
 def test_model_is_torch_module() -> None:

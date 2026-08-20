@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from PIL import Image
-import Backend.app.training.image.predict_validation as predict_validation
+import app.training.image.predict_validation as predict_validation
 
 def create_test_image(path: Path) -> None:
     Image.new(
@@ -38,9 +38,9 @@ def test_main_processes_validation_images(tmp_path: Path):
         patch.object(predict_validation, "DATASET_DIRECTORY", dataset_directory),
         patch.object(predict_validation, "OUTPUT_DIRECTORY", output_directory),
         patch.object(predict_validation, "MODEL_PATH", model_path),
-        patch("app.training.predict_validation.AIImageDetector", return_value=mock_model) as mock_model_class,
-        patch("app.training.predict_validation.torch.load", return_value={"model_state_dict": MagicMock()}) as mock_load,
-        patch("app.training.predict_validation.predict_and_explain", side_effect=mock_prediction) as mock_predict
+        patch("app.training.image.predict_validation.AIImageDetector", return_value=mock_model) as mock_model_class,
+        patch("app.training.image.predict_validation.torch.load", return_value={"model_state_dict": MagicMock()}) as mock_load,
+        patch("app.training.image.predict_validation.predict_and_explain", side_effect=mock_prediction) as mock_predict
     ):
         predict_validation.main()
 
@@ -92,9 +92,9 @@ def test_main_continues_when_image_prediction_fails(tmp_path: Path):
     with (
         patch.object(predict_validation, "DATASET_DIRECTORY", dataset_directory),
         patch.object(predict_validation, "OUTPUT_DIRECTORY", output_directory),
-        patch("app.training.predict_validation.AIImageDetector",  return_value=mock_model),
-        patch("app.training.predict_validation.torch.load", return_value={"model_state_dict": MagicMock()}),
-        patch("app.training.predict_validation.predict_and_explain", side_effect=RuntimeError("Prediction failed"))
+        patch("app.training.image.predict_validation.AIImageDetector",  return_value=mock_model),
+        patch("app.training.image.predict_validation.torch.load", return_value={"model_state_dict": MagicMock()}),
+        patch("app.training.image.predict_validation.predict_and_explain", side_effect=RuntimeError("Prediction failed"))
     ):
         predict_validation.main()
 

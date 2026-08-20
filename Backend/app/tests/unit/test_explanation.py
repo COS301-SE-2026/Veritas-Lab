@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 from torch import nn
 
-from Backend.app.training.image.explanation import (
+from app.training.image.explanation import (
     GradCAM,
     analyse_metadata,
     calculate_attention_statistics,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock, patch
 
-from Backend.app.training.image.evaluate import parse_arguments, main
+from app.training.image.evaluate import parse_arguments, main
 
 def test_parse_arguments_returns_default_data_dir() -> None:
     with patch("sys.argv", ["evaluate.py"]):
@@ -76,10 +76,10 @@ def evaluate_mocks():
     mock_result = _make_mock_evaluation_result()
 
     with (
-        patch("app.training.evaluate.create_data_loaders") as mock_loaders,
-        patch("app.training.evaluate.AIImageDetector") as mock_model_class,
-        patch("app.training.evaluate.torch.load") as mock_torch_load,
-        patch("app.training.evaluate.evaluate_model") as mock_evaluate_model,
+        patch("app.training.image.evaluate.create_data_loaders") as mock_loaders,
+        patch("app.training.image.evaluate.AIImageDetector") as mock_model_class,
+        patch("app.training.image.evaluate.torch.load") as mock_torch_load,
+        patch("app.training.image.evaluate.evaluate_model") as mock_evaluate_model,
     ):
         mock_loaders.return_value = (mock_train, mock_val, mock_test)
         mock_model = MagicMock()

@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
-from Backend.app.training.image.predict import parse_arguments, main
+from app.training.image.predict import parse_arguments, main
 
 def test_parse_arguments_accepts_image_path() -> None:
     with patch("sys.argv", ["predict.py", "images/test.jpg"]):
@@ -80,9 +80,9 @@ def _make_mock_prediction_result() -> dict:
 def predict_mocks():
     mock_result = _make_mock_prediction_result()
     with (
-        patch("app.training.predict.AIImageDetector") as mock_model_class,
-        patch("app.training.predict.torch.load") as mock_torch_load,
-        patch("app.training.predict.predict_and_explain") as mock_predict,
+        patch("app.training.image.predict.AIImageDetector") as mock_model_class,
+        patch("app.training.image.predict.torch.load") as mock_torch_load,
+        patch("app.training.image.predict.predict_and_explain") as mock_predict,
     ):
         mock_model = MagicMock()
         mock_model.to.return_value = mock_model

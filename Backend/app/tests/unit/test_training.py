@@ -6,9 +6,9 @@ from PIL import Image
 from torch.utils.data import RandomSampler, SequentialSampler, DataLoader, TensorDataset
 from torchvision.datasets import ImageFolder
 from unittest.mock import MagicMock
-from Backend.app.training.image.training import train_one_epoch
+from app.training.image.training import train_one_epoch
 
-from Backend.app.training.image.data import (
+from app.training.image.data import (
     EXPECTED_CLASS_MAPPING,
     _validate_dataset,
     create_data_loaders,
