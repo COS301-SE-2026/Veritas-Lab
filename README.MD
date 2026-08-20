@@ -7,8 +7,7 @@
 [![Main CI](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml)
 [![Main CD](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CD.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CD.yml)
 [![Availability check](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml)
-![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritaslab.app%2F)
-
+![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritaslab.app)
 
 </div>
 
