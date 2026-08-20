@@ -21,7 +21,7 @@ export async function fetchCase(caseID: string): Promise<CaseResponse> {
             },
             body: JSON.stringify({ CaseID: caseID })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
         if (!res.ok) {
             const error = data as ApiError | null
             throw new Error(error?.detail?.message ||`Failed to fetch case with ID ${caseID}`);

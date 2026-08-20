@@ -10,7 +10,7 @@ export async function register(username: string, email: string, password: string
         body: JSON.stringify({ username, email, password })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
 
     if (!res.ok) {
         const error = data as ApiError | null

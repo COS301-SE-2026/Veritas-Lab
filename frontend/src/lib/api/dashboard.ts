@@ -11,7 +11,7 @@ export async function fetchCases(): Promise<DashboardCase[]> {
 			body: JSON.stringify({})
 		});
 		
-		const data = await res.json();
+		const data = await res.json().catch(() => null);
 		if (!res.ok) {
 			const error = data as ApiError | null
 			throw new Error(error?.detail?.message || 'Failed to fetch dashboard cases');
@@ -36,7 +36,7 @@ export async function createCase(title: string, description?: string): Promise<{
 			body: JSON.stringify({ title, description }),
 		});
 
-		const data = await res.json();
+		const data = await res.json().catch(() => null);
 		if (!res.ok) {
 			const error = data as ApiError | null
             throw new Error(error?.detail?.message ||  'Failed to create case');

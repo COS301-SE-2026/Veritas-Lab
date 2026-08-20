@@ -10,11 +10,11 @@ export async function login(email: string, password: string): Promise<LoginRespo
         body: JSON.stringify({ email, password })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
 
     if (!res.ok) {
         const error = data as ApiError | null
-        throw new Error(error?.detail?.message || 'Login failed');
+        throw new Error(error?.detail?.message || 'Unexpected error, login failed');
     }
 
     return data as LoginResponse;
