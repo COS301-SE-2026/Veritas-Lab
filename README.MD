@@ -4,10 +4,10 @@
 
 <div align="center">
 
-[![Main CI-CD](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main.yml)
-![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritsalab.vercel.app%2Flanding)
+[![Main CI-CD](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CD.yml)
+![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritaslab.app%2Flanding)
 [![Availability check](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml)
-[![Tests](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-Tests.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-Tests.yml)
+[![Tests](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-Tests.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml)
 
 </div>
 
