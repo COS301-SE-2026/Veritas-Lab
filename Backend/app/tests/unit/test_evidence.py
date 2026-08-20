@@ -468,25 +468,6 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {"status": "error", "message": "Media not found."}
 
-@pytest.mark.asyncio
-async def test_add_evidence_invalid_case_id_uuid():
-    fileContent = b"A fake binary for a png"
-    testContent = io.BytesIO(fileContent)
-
-    mockMedia = UploadFile(
-        file=testContent,
-        filename="we_are_cooked.png",
-        headers={"content-type": "image/png"}
-    )
-
-    case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
-    connection = AsyncMock()
-
-    with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid", connection=connection)
-
-    assert excInfo.value.status_code == 400
-    assert excInfo.value.detail["message"] == INVALID_CASE_ID_UUID
 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")

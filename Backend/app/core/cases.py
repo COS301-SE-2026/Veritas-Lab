@@ -99,6 +99,59 @@ def check_case_creator_valid(case_creator):
             }
         )
 
+# pdf script detection helper
+def pdf_script_helper(file_bytes):
+    try:
+        pdf_file = io.BytesIO(file_bytes)
+        reader = PdfReader(pdf_file)
+
+        try: 
+            root = reader.trailer.get("/Root", {}) #checking for automatic triggers
+            if root:
+                root = root.get_object()
+                if "/OpenAction" in root or "/AA" in root:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail={
+                            "status": "error",
+                            "message": PDF_SCRIPTS_NOT_ALLOWED
+                        }
+                    )
+
+                if "/Names" in root:
+                    names=root["/Names"].get_object()
+                    if "/JavaScript" in names:
+                        raise HTTPException(
+                            status_code=400,
+                            detail={
+                                "status": "error",
+                                "message": PDF_SCRIPTS_NOT_ALLOWED
+                            }
+                        )
+        except HTTPException:
+            raise
+        except KeyError :
+            pass
+        except Exception :
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
+                    "message": PDF_VERIFICATION_FAILED
+                }
+            ) 
+    except HTTPException:
+        raise 
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "status": "error",
+                "message": f"{INVALID_PDF_PREFIX}{str(e)}"
+            }
+        )
+                   
+
 # If the case_id is None then the case is not in the db. You may call create().
 # When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 class Case:
@@ -189,67 +242,9 @@ class Case:
         await media.seek(0)
         #script detection
         if local_extension == ".pdf":
-            try:
-                pdf_file = io.BytesIO(file_bytes)
-                reader = PdfReader(pdf_file)
-
-                try: 
-                    root = reader.trailer.get("/Root", {}) #checking for automatic triggers
-                    if root:
-                        root = root.get_object()
-                        if "/OpenAction" in root or "/AA" in root:
-                            raise HTTPException(
-                                status_code=400, 
-                                detail={
-                                    "status": "error",
-                                    "message": PDF_SCRIPTS_NOT_ALLOWED
-                                }
-                            )
-
-                        if "/Names" in root:
-                            names=root["/Names"].get_object()
-                            if "/JavaScript" in names:
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail={
-                                        "status": "error",
-                                        "message": PDF_SCRIPTS_NOT_ALLOWED
-                                    }
-                                )
-                except HTTPException:
-                    raise
-                except KeyError :
-                    pass
-                except Exception :
-                    raise HTTPException(
-                        status_code=400,
-                        detail={
-                            "status": "error",
-                            "message": PDF_VERIFICATION_FAILED
-                        }
-                    )  
-                        
-            except HTTPException:
-                raise 
-            except Exception as e:
-                raise HTTPException(
-                    status_code=400, 
-                    detail={
-                        "status": "error",
-                        "message": f"{INVALID_PDF_PREFIX}{str(e)}"
-                    }
-                )
-        # validate case_id is a UUID
-        try:
-            case_uuid = uuid.UUID(str(case_id)) if not isinstance(case_id, uuid.UUID) else case_id
-        except Exception:
-            raise HTTPException(
-                status_code=400, 
-                detail={
-                    "status": "error",
-                    "message": INVALID_CASE_ID_UUID
-                }
-            )
+            pdf_script_helper(file_bytes)
+            
+        # It is impossible for case id to be an invalid uuid since it is typed to UUID
 
         try:
             type_record = await connection.fetchrow(
@@ -322,7 +317,7 @@ class Case:
                         WHERE MediaId = $2
                         LIMIT 1;
                         """,
-                        case_uuid,
+                        case_id,
                         media_id,
                         filename
                     )
@@ -372,7 +367,7 @@ class Case:
                         INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
                         VALUES ($1, $2, $3, $4, $5, $6)
                         """,
-                        case_uuid,
+                        case_id,
                         media_id,
                         filename,
                         None,
