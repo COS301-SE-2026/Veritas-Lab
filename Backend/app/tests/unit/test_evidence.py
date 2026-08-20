@@ -18,9 +18,20 @@ from app.core.cases import (
 )
 import app.api.routers.cases_router as cases_router
 from starlette.datastructures import UploadFile
+from app.core.database import get_connection as database_get_connection
+from app.tests.unit.database_override import unit_get_connection
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[database_get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(database_get_connection, None)
 
 
 @pytest.mark.asyncio
@@ -67,7 +78,7 @@ async def test_images_upload_success(mockUuid, mockget_object, mockDbConnect):
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
-    result = await case.add_evidence(media=mockMedia, case_id=test_case_id)
+    result = await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
 
     # Verify the result
     assert result is not None
@@ -97,12 +108,11 @@ async def test_invalid_file_type(mockDbConnect):
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail["message"] == f"{UNSUPPORTED_EXTENSION_PREFIX}.food"
 
-    mockDbConnection.close.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -163,9 +173,9 @@ async def test_same_image_different_name(mockUuid, mockget_object, mockDbConnect
     test_case_id_1 = uuid.uuid4()
     test_case_id_2 = uuid.uuid4()
 
-    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id_1)
+    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id_1, connection=mockDbConnection)
     
-    result2 = await case.add_evidence(media=mockMedia2, case_id=test_case_id_2)
+    result2 = await case.add_evidence(media=mockMedia2, case_id=test_case_id_2, connection=mockDbConnection)
 
     assert result1 is not None
     assert "url" in result1
@@ -246,13 +256,13 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
-    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id)
+    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id, connection=mockDbConnection)
     assert result1 is not None
     assert result1.get("Status") == "uploaded"
     
     # Second upload should raise HTTPException with 409 Conflict
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia2, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia2, case_id=test_case_id, connection=mockDbConnection)
     
     assert excInfo.value.status_code == 409
     assert excInfo.value.detail["message"] == MEDIA_ALREADY_ON_CASE
@@ -281,7 +291,7 @@ An investigator deletes a duplicate. Only the report is deleted.
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
-    result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
+    result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user, connection=mockDbConnection)
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
@@ -319,7 +329,7 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
 
-    result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
+    result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user, connection=mockDbConnection)
 
     mock_asyncio.to_thread.assert_awaited_once_with(
         mock_s3_client.delete_object,
@@ -349,7 +359,7 @@ An admin deletes a duplicate. Therefore only the report is deleted
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.delete_evidence(media_id=test_media_id)
+    result = await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
 
     mockDbConnection.execute.assert_called_once()
     mock_s3_client.remove_object.assert_not_called()
@@ -384,7 +394,7 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.delete_evidence(media_id=test_media_id)
+    result = await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
 
     mock_asyncio.to_thread.assert_awaited_once_with(
         mock_s3_client.delete_object,
@@ -403,9 +413,10 @@ async def test_delete_evidence_missing_case_id_400():
 
     test_media_id = uuid.uuid4()
     test_user = "Investigator_Bob"
+    mockDbConnection = AsyncMock()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
+        await case.delete_evidence(media_id=test_media_id, jwt_username=test_user, connection=mockDbConnection)
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail == {
@@ -430,7 +441,7 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
     test_user = "Hacker_Eve"
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id, jwt_username=test_user)
+        await case.delete_evidence(media_id=test_media_id, jwt_username=test_user, connection=mockDbConnection)
 
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail["message"] == "Unauthorized to delete this evidence or record not found."
@@ -452,7 +463,7 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     test_media_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id)
+        await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {"status": "error", "message": "Media not found."}
@@ -469,9 +480,10 @@ async def test_add_evidence_invalid_case_id_uuid():
     )
 
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
+    connection = AsyncMock()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid")
+        await case.add_evidence(media=mockMedia, case_id="not-a-valid-uuid", connection=connection)
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail["message"] == INVALID_CASE_ID_UUID
@@ -497,9 +509,10 @@ async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
 
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
+    connection = AsyncMock()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=connection)
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail["message"] == PDF_SCRIPTS_NOT_ALLOWED
@@ -528,9 +541,10 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
 
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
+    connection = AsyncMock()
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=connection)
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail["message"] == PDF_SCRIPTS_NOT_ALLOWED
@@ -581,7 +595,7 @@ async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClas
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
 
-    result = await case.add_evidence(media=mockMedia, case_id=test_case_id)
+    result = await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
 
     assert result is not None 
     assert result["url"] == "https://fake-presigned-url"
@@ -734,7 +748,7 @@ async def test_add_evidence_storage_failure_returns_500(mockDbConnect, mockget_o
     test_case_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id)
+        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail["message"] == INTERNAL_SERVER_ERROR_STORAGE
