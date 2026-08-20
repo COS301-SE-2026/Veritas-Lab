@@ -1,3 +1,5 @@
+import type { ApiError } from '@/types/api';
+
 import type { CaseResponse } from '@/types/api';
 function normalizeComment(comment: Record<string, unknown>) {
     return {
@@ -19,10 +21,11 @@ export async function fetchCase(caseID: string): Promise<CaseResponse> {
             },
             body: JSON.stringify({ CaseID: caseID })
         });
-        if (!res.ok) {
-            throw new Error(`Failed to fetch case with ID ${caseID}`);
-        }
         const data = await res.json();
+        if (!res.ok) {
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message ||`Failed to fetch case with ID ${caseID}`);
+        }
         return {
             ...data,
             comments: Array.isArray(data.comments) ? data.comments.map(normalizeComment) : [],
@@ -47,11 +50,12 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
             },
             body: formData
         });
+        const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error('Failed to upload evidence');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to upload evidence');
         }
-
-        return await res.json().catch(() => null);
+        return data;
     } catch (error) {
         console.error('Error uploading evidence:', error);
         throw error;
@@ -70,7 +74,8 @@ export async function addComment(caseId: string, comment: string) {
 
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to add comment');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to add comment');
         }
         return normalizeComment(data.comment ?? {});
     }
@@ -93,7 +98,8 @@ export async function closeCase(caseId: string): Promise<{ status: string; messa
 
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to close case');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to close case');
         }
         return data;
     }
@@ -111,7 +117,8 @@ export async function deleteEvidence(caseId: string, mediaId: string): Promise<{
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to delete evidence');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to delete evidence');
         }
         return data;
     }
@@ -135,7 +142,8 @@ export async function updateCase(caseId: string, updates: { caseName?: string; c
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to update case');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to update case');
         }
         return data;
     } catch (error) {
@@ -154,7 +162,8 @@ export async function editComment(caseId: string, commentId: number, comment: st
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to edit comment');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to edit comment');
         }
         return data;
     } catch (error) {
@@ -171,7 +180,8 @@ export async function deleteComment(commentId: number): Promise<{ status: string
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to delete comment');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to delete comment');
         }
         return data;
     } catch (error) {

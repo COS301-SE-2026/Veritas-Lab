@@ -1,5 +1,5 @@
 import type { DashboardCase } from '@/types/api';
-
+import type { ApiError } from '@/types/api';
 export async function fetchCases(): Promise<DashboardCase[]> {
 	try {
 		const res = await fetch(`/api/getCases`, {
@@ -10,12 +10,13 @@ export async function fetchCases(): Promise<DashboardCase[]> {
 			},
 			body: JSON.stringify({})
 		});
-
+		
+		const data = await res.json();
 		if (!res.ok) {
-			throw new Error('Failed to fetch dashboard cases');
+			const error = data as ApiError | null
+			throw new Error(error?.detail?.message || 'Failed to fetch dashboard cases');
 		}
 
-		const data = await res.json();
 		const serverCases = Array.isArray(data) ? data : data.cases ?? [];
 		return serverCases as DashboardCase[];
 	} catch (error) {
@@ -35,12 +36,12 @@ export async function createCase(title: string, description?: string): Promise<{
 			body: JSON.stringify({ title, description }),
 		});
 
+		const data = await res.json();
 		if (!res.ok) {
-			const err = await res.json().catch(() => null);
-			throw new Error(err?.message || 'Failed to create case');
+			const error = data as ApiError | null
+            throw new Error(error?.detail?.message ||  'Failed to create case');
 		}
 
-		const data = await res.json();
 		return { CaseId: data.CaseId };
 	} catch (error) {
 		console.error('Error creating case:', error);
@@ -58,7 +59,8 @@ export async function deleteCase(caseId: string): Promise<{ status: string; mess
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-            throw new Error(data?.message ?? 'Failed to delete case');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to delete case');
         }
         return data;
     } catch (error) {

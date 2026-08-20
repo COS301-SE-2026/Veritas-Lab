@@ -1,4 +1,5 @@
 import type { SaveAnnotationsPayload } from '@/types/workbench';
+import type { ApiError } from '@/types/api';
 
 export async function saveAnnotations({ evidenceId, annotations }: SaveAnnotationsPayload): Promise<void> {
     try {
@@ -12,9 +13,10 @@ export async function saveAnnotations({ evidenceId, annotations }: SaveAnnotatio
             body: JSON.stringify({ reportId, annotations }),
         });
 
+        const data = await res.json().catch(() => null)
         if (!res.ok) {
-            const data = (await res.json().catch(() => null))
-            throw new Error(data?.message || 'Failed to save annotations');
+            const error = data as ApiError | null
+            throw new Error(error?.detail?.message || 'Failed to save annotations');
         }
     } catch (error) {
         console.error('Error saving annotations:', error);

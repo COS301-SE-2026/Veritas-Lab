@@ -1,5 +1,5 @@
 import type { LoginResponse } from '@/types/api';
-
+import type { ApiError } from '@/types/api';
 export async function login(email: string, password: string): Promise<LoginResponse> {
     const res = await fetch(`/api/login`, {
         method: 'POST',
@@ -10,11 +10,12 @@ export async function login(email: string, password: string): Promise<LoginRespo
         body: JSON.stringify({ email, password })
     });
 
-    const data: LoginResponse = await res.json();
+    const data = await res.json();
 
     if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
+        const error = data as ApiError | null
+        throw new Error(error?.detail?.message || 'Login failed');
     }
 
-    return data;
+    return data as LoginResponse;
 }

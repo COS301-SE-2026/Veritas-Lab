@@ -1,15 +1,9 @@
 import type { AdminUser } from '@/types/api';
+import type { ApiError } from '@/types/api';
 type ApiResult = {
     status?: 'success' | 'error';
     message?: string;
 };
-
-type ApiError = {
-    detail: {
-        status?: 'error';
-        message?: string;
-    }
-}
 
 //get users list for cards.
 export async function fetchUsers(): Promise<AdminUser[]> {
