@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Button from '@/components/ui/button';
 import useCase from '@/lib/hooks/useCase';
 import type { CaseCloseButtonProps } from '@/types/components';
+import Label from '../ui/label';
 
 export default function CaseCloseButton({ caseId, onClosed, className = '' }: CaseCloseButtonProps) {
     const { closeCase } = useCase();
@@ -31,7 +32,7 @@ export default function CaseCloseButton({ caseId, onClosed, className = '' }: Ca
                 className="w-full py-3"
                 text={isClosing ? 'Closing' : 'Close Case'}
             />
-            {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+            {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
         </div>
     );
 }

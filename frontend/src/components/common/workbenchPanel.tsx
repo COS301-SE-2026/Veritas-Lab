@@ -5,6 +5,7 @@ import SliderBar from '@/components/ui/sliderBar';
 import Button from '@/components/ui/button';
 import AnnotationList from '@/components/common/annotationList';
 import type { AnnotationTool, WorkbenchPanelProps } from '@/types/workbench';
+import Label from '@/components/ui/label';
 
 const ANNOTATION_TOOLS: readonly AnnotationTool[] = ['Select', 'Draw', 'Comment'];
 
@@ -21,6 +22,7 @@ export default function WorkbenchPanel({
     onSave,
 }: Readonly<WorkbenchPanelProps>) {
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [error, setError] = useState<string | null>(null);
 
     const isAnnotationsActive = activeWorkbenchTool === 'Annotations';
     const isCompareActive = activeWorkbenchTool === 'Compare';
@@ -30,7 +32,8 @@ export default function WorkbenchPanel({
         try {
             await onSave();
             setSaveStatus('saved');
-        } catch {
+        } catch(error) {
+            setError(error instanceof Error ? error.message : 'Failed to save annotations');
             setSaveStatus('error');
         }
     };
@@ -109,10 +112,10 @@ export default function WorkbenchPanel({
                     </div>
 
                     {saveStatus === 'saved' ? (
-                        <p className="text-xs text-(--color-secondary)">Annotations saved.</p>
+                        <Label text="Annotations saved successfully!" htmlFor="success" variant="success" />
                     ) : null}
                     {saveStatus === 'error' ? (
-                        <p className="text-xs text-(--color-error)">Couldn’t save. Try again.</p>
+                        <Label text={error} htmlFor="error" variant="error" />
                     ) : null}
                 </div>
             ) : null}

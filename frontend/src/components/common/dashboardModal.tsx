@@ -10,6 +10,7 @@ export default function DashboardModal({ isOpen, onClose, onCreated }: Dashboard
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,7 +21,7 @@ export default function DashboardModal({ isOpen, onClose, onCreated }: Dashboard
             setDescription('');
             onCreated?.();
         } catch (err) {
-            console.error('Failed to create case:', err);
+            setError(err instanceof Error ? err.message : 'Failed to create case');
         } finally {
             setIsSubmitting(false);
         }
@@ -34,6 +35,7 @@ export default function DashboardModal({ isOpen, onClose, onCreated }: Dashboard
                 <Input id="caseTitle" type="text" value={title} onChange={(value) => setTitle(value)} placeholder="Enter case title" className="border border-gray-300 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-(--color-light) mb-4 w-full text-[16px] text-(--color-text)" required />
                 <Label text="Case Description" htmlFor="caseDescription" className="mb-2 text-[16px] text-(--color-text)" />
                 <Input id="caseDescription" type="text" value={description} onChange={(value) => setDescription(value)} placeholder="Enter case description" className="border border-(--color-light) rounded-lg py-10 px-4 focus:outline-none focus:ring-2 focus:ring-(--color-light) mb-4 w-full text-[16px] text-(--color-text)" required />
+                {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                 <div className="flex justify-end">
                     <Button variant="sadSack" onClick={onClose} className="mr-2" disabled={isSubmitting}>
                         <div className="text-[16px] font-bold">Cancel</div>

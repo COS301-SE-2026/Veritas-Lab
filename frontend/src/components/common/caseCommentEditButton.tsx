@@ -1,10 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { CircleX, Pencil } from 'lucide-react';
 import Modal from '@/components/ui/modal';
 import Button from '@/components/ui/button';
 import useCase from '@/lib/hooks/useCase';
 import type { CommentEditButtonProps } from '@/types/components';
+import Label from '../ui/label';
 //a button that will open a modal where we can change the content of the comment or delete the comment!
 export default function CommentEditButton({ caseId, commentId, initialComment, onUpdated, onDeleted }: Readonly<CommentEditButtonProps>) {
     const { editComment, deleteComment } = useCase();
@@ -80,7 +81,7 @@ export default function CommentEditButton({ caseId, commentId, initialComment, o
                                 rows={3}
                                 className="mt-3 w-full resize-none rounded-2xl border border-[var(--color-light)]/30 bg-[var(--color-background)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary)]"
                             />
-                            {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+                            {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                             <div className="mt-4 flex items-center justify-between gap-3">
                                 <Button
                                     variant="sadSack"
@@ -106,7 +107,7 @@ export default function CommentEditButton({ caseId, commentId, initialComment, o
                             <p className="mt-2 text-sm text-(--color-light)">
                                 This will permanently remove this comment. This action cannot be undone.
                             </p>
-                            {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+                            {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                             <div className="mt-6 flex justify-end gap-3">
                                 <Button variant="sadSack" text="Back" onClick={() => setMode('edit')} disabled={isDeleting} />
                                 <Button

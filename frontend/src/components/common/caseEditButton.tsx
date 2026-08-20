@@ -65,7 +65,7 @@ export default function CaseEditButton({ caseId, initialName, initialDescription
                         className="border border-(--color-light) rounded-lg py-10 px-4 focus:outline-none focus:ring-2 focus:ring-(--color-light) mb-4 w-full text-[16px] text-(--color-text)"
                         required
                     />
-                    {error ? <p className="mb-4 text-sm text-red-500">{error}</p> : null}
+                    {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                     <div className="flex justify-end">
                         <Button variant="sadSack" onClick={closeModal} className="mr-2" disabled={isSaving}>
                             <div className="text-[16px] font-bold">Cancel</div>
