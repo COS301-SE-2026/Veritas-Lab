@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.training.train import parse_arguments, main
+from Backend.app.training.image.train import parse_arguments, main
 
 def test_parse_arguments_returns_default_data_dir() -> None:
     with patch("sys.argv", ["train.py"]):

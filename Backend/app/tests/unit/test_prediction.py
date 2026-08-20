@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 from PIL import Image
-import app.training.prediction as prediction
+import Backend.app.training.image.prediction as prediction
 
 class DummyModel:
     def __init__(self) -> None:

@@ -2,8 +2,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import torch
-from app.training.model import AIImageDetector
-from app.training.prediction import predict_and_explain
+from Backend.app.training.image.model import AIImageDetector
+from Backend.app.training.image.prediction import predict_and_explain
 
 DATASET_DIRECTORY =Path("../dataset/validation")
 MODEL_PATH = Path("app/ai/best_model.pth")

@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
-from app.training.predict import parse_arguments, main
+from Backend.app.training.image.predict import parse_arguments, main
 
 def test_parse_arguments_accepts_image_path() -> None:
     with patch("sys.argv", ["predict.py", "images/test.jpg"]):

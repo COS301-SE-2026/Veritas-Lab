@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from PIL import Image
-import app.training.predict_validation as predict_validation
+import Backend.app.training.image.predict_validation as predict_validation
 
 def create_test_image(path: Path) -> None:
     Image.new(
