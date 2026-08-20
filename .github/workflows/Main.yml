@@ -20,6 +20,8 @@ jobs:
         needs: tests
         runs-on: ubuntu-latest
         timeout-minutes: 15
+        environment:
+            name: Prod
         steps:
             - uses: actions/checkout@v7
             - uses: docker/login-action@v4
@@ -37,7 +39,7 @@ jobs:
                     context: ./frontend
                     push: true
                     tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
-            - uses: azure/login@v2
+            - uses: azure/login@v3
               with:
                     client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
                     tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
