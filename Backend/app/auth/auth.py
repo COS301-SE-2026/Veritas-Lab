@@ -17,6 +17,7 @@ COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
+DATABASE_ERROR="Database error"
 EXPIRED_TOKEN = "Token has expired"
 
 INVALID_TOKEN_401 = {
@@ -227,7 +228,7 @@ async def search_users_via_email(email: str, connection: asyncpg.Connection):
         "role": row["userrole"],
         "password": row["userpassword"]
     }
-    
+
 async def search_users_via_username(username: str, connection: asyncpg.Connection):
     row = await connection.fetchrow(
             """
@@ -648,7 +649,21 @@ async def register(
                     }
                 }
             }
+        },
+        500: {
+            "description": "There was an internal server error - Database",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR
+                        }
+                    }
+                }
+            }
         }
+
     }
 
 )
@@ -696,7 +711,7 @@ async def fetch_users(
             status_code=500,
             detail={
                 "status": "error",
-                "message": "Database error"
+                "message": DATABASE_ERROR
             }
         )
 
@@ -849,13 +864,13 @@ async def fetch_users(
         },
 
         500: {
-            "description": "Database error",
+            "description": DATABASE_ERROR,
             "content": {
                 "application/json": {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "Database error"
+                            "message": DATABASE_ERROR
                         }
                     }
                 }
@@ -948,7 +963,7 @@ async def change_user_role(
             status_code=500,
             detail={
                 "status":"error",
-                "message":"Database error"
+                "message":DATABASE_ERROR
             }
         )
 
@@ -1073,13 +1088,13 @@ async def change_user_role(
         },
 
         500 : {
-            "description": "Database error",
+            "description": DATABASE_ERROR,
             "content": {
                 "application/json": {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "Database error"
+                            "message": DATABASE_ERROR
                         }
                     }
                 }
@@ -1135,7 +1150,7 @@ async def delete_user(
             status_code=500,
             detail={
                 "status":"error",
-                "message":"Database error"
+                "message":DATABASE_ERROR
             }
         )
         
