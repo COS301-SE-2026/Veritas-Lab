@@ -1,8 +1,9 @@
 #Test can be called from here instead of duplicating it in both CI/CD files
-name: Tests
+name: Main CI
 
 on:
-    workflow_call:
+    pull_request:
+        branches: ["main"]
     workflow_dispatch: 
 
 permissions: 
