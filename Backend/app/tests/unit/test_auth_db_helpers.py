@@ -42,7 +42,7 @@ async def test_search_users_via_email_found(monkeypatch):
     }
     connection = mock_connection(monkeypatch, fetchrowResult=row)
 
-    result = await search_users_via_email("oh_nana@example.com")\
+    result = await search_users_via_email("oh_nana@example.com", connection)
 
     assert result == {
         "id": row["userid"],
@@ -51,4 +51,4 @@ async def test_search_users_via_email_found(monkeypatch):
         "role": row["userrole"],
         "password": row["userpassword"]
     }
-    connection.close.assert_awaited_once()
+    connection.fetchrow.assert_awaited_once()

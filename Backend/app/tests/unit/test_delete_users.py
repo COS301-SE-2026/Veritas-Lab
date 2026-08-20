@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 
 #module that contains router, verufyJWT, deeleUserById
 import app.auth.auth as auth
+from app.core.database import get_connection as database_get_connection
+from app.tests.unit.database_override import unit_get_connection
 
 #Create a calid uuid for testing as the target to delete
 TARGET_USER_ID = "11111111-1111-1111-1111-111111111111"
@@ -14,6 +16,7 @@ def client():
     """Builds a test client for the FastAPI app."""
     app = FastAPI()
     app.include_router(auth.router)
+    app.dependency_overrides[database_get_connection] = unit_get_connection
     return TestClient(app)
 
 def admin_payload():
@@ -27,7 +30,7 @@ async def test_admin_deletes_user_successfully(client, monkeypatch):
         lambda request: admin_payload()
     )
 
-    async def fake_delete(user_id):
+    async def fake_delete(user_id, connection):
         return True #row found and deleted
 
     monkeypatch.setattr(
@@ -128,7 +131,7 @@ async def test_nonexistent_user_delete_404(client, monkeypatch):
         lambda request: admin_payload()
     )
 
-    async def fake_delete(user_id):
+    async def fake_delete(user_id, connection):
         return False # found no one 
 
     monkeypatch.setattr(

@@ -1,16 +1,28 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.api.main import app
 import app.auth.auth as auth
 from app.auth.auth import hash_password
+from app.core.database import get_connection as database_get_connection
+from app.tests.unit.database_override import unit_get_connection
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[database_get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(database_get_connection, None)
 
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 
 def test_successful_login(monkeypatch):
     client.cookies.clear()
     
-    async def mock_search_users_via_email(email):
+    async def mock_search_users_via_email(email, connection):
         hashed_password= hash_password("StrongP@ssword12334567")
         return {
             "id": "mock-user-id",
@@ -23,7 +35,7 @@ def test_successful_login(monkeypatch):
     def mock_create_token(user):
         return "mockedJWTToken"
     
-    async def mock_update_user_jwt_issued(email):
+    async def mock_update_user_jwt_issued(email, connection):
         return None
     
     monkeypatch.setattr(
@@ -62,7 +74,7 @@ def test_successful_login(monkeypatch):
 
 def test_login_incorrect_password(monkeypatch):
     client.cookies.clear()
-    async def mock_search_users_via_email(email):
+    async def mock_search_users_via_email(email, connection):
         hashed_password= hash_password("CorrectP@ssword1234567")
         return {
             "id": "mock-user-id",
@@ -98,7 +110,7 @@ def test_login_incorrect_password(monkeypatch):
 
 def test_login_user_does_not_exist(monkeypatch):
     client.cookies.clear()
-    async def mock_search_users_via_email(email):
+    async def mock_search_users_via_email(email, connection):
         return None
 
     monkeypatch.setattr(
