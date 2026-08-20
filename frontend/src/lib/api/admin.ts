@@ -4,6 +4,13 @@ type ApiResult = {
     message?: string;
 };
 
+type ApiError = {
+    detail: {
+        status?: 'error';
+        message?: string;
+    }
+}
+
 //get users list for cards.
 export async function fetchUsers(): Promise<AdminUser[]> {
     const response = await fetch(`/api/fetchUsers`, {
@@ -14,15 +21,18 @@ export async function fetchUsers(): Promise<AdminUser[]> {
         },
         body: JSON.stringify({}),
     });
+
     const data = (await response.json().catch(() => null)) as ApiResult & { users?: AdminUser[] } | AdminUser[] | null;
-    if (!response.ok) {
-        throw new Error((data && 'message' in data && data.message) || 'Failed to fetch users');
+    if(!response.ok) {
+        const error = data as ApiError | null
+        throw new Error(error?.detail.message || 'Failed to fetch users')
     }
     if (Array.isArray(data)) {
         return data;
     }
     return data?.users ?? [];
 }
+
 //change role
 export async function changeUserRole(userId: string, newRole: AdminUser['role']): Promise<void> {
     const response = await fetch(`/api/changeUserRole`, {
@@ -33,9 +43,9 @@ export async function changeUserRole(userId: string, newRole: AdminUser['role'])
         },
         body: JSON.stringify({ userId, NewRole: newRole }),
     });
-    if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as ApiResult | null;
-        throw new Error(data?.message || 'Failed to update user role');
+    if(!response.ok) {
+        const error = (await response.json().catch(() => null)) as ApiError | null
+        throw new Error(error?.detail.message || 'Failed to update user role')
     }
 }
 //del user
@@ -48,7 +58,7 @@ export async function deleteUser(userId: string): Promise<void> {
         },
     });
     if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as ApiResult | null;
-        throw new Error(data?.message || 'Failed to delete user');
+        const error = (await response.json().catch(() => null)) as ApiError | null;
+        throw new Error(error?.detail.message || 'Failed to delete user');
     }
 }
