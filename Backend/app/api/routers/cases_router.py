@@ -263,7 +263,11 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         }
     }
 )
-async def create_case(case_request: CreateCaseRequest, request: Request):
+async def create_case(
+    case_request: CreateCaseRequest,
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
     payload = verify_jwt(request)
     verify_not_user(payload.get("role"))
 
@@ -282,7 +286,7 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
             }
         )
 
-    case_id = await case.create()
+    case_id = await case.create(connection)
 
     return {
         "status": "success",
@@ -562,7 +566,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
         return jsonable_encoder({
             "status": "success",
             "case": case.to_json(),
-            "comments": await case.get_comments(),
+            "comments": await case.get_comments(connection),
             "evidence": [
                 _format_case_evidence(evidence_row, not is_standard_user)
                 for evidence_row in evidence_rows
@@ -747,7 +751,7 @@ async def upload_evidence(
 
         case = _row_to_case(row)
 
-        result = await case.add_evidence(media, validated_case_id)
+        result = await case.add_evidence(media, validated_case_id, connection)
 
         # start the media pipeline
         extension = Path(result["Filename"]).suffix.lower()
@@ -1417,7 +1421,8 @@ async def delete_comment(
 )
 async def retreive_comments(
     case_id: str,
-    request: Request
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
 ):
 
     payload = verify_jwt(request)
@@ -1426,7 +1431,7 @@ async def retreive_comments(
 
     try:
         case = Case(case_id=case_id)
-        comments_data= await case.get_comments()
+        comments_data= await case.get_comments(connection)
 
         return JSONResponse(
             status_code=200,
@@ -1571,7 +1576,8 @@ async def retreive_comments(
 async def delete_evidence(
     case_id:str, 
     media_id:str,
-    request: Request
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
 ):
     payload = verify_jwt(request)
     #Can raise the 401 errors
@@ -1590,7 +1596,11 @@ async def delete_evidence(
         case = Case(case_id=case_id)
         #raises 400 for bad case id format
         username=payload.get("username") if user_role == "INVESTIGATOR" else None
-        response=await case.delete_evidence(media_id=media_id, jwt_username=username)
+        response=await case.delete_evidence(
+            media_id=media_id,
+            connection=connection,
+            jwt_username=username
+        )
         #
         
         return response
@@ -1864,7 +1874,11 @@ async def create_comment(
         }
     }
 )
-async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
+async def delete_case(
+    case_request: CreateSingleCaseRequest,
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
 
     payload = verify_jwt(request)
     
@@ -1885,7 +1899,8 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
     try:
         await delete_case.delete_case(
             username=payload.get("username"),
-            role=payload.get("role")
+            role=payload.get("role"),
+            connection=connection
         )
 
         
