@@ -271,20 +271,12 @@ async def create_case(
     payload = verify_jwt(request)
     verify_not_user(payload.get("role"))
 
-    try:
-        case = Case(
-            case_name=case_request.title, 
-            case_creator=payload.get("username"), 
-            case_description=case_request.description
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "status": "error",
-                "message": str(e)
-            }
-        )
+
+    case = Case(
+        case_name=case_request.title, 
+        case_creator=payload.get("username"), 
+        case_description=case_request.description
+    )
 
     case_id = await case.create(connection)
 

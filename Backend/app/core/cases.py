@@ -78,6 +78,27 @@ def get_object(for_presign: bool = False) -> S3Client:
             ),
         )
 
+
+#helper to lessen the complexity of the constructor for the case class.
+def check_case_creator_valid(case_creator):
+    if not case_creator.strip():
+        raise HTTPException(
+            status_code=400,
+                detail={
+                    "status": "error",
+                    "message": "CaseCreator is required"
+                }
+            )
+
+    if  len(case_creator) > 100:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message":"Name is too long. Must be 100 characters or less"
+            }
+        )
+
 # If the case_id is None then the case is not in the db. You may call create().
 # When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
 class Case:
@@ -89,15 +110,24 @@ class Case:
         case_id: str=None
     ):
         if  (case_creator is not None):
-            if not case_creator.strip():
-                raise ValueError("CaseCreator is required")
-            if  len(case_creator) > 100:
-                raise ValueError("Name is too long. Must be 100 characters or less")
+            check_case_creator_valid(case_creator)
         if  (case_name is not None):
             if not case_name.strip():
-                raise ValueError("CaseName is required")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message":"CaseName is required"
+                    }
+                )
             if len(case_name) > 255:
-                raise ValueError("CaseName must be 255 characters or less")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message":"CaseName must be 255 characters or less"
+                    }
+                )
         
         self.case_creator = None if case_creator is None else case_creator.strip()
         self.case_name = None if case_name is None else case_name.strip()
@@ -198,7 +228,7 @@ class Case:
                             "message": PDF_VERIFICATION_FAILED
                         }
                     )  
-                     
+                        
             except HTTPException:
                 raise 
             except Exception as e:

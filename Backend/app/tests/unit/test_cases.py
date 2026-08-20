@@ -55,8 +55,14 @@ def test_case_creation_Does_Not_Require_CaseName():
 
 @pytest.mark.asyncio
 async def test_case_creation_Rejects_Blank_Creator():
-    with pytest.raises(ValueError, match="CaseCreator is required"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_creator="   ", case_name="Test Case")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "CaseCreator is required"
+    }
 
 @pytest.mark.asyncio
 async def test_Cas_creation_Rejects_Invalid_UUID():
@@ -70,13 +76,25 @@ async def test_Cas_creation_Rejects_Invalid_UUID():
     }
 
 def test_CaseCreationRejectsBlankCaseName():
-    with pytest.raises(ValueError, match="CaseName is required"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_creator="alice_dev", case_name="   ")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "CaseName is required"
+    }
 
 def test_name_is_too_long():
     client.cookies.clear()
-    with pytest.raises(ValueError, match="Name is too long"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_name="Test Case", case_creator="A" * 101)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "Name is too long. Must be 100 characters or less"
+    }
 
 def test_name_at_100_characters():
     client.cookies.clear()
@@ -115,8 +133,14 @@ def test_case_name_at_256_characters():
     client.cookies.clear()
     case_name_256 = "A" * 256
     
-    with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_creator="alice_dev", case_name=case_name_256)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "CaseName must be 255 characters or less"
+    }
 
 def test_case_stores_description():
     client.cookies.clear()
