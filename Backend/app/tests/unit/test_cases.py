@@ -228,14 +228,14 @@ async def test_create_case_with_mock():
     mock_connection.fetchrow.assert_called_once()
 
 @pytest.mark.asyncio
-@patch("asyncpg.connect")
-async def test_create_case_cannot_be_called_twice(mock_connect):
+async def test_create_case_cannot_be_called_twice():
     client.cookies.clear()
     case = Case(case_creator="alice_dev", case_name="Test Case")
     case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    connection = AsyncMock()
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.create(AsyncMock())
+        await case.create(connection)
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == {
