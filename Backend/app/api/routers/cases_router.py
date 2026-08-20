@@ -26,7 +26,8 @@ import boto3
 from botocore.client import Config
 from mypy_boto3_s3 import S3Client
 from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_Settings
-from app.core.cases import get_object, get_connection
+from app.core.cases import get_object
+from app.core.database import get_connection
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -372,15 +373,11 @@ async def create_case(case_request: CreateCaseRequest, request: Request):
         }
     }
 )
-async def get_cases(request: Request):
+async def get_cases(request: Request, connection: asyncpg.Connection = Depends(get_connection)):
   
     payload = verify_jwt(request)
 
-    connection = None
-
     try:
-        connection = await get_connection()
-
         is_standard_user = payload.get("role") == "USER"
 
         rows = await connection.fetch(
@@ -407,9 +404,6 @@ async def get_cases(request: Request):
             }
         )
 
-    finally:
-        if connection is not None:
-            await connection.close()
     
 @router.post(
     "/getSingleCase",
@@ -501,7 +495,7 @@ async def get_cases(request: Request):
         }
     }
 )
-async def get_single_case(case_request: CreateSingleCaseRequest, request: Request):
+async def get_single_case(case_request: CreateSingleCaseRequest, request: Request, connection: asyncpg.Connection = Depends(get_connection)):
     payload = verify_jwt(request)
 
     if not case_request.CaseID:
@@ -515,11 +509,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
 
     case_id = Case(case_id=case_request.CaseID).case_id
 
-    connection = None
-
     try:
-        connection = await get_connection()
-
         is_standard_user = payload.get("role") == "USER"
 
         row = await connection.fetchrow(
@@ -588,10 +578,7 @@ async def get_single_case(case_request: CreateSingleCaseRequest, request: Reques
             }
         )
 
-    finally:
-        if connection is not None:
-            await connection.close()
-
+ 
 
 @router.post(
     "/cases/evidence",
@@ -724,7 +711,8 @@ async def upload_evidence(
     request: Request,
     background_task: BackgroundTasks,
     case_id: Annotated[str, Form()],
-    media: Annotated[UploadFile, File()]
+    media: Annotated[UploadFile, File()],
+    connection: asyncpg.Connection = Depends(get_connection)
 ):
     payload = verify_jwt(request)
 
@@ -735,11 +723,7 @@ async def upload_evidence(
     # Case.__init__ validates the UUID and raises a 400 on a malformed value
     validated_case_id = Case(case_id=case_id).case_id
 
-    connection = None
-
     try:
-        connection = await get_connection()
-
         row = await connection.fetchrow(
             """
             SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -785,10 +769,6 @@ async def upload_evidence(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-
-    finally:
-        if connection is not None:
-            await connection.close()
 
 @router.post(
     "/closeCase",
@@ -871,8 +851,11 @@ async def upload_evidence(
         }
     }
 )
-async def close_case(case_request: CreateSingleCaseRequest, request: Request):
-    connection = None
+async def close_case(
+    case_request: CreateSingleCaseRequest,
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
     payload = verify_jwt(request)
 
     verify_not_user(payload.get("role"))
@@ -898,8 +881,6 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         )
 
     try:    
-        connection = await get_connection()
-
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
@@ -934,10 +915,6 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-    finally:
-        if connection is not None:
-            await connection.close()
-
 @router.post(
     "/updateCase",
     status_code=status.HTTP_200_OK,
@@ -1053,7 +1030,11 @@ async def close_case(case_request: CreateSingleCaseRequest, request: Request):
         }
     }
 )
-async def update_case(case_request: UpdateCaseRequest, request: Request):
+async def update_case(
+    case_request: UpdateCaseRequest,
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
     payload = verify_jwt(request)
 
     verify_not_user(payload.get("role"))
@@ -1092,11 +1073,7 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
                 }
             )
 
-    connection = None
-
     try:
-        connection = await get_connection()
-
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
@@ -1134,10 +1111,6 @@ async def update_case(case_request: UpdateCaseRequest, request: Request):
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-
-    finally:
-        if connection is not None:
-            await connection.close()
 
 @router.post(
     "/editComment/case/{case_id}/comment/{comment_id}",
@@ -1217,17 +1190,14 @@ async def update_comment(
     case_id: str,
     comment_id: int,
     update_data: UpdateCommentRequest,
-    request: Request
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
 ):
     payload = verify_jwt(request)
 
     case_uuid = Case(case_id=case_id).case_id
 
-    connection = None
-
     try:
-        connection = await get_connection()
-
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Comments"
@@ -1265,10 +1235,6 @@ async def update_comment(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-
-    finally:
-        if connection is not None:
-            await connection.close()
 
 @router.delete(
     "/deleteComment/comment/{comment_id}",
@@ -1319,14 +1285,15 @@ async def update_comment(
         }
     }
 )
-async def delete_comment(request: Request, comment_id: int):
+async def delete_comment(
+    request: Request,
+    comment_id: int,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
     payload = verify_jwt(request)
     username = payload.get("username")
     
-    connection = None
     try:
-        connection = await get_connection()
-
         row = await connection.fetchrow(
             """
             DELETE FROM "Cases_DB"."Comments"
@@ -1361,10 +1328,6 @@ async def delete_comment(request: Request, comment_id: int):
             }
         )
         
-    finally:
-        if connection is not None:
-            await connection.close()
-
 @router.post(
     "/getComments/{case_id}",
     dependencies=[Depends(COOKIE_SCHEME)],
@@ -1744,7 +1707,11 @@ def validate_comment_length(comment: str) -> bool:
 
     }
 )
-async def create_comment(body: create_comment_request, req: Request):
+async def create_comment(
+    body: create_comment_request,
+    req: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
     payload = verify_jwt(req)
     # Need to document 
 
@@ -1760,28 +1727,22 @@ async def create_comment(body: create_comment_request, req: Request):
             }
         )
 
-    connection = await get_connection()
+    case = Case(case_id=str(body.case_id))
 
-    try:
-        case = Case(case_id=str(body.case_id))
+    new_comment = await case.add_comment(
+        connection,
+        username,
+        body.comment,
+        role
+    )
 
-        new_comment = await case.add_comment(
-            connection, 
-            username, 
-            body.comment, 
-            role
-        )
-
-        return JSONResponse(
-            status_code=201,
-            content={
-                "status": "success", 
-                "comment": new_comment
-            }
-        )
-
-    finally:
-        await connection.close()
+    return JSONResponse(
+        status_code=201,
+        content={
+            "status": "success",
+            "comment": new_comment
+        }
+    )
           
 @router.delete(
     "/deleteCase",
@@ -1945,7 +1906,12 @@ async def delete_case(case_request: CreateSingleCaseRequest, request: Request):
             }
         )
 
-async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
+async def _save_annotations(
+    connection: asyncpg.Connection,
+    connector_id: UUID,
+    annotations: str,
+    user_name: str
+):
     #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
     #report_id was changed to connector_id to prepare for the database change since the reports need to be de a one-to-many relationship and not one-to-one
     query = """
@@ -1957,10 +1923,8 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
           AND c.CaseCreator = $3 
           AND r.ReportId = $2;
     """
-    con = None
     try:
-        con=await get_connection()
-        await con.execute(
+        await connection.execute(
             query, 
             annotations, 
             connector_id, 
@@ -1975,10 +1939,6 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-
-    finally:
-        if con:
-            await con.close()
 
 @router.post("/saveAnnotations", 
     status_code=status.HTTP_200_OK,
@@ -2077,7 +2037,11 @@ async def _save_annotations(connector_id:UUID,annotations:str,user_name:str):
         },
     }
 )
-async def save_annotations(payload: save_snnotations_payload, request:Request):
+async def save_annotations(
+    payload: save_snnotations_payload,
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+):
     cookie=verify_jwt(request)
     user_role=cookie.get("role")
     # Checking authorization
@@ -2088,6 +2052,7 @@ async def save_annotations(payload: save_snnotations_payload, request:Request):
         connector_id=transform_to_uuid(payload.connector_id)
         annotations_json_str = json.dumps(payload.annotations)
         await _save_annotations(
+            connection,
             connector_id,
             annotations_json_str,
             user_name
