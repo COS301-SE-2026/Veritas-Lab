@@ -52,16 +52,7 @@ export default function useLoginForm() {
         setStatus({ error: null, success: null, isSubmitting: true });
 
         try {
-            const response = await login(formState.email.trim(), formState.password);
-
-            if (response.status !== 'success') {
-                setStatus({
-                    error: response.message || 'Login failed. Please check your credentials and try again.',
-                    success: null,
-                    isSubmitting: false,
-                });
-                return;
-            }
+            await login(formState.email.trim(), formState.password);
 
             setStatus({
                 error: null,

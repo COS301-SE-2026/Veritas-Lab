@@ -152,7 +152,9 @@ export type InputProps = {
 };
 
 export type labelProps = {
-    text: string;
+    children?: ReactNode;
+    variant?: 'default' | 'error' | 'success';
+    text: string | null;
     htmlFor: string;
     className?: string;
 };

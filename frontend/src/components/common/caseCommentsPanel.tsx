@@ -3,6 +3,7 @@ import CaseCommentComposer from '@/components/common/caseCommentComposer';
 import CaseCommentMessage from '@/components/common/caseCommentMessage';
 import useCaseComments from '@/lib/hooks/useCaseComments';
 import type { CaseComment } from '@/types/api';
+import Label from '../ui/label';
 
 type CaseCommentsPanelProps = {
     caseId: string;
@@ -56,7 +57,7 @@ export default function CaseCommentsPanel({ caseId, initialComments, currentUser
                         </div>
                     )}
                 </div>
-                {error ? <p className="mt-3 text-sm text-red-500">{error}</p> : null}
+                {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                 <CaseCommentComposer
                     draft={draft}
                     isSubmitting={isSubmitting}
