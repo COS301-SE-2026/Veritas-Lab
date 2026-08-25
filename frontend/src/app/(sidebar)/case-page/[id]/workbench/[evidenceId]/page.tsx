@@ -18,6 +18,7 @@ import type { WorkbenchTool } from '@/types/workbench';
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
+    const [error, setError] = useState<string | null>(null);
     const caseId = params.id;
     const evidenceId = params.evidenceId;
 
@@ -42,7 +43,7 @@ export default function WorkbenchPage() {
 
     useEffect(() => {
         let cancelled = false;
-
+        
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
@@ -50,7 +51,9 @@ export default function WorkbenchPage() {
                 setEvidence(match);
                 loadAnnotations(match?.annotations ?? []);
             })
-            .catch((error) => console.error('Failed to load evidence media:', error));
+            .catch((error) => {
+                setError(error instanceof Error ? error.message : 'Failed to load evidence media');
+            });
 
         return () => {
             cancelled = true;

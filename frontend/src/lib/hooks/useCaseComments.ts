@@ -36,12 +36,20 @@ export default function useCaseComments({ caseId, initialComments }: UseCaseComm
         }
     };
     const updateComment = async (commentId: number, newComment: string) => {
-        await editCommentRequest(caseId, commentId, newComment);
-        setComments((current) => current.map((c) => (c.commentId === commentId ? { ...c, comment: newComment } : c)));
+        try {
+            await editCommentRequest(caseId, commentId, newComment);
+            setComments((current) => current.map((c) => (c.commentId === commentId ? { ...c, comment: newComment } : c)));
+        } catch (updateError) {
+            setError(updateError instanceof Error ? updateError.message : 'Failed to edit comment');
+        }
     };
     const removeComment = async (commentId: number) => {
-        await deleteCommentRequest(commentId);
-        setComments((current) => current.filter((c) => c.commentId !== commentId));
+        try {
+            await deleteCommentRequest(commentId);
+            setComments((current) => current.filter((c) => c.commentId !== commentId));
+        } catch (removeError) {
+            setError(removeError instanceof Error ? removeError.message : 'Failed to remove comment');
+        }
     };
 
     return {

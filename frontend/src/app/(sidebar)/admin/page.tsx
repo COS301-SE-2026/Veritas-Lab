@@ -7,6 +7,7 @@ import AdminUsersPanel from '@/components/common/adminUsersPanel';
 import AdminDeleteModal from '@/components/common/adminDeleteModal';
 import useAdminUsers from '@/lib/hooks/useAdminUsers';
 import type { AdminUser } from '@/types/api';
+import Label from '@/components/ui/label';
 //le admin page
 export default function AdminPage() {
     const router = useRouter();
@@ -69,9 +70,7 @@ export default function AdminPage() {
             <div className='mt-4 space-y-3'>
                 {isLoading ? (
                     <div className='text-sm text-[var(--color-light)]'>Loading users...</div>
-                ) : error ? (
-                    <div className='text-sm text-[var(--color-error)]'>{error}</div>
-                ) : visibleUsers.length === 0 ? (
+                ) : error ? <Label text={error} htmlFor="error" variant="error" /> : visibleUsers.length === 0 ? (
                     <div className='text-sm text-[var(--color-light)]'>No users found.</div>
                 ) : (
                     <AdminUsersPanel

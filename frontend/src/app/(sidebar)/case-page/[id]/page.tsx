@@ -11,6 +11,7 @@ import useCase from "@/lib/hooks/useCase";
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
 import CaseEditButton from "@/components/common/caseEditButton";
+import Label from "@/components/ui/label";
 
 const TABS = ['Evidence', 'Comments'] as const;
 export default function CasePage() {
@@ -93,10 +94,10 @@ export default function CasePage() {
                         <h1 className="text-2xl font-bold text-[var(--color-text)]">
                             {isLoading ? 'Loading case...' : caseDetails?.caseName ?? 'Case not found'}
                         </h1>
-                        <p className="text-[var(--color-light)] mt-2">
+                        <p className="text-[var(--color-light)] mt-2 mb-4">
                             {caseDetails?.caseDescription ?? 'No description available.'}
                         </p>
-                        {error ? <p className="text-sm text-red-500 mt-2">{error}</p> : null}
+                        {error ? <Label text={error} htmlFor="error" variant="error"/> : null}
                     </div>
                     {(canUploadEvidence || canEditCase) ? (
                         <div className="w-1/5 flex items-end justify-end gap-2">

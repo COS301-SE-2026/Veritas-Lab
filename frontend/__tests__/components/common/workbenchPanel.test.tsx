@@ -114,7 +114,7 @@ describe('WorkbenchPanel', () => {
  
         fireEvent.click(screen.getByText('Save'));
  
-        expect(await screen.findByText('Couldn’t save. Try again.')).toBeInTheDocument();
+        expect(await screen.findByText('network error')).toBeInTheDocument();
     });
 
     it('renders the View side by side tool button', () => {

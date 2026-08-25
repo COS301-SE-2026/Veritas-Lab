@@ -128,11 +128,11 @@ describe('useCaseComments', () => {
         const mockedEditComment = editComment as jest.MockedFunction<typeof editComment>;
         mockedEditComment.mockRejectedValue(new Error('Failed to edit comment'));
         const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
-        await expect(
-            act(async () => {
-                await result.current.updateComment(1, 'Edited comment text');
-            })
-        ).rejects.toThrow('Failed to edit comment');
+        await act(async () => {
+            await result.current.updateComment(1, 'Edited comment text');
+        });
+
+        expect(result.current.error).toBe('Failed to edit comment');
         expect(result.current.comments[0].comment).toBe('Existing comment');
     });
     //delete tests

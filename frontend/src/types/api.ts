@@ -1,3 +1,10 @@
+export type ApiError = {
+    detail: {
+        status?: 'error';
+        message?: string;
+    }
+}
+
 export type LoginResponse = {
     status: 'success' | 'error';
     token: string;

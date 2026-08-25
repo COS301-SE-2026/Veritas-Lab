@@ -8,6 +8,7 @@ on:
 permissions:
     contents: read
     packages: write
+    id-token: write
 
 jobs:
     #This runs the tests again when anything gets on main not just when we do PR's
@@ -16,107 +17,97 @@ jobs:
         secrets: inherit
     
     deploy-azure:
-        needs: [tests]
+        needs: tests
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
-            - uses: actions/checkout@v4
-
-            - name: log in to GitHub Container Registry
-              uses: docker/login-action@v3
+            - uses: actions/checkout@v7
+            - uses: docker/login-action@v4
               with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: build and push backend image
-              uses: docker/build-push-action@v6
+                    registry: ghcr.io
+                    username: ${{ github.actor }}
+                    password: ${{ secrets.GITHUB_TOKEN }}
+            - uses: docker/build-push-action@v7
               with:
-                  context: ./Backend
-                  push: true
-                  tags: |
-                      ghcr.io/cos301-se-2026/veritas-lab-backend:latest
-                      ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
-
-            - name: deploy to Azure Web App
-              id: deploy
-              uses: azure/webapps-deploy@v3
+                    context: ./Backend
+                    push: true
+                    tags: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
+            - uses: docker/build-push-action@v7
               with:
-                  app-name: veritas-lab-api
-                  publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-                  images: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
-    deploy-vercel:
-        needs: [tests]
-        runs-on: ubuntu-latest
-        timeout-minutes: 15
-        environment:
-            name: Production - veritas-lab
-            url: ${{ steps.deploy.outputs.url }}
-        env:
-            VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-            VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        steps:
-            #push to main checks out the branch properly (not detached),
-            #so the vercel cli picks up "main" as the branch on its own here.
-            - uses: actions/checkout@v4
- 
-            - name: install Vercel CLI
-              run: npm install -g vercel
- 
-            - name: deploy to vercel (production)
-              id: deploy
-              env:
-                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-              run: |
-                  url="$(vercel deploy --prod --token="$VERCEL_TOKEN")"
-                  echo "url=$url" >> "$GITHUB_OUTPUT"
-                  echo "production frontend deployed to $url"
+                    context: ./frontend
+                    push: true
+                    tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+            - uses: azure/login@v2
+              with:
+                    client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
+                    tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
+                    subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_02B6A6C1098B4F408E9DEBBC5971A95D }}
+            - uses: azure/webapps-deploy@v3
+              with:
+                app-name: veritas-lab-api
+                sitecontainers-config: >-
+                    [
+                        {
+                            "name": "main",
+                            "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}",
+                            "targetPort": 3000,
+                            "isMain": true,
+                            "authType": "UserCredentials",
+                            "userName": "${{ secrets.GHCR_USERNAME }}",
+                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                        },
+                        {
+                            "name": "backend",
+                            "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}",
+                            "targetPort": 8000,
+                            "isMain": false,
+                            "authType": "UserCredentials",
+                            "userName": "${{ secrets.GHCR_USERNAME }}",
+                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                        }
+                    ]
     rollback:
-        name: automatic rollback
-        needs: [deploy-azure, deploy-vercel]
-        #Always attempts to rollback even when tests succeed this is to make sure failurs run this job
-        if: always() && (needs.deploy-azure.result == 'failure' || needs.deploy-vercel.result == 'failure')
+        name: rollback
+        needs: [deploy-azure]
+        if: failure()
         runs-on: ubuntu-latest
-        timeout-minutes: 15
+        timeout-minutes: 20
         environment:
-            name: production
+            name: Prod
         steps:
-            - name: fetch previous good commit
-              id: resolve
-              run: |
-                  sha="${{ github.event.before }}"
-                  if [ -z "$sha" ] || [ "$sha" = "0000000000000000000000000000000000000000" ]; then
-                      echo "valid=false" >> "$GITHUB_OUTPUT"
-                      echo "::error::No previous commit available to automatically rollback."
-                  else
-                      echo "valid=true" >> "$GITHUB_OUTPUT"
-                      echo "sha=$sha" >> "$GITHUB_OUTPUT"
-                      echo "rolling both services back to $sha"
-                  fi
-
-            - name: roll back Azure Web App to previous image
-              if: always() && steps.resolve.outputs.valid == 'true'
-              uses: azure/webapps-deploy@v3
+            - uses: actions/checkout@v7
               with:
-                  app-name: veritas-lab-api
-                  publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-                  images: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ steps.resolve.outputs.sha }}
- 
-            - name: roll back Vercel production deployment
-              if: always() && steps.resolve.outputs.valid == 'true'
-              env:
-                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-              run: |
-                  npm install -g vercel
-                  vercel rollback --token="$VERCEL_TOKEN" --yes
- 
-            - name: report outcome
-              if: always()
-              run: |
-                  if [ "${{ steps.resolve.outputs.valid }}" = "true" ]; then
-                      echo "::error::CD failed (deploy-azure=${{ needs.deploy-azure.result }}, deploy-vercel=${{ needs.deploy-vercel.result }}). Automatic rollback to ${{ steps.resolve.outputs.sha }} was attempted."
-                  else
-                      echo "::error::CD failed (deploy-azure=${{ needs.deploy-azure.result }}, deploy-vercel=${{ needs.deploy-vercel.result }}). Automatic rollback was NOT possible."
-                  fi
+                    fetch-depth: 2
+
+            - id: previous
+              run: echo "sha=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
+            - uses: azure/login@v3
+              with:
+                    client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
+                    tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
+                    subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_02B6A6C1098B4F408E9DEBBC5971A95D }}
+
+            - uses: azure/webapps-deploy@v3
+              with:
+                    app-name: veritas-lab-api
+                    sitecontainers-config: >-
+                        [
+                            {
+                                "name": "main",
+                                "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ steps.previous.outputs.sha }}",
+                                "targetPort": 3000,
+                                "isMain": true,
+                                "authType": "UserCredentials",
+                                "userName": "${{ secrets.GHCR_USERNAME }}",
+                                "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                            },
+                            {
+                                "name": "backend",
+                                "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:${{ steps.previous.outputs.sha }}",
+                                "targetPort": 8000,
+                                "isMain": false,
+                                "authType": "UserCredentials",
+                                "userName": "${{ secrets.GHCR_USERNAME }}",
+                                "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                            }
+                        ]   

@@ -103,6 +103,6 @@ describe('LoginForm', () => {
 		fillValidForm();
 		const submitButton = screen.getByRole('button', { name: 'Login' });
 		fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
-		expect(await screen.findByRole('alert')).toHaveTextContent('Invalid credentials');
+		expect(await screen.findByRole('alert')).toHaveTextContent('Unexpected error, login failed');
 	});
 });

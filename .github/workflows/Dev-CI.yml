@@ -1,12 +1,10 @@
-name: CI Dev
+name: Dev CI
 #we want the CI to only run when we create a pull request to dev or when that PR is updated
 #obviously if the CI fails you dont merge.
 on:
     pull_request:
         branches: ["dev"]
-        types: [opened, synchronize, reopened, labeled]
     workflow_dispatch:
-#similar to main but added timeout.
 jobs:
     backend-unit-tests:
         runs-on: ubuntu-latest
@@ -87,7 +85,3 @@ jobs:
               run: |
                   cd frontend
                   npx jest
-    deploy:
-        needs: [backend-unit-tests, frontend-unit-tests]
-        uses: ./.github/workflows/CD-Dev.yml
-        secrets: inherit

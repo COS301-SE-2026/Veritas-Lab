@@ -5,6 +5,7 @@ import Modal from '@/components/ui/modal';
 import Button from '@/components/ui/button';
 import { deleteCase } from '@/lib/api/dashboard';
 import type { CaseDeleteButtonProps } from '@/types/components';
+import Label from '../ui/label';
 //will be styled the same as the delete evidence button
 export default function CaseDeleteButton({ caseId, caseTitle, onDeleted }: Readonly<CaseDeleteButtonProps>) {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,7 +50,7 @@ export default function CaseDeleteButton({ caseId, caseTitle, onDeleted }: Reado
                     <p className="mt-2 text-sm text-(--color-light)">
                         This will permanently remove &ldquo;{caseTitle}&rdquo; and all attached evidence and comments. This action cannot be undone.
                     </p>
-                    {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+                    {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                     <div className="mt-6 flex justify-end gap-3">
                         <Button variant="sadSack" text="Cancel" onClick={closeModal} disabled={isDeleting} />
                         <Button

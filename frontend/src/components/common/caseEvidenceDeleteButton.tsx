@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import Modal from '@/components/ui/modal';
 import Button from '@/components/ui/button';
 import useCase from '@/lib/hooks/useCase';
+import Label from '@/components/ui/label';
 import type { EvidenceDeleteButtonProps } from '@/types/components';
 
 export default function EvidenceDeleteButton({ caseId, mediaId, mediaName, onDeleted }: Readonly<EvidenceDeleteButtonProps>) {
@@ -52,7 +53,7 @@ export default function EvidenceDeleteButton({ caseId, mediaId, mediaName, onDel
                     <p className="mt-2 text-sm text-(--color-light)">
                         This will permanently remove &ldquo;{mediaName}&rdquo; from this case. This action cannot be undone.
                     </p>
-                    {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+                    {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
                     <div className="mt-6 flex justify-end gap-3">
                         <Button variant="sadSack" text="Cancel" onClick={closeModal} disabled={isDeleting} />
                         <Button
