@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import CasePage from '@/app/case-page/[id]/page';
+import CasePage from '@/app/(sidebar)/case-page/[id]/page';
 import { fetchCase, addEvidence, closeCase, deleteEvidence, editComment, deleteComment, updateCase, addComment, } from '@/lib/api/case';
 //only mocking backend api everything else needs to be real
 jest.mock('@/lib/api/case', () => ({
@@ -92,13 +92,13 @@ describe('CasePage (integration)', () => {
     const mockedAddComment = addComment as jest.MockedFunction<typeof addComment>;
     let toLocaleDateStringSpy: jest.SpyInstance;
     beforeEach(() => {
-        jest.clearAllMocks();
+        jest.resetAllMocks();
         toLocaleDateStringSpy = jest.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue('01/05/2026');
         mockUseUserRole.mockReturnValue('INVESTIGATOR');
         mockUseCurrentUser.mockReturnValue({ username: 'investigator.one' });
         mockedFetchCase.mockResolvedValue(baseCase as Awaited<ReturnType<typeof fetchCase>>);
     });
-    
+
     afterEach(() => {
         toLocaleDateStringSpy.mockRestore();
     });
@@ -203,11 +203,14 @@ describe('CasePage (integration)', () => {
         await screen.findByText('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'Upload Evidence' }));
         const file = new File(['dummy'], 'newfile.png', { type: 'image/png' });
-        fireEvent.change(screen.getByLabelText('Upload Media'), { target: { files: [file] } });
-        fireEvent.click(screen.getByRole('button', { name: 'Upload Media' }));
-        await waitFor(() => expect(mockedAddEvidence).toHaveBeenCalledWith(file, 'case-1'));
+        const fileInput = screen.getByLabelText('Upload Media');
+        fireEvent.change(fileInput, { target: { files: [file] } });
+        fireEvent.submit(fileInput.closest('form')!);
+        await waitFor(() => {
+            expect(mockedAddEvidence).toHaveBeenCalledWith(file, 'case-1');
+            expect(mockedFetchCase).toHaveBeenCalledTimes(2);
+        });
         expect(await screen.findByText('newfile.png')).toBeInTheDocument();
-        expect(mockedFetchCase).toHaveBeenCalledTimes(2);
     });
 
     it('deletes evidence and removes it from the list after reload', async () => {
@@ -253,7 +256,7 @@ describe('CasePage (integration)', () => {
         await screen.findByText('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'Comments' }));
         await screen.findByText('Initial review complete');
-        fireEvent.click(screen.getByRole('button', { name: /Edit/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
         fireEvent.change(screen.getByDisplayValue('Initial review complete'), {
             target: { value: 'Initial review complete - escalated' },
         });
