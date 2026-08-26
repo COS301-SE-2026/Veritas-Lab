@@ -72,9 +72,9 @@ describe('LoginForm (integration)', () => {
         expect(screen.getByLabelText('Email')).toHaveValue('');
         expect(screen.getByLabelText('Password')).toHaveValue('');
     });
-    //error message tests (we will need to redo these after error message changes)
-    it('shows the server provided error message when login fails without throwing', async () => {
-        mockedLogin.mockResolvedValue({ status: 'error', message: 'Invalid credentials.' } as LoginResponse);
+    //error message tests
+    it('shows the server provided error message when login fails', async () => {
+        mockedLogin.mockRejectedValue(new Error('Invalid credentials.'));
         render(<LoginForm />);
         fillAndSubmit('user@example.com', 'wrong-password');
         expect(await screen.findByRole('alert')).toHaveTextContent('Invalid credentials.');
