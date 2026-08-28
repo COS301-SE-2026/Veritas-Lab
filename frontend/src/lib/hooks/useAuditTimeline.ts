@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { getAudit } from "../api/audit";
+import { getAudit } from "@/lib/api/audit";
 import { AuditTimelineResponse } from "@/types/api";
 export default function useAuditTimeline( caseId: string ) {
     const [timeline, setTimeline] = useState<AuditTimelineResponse>();
@@ -17,7 +17,7 @@ export default function useAuditTimeline( caseId: string ) {
             }
             setIsLoading(false);
         })
-    })
+    }, [caseId]);
 
     return {
         error,
