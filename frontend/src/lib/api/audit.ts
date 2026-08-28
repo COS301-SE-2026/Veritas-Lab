@@ -2,13 +2,12 @@ import { ApiError } from "@/types/api";
 import { AuditTimelineResponse } from "@/types/api";
 
 export async function getAudit(caseID: string): Promise<AuditTimelineResponse>  {
-    const res = await fetch(`/api/getAudit`, {
-        method: 'POST',
+    const res = await fetch(`/api/getAudit/${caseID}`, {
+        method: 'GET',
         credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ CaseID: caseID })
     })
     
     const data = await res.json().catch(() => null);
