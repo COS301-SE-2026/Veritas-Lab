@@ -84,3 +84,7 @@ export type AuditEvents = {
     user: string;
     action: string;
 }
+
+export type AuditLogResponse = {
+    auditLogs: AuditTimelineResponse[];
+}
