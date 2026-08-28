@@ -1,6 +1,7 @@
 import { ApiError } from "@/types/api";
+import { AuditTimelineResponse } from "@/types/api";
 
-export async function getAudit(caseID: string) {
+export async function getAudit(caseID: string): Promise<AuditTimelineResponse>  {
     const res = await fetch(`/api/getAudit`, {
         method: 'POST',
         credentials: 'include',
