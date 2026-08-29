@@ -50,4 +50,39 @@ describe('AuditTimeline', () => {
         expect(errorLabel).toHaveTextContent('Failed to load audit timeline');
         expect(auditTimelineMock).toHaveBeenCalledWith('case-1');
     });
+
+    it('renders timeline events', () => {
+        const auditTimelineMock = useAuditTimeline as jest.Mock;
+        const mockedResponse = {
+            timeline: {
+                caseID: 'case-1',
+                events: [
+                    {
+                        action: 'Created case',
+                        user: 'Invest Admin',
+                        timestamp: '2026-05-01T05:00:00.000Z',
+                    },
+                    {
+                        action: 'Closed case',
+                        user: 'Invest Admin',
+                        timestamp: '2026-05-01T07:00:00.000Z',
+                    },
+                ],
+            },
+            isLoading: false,
+            error: null,
+        };
+        auditTimelineMock.mockReturnValue(mockedResponse);
+
+        render(<AuditTimeline caseId="case-1" />);
+        const createCaseEvent = screen.getAllByText('Case Created');
+        expect(createCaseEvent.length).toBeGreaterThan(0);
+        const usersNameJoe = screen.getAllByText('John Doe');
+        expect(usersNameJoe.length).toBeGreaterThan(0);
+        const usersNameJane = screen.getAllByText('Jane Smith');
+        expect(usersNameJane.length).toBeGreaterThan(0);
+        const icons = screen.getAllByText('FolderPlus Icon');
+        expect(icons.length).toBeGreaterThan(0);
+        expect(auditTimelineMock).toHaveBeenCalledWith('case-1');
+    });
 })
