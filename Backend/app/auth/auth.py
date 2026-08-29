@@ -8,13 +8,16 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta, timezone
 import asyncpg # This is the library for communicating with Postgres
-from app.core.env import Postgres_Settings, Auth_Settings
+from typing import Annotated
+from app.core.env import Auth_Settings
+from app.core.database import get_connection
 from fastapi.security import APIKeyCookie
 
 COOKIE_NAME = "JWT_token"
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
+DATABASE_ERROR="Database error"
 EXPIRED_TOKEN = "Token has expired"
 
 INVALID_TOKEN_401 = {
@@ -64,21 +67,10 @@ COOKIE_SCHEME = APIKeyCookie(
     auto_error=False
 )
 
-postgres_settings = Postgres_Settings()
 auth_settings = Auth_Settings()
 
 SECRET_KEY = auth_settings.JWT_SECRET
 ALGORITHM = auth_settings.HASH
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=postgres_settings.DB_USER,
-        password=postgres_settings.DB_PASSWORD,
-        database=postgres_settings.DB_NAME,
-        host=postgres_settings.DB_HOST,
-        port=postgres_settings.DB_PORT,
-        ssl="require" if postgres_settings.DB_SSL else None,
-    )
 
 router = APIRouter(
     prefix="/api",
@@ -195,10 +187,8 @@ class ChangeRoleRequest(BaseModel):
     userId: str | None = None
     NewRole: str | None = None
 
-async def update_user_jwt_issued(email: str):
-    connection = await get_connection()
-    try:
-        await connection.execute(
+async def update_user_jwt_issued(email: str, connection: asyncpg.Connection):
+    await connection.execute(
             """
             UPDATE "Users_DB"."Users"
             SET userjwtissued = NOW()
@@ -206,13 +196,9 @@ async def update_user_jwt_issued(email: str):
             """,
             email
         )
-    finally:
-        await connection.close()
 
-async def update_user_jwt_issued_via_user(user: dict):
-    connection = await get_connection()
-    try:
-        await connection.execute(
+async def update_user_jwt_issued_via_user(user: dict, connection: asyncpg.Connection):
+    await connection.execute(
             """
             UPDATE "Users_DB"."Users"
             SET userjwtissued = NOW()
@@ -220,14 +206,10 @@ async def update_user_jwt_issued_via_user(user: dict):
             """,
             user["id"]
         )
-    finally:
-        await connection.close()
 
 # Once the envs are setup this will need to be updated
-async def search_users_via_email(email:str):
-    connection = await get_connection()
-    try:
-        row = await connection.fetchrow(
+async def search_users_via_email(email: str, connection: asyncpg.Connection):
+    row = await connection.fetchrow(
             """
             SELECT userid, useremail, username, userrole, userpassword
             FROM "Users_DB"."Users"
@@ -236,24 +218,19 @@ async def search_users_via_email(email:str):
             email
         )
 
-        if row is None:
-            return None
-        
-        return {
-            "id": str(row["userid"]),
-            "email": row["useremail"],
-            "username": row["username"],
-            "role": row["userrole"],
-            "password": row["userpassword"]
-        }
-    finally:
-        await connection.close()
-    
-async def search_users_via_username(username: str):
-    connection = await get_connection()
+    if row is None:
+        return None
 
-    try:
-        row = await connection.fetchrow(
+    return {
+        "id": str(row["userid"]),
+        "email": row["useremail"],
+        "username": row["username"],
+        "role": row["userrole"],
+        "password": row["userpassword"]
+    }
+
+async def search_users_via_username(username: str, connection: asyncpg.Connection):
+    row = await connection.fetchrow(
             """
             SELECT userid, useremail, username, userrole, userpassword
             FROM "Users_DB"."Users"
@@ -262,26 +239,21 @@ async def search_users_via_username(username: str):
             username
         )
 
-        if row is None:
-            return None
-        
-        return {
-            "id": str(row["userid"]),
-            "email": row["useremail"],
-            "username": row["username"],
-            "role": row["userrole"],
-            "password": row["userpassword"]
-        }
-    finally:
-        await connection.close()
+    if row is None:
+        return None
+
+    return {
+        "id": str(row["userid"]),
+        "email": row["useremail"],
+        "username": row["username"],
+        "role": row["userrole"],
+        "password": row["userpassword"]
+    }
 
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
-async def delete_user_by_id(user_id: str) -> bool:
-    connection = await get_connection()
-
-    try:
-        row = await connection.fetchrow(
+async def delete_user_by_id(user_id: str, connection: asyncpg.Connection) -> bool:
+    row = await connection.fetchrow(
             """
             DELETE FROM "Users_DB"."Users"
             WHERE userid = $1::uuid
@@ -290,21 +262,16 @@ async def delete_user_by_id(user_id: str) -> bool:
             user_id
         )
 
-        return row is not None # when the specified user is not found in the Db
-    finally:
-        await connection.close()
+    return row is not None # when the specified user is not found in the Db
 
 async def insert_user(
     email : str, 
     username : str, 
     role : str, 
-    hashed_password : str
+    hashed_password: str,
+    connection: asyncpg.Connection
 ):
-
-    connection = await get_connection()
-
-    try:
-        row = await connection.fetchrow(
+    row = await connection.fetchrow(
             """
             INSERT INTO "Users_DB"."Users"
             (useremail, username, userrole, userpassword)
@@ -314,14 +281,12 @@ async def insert_user(
             email, username, role, hashed_password
         )
 
-        return {
-            "id": str(row["userid"]),
-            "email": row["useremail"],
-            "username": row["username"],
-            "role": row["userrole"]
-        }
-    finally:
-        await connection.close()
+    return {
+        "id": str(row["userid"]),
+        "email": row["useremail"],
+        "username": row["username"],
+        "role": row["userrole"]
+    }
 
 def create_token(user: dict) ->str:
     expiry_time = datetime.now(timezone.utc) + timedelta(minutes=auth_settings.TOKEN_EXPIRE)
@@ -403,7 +368,11 @@ def create_token(user: dict) ->str:
     }
 
 )
-async def login(request: login_request, response: Response):
+async def login(
+    request: login_request,
+    response: Response,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
     if not validate_email(request.email):
         raise HTTPException(
             status_code=400,
@@ -422,7 +391,7 @@ async def login(request: login_request, response: Response):
             }
         )
 
-    user = await search_users_via_email(request.email.strip())
+    user = await search_users_via_email(request.email.strip(), connection)
 
     if user is None:
         raise HTTPException(
@@ -444,7 +413,7 @@ async def login(request: login_request, response: Response):
 
     token = create_token(user)
 
-    await update_user_jwt_issued(user["email"])
+    await update_user_jwt_issued(user["email"], connection)
 
     response.set_cookie(
         key=COOKIE_NAME,
@@ -555,7 +524,11 @@ async def login(request: login_request, response: Response):
         }
     }
 )
-async def register(request: RegisterRequest, response: Response):
+async def register(
+    request: RegisterRequest,
+    response: Response,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
     if not validate_email(request.email):
         raise HTTPException(
             status_code=400,
@@ -583,7 +556,7 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
 
-    existing_user = await search_users_via_email(request.email.strip())
+    existing_user = await search_users_via_email(request.email.strip(), connection)
 
     if existing_user is not None:
         raise HTTPException(
@@ -594,7 +567,7 @@ async def register(request: RegisterRequest, response: Response):
             }
         )
     
-    existing_username = await search_users_via_username(request.username.strip())
+    existing_username = await search_users_via_username(request.username.strip(), connection)
     
     if existing_username is not None:
         raise HTTPException(
@@ -610,12 +583,13 @@ async def register(request: RegisterRequest, response: Response):
         request.email.strip(), 
         request.username.strip(), 
         "USER", 
-        hashed_password
+        hashed_password,
+        connection
     )
 
     token = create_token(new_user)
 
-    await update_user_jwt_issued(new_user["email"])
+    await update_user_jwt_issued(new_user["email"], connection)
 
     response.set_cookie(
         key=COOKIE_NAME,
@@ -675,13 +649,28 @@ async def register(request: RegisterRequest, response: Response):
                     }
                 }
             }
+        },
+        500: {
+            "description": "There was an internal server error - Database",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR
+                        }
+                    }
+                }
+            }
         }
+
     }
 
 )
-async def fetch_users(request: Request):
-    connection = None
-
+async def fetch_users(
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
     try:
         payload = verify_jwt(request)
 
@@ -694,8 +683,6 @@ async def fetch_users(request: Request):
                 }
             )
         
-        connection = await get_connection()
-
         rows = await connection.fetch(
             """
             SELECT userid, username, userrole
@@ -718,9 +705,15 @@ async def fetch_users(request: Request):
             "status":"success",
             "users": users
         }
-    finally:
-        if connection is not None:
-            await connection.close()
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR
+            }
+        )
 
 @router.post(
     "/changeUserRole",
@@ -871,13 +864,13 @@ async def fetch_users(request: Request):
         },
 
         500: {
-            "description": "Database error",
+            "description": DATABASE_ERROR,
             "content": {
                 "application/json": {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "Database error"
+                            "message": DATABASE_ERROR
                         }
                     }
                 }
@@ -885,7 +878,11 @@ async def fetch_users(request: Request):
         }
     }
 )
-async def change_user_role(change_role_request: ChangeRoleRequest, request: Request):
+async def change_user_role(
+    change_role_request: ChangeRoleRequest,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
     payload = verify_jwt(request)
 
     if payload.get("role") != "ADMIN":
@@ -939,8 +936,6 @@ async def change_user_role(change_role_request: ChangeRoleRequest, request: Requ
         )
     
     try:
-        connection = await get_connection()
-
         result = await connection.execute(
             """
             UPDATE "Users_DB"."Users"
@@ -968,12 +963,9 @@ async def change_user_role(change_role_request: ChangeRoleRequest, request: Requ
             status_code=500,
             detail={
                 "status":"error",
-                "message":"Database error"
+                "message":DATABASE_ERROR
             }
         )
-    finally:
-        if connection is not None:
-            await connection.close()
 
 @router.delete(
     "/users/{user_id}",
@@ -1096,13 +1088,13 @@ async def change_user_role(change_role_request: ChangeRoleRequest, request: Requ
         },
 
         500 : {
-            "description": "Database error",
+            "description": DATABASE_ERROR,
             "content": {
                 "application/json": {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "Database error"
+                            "message": DATABASE_ERROR
                         }
                     }
                 }
@@ -1110,7 +1102,11 @@ async def change_user_role(change_role_request: ChangeRoleRequest, request: Requ
         }
     }
 )
-async def delete_user(user_id: str, request: Request): 
+async def delete_user(
+    user_id: str,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
     #Verify the JWT for security
     payload = verify_jwt(request)
     user_id = user_id.strip()
@@ -1148,13 +1144,13 @@ async def delete_user(user_id: str, request: Request):
 
     #Now delete
     try:
-        deleted = await delete_user_by_id(user_id)
+        deleted = await delete_user_by_id(user_id, connection)
     except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={
                 "status":"error",
-                "message":"Database error"
+                "message":DATABASE_ERROR
             }
         )
         
@@ -1287,7 +1283,11 @@ async def delete_user(user_id: str, request: Request):
         }
     }
 )
-async def refresh_token(request: Request, response: Response):
+async def refresh_token(
+    request: Request,
+    response: Response,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
     token = request.cookies.get(COOKIE_NAME)
 
     if token == "":
@@ -1382,7 +1382,7 @@ async def refresh_token(request: Request, response: Response):
     new_token = create_token(user)
 
     try:
-        await update_user_jwt_issued_via_user(user)
+        await update_user_jwt_issued_via_user(user, connection)
     except Exception:
         raise HTTPException(
             status_code=500,

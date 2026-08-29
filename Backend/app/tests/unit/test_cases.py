@@ -10,11 +10,22 @@ from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
 from app.auth.auth import NOT_AUTH, INVALID_TOKEN
+from app.core.database import get_connection 
+from app.tests.unit.database_override import unit_get_connection
 
 import uuid
 from uuid import uuid4
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_connection, None)
 
 def test_case_creation_with_valid_data():
     client.cookies.clear()
@@ -44,8 +55,14 @@ def test_case_creation_Does_Not_Require_CaseName():
 
 @pytest.mark.asyncio
 async def test_case_creation_Rejects_Blank_Creator():
-    with pytest.raises(ValueError, match="CaseCreator is required"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_creator="   ", case_name="Test Case")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "CaseCreator is required"
+    }
 
 @pytest.mark.asyncio
 async def test_Cas_creation_Rejects_Invalid_UUID():
@@ -59,13 +76,25 @@ async def test_Cas_creation_Rejects_Invalid_UUID():
     }
 
 def test_CaseCreationRejectsBlankCaseName():
-    with pytest.raises(ValueError, match="CaseName is required"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_creator="alice_dev", case_name="   ")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "CaseName is required"
+    }
 
 def test_name_is_too_long():
     client.cookies.clear()
-    with pytest.raises(ValueError, match="Name is too long"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_name="Test Case", case_creator="A" * 101)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "Name is too long. Must be 100 characters or less"
+    }
 
 def test_name_at_100_characters():
     client.cookies.clear()
@@ -104,8 +133,14 @@ def test_case_name_at_256_characters():
     client.cookies.clear()
     case_name_256 = "A" * 256
     
-    with pytest.raises(ValueError, match="CaseName must be 255 characters or less"):
+    with pytest.raises(HTTPException) as exc_info:
         Case(case_creator="alice_dev", case_name=case_name_256)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == {
+        "status": "error",
+        "message": "CaseName must be 255 characters or less"
+    }
 
 def test_case_stores_description():
     client.cookies.clear()
@@ -177,8 +212,7 @@ def test_case_to_json_with_no_description_or_reviews():
     }
 
 @pytest.mark.asyncio
-@patch("asyncpg.connect")
-async def test_create_case_with_mock(mock_connect):
+async def test_create_case_with_mock():
     client.cookies.clear()
     case = Case(
         case_creator="alice_dev",
@@ -190,15 +224,13 @@ async def test_create_case_with_mock(mock_connect):
     fake_creation_date = "2026-05-20T16:00:00Z"
 
     mock_connection = AsyncMock()
-    mock_connect.return_value = mock_connection
-    mock_connection.close = AsyncMock(return_value=None)
 
     mock_connection.fetchrow = AsyncMock(return_value={
         "caseid": fake_db_uuid,
         "casecreationdate": fake_creation_date
     })
 
-    case_id = await case.create()
+    case_id = await case.create(mock_connection)
 
     assert case_id == fake_db_uuid
     assert isinstance(case_id, str)
@@ -217,19 +249,17 @@ async def test_create_case_with_mock(mock_connect):
         case.case_closed
     )
 
-    mock_connect.assert_called_once()
     mock_connection.fetchrow.assert_called_once()
-    mock_connection.close.assert_called_once()
 
 @pytest.mark.asyncio
-@patch("asyncpg.connect")
-async def test_create_case_cannot_be_called_twice(mock_connect):
+async def test_create_case_cannot_be_called_twice():
     client.cookies.clear()
     case = Case(case_creator="alice_dev", case_name="Test Case")
     case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    connection = AsyncMock()
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.create()
+        await case.create(connection)
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == {
@@ -1314,11 +1344,13 @@ async def test_get_comment_missing_case_id():
         case_name="Billy Jean's not my Son"
     )
 
-    with pytest.raises(HTTPException) as exeInfo:
-        await test_case.get_comments()
+    connection = AsyncMock()
 
-    assert exeInfo.value.status_code == 400
-    assert "Case id is missing" in exeInfo.value.detail  
+    with pytest.raises(HTTPException) as exc_info:
+        await test_case.get_comments(connection)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Case id is missing"
 
 @pytest.mark.asyncio
 async def test_get_comment_successful():
@@ -1345,7 +1377,7 @@ Return a dict of the comments belonging to the case id
     with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
         mock_connect.return_value = mock_connection
 
-        result = await test_case.get_comments()
+        result = await test_case.get_comments(mock_connection)
 
     assert isinstance(result, list), "Should be a single returned record"
     assert result[0]["commentID"] == "1"
@@ -1372,11 +1404,11 @@ Raises an error due to the database going down
         case_id=fake_case_id
     )
 
-    with patch("app.core.cases.asyncpg.connect", new_callable=AsyncMock) as mock_connect:
-        mock_connect.side_effect = asyncpg.PostgresConnectionError("Connection lost")
+    mock_connection = AsyncMock()
+    mock_connection.fetch.side_effect = asyncpg.PostgresConnectionError("Connection lost")
 
-        with pytest.raises(HTTPException) as exc_info:
-            await test_case.get_comments()
+    with pytest.raises(HTTPException) as exc_info:
+        await test_case.get_comments(mock_connection)
 
     assert exc_info.value.status_code == 500
     assert "Internal Server Error" in exc_info.value.detail or "database" in exc_info.value.detail.lower()
@@ -1392,7 +1424,7 @@ def test_delete_case_success_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str):
+    async def mock_delete_case(self, username: str, role: str, connection):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "investigator_user"
@@ -1435,7 +1467,7 @@ def test_delete_case_success_admin(monkeypatch):
             "role": "ADMIN"
         }
     
-    async def mock_delete_case(self, username: str, role: str):
+    async def mock_delete_case(self, username: str, role: str, connection):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "admin_user"
@@ -1593,7 +1625,7 @@ def test_delete_case_not_found(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str):
+    async def mock_delete_case(self, username: str, role: str, connection):
         raise HTTPException(
             status_code=404,
             detail={
@@ -1639,7 +1671,7 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str):
+    async def mock_delete_case(self, username: str, role: str, connection):
         assert username == "other_investigator"
         assert role == "INVESTIGATOR"
         
@@ -1740,14 +1772,13 @@ async def test_delete_case_not_found(mockDbConnect):
     case = Case(case_id=str(uuid4()))
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_case("someone", "USER")
+        await case.delete_case("someone", "USER", connection)
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {
         "status": "error",
         "message": "Case not found"
     }
-    connection.close.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
@@ -1760,14 +1791,13 @@ async def test_delete_case_unauthorized(mockDbConnect):
     case = Case(case_id=str(uuid4()))
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_case("someone_eklse", "USER")
+        await case.delete_case("someone_eklse", "USER", connection)
 
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == {
         "status": "error",
         "message": "Only the case creator or an admin can delete this case"
     }
-    connection.close.assert_called_once()
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
@@ -1789,14 +1819,13 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockget_object, moc
 
     case = Case(case_id=str(case_id))
 
-    result = await case.delete_case("tha_real_creator", "USER")
+    result = await case.delete_case("tha_real_creator", "USER", connection)
 
     assert result is None
     mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
         Key="media-1.jpg"
     )
-    connection.close.assert_called_once()
 
 def test_get_comments_missing_jwt(monkeypatch):
     client.cookies.clear()

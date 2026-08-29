@@ -4,8 +4,19 @@ from fastapi import HTTPException
 
 from app.api.main import app
 import app.auth.auth as auth
+from app.core.database import get_connection
+from app.tests.unit.database_override import unit_get_connection
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_connection, None)
 
 class MockConnection:
     async def fetch(self, query):

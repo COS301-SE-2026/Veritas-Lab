@@ -2,9 +2,30 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
-from app.core.env import Other_Settings
+from app.core.env import Postgres_Settings,Other_Settings
+
+from contextlib import asynccontextmanager
+import asyncpg
 
 other_settings = Other_Settings()
+postgres_settings = Postgres_Settings()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = await asyncpg.create_pool(
+        user=postgres_settings.DB_USER,
+        password=postgres_settings.DB_PASSWORD,
+        database=postgres_settings.DB_NAME,
+        host=postgres_settings.DB_HOST,
+        port=postgres_settings.DB_PORT,
+        ssl="require" if postgres_settings.DB_SSL else None,
+        min_size=5,
+        max_size=30
+    )
+
+    yield
+
+    await app.state.pool.close()
 
 app = FastAPI(
     title="Veritas Lab API",
@@ -12,6 +33,7 @@ app = FastAPI(
     docs_url=None if other_settings.ENVIRONMENT == "production" else "/docs",
     redoc_url=None if other_settings.ENVIRONMENT == "production" else "/redoc",
     openapi_url=None if other_settings.ENVIRONMENT == "production" else "/openapi.json",
+    lifespan=lifespan
 )
 
 
