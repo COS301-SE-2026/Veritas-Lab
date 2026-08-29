@@ -52,4 +52,15 @@ describe('useAuditLog', () => {
         expect(result.current.error).toBeNull();
     });
 
+    it('handles errors when fetching audit logs', async () => {
+        const mockedGetAllAudit = getAllAudit as jest.MockedFunction<typeof getAllAudit>;
+        mockedGetAllAudit.mockRejectedValue(new Error('Failed to load audit logs'));
+        const { result } = renderHook(() => useAuditLog());
+        await waitFor(() => {
+            expect(result.current.error).toBe('Failed to load audit logs');
+        });
+        expect(result.current.auditLogs).toBeNull();
+        expect(result.current.isLoading).toBe(false);
+    });
+
 });
