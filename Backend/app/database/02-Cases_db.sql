@@ -54,3 +54,23 @@ create UNIQUE INDEX CaseImage ON "Cases_DB"."Reports"(CaseId, MediaId);
 ALTER TABLE "Cases_DB"."MediaType" 
 ALTER COLUMN MediaExtension SET NOT NULL;
 
+
+-- BELOW is the Audit tables
+CREATE SEQUENCE case_audit_seq START WITH 1 INCREMENT BY 1;
+
+DROP TYPE IF EXISTS queryType CASCADE;
+CREATE TYPE queryType AS ENUM ('CREATE','UPDATE','DELETE');
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
+    audit_case_id int PRIMARY KEY DEFAULT nextval('case_audit_seq'),
+    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor_name VARCHAR(100) NOT NULL,
+    query_type queryType NOT NULL,
+    old_case_id UUID,
+    CaseName varchar(255) NOT NULL,
+    CaseCreator varchar(100) NOT NULL,
+    CaseDescription TEXT,
+    CaseClosed boolean NOT NULL DEFAULT FALSE,
+    CaseCreationDate TIMESTAMPTZ,
+    AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
