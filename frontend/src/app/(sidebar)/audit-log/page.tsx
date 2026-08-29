@@ -1,7 +1,6 @@
 'use client';
 import AuditLogs from '@/components/common/auditLogs';
 import { useUserRole } from '@/context/UserRoleContext';
-import useAuditLog from '@/lib/hooks/useAuditLog';
 import { useRouter } from 'next/dist/client/components/navigation';
 import { useEffect } from 'react';
 import Card from '@/components/ui/card';
@@ -13,20 +12,6 @@ export default function AuditLogPage() {
         router.replace('/dashboard');
       }  
     })
-
-    const { auditLogs, isLoading, error } = useAuditLog();
-
-    if (isLoading) {
-        return <div>Loading...</div>;
-    }
-
-    // if (error) {
-    //     return <div>Error: {error}</div>;
-    // }
-
-    // if (!auditLogs) {
-    //     return <div>No audit logs found</div>;
-    // }
 
     return (
         <div className='mt-8 ml-8 mr-8'>
