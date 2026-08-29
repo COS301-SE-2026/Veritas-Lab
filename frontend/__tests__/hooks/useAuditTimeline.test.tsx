@@ -34,4 +34,16 @@ describe('useAuditTimeline', () => {
         expect(result.current.isLoading).toBe(false);
         expect(result.current.error).toBeNull();
     });
+
+    it('handles errors when fetching audit timeline', async () => {
+        const caseId = 'case-2';
+        const mockedGetAudit = getAudit as jest.MockedFunction<typeof getAudit>;
+        mockedGetAudit.mockRejectedValue(new Error('Failed to load audit timeline'));
+        const { result } = renderHook(() => useAuditTimeline(caseId));
+        await waitFor(() => {
+            expect(result.current.error).toBe('Failed to load audit timeline');
+        });
+        expect(result.current.timeline).toBeUndefined();
+        expect(result.current.isLoading).toBe(false);
+    });
 });
