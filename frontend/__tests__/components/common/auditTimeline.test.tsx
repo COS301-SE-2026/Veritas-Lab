@@ -8,7 +8,7 @@ jest.mock('@/lib/hooks/useAuditTimeline', () => ({
 
 jest.mock('@/components/ui/label', () => ({
     __esModule: true,
-    default: jest.fn(({ text }) => <div>{text}</div>),
+    default: jest.fn(({ text }) => <div data-testid="error-label">{text}</div>),
 }));
 
 jest.mock('lucide-react', () => ({
@@ -34,4 +34,20 @@ describe('AuditTimeline', () => {
         expect(screen.getByText('Loading timeline...')).toBeInTheDocument();
         expect(auditTimelineMock).toHaveBeenCalledWith('case-1');
     });
-});
+
+    it('renders error state', () => {
+        const auditTimelineMock = useAuditTimeline as jest.Mock;
+        const mockedResponse = {
+            timeline: null,
+            isLoading: false,
+            error: 'Failed to load audit timeline',
+        };
+        auditTimelineMock.mockReturnValue(mockedResponse);
+
+        render(<AuditTimeline caseId="case-1" />);
+        const errorLabel = screen.getByTestId('error-label');
+        expect(errorLabel).toBeInTheDocument();
+        expect(errorLabel).toHaveTextContent('Failed to load audit timeline');
+        expect(auditTimelineMock).toHaveBeenCalledWith('case-1');
+    });
+})
