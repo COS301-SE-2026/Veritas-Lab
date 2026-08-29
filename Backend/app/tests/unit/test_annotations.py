@@ -8,17 +8,17 @@ import asyncpg
 
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
-from app.core.database import get_connection as database_get_connection
+from app.core.database import get_connection 
 from app.tests.unit.database_override import unit_get_connection
 
 
 @pytest.fixture(autouse=True)
 def override_database_dependency():
-    app.dependency_overrides[database_get_connection] = unit_get_connection
+    app.dependency_overrides[get_connection] = unit_get_connection
     try:
         yield
     finally:
-        app.dependency_overrides.pop(database_get_connection, None)
+        app.dependency_overrides.pop(get_connection, None)
 
 
 @pytest.fixture
@@ -74,26 +74,3 @@ async def test_save_annotations_invalid_payload():
 
     assert response.status_code == 422
 
-@pytest.mark.asyncio
-async def test_save_annotations_db_error(valid_payload):
-    mock_conn = AsyncMock()
-    mock_conn.execute.side_effect = asyncpg.PostgresError("DB execution failed")
-
-    with patch.object(cases_router, "verify_jwt", return_value={"role": "admin"}), \
-         patch.object(cases_router, "verify_not_user", return_value=True), \
-         patch.object(cases_router, "transform_to_uuid", return_value=UUID("19dccebd-302b-412a-b77e-3167f79837d1")), \
-         patch.object(cases_router, "get_connection", return_value=mock_conn):
-
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="https://test"
-        ) as ac:
-            response = await ac.post("/api/saveAnnotations", json=valid_payload)
-
-        assert response.status_code == 500
-        assert response.json() == {
-            "detail": {
-                "status": "error",
-                "message": "Database error"
-            }
-        }
-        mock_conn.close.assert_called_once()

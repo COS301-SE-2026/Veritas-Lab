@@ -18,7 +18,7 @@ from app.core.cases import (
 )
 import app.api.routers.cases_router as cases_router
 from starlette.datastructures import UploadFile
-from app.core.database import get_connection as database_get_connection
+from app.core.database import get_connection
 from app.tests.unit.database_override import unit_get_connection
 
 
@@ -27,11 +27,11 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def override_database_dependency():
-    app.dependency_overrides[database_get_connection] = unit_get_connection
+    app.dependency_overrides[get_connection] = unit_get_connection
     try:
         yield
     finally:
-        app.dependency_overrides.pop(database_get_connection, None)
+        app.dependency_overrides.pop(get_connection, None)
 
 
 @pytest.mark.asyncio

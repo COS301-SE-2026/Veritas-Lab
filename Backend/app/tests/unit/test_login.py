@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.api.main import app
 import app.auth.auth as auth
 from app.auth.auth import hash_password
-from app.core.database import get_connection as database_get_connection
+from app.core.database import get_connection
 from app.tests.unit.database_override import unit_get_connection
 
 client = TestClient(app)
@@ -11,11 +11,11 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def override_database_dependency():
-    app.dependency_overrides[database_get_connection] = unit_get_connection
+    app.dependency_overrides[get_connection] = unit_get_connection
     try:
         yield
     finally:
-        app.dependency_overrides.pop(database_get_connection, None)
+        app.dependency_overrides.pop(get_connection, None)
 
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 

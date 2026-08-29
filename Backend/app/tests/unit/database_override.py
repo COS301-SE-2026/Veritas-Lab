@@ -1,38 +1,31 @@
 import inspect
 from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock
 
 import asyncpg
 from fastapi import Request
 
 from app.api.routers import cases_router
-from app.core.database import get_connection as database_get_connection
-from app.core.env import Postgres_Settings
+
+ORIGINAL_ASYNCPG_CONNECT = asyncpg.connect
 
 
-postgres_settings = Postgres_Settings()
+async def unit_get_connection(request: Request) -> AsyncGenerator[AsyncMock, None]:
+    connect_fn = getattr(cases_router.asyncpg, "connect", ORIGINAL_ASYNCPG_CONNECT)
+    connection = AsyncMock()
 
-
-async def unit_get_connection(request: Request) -> AsyncGenerator[asyncpg.Connection, None]:
-    patched_dependency = cases_router.get_connection
-
-    if patched_dependency is not database_get_connection:
-        connection = patched_dependency()
-        if inspect.isawaitable(connection):
-            connection = await connection
-        elif inspect.isasyncgen(connection):
-            connection = await anext(connection)
-    else:
-        connection = await asyncpg.connect(
-            user=postgres_settings.DB_USER,
-            password=postgres_settings.DB_PASSWORD,
-            database=postgres_settings.DB_NAME,
-            host=postgres_settings.DB_HOST,
-            port=postgres_settings.DB_PORT,
-            ssl="require" if postgres_settings.DB_SSL else None,
-        )
+    if callable(connect_fn) and connect_fn is not ORIGINAL_ASYNCPG_CONNECT:
+        result = connect_fn()
+        if inspect.isawaitable(result):
+            result = await result
+        if result is not None:
+            connection = result
 
     try:
         yield connection
     finally:
-        if connection is not None:
-            await connection.close()
+        close_method = getattr(connection, "close", None)
+        if callable(close_method):
+            close_result = close_method()
+            if inspect.isawaitable(close_result):
+                await close_result
