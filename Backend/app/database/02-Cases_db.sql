@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
 
 CREATE SEQUENCE IF NOT EXISTS mediatype_audit_seq START WITH 1 INCREMENT BY 1;
 
-CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_MediaType"(
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_MediaTypes"(
     audit_mediatype_id int PRIMARY KEY DEFAULT nextval('mediatype_audit_seq'),
     query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
     query_executor_name VARCHAR(100) NOT NULL,
@@ -100,5 +100,20 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Media"(
     old_MediaHash TEXT,
     old_MediaAnnotations JSONB,
     old_MediaUploadDate TIMESTAMPTZ,
+    AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE SEQUENCE IF NOT EXISTS comment_audit_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Comments"(
+    audit_comment_id int PRIMARY KEY DEFAULT nextval('comment_audit_seq'),
+    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor_name VARCHAR(100) NOT NULL,
+    query_type queryType NOT NULL,
+    old_comment_id BIGINT,
+    old_CaseId UUID,
+    old_Username varchar(100),
+    old_Comment TEXT,
+    old_CommentTimestamp TIMESTAMPTZ,
     AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
