@@ -110,14 +110,15 @@ services:
             - POSTGRES_USER=${DB_USER}
             - POSTGRES_PASSWORD=${DB_PASSWORD}
             - POSTGRES_DB=${DB_NAME}
+            - PGDATA=/var/lib/postgresql/data
         ports:
             - "5432:5432"
         volumes:
-            - postgres_data:/var/lib/postgresql
-            - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/schema-users.sql
-            - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/schema-cases.sql
-            - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/seed-cases.sql
-            - ./Backend/app/database/seed_cases.sql:/docker-entrypoint-initdb.d/seed-cases-extra.sql
+            - postgres_data:/var/lib/postgresql/data
+            - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/00-users.sql
+            - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/01-cases.sql
+            - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/02-init-cases.sql
+            - ./Backend/app/database/seed_cases.sql:/docker-entrypoint-initdb.d/03-seed-cases.sql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
             interval: 5s
