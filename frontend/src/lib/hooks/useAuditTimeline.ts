@@ -16,7 +16,7 @@ export default function useAuditTimeline( caseId: string ) {
                 setError(loadError instanceof Error ? loadError.message : 'Failed to load audit timeline');
             }
             setIsLoading(false);
-        })
+        })();
     }, [caseId]);
 
     return {
