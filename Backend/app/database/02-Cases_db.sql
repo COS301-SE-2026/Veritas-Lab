@@ -142,7 +142,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION "Cases_DB".audit_mediatypes_delete_fn()
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_mediatypes_delete_trigger()
 RETURNS TRIGGER AS $$
 DECLARE
     v_executor_id UUID;
@@ -164,4 +164,39 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER trg_audit_mediatypes_delete
 AFTER DELETE ON "Cases_DB"."MediaType"
-FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_delete_fn();
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_delete_trigger();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_mediatypes_table_modify_trigger()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_MediaTypes" (
+            query_executor, query_executor_name, query_type,
+            old_mediatype_id, old_MediaName, old_MediaBucket, old_MediaExtension
+        ) VALUES (
+            v_executor_id, v_executor_name, 'INSERT'::queryType,
+            NEW.MediaTypeId, NEW.MediaName, NEW.MediaBucket, NEW.MediaExtension
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_MediaTypes" (
+            query_executor, query_executor_name, query_type,
+            old_mediatype_id, old_MediaName, old_MediaBucket, old_MediaExtension
+        ) VALUES (
+            v_executor_id, v_executor_name, 'UPDATE'::queryType,
+            OLD.MediaTypeId, OLD.MediaName, OLD.MediaBucket, OLD.MediaExtension
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_audit_mediatypes_upsert
+AFTER INSERT OR UPDATE ON "Cases_DB"."MediaType"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_table_modify_trigger();
