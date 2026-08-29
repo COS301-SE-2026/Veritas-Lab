@@ -37,8 +37,48 @@ describe('AuditLogs', () => {
 
         render(<AuditLogs />);
 
-        expect(screen.getByText('Loading audit logs...')).toBeInTheDocument();
+        expect(screen.queryByText('Loading audit logs...')).toBeInTheDocument();
         expect(useAuditLogMock).toHaveBeenCalled();
         expect(screen.queryByTestId('audit-log-case-card')).not.toBeInTheDocument();
+    });
+
+    it('renders audit logs when data is available', () => {
+        // This test also is waiting fot the mock data to be removed so it can test properly
+        const useAuditLogMock = useAuditLog as jest.Mock;
+        const mockedResponse = {
+            isLoading: false,
+            error: null,
+            auditLogs: [
+                {
+                    caseID: 'case-1',
+                    events: [
+                        {
+                            timestamp: '2026-05-01T05:00:00.000Z',
+                            action: 'Created case',
+                            user: 'Invest Admin',
+                        },
+                        {
+                            timestamp: '2026-05-02T10:30:00.000Z',
+                            action: 'Added evidence',
+                            user: 'Invest Admin',
+                        }
+                    ]
+                },
+                {
+                    caseID: 'case-2',
+                    events: [
+                        {
+                            timestamp: '2026-05-03T14:15:00.000Z',
+                            action: 'Closed case',
+                            user: 'Invest Admin',
+                        }
+                    ]
+                }
+            ]
+        };
+        useAuditLogMock.mockReturnValue(mockedResponse);
+
+        render(<AuditLogs />);
+        expect(screen.queryByText('Loading audit logs...')).not.toBeInTheDocument();
     });
 });
