@@ -58,7 +58,7 @@ ALTER COLUMN MediaExtension SET NOT NULL;
 CREATE SEQUENCE case_audit_seq START WITH 1 INCREMENT BY 1;
 
 DROP TYPE IF EXISTS queryType CASCADE;
-CREATE TYPE queryType AS ENUM ('CREATE','UPDATE','DELETE');
+CREATE TYPE queryType AS ENUM ('INSERT','UPDATE','DELETE');
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
     audit_case_id int PRIMARY KEY DEFAULT nextval('case_audit_seq'),
@@ -117,3 +117,51 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Comments"(
     old_CommentTimestamp TIMESTAMPTZ,
     AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE OR REPLACE FUNCTION "Cases_DB".get_audit_executor(
+    OUT executor_id UUID, 
+    OUT executor_name VARCHAR(100)
+) AS $$
+DECLARE
+    v_user_setting TEXT;
+BEGIN
+    v_user_setting := NULLIF(current_setting('app.current_user_id', true), '');
+    IF v_user_setting IS NULL THEN
+        RAISE EXCEPTION 'Audit constraint failure: Session variable "app.current_user_id" is not set.';
+    END IF;
+
+    executor_id := v_user_setting::UUID;
+    SELECT UserName INTO executor_name
+    FROM "Users_DB"."Users"
+    WHERE UserId = executor_id;
+
+    IF executor_name IS NULL THEN
+        RAISE EXCEPTION 'This user is unauthorised to preform this task', executor_id;
+    END IF;
+
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_mediatypes_delete_fn()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_MediaTypes" (
+        query_executor, query_executor_name, query_type,
+        old_mediatype_id, old_MediaName, old_MediaBucket, old_MediaExtension
+    ) VALUES (
+        v_executor_id, v_executor_name, 'DELETE'::queryType,
+        OLD.MediaTypeId, OLD.MediaName, OLD.MediaBucket, OLD.MediaExtension
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_audit_mediatypes_delete
+AFTER DELETE ON "Cases_DB"."MediaType"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_delete_fn();
