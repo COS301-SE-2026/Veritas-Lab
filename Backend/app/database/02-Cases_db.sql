@@ -342,3 +342,38 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER audit_cases_delete_trigger
 AFTER DELETE ON "Cases_DB"."Cases"
 FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_delete();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_modify()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, query_executor_name, query_type,
+            old_case_id, old_CaseName, old_CaseCreator, old_CaseDescription, old_CaseClosed, old_CaseCreationDate
+        ) VALUES (
+            v_executor_id, v_executor_name, 'INSERT'::queryType,
+            NEW.CaseId, NEW.CaseName, NEW.CaseCreator, NEW.CaseDescription, NEW.CaseClosed, NEW.CaseCreationDate
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, query_executor_name, query_type,
+            old_case_id, old_CaseName, old_CaseCreator, old_CaseDescription, old_CaseClosed, old_CaseCreationDate
+        ) VALUES (
+            v_executor_id, v_executor_name, 'UPDATE'::queryType,
+            OLD.CaseId, OLD.CaseName, OLD.CaseCreator, OLD.CaseDescription, OLD.CaseClosed, OLD.CaseCreationDate
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_cases_modified_trigger
+AFTER INSERT OR UPDATE ON "Cases_DB"."Cases"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_modify();
