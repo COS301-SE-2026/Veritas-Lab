@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
     old_CaseDescription TEXT,
     old_CaseClosed boolean NOT NULL DEFAULT FALSE,
     old_CaseCreationDate TIMESTAMPTZ,
-    old_AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE SEQUENCE IF NOT EXISTS mediatype_audit_seq START WITH 1 INCREMENT BY 1;
@@ -85,5 +85,20 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_MediaType"(
     old_MediaName varchar(100) NOT NULL,
     old_MediaBucket varchar(255) NOT NULL,
     old_MediaExtension varchar(10) NOT NULL,
-    old_AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE SEQUENCE IF NOT EXISTS media_audit_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Media"(
+    audit_media_id int PRIMARY KEY DEFAULT nextval('media_audit_seq'),
+    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor_name VARCHAR(100) NOT NULL,
+    query_type queryType NOT NULL,
+    old_media_id UUID,
+    old_MediaType UUID,
+    old_MediaHash TEXT,
+    old_MediaAnnotations JSONB,
+    old_MediaUploadDate TIMESTAMPTZ,
+    AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
