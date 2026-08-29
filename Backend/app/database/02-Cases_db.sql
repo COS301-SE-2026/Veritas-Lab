@@ -259,3 +259,27 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER audit_media_insert_trigger
 AFTER INSERT OR UPDATE ON "Cases_DB"."Media"
 FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_media_modify();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_comments_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Comments" (
+        query_executor, query_executor_name, query_type,
+        old_comment_id, old_CaseId, old_Username, old_Comment, old_CommentTimestamp
+    ) VALUES (
+        v_executor_id, v_executor_name, 'DELETE'::queryType,
+        OLD.CommentID, OLD.CaseId, OLD.Username, OLD.Comment, OLD.CommentTimestamp
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_comments_delete_trigger
+AFTER DELETE ON "Cases_DB"."Comments"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_comments_delete();
