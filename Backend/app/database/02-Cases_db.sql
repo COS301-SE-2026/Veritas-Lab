@@ -318,3 +318,27 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER audit_comments_modifed_trigger
 AFTER INSERT OR UPDATE ON "Cases_DB"."Comments"
 FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_comments_modify();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Cases" (
+        query_executor, query_executor_name, query_type,
+        old_case_id, old_CaseName, old_CaseCreator, old_CaseDescription, old_CaseClosed, old_CaseCreationDate
+    ) VALUES (
+        v_executor_id, v_executor_name, 'DELETE'::queryType,
+        OLD.CaseId, OLD.CaseName, OLD.CaseCreator, OLD.CaseDescription, OLD.CaseClosed, OLD.CaseCreationDate
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_cases_delete_trigger
+AFTER DELETE ON "Cases_DB"."Cases"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_delete();
