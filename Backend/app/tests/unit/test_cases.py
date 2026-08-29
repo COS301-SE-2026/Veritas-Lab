@@ -10,7 +10,7 @@ from app.api.main import app
 from app.core.cases import Case
 import app.api.routers.cases_router as cases_router
 from app.auth.auth import NOT_AUTH, INVALID_TOKEN
-from app.core.database import get_connection as database_get_connection
+from app.core.database import get_connection 
 from app.tests.unit.database_override import unit_get_connection
 
 import uuid
@@ -21,11 +21,11 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def override_database_dependency():
-    app.dependency_overrides[database_get_connection] = unit_get_connection
+    app.dependency_overrides[get_connection] = unit_get_connection
     try:
         yield
     finally:
-        app.dependency_overrides.pop(database_get_connection, None)
+        app.dependency_overrides.pop(get_connection, None)
 
 def test_case_creation_with_valid_data():
     client.cookies.clear()
