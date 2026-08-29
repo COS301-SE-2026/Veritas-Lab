@@ -21,6 +21,7 @@ export default function Sidebar() {
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', icon: Home },
         ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
+        ...(userRole === 'ADMIN' ? [{ label: 'Audit Logs', href: '/audit-log', icon: UserStar }] : []),
         { label: 'Help', href: '/help', icon: HelpCircle },
     ];
 
