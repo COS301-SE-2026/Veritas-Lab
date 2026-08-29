@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Cases" (
     CaseCreationDate TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Media"(
     MediaId UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     MediaType UUID NOT NULL REFERENCES "Cases_DB"."MediaType"(MediaTypeId) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -67,10 +66,24 @@ CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_case_id UUID,
-    CaseName varchar(255) NOT NULL,
-    CaseCreator varchar(100) NOT NULL,
-    CaseDescription TEXT,
-    CaseClosed boolean NOT NULL DEFAULT FALSE,
-    CaseCreationDate TIMESTAMPTZ,
-    AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    old_CaseName varchar(255) NOT NULL,
+    old_CaseCreator varchar(100) NOT NULL,
+    old_CaseDescription TEXT,
+    old_CaseClosed boolean NOT NULL DEFAULT FALSE,
+    old_CaseCreationDate TIMESTAMPTZ,
+    old_AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE SEQUENCE IF NOT EXISTS mediatype_audit_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_MediaType"(
+    audit_mediatype_id int PRIMARY KEY DEFAULT nextval('mediatype_audit_seq'),
+    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor_name VARCHAR(100) NOT NULL,
+    query_type queryType NOT NULL,
+    old_mediatype_id UUID,
+    old_MediaName varchar(100) NOT NULL,
+    old_MediaBucket varchar(255) NOT NULL,
+    old_MediaExtension varchar(10) NOT NULL,
+    old_AuditTimestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
