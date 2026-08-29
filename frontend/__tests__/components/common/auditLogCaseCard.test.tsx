@@ -44,4 +44,14 @@ describe('AuditLogCaseCard', () => {
         expect(folderPlusIcon).toHaveLength(2);
     });
 
+    it('collapses events when clicking the chevron icon again', () => {
+        render(<AuditLogCaseCard caseId={mockedCaseId} events={mockedEvents} />);
+        const chevy = screen.getByTestId('chevron-icon');
+        fireEvent.click(chevy);
+        expect(screen.getByText('Created case')).toBeInTheDocument();
+        expect(screen.getByText('Added evidence')).toBeInTheDocument();
+        fireEvent.click(chevy);
+        expect(screen.queryByText('Created case')).not.toBeInTheDocument();
+        expect(screen.queryByText('Added evidence')).not.toBeInTheDocument();
+    });
 })
