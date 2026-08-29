@@ -75,6 +75,8 @@ describe('AuditTimeline', () => {
         auditTimelineMock.mockReturnValue(mockedResponse);
 
         render(<AuditTimeline caseId="case-1" />);
+
+        // For now the mocked timeline items are tested until the auditTimeline component is rid of mocks
         const createCaseEvent = screen.getAllByText('Case Created');
         expect(createCaseEvent.length).toBeGreaterThan(0);
         const usersNameJoe = screen.getAllByText('John Doe');
