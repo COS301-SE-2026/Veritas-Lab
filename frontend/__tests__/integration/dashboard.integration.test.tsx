@@ -50,7 +50,7 @@ describe('Dashboard (integration)', () => {
     const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
     const mockedCreateCase = createCase as jest.MockedFunction<typeof createCase>;
     const mockedDeleteCase = deleteCase as jest.MockedFunction<typeof deleteCase>;
-    
+
     beforeEach(() => {
         jest.resetAllMocks();
         mockUseUserRole.mockReturnValue('INVESTIGATOR');
@@ -71,7 +71,8 @@ describe('Dashboard (integration)', () => {
         expect(screen.getByText('Cases Closed')).toBeInTheDocument();
         expect(screen.getByText('1')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'New Case' })).toBeInTheDocument();
-        expect(screen.getByText('Created by investigator.one')).toBeInTheDocument();
+        //needed to change this due to ambiguity
+        expect(within(getCardContainer('Alpha Fraud')).getByText('Created by investigator.one')).toBeInTheDocument();
     });
     it('hides the summary cards and new case button for a normal user but still lists cases', async () => {
         mockUseUserRole.mockReturnValue('USER');
