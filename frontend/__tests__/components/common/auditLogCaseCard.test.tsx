@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import AuditLogCaseCard from '@/components/common/auditLogCaseCard';
 import { AuditEvents } from '@/types/api';
 jest.mock('lucide-react', () => ({
@@ -30,6 +30,18 @@ describe('AuditLogCaseCard', () => {
         expect(screen.getByText(mockedCaseId)).toBeInTheDocument();
         expect(screen.queryByText('Created case')).not.toBeInTheDocument();
         expect(screen.queryByText('Added evidence')).not.toBeInTheDocument();
-    })
+    });
+
+    it('renders case ID and events in open state', () => {
+        render(<AuditLogCaseCard caseId={mockedCaseId} events={mockedEvents} />);
+        const chevy = screen.getByTestId('chevron-icon');
+        fireEvent.click(chevy);
+
+        expect(screen.getByText('Created case')).toBeInTheDocument();
+        expect(screen.getByText('Added evidence')).toBeInTheDocument();
+
+        const folderPlusIcon = screen.getAllByTestId('folder-plus-icon');
+        expect(folderPlusIcon).toHaveLength(2);
+    });
 
 })
