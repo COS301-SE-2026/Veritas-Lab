@@ -2237,3 +2237,63 @@ async def get_case_audit_events(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+@router.get(
+    "/getAuditedCases",
+    status_code=status.HTTP_200_OK,
+    tags=["Audit"],
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Get all cases with audit logs",
+    description=(
+        "Returns the different cases that have at least one audit entry, with the number of recorded events"
+        " and when the most recent one happened. Amdin only."
+    ),
+    responses={
+        200: {
+            "model": audited_cases_response,
+            "description": "Audited cases retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "cases": [
+                            {
+                                "caseId": "123e4567-e89b-12d3-a456-426614174000",
+                                "caseName": "Reciepts sus",
+                                "eventCount": 5,
+                                "lastEventTimnestamp": "2026-08-12T11:01:30",
+                                "caseExists": True
+                            },
+                            {
+                                "caseId": "987e6543-e21b-12d3-a456-426614174000",
+                                "caseName": "Idk ig",
+                                "eventCount": 2,
+                                "lastEventTimnestamp": None,
+                                "caseExists": False
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: USER_UNAUTHORIZED_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
