@@ -3,8 +3,10 @@ from pathlib import Path
 import torch
 from app.training.image.model import AIImageDetector as TrainedAIImageDetector
 from app.training.image.prediction import predict_and_explain
+from app.training.pdf.explain import explain_pdf, load_detector
 
 MODEL_PATH = Path("app/ai/best_model.pth")
+PDF_MODEL_PATH = Path("app/ai/pdf_detector.pt")
 
 class AIImageDetector:
     def __init__(self) -> None:
@@ -50,4 +52,30 @@ class AIImageDetector:
         }
 
         result["risk_level"] = risk_mapping[result["risk_level"]]
+        return result
+
+class AIPDFDetector:
+    def __init__(self) -> None:
+        self.model_path = PDF_MODEL_PATH
+        load_detector(str(self.model_path))
+
+    def analyse_pdf(self, pdf_path: str | Path):
+        pdf_path = Path(pdf_path)
+
+        result = explain_pdf(pdf_path, str(self.model_path))
+
+        confidence = (
+            result["ai_probability"]
+            if result["prediction"] == "AI-generated"
+            else 1.0 - result["ai_probability"]
+        )
+
+        if confidence >= 0.80:
+            risk_level = 3
+        elif confidence >= 0.60:
+            risk_level = 2
+        else:
+            risk_level = 1
+
+        result["risk_level"] = risk_level
         return result
