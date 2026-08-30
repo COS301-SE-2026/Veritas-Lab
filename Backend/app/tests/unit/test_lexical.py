@@ -1,24 +1,30 @@
-import argparse
 import numpy as np
 import torch
-
-from app.training.pdf.features import extract_pdf_features
-from app.training.pdf.lexical import extract_pdf_text, lexical_ai_probability
+from types import SimpleNamespace
 import app.training.pdf.lexical as lexical
-from app.training.pdf.model import PDFDetector
 import pytest
+
+def clear_cache(function):
+    cache_clear = getattr(
+        function,
+        "cache_clear",
+        None
+    )
+
+    if cache_clear:
+        cache_clear()
 
 @pytest.fixture(autouse=True)
 def clear_model_caches():
-    lexical.get_training_tokeniser.cache_clear()
-    lexical.get_inference_model.cache_clear()
-    lexical.get_inference_tokeniser.cache_clear()
+    clear_cache(lexical.get_training_tokeniser)
+    clear_cache(lexical.get_inference_model)
+    clear_cache(lexical.get_inference_tokeniser)
 
     yield
 
-    lexical.get_training_tokeniser.cache_clear()
-    lexical.get_inference_model.cache_clear()
-    lexical.get_inference_tokeniser.cache_clear()
+    clear_cache(lexical.get_training_tokeniser)
+    clear_cache(lexical.get_inference_model)
+    clear_cache(lexical.get_inference_tokeniser)
 
 def test_get_training_tokeniser_loads_and_caches(monkeypatch):
     fake_tokeniser = object()
@@ -210,6 +216,35 @@ def test_page_has_ocr_candidate_rejects_missing_bbox():
 
     assert lexical.page_has_ocr_candidate(page) is False
 
+def test_extract_pdf_text_falls_back_when_ocr_returns_empty(monkeypatch, tmp_path):
+    class Page:
+        number = 0
+
+        def get_text(self, *args, **kwargs):
+            if "textpage" in kwargs:
+                return ""
+
+            return "Fallback"
+
+        def get_textpage_ocr(self, **kwargs):
+            return object()
+
+    monkeypatch.setattr(
+        lexical.pymupdf,
+        "open",
+        lambda path: FakeDocument([Page()])
+    )
+
+    monkeypatch.setattr(
+        lexical,
+        "page_has_ocr_candidate",
+        lambda page: True
+    )
+
+    result = lexical.extract_pdf_text(tmp_path / "document.pdf")
+    assert result == "Fallback"
+
+
 def test_page_has_ocr_candidate_rejects_low_coverage():
     page = FakeOCRPage(
         images=[
@@ -383,3 +418,391 @@ def test_pdf_ai_probability_returns_neutral_when_no_text(monkeypatch):
     )
 
     assert lexical.pdf_ai_probability("test.pdf") == 0.5
+
+def test_pdf_ai_probability_calls_lexical_model(monkeypatch):
+    monkeypatch.setattr(
+        lexical,
+        "extract_pdf_text",
+        lambda path: "Some extracted text"
+    )
+
+    captured = {}
+
+    def fake_probability(text, max_chunks=None):
+        captured["text"] = text
+        captured["max_chunks"] = max_chunks
+        return 0.83
+
+    monkeypatch.setattr(
+        lexical,
+        "lexical_ai_probability",
+        fake_probability
+    )
+
+    result = lexical.pdf_ai_probability(
+        "test.pdf",
+        max_chunks=4
+    )
+
+    assert result == 0.83
+    assert captured["text"] == "Some extracted text"
+    assert captured["max_chunks"] == 4
+
+def test_prepare_dataset_limits_chunks(monkeypatch):
+    class FakeTokeniser:
+        def __call__(self, text, **kwargs):
+            return {
+                "input_ids": [
+                    [1,2],
+                    [3,4],
+                    [5,6]
+                ],
+
+                "attention_mask": [
+                    [1,1],
+                    [1,1],
+                    [1,1]
+                ]
+            }
+
+    monkeypatch.setattr(
+        lexical,
+        "get_training_tokeniser",
+        lambda: FakeTokeniser()
+    )
+
+    monkeypatch.setattr(
+        lexical,
+        "MAX_TRAINING_CHUNKS_PER_PDF",
+        2
+    )
+
+    raw_dataset = [
+        {
+            "text": "example text",
+            "label": 1,
+            "pdf_id": "example.pdf"
+        }
+    ]
+
+    prepared, pdf_ids = lexical.prepare_dataset(raw_dataset)
+
+    assert len(prepared) == 2
+    assert prepared["label"] == [1, 1]
+    
+    assert pdf_ids == [
+        "example.pdf",
+        "example.pdf"
+    ]
+
+def test_create_pdf_metrics_returns_correct_metrics():
+    pdf_ids = [
+        "ai.pdf",
+        "ai.pdf",
+        "authentic.pdf"
+    ]
+
+    compute_metrics = lexical.create_pdf_metrics(pdf_ids)
+
+    logits = np.array(
+        [
+            [0.0, 3.0],
+            [0.0, 2.0],
+            [3.0, 0.0]
+        ]
+    )
+
+    labels = np.array(
+        [
+            1,
+            1,
+            0
+        ]
+    )
+
+    result = compute_metrics((logits, labels))
+
+    assert result["accuracy"] == 1.0
+    assert result["precision"] == 1.0
+    assert result["recall"] == 1.0
+    assert result["f1"] == 1.0
+
+def test_lexical_ai_probability_empty_text():
+    assert lexical.lexical_ai_probability("") == 0.5
+    assert lexical.lexical_ai_probability(None) == 0.5
+
+def test_lexical_ai_probability_runs_in_batches(monkeypatch):
+    class FakeTokeniser:
+        def __call__(self, text, **kwargs):
+            return {
+                "input_ids": torch.ones(
+                    (5,4),
+                    dtype=torch.long
+                ),
+                "attention_mask": torch.ones(
+                    (5,4),
+                    dtype=torch.long
+                )
+            }
+
+    class FakeModel:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, input_ids, attention_mask):
+            self.calls += 1
+            
+            batch_size = input_ids.shape[0]
+            
+            logits = torch.tensor(
+                [[0.0, 2.0]] * batch_size,
+                dtype=torch.float32
+            )
+            
+            return SimpleNamespace(logits=logits)
+
+    fake_model = FakeModel()
+
+    monkeypatch.setattr(
+        lexical,
+        "get_inference_model",
+        lambda: fake_model
+    )
+
+    monkeypatch.setattr(
+        lexical,
+        "get_inference_tokeniser",
+        lambda: FakeTokeniser()
+    )
+
+    monkeypatch.setattr(
+        lexical,
+        "INFERENCE_BATCH_SIZE",
+        2
+    )
+
+    probability = lexical.lexical_ai_probability(
+        "Some document text",
+        max_chunks=3
+    )
+
+    expected = torch.softmax(
+        torch.tensor([0.0, 2.0]),
+        dim=-1
+    )[1].item()
+
+    assert probability == pytest.approx(
+        expected,
+        rel=1e-5
+    )
+
+    assert fake_model.calls == 2
+
+def test_lexical_ai_probability_no_chunks(monkeypatch):
+    class FakeTokeniser:
+        def __call__(self, text, **kwargs):
+            return {
+                "input_ids": torch.empty(
+                    (0,4),
+                    dtype=torch.long
+                ),
+
+                "attention_mask": torch.empty(
+                    (0,4),
+                    dtype=torch.long
+                )
+            }
+
+    monkeypatch.setattr(
+        lexical,
+        "get_inference_model",
+        lambda: object()
+    )
+
+    monkeypatch.setattr(
+        lexical,
+        "get_inference_tokeniser",
+        lambda: FakeTokeniser()
+    )
+
+    result = lexical.lexical_ai_probability(
+        "Some text"
+    )
+
+    assert result == 0.5
+
+def test_test_model_pdf_level(monkeypatch, tmp_path):
+    authentic = tmp_path / "0_authentic"
+    ai = tmp_path / "1_ai"
+
+    authentic.mkdir()
+    ai.mkdir()
+
+    (authentic / "authentic.pdf").touch()
+    (ai / "ai.pdf").touch()
+
+    monkeypatch.setattr(
+        lexical,
+        "TEST_PATH",
+        tmp_path
+    )
+
+    def fake_probability(path, max_chunks=None):
+        if path.name == "ai.pdf":
+            return 0.90
+
+        return 0.10  
+
+    monkeypatch.setattr(
+        lexical,
+        "pdf_ai_probability",
+        fake_probability
+    )
+
+    results = lexical.test_model_pdf_level()
+
+    assert results["accuracy"] == 1.0
+    assert results["precision"] == 1.0
+    assert results["recall"] == 1.0
+    assert results["f1"] == 1.0
+
+def test_test_model_pdf_level_raises_when_no_pdfs(monkeypatch, tmp_path):
+    (tmp_path / "0_authentic").mkdir()
+    (tmp_path / "1_ai").mkdir()
+
+    monkeypatch.setattr(
+        lexical,
+        "TEST_PATH",
+        tmp_path
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="No test PDFs with extractable text were found"
+    ):
+        lexical.test_model_pdf_level()
+
+def test_train_model_raises_when_training_set_empty(monkeypatch):
+    def fake_load_split(path):
+        if path == lexical.TRAIN_PATH:
+            return []
+
+        return [1]
+
+    monkeypatch.setattr(
+        lexical,
+        "load_split",
+        fake_load_split
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="No training PDFs"
+    ):
+        lexical.train_model()
+
+def test_train_model_raises_when_validation_set_empty(monkeypatch):
+    def fake_load_split(path):
+        if path == lexical.TRAIN_PATH:
+            return [1]
+
+        return []
+
+    monkeypatch.setattr(
+        lexical,
+        "load_split",
+        fake_load_split
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="No validation PDFs"
+    ):
+        lexical.train_model()
+
+def test_train_model_success(monkeypatch):
+    train_raw = [{"text": "train"}]
+    validation_raw = [{"text": "validation"}]
+
+    def fake_load_split(path):
+        if path == lexical.TRAIN_PATH:
+            return train_raw
+
+        return validation_raw
+
+    monkeypatch.setattr(
+        lexical,
+        "load_split",
+        fake_load_split
+    )
+
+    def fake_prepare_dataset(dataset):
+        if dataset is train_raw:
+            return "train_dataset", []
+
+        return (
+            "validation_dataset",
+            ["validation.pdf"]
+        )
+
+    monkeypatch.setattr(
+        lexical,
+        "prepare_dataset",
+        fake_prepare_dataset
+    )
+
+    fake_model = object()
+
+    monkeypatch.setattr(
+        lexical,
+        "create_model",
+        lambda: fake_model
+    )
+
+    monkeypatch.setattr(
+        lexical,
+        "TrainingArguments",
+        lambda **kwargs: kwargs
+    )
+
+    class FakeTrainer:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.train_called = False
+            self.saved_path = None
+
+        def train(self):
+            self.train_called = True
+
+        def save_model(self, path):
+            self.saved_path = path
+
+    monkeypatch.setattr(
+        lexical,
+        "Trainer",
+        FakeTrainer
+    )
+
+    class FakeTrainingTokeniser:
+        def __init__(self):
+            self.saved_path = None
+
+        def save_pretrained(self, path):
+            self.saved_path = path
+
+    fake_tokeniser = FakeTrainingTokeniser()
+
+    monkeypatch.setattr(
+        lexical,
+        "get_training_tokeniser",
+        lambda: fake_tokeniser
+    )
+
+    trainer = lexical.train_model()
+
+    assert trainer.train_called is True
+    assert trainer.saved_path == (lexical.MODEL_OUTPUT_PATH)
+    assert fake_tokeniser.saved_path == (lexical.MODEL_OUTPUT_PATH)
+    assert trainer.kwargs["model"] is fake_model
+    assert trainer.kwargs["train_dataset"] == "train_dataset"
+    assert trainer.kwargs["eval_dataset"] == "validation_dataset"
