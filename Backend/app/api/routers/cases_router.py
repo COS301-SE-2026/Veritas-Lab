@@ -2369,7 +2369,7 @@ async def get_audited_cases(
 
         return {
             "status": "success",
-            "cases": [_row_to_audit_event(row) for row in rows]
+            "cases": [_row_to_audited_case(row) for row in rows]
         }
 
     except asyncpg.PostgresError:
