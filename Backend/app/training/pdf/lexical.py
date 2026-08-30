@@ -30,7 +30,9 @@ INFERENCE_BATCH_SIZE = 8
 MAX_TRAINING_CHUNKS_PER_PDF = 8 
 # The training is currently way too long, we could consider retraining at a later stage.
 
-tokeniser = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
+@lru_cache
+def get_training_tokeniser():
+    return AutoTokenizer.from_pretrained(TOKENIZER_NAME)
 
 @lru_cache
 def get_inference_model():
@@ -210,6 +212,7 @@ def prepare_dataset(dataset):
     attention_masks = []
     labels = []
     pdf_ids = []
+    tokeniser = get_training_tokeniser()
 
     for example in dataset:
         encoded = tokeniser(
@@ -364,7 +367,7 @@ def train_model():
     trainer.train()
 
     trainer.save_model(MODEL_OUTPUT_PATH)
-    tokeniser.save_pretrained(MODEL_OUTPUT_PATH)
+    get_training_tokeniser().save_pretrained(MODEL_OUTPUT_PATH)
 
     get_inference_model.cache_clear()
     get_inference_tokeniser.cache_clear()
