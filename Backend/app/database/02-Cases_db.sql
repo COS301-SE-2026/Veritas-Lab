@@ -62,7 +62,7 @@ CREATE TYPE queryType AS ENUM ('INSERT','UPDATE','DELETE');
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
     audit_case_id int PRIMARY KEY DEFAULT nextval('case_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_case_id UUID,
@@ -78,7 +78,7 @@ CREATE SEQUENCE IF NOT EXISTS mediatype_audit_seq START WITH 1 INCREMENT BY 1;
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_MediaTypes"(
     audit_mediatype_id int PRIMARY KEY DEFAULT nextval('mediatype_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID  REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_mediatype_id UUID,
@@ -92,7 +92,7 @@ CREATE SEQUENCE IF NOT EXISTS media_audit_seq START WITH 1 INCREMENT BY 1;
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Media"(
     audit_media_id int PRIMARY KEY DEFAULT nextval('media_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_media_id UUID,
@@ -107,7 +107,7 @@ CREATE SEQUENCE IF NOT EXISTS comment_audit_seq START WITH 1 INCREMENT BY 1;
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Comments"(
     audit_comment_id int PRIMARY KEY DEFAULT nextval('comment_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_comment_id BIGINT,
@@ -137,7 +137,7 @@ BEGIN
         executor_name := 'SYSTEM_INIT';
         RETURN;
     END IF;
-    
+
     SELECT UserName INTO executor_name
     FROM "Users_DB"."Users"
     WHERE UserId = executor_id;

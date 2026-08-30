@@ -1424,11 +1424,12 @@ def test_delete_case_success_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "investigator_user"
         assert role == "INVESTIGATOR"
+        assert executor_id == "mock-user-id"
     
         return None
     
@@ -1467,11 +1468,12 @@ def test_delete_case_success_admin(monkeypatch):
             "role": "ADMIN"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "admin_user"
         assert role == "ADMIN"
+        assert executor_id == "mock-admin-id"
 
         return None
     
@@ -1625,7 +1627,8 @@ def test_delete_case_not_found(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
+        assert executor_id == "mock-investigator-id"
         raise HTTPException(
             status_code=404,
             detail={
@@ -1671,9 +1674,10 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
         assert username == "other_investigator"
         assert role == "INVESTIGATOR"
+        assert executor_id == "mock-investigator-id"
         
         raise HTTPException(
             status_code=403,

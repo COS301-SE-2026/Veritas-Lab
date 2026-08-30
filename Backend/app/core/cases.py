@@ -29,6 +29,17 @@ minio_settings = Minio_Settings()
 other_settings = Other_Settings()
 r2_settings= R2_Settings()
 
+
+async def set_audit_executor(connection: asyncpg.Connection, executor_id: str | uuid.UUID | None):
+    if executor_id is None:
+        return
+
+    await connection.execute(
+        "SELECT set_config('app.current_user_id', $1, true)",
+        str(executor_id),
+    )
+
+
 def get_object(for_presign: bool = False) -> S3Client:
     if other_settings.ENVIRONMENT == "development":
 
@@ -422,7 +433,8 @@ class Case:
         self,
         media_id: uuid.UUID,
         connection: asyncpg.Connection,
-        jwt_username: str = None
+        jwt_username: str = None,
+        jwt_user_id: str | None = None,
     ):
         if self.case_id is None:
             raise HTTPException(
@@ -434,73 +446,77 @@ class Case:
             )
 
         try:
-            if jwt_username is not None:
+            async with connection.transaction():
+                if jwt_user_id is not None:
+                    await set_audit_executor(connection, jwt_user_id)
 
-                status=await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c 
-                    WHERE r.CaseId = c.CaseId
-                        AND r.CaseId = $1
-                        AND r.MediaId = $2
-                        AND c.CaseCreator = $3;
-                    """,
-                    self.case_id,
-                    media_id,
-                    jwt_username
-                )
+                if jwt_username is not None:
 
-                rows_deleted = int(status.split(" ")[1])
-
-                if rows_deleted == 0:
-                    raise HTTPException(
-                        status_code=403, 
-                        detail={
-                            "status":"error",
-                            "message":"Unauthorized to delete this evidence or record not found."
-                        }
+                    status=await connection.execute(
+                        """
+                        DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c 
+                        WHERE r.CaseId = c.CaseId
+                            AND r.CaseId = $1
+                            AND r.MediaId = $2
+                            AND c.CaseCreator = $3;
+                        """,
+                        self.case_id,
+                        media_id,
+                        jwt_username
                     )
+
+                    rows_deleted = int(status.split(" ")[1])
+
+                    if rows_deleted == 0:
+                        raise HTTPException(
+                            status_code=403, 
+                            detail={
+                                "status":"error",
+                                "message":"Unauthorized to delete this evidence or record not found."
+                            }
+                        )
 
         # Above this is the normal investigator deleting something
-            else:
-                # This block contain the logic for the Admin deleting
-                status=await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Reports" r WHERE
-                    r.CaseId = $1
-                    AND r.MediaId = $2;
-                    """,
-                    self.case_id,
-                    media_id
-                )
-
-                rows_deleted = int(status.split(" ")[1])
-                if rows_deleted == 0:
-                    raise HTTPException(
-                        status_code=404, 
-                        detail={
-                            "status":"error",
-                            "message": "Media not found."
-                        }
+                else:
+                    # This block contain the logic for the Admin deleting
+                    status=await connection.execute(
+                        """
+                        DELETE FROM "Cases_DB"."Reports" r WHERE
+                        r.CaseId = $1
+                        AND r.MediaId = $2;
+                        """,
+                        self.case_id,
+                        media_id
                     )
 
-            deleted_media = await connection.fetchrow(
-                """
-                DELETE FROM "Cases_DB"."Media" media
-                USING "Cases_DB"."MediaType" mt
-                WHERE media.MediaId = $1
-                AND media.MediaType = mt.MediaTypeId
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM "Cases_DB"."Reports" r
-                    WHERE r.MediaId = media.MediaId
-                )
-                    RETURNING 
-                    media.MediaId,
-                    mt.MediaBucket,
-                    mt.MediaExtension
-                """,
-                    media_id
-                )
+                    rows_deleted = int(status.split(" ")[1])
+                    if rows_deleted == 0:
+                        raise HTTPException(
+                            status_code=404, 
+                            detail={
+                                "status":"error",
+                                "message": "Media not found."
+                            }
+                        )
+
+                deleted_media = await connection.fetchrow(
+                    """
+                    DELETE FROM "Cases_DB"."Media" media
+                    USING "Cases_DB"."MediaType" mt
+                    WHERE media.MediaId = $1
+                    AND media.MediaType = mt.MediaTypeId
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM "Cases_DB"."Reports" r
+                        WHERE r.MediaId = media.MediaId
+                    )
+                        RETURNING 
+                        media.MediaId,
+                        mt.MediaBucket,
+                        mt.MediaExtension
+                    """,
+                        media_id
+                    )
 
             if deleted_media is not None:
                     
@@ -660,7 +676,8 @@ class Case:
         self,
         username: str, 
         role: str,
-        connection: asyncpg.Connection
+        connection: asyncpg.Connection,
+        executor_id: str | None = None,
     ):
         if self.case_id is None:
             raise HTTPException(
@@ -673,7 +690,11 @@ class Case:
         orphan_media = []
 
         try:
+            
             async with connection.transaction():
+                if executor_id is not None:
+                    await set_audit_executor(connection, executor_id)
+
                 case_row = await connection.fetchrow(
                     """
                     SELECT casecreator

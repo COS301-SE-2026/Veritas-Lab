@@ -277,6 +277,7 @@ async def test_delete_evidence_investigator_duplicate_entry(mockget_object, mock
 An investigator deletes a duplicate. Only the report is deleted.
     """
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
@@ -308,6 +309,7 @@ async def test_delete_evidence_investigator_only_entry(mock_asyncio, mockget_obj
 An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
     """
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockMediaData = {
@@ -347,6 +349,7 @@ async def test_delete_evidence_admin_duplicate_entry(mockget_object, mockDbConne
 An admin deletes a duplicate. Therefore only the report is deleted
     """
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
@@ -375,6 +378,7 @@ async def test_delete_evidence_admin_only_entry(mock_asyncio, mockget_object, mo
 An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
     """
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockMediaData = {
@@ -431,6 +435,7 @@ async def test_delete_evidence_investigator_unauthorized_403(mockDbConnect):
 An investigator tries to delete evidence but it fails due to either CaseCreator validation or record is missing (returns DELETE 0). Should raise 403.
     """
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
@@ -454,6 +459,7 @@ async def test_delete_evidence_admin_not_found_404(mockDbConnect):
 When an admin tries to delete a record that does not exist. (returns DELETE 0). Should raise 404.
     """
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 0")

@@ -11,115 +11,111 @@ import asyncpg
 import json
 import uuid
 from app.auth.auth import create_token, COOKIE_NAME 
+from app.tests.integration.conftest import get_connection
 
-USER_SETTINGS=User_Settings()
-POSTGRES_SEETTINGS=Postgres_Settings()
+USER_SETTINGS = User_Settings()
 
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=POSTGRES_SEETTINGS.DB_USER,
-        password=POSTGRES_SEETTINGS.DB_PASSWORD,
-        database=POSTGRES_SEETTINGS.DB_NAME,
-        host=POSTGRES_SEETTINGS.DB_HOST,
-        port=POSTGRES_SEETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SEETTINGS.DB_SSL else None,
-    )
-
-@pytest.fixture
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
 
 @pytest_asyncio.fixture
-async def fake_report_context():
+async def fake_report_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
+    user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
 
     try:
-        media_type_id = str(uuid.uuid4())
-        media_name = f"IMAGE_PNG_"
-        
-        await conn.execute(
-            """
-            INSERT INTO "Cases_DB"."MediaType" 
-            (MediaTypeId, MediaName, MediaBucket, MediaExtension)
-            VALUES ($1, $2, $3, $4)
-            """,
-            uuid.UUID(media_type_id), 
-            media_name, 
-            "test-bucket", 
-            ".tester"
-        )
-        created_ids["media_type_id"] = media_type_id
+        await ensure_user_exists(conn, user_id, "TestInvest", "INVESTIGATOR")
 
-        media_id = str(uuid.uuid4())
-        media_hash = f"{uuid.uuid4().hex}"
+        async with conn.transaction():
 
-        await conn.execute(
-            """
-            INSERT INTO "Cases_DB"."Media" 
-            (MediaId, MediaType, MediaHash)
-            VALUES ($1, $2, $3)
-            """,
-            uuid.UUID(media_id), 
-            uuid.UUID(media_type_id), 
-            media_hash
-        )
-        created_ids["media_id"] = media_id
+            await conn.execute(f"SET LOCAL app.current_user_id = '{user_id}';")
 
-        case_id = str(uuid.uuid4())
-        await conn.execute(
-            """
-            INSERT INTO "Cases_DB"."Cases" 
-            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
-            """,
-            uuid.UUID(case_id), 
-            "Integration Test Investigation Case", 
-            "TestInvest", 
-            "Integration test case description", 
-            False
-        )
-        created_ids["case_id"] = case_id
+            media_type_id = str(uuid.uuid4())
+            media_name = f"IMAGE_PNG_"
+            
+            await conn.execute(
+                """
+                INSERT INTO "Cases_DB"."MediaType" 
+                (MediaTypeId, MediaName, MediaBucket, MediaExtension)
+                VALUES ($1, $2, $3, $4)
+                """,
+                uuid.UUID(media_type_id), 
+                media_name, 
+                "test-bucket", 
+                ".tester"
+            )
+            created_ids["media_type_id"] = media_type_id
 
-        report_row = await conn.fetchrow(
-            """
-            INSERT INTO "Cases_DB"."Reports" 
-            (CaseId, MediaId, ImageTitle )
-            VALUES ($1, $2, $3)
-            RETURNING ReportId, CaseId, MediaId, ImageTitle
-            """,
-            uuid.UUID(case_id),
-            uuid.UUID(media_id),
-            media_name
-        )
+            media_id = str(uuid.uuid4())
+            media_hash = f"{uuid.uuid4().hex}"
 
-        report_id = str(report_row["reportid"])
-        created_ids["report_id"] = report_id
+            await conn.execute(
+                """
+                INSERT INTO "Cases_DB"."Media" 
+                (MediaId, MediaType, MediaHash)
+                VALUES ($1, $2, $3)
+                """,
+                uuid.UUID(media_id), 
+                uuid.UUID(media_type_id), 
+                media_hash
+            )
+            created_ids["media_id"] = media_id
+
+            case_id = str(uuid.uuid4())
+            await conn.execute(
+                """
+                INSERT INTO "Cases_DB"."Cases" 
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                uuid.UUID(case_id), 
+                "Integration Test Investigation Case", 
+                "TestInvest", 
+                "Integration test case description", 
+                False
+            )
+            created_ids["case_id"] = case_id
+
+            report_row = await conn.fetchrow(
+                """
+                INSERT INTO "Cases_DB"."Reports" 
+                (CaseId, MediaId, ImageTitle )
+                VALUES ($1, $2, $3)
+                RETURNING ReportId, CaseId, MediaId, ImageTitle
+                """,
+                uuid.UUID(case_id),
+                uuid.UUID(media_id),
+                media_name
+            )
+
+            report_id = str(report_row["reportid"])
+            created_ids["report_id"] = report_id
 
         yield report_id 
 
     finally:
-        if "case_id" in created_ids:
-            await conn.execute(
-                """DELETE FROM "Cases_DB"."Cases" 
-                WHERE CaseId = $1""",
-                uuid.UUID(created_ids["case_id"])
-            )
+        async with conn.transaction():
+            await conn.execute(f"SET LOCAL app.current_user_id = '{user_id}';")
 
-        if "media_id" in created_ids:
-            await conn.execute(
-                """DELETE FROM "Cases_DB"."Media" 
-                WHERE MediaId = $1""",
-                uuid.UUID(created_ids["media_id"])
-            )
+            if "case_id" in created_ids:
+                await conn.execute(
+                    """DELETE FROM "Cases_DB"."Cases" 
+                    WHERE CaseId = $1""",
+                    uuid.UUID(created_ids["case_id"])
+                )
 
-        if "media_type_id" in created_ids:
-            await conn.execute(
-                """DELETE FROM "Cases_DB"."MediaType" 
-                WHERE MediaTypeId = $1""",
-                uuid.UUID(created_ids["media_type_id"])
-            )
+            if "media_id" in created_ids:
+                await conn.execute(
+                    """DELETE FROM "Cases_DB"."Media" 
+                    WHERE MediaId = $1""",
+                    uuid.UUID(created_ids["media_id"])
+                )
+
+            if "media_type_id" in created_ids:
+                await conn.execute(
+                    """DELETE FROM "Cases_DB"."MediaType" 
+                    WHERE MediaTypeId = $1""",
+                    uuid.UUID(created_ids["media_type_id"])
+                )
 
         await conn.close()
 
@@ -161,10 +157,10 @@ async def test_integration_save_annotations_success(client, fake_report_context)
         "role": "INVESTIGATOR"
     }
 
-    test_token=create_token(mock_invest)
+    test_token = create_token(mock_invest)
     client.cookies.set(COOKIE_NAME, test_token)
 
-    payload={
+    payload = {
         "reportId": report_id,
         "annotations": [
             {
@@ -173,8 +169,8 @@ async def test_integration_save_annotations_success(client, fake_report_context)
                 "label": "evidence"
             },
             {
-                "type":"line",
-                "coordinates": [0,0,100,100],
+                "type": "line",
+                "coordinates": [0, 0, 100, 100],
                 "label": "underline_1"
             }
         ]
@@ -214,7 +210,7 @@ async def test_integration_save_annotations_success(client, fake_report_context)
     finally:
         await conn.close()
 
-#Test 401, Invalid UUID
+# Test 401, Invalid UUID
 @pytest.mark.asyncio
 async def test_integration_save_annotations_invalid_uuid(client, fake_report_context):
     report_id = fake_report_context
@@ -225,10 +221,10 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
         "role": "INVESTIGATOR"
     }
 
-    test_token=create_token(mock_invest)
+    test_token = create_token(mock_invest)
     client.cookies.set(COOKIE_NAME, test_token)
 
-    payload={
+    payload = {
         "reportId": "Invalid UUID",
         "annotations": [
             {
@@ -237,8 +233,8 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
                 "label": "scribble"
             },
             {
-                "type":"highlight",
-                "coordinates": [0,0,100,100],
+                "type": "highlight",
+                "coordinates": [0, 0, 100, 100],
                 "label": "power"
             }
         ]
@@ -252,17 +248,17 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload,report_id)
+    await check_annotations(payload, report_id)
 
-#Test 401, Invalid JWT
+# Test 401, Invalid JWT
 @pytest.mark.asyncio
 async def test_integration_save_annotations_invalid_jwt(client, fake_report_context):
     report_id = fake_report_context
 
-    test_token=""
+    test_token = ""
     client.cookies.set(COOKIE_NAME, test_token)
 
-    payload={
+    payload = {
         "reportId": report_id,
         "annotations": [
             {
@@ -271,8 +267,8 @@ async def test_integration_save_annotations_invalid_jwt(client, fake_report_cont
                 "label": "scribble"
             },
             {
-                "type":"highlight",
-                "coordinates": [0,0,100,100],
+                "type": "highlight",
+                "coordinates": [0, 0, 100, 100],
                 "label": "power"
             }
         ]
@@ -286,11 +282,11 @@ async def test_integration_save_annotations_invalid_jwt(client, fake_report_cont
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload,report_id)
+    await check_annotations(payload, report_id)
 
-#403- User doesn't have permission. The role is User or anything but the ADMIN or INVESTIGATOR
+# 403 - User doesn't have permission. Role is USER
 @pytest.mark.asyncio
-async def test_integration_save_annotations_invalid_uuid(client, fake_report_context):
+async def test_integration_save_annotations_user_unauthorized(client, fake_report_context):
     report_id = fake_report_context
 
     mock_invest = {
@@ -299,10 +295,10 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
         "role": "USER"
     }
 
-    test_token=create_token(mock_invest)
+    test_token = create_token(mock_invest)
     client.cookies.set(COOKIE_NAME, test_token)
 
-    payload={
+    payload = {
         "reportId": "Invalid UUID",
         "annotations": [
             {
@@ -311,8 +307,8 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
                 "label": "Pasco"
             },
             {
-                "type":"highlight",
-                "coordinates": [0,0,100,100],
+                "type": "highlight",
+                "coordinates": [0, 0, 100, 100],
                 "label": "powerm2"
             }
         ]
@@ -326,67 +322,74 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload,report_id)
+    await check_annotations(payload, report_id)
 
 @pytest_asyncio.fixture
-async def fake_comment_context():
+async def fake_comment_context(ensure_user_exists):
     conn = await get_connection()
-    created_ids={}
+    created_ids = {}
+    user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
 
     try:
-        case_id1=str(uuid.uuid4())
-        case_creation_literal="""
-        INSERT INTO "Cases_DB"."Cases" 
-        (CaseId, CaseName, 
-        CaseCreator, CaseDescription, CaseClosed)
-        VALUES ($1, $2, $3, $4, $5)
-        """
+        await ensure_user_exists(conn, user_id, "TestInvest", "INVESTIGATOR")
 
-        await conn.execute(
-            case_creation_literal,
-            uuid.UUID(case_id1), 
-            "Test Case","Creator",
-            "To test comments", 
-            False
-        )
+        async with conn.transaction():
 
-        created_ids["case_id1"]=case_id1
+            await conn.execute(f"SET LOCAL app.current_user_id = '{user_id}';")
+            case_id1 = str(uuid.uuid4())
+            case_creation_literal = """
+            INSERT INTO "Cases_DB"."Cases" 
+            (CaseId, CaseName, 
+            CaseCreator, CaseDescription, CaseClosed)
+            VALUES ($1, $2, $3, $4, $5)
+            """
 
-        case_id2=str(uuid.uuid4())
-        await conn.execute(
-            case_creation_literal,
-            uuid.UUID(case_id2), 
-            "Test separation", 
-            "TestInvest", 
-            "For more Tests", 
-            True
-        )
+            await conn.execute(
+                case_creation_literal,
+                uuid.UUID(case_id1), 
+                "Test Case", "Creator",
+                "To test comments", 
+                False
+            )
 
-        comment_creation_literal="""
-        INSERT INTO "Cases_DB"."Comments" (CaseId,Username,Comment)
-        VALUES ($1,$2,$3)
-        RETURNING CommentID
-        """
+            created_ids["case_id1"] = case_id1
 
-        comment_1_user="Creator"
-        comment_1_comment="Checking if you receive this message"
-        row = await conn.fetchrow(
-            comment_creation_literal,
-            case_id1,
-            comment_1_user,
-            comment_1_comment
-        )
-        comment_id1=row["commentid"]
+            case_id2 = str(uuid.uuid4())
+            await conn.execute(
+                case_creation_literal,
+                uuid.UUID(case_id2), 
+                "Test separation", 
+                "TestInvest", 
+                "For more Tests", 
+                True
+            )
+            created_ids["case_id2"] = case_id2
 
-        comment_2_comment="Nothing"
-        comment_2_user="TestInvest"
-        row = await conn.fetchrow(
-            comment_creation_literal,
-            case_id1,
-            comment_2_user,
-            comment_2_comment
-        )
-        comment_id2=row["commentid"]
+            comment_creation_literal = """
+            INSERT INTO "Cases_DB"."Comments" (CaseId, Username, Comment)
+            VALUES ($1, $2, $3)
+            RETURNING CommentID
+            """
+
+            comment_1_user = "Creator"
+            comment_1_comment = "Checking if you receive this message"
+            row = await conn.fetchrow(
+                comment_creation_literal,
+                uuid.UUID(case_id1),
+                comment_1_user,
+                comment_1_comment
+            )
+            comment_id1 = row["commentid"]
+
+            comment_2_comment = "Nothing"
+            comment_2_user = "TestInvest"
+            row = await conn.fetchrow(
+                comment_creation_literal,
+                uuid.UUID(case_id1),
+                comment_2_user,
+                comment_2_comment
+            )
+            comment_id2 = row["commentid"]
 
         yield {
             "case_id1": case_id1,
@@ -399,30 +402,29 @@ async def fake_comment_context():
             "comment_2_comment": comment_2_comment,
         }
 
-
     finally:
-        delete_case="""
-        DELETE FROM "Cases_DB"."Cases" WHERE CaseId= $1
-        """
-        # Deletes cascade so this should delete the comments as while
-        if 'case_id1' in locals():
-            await conn.execute(
-                delete_case,
-                uuid.UUID(case_id1)
-            )
-        if 'case_id2' in locals():
-            await conn.execute(
-                delete_case,
-                uuid.UUID(case_id2)
-            )
+        async with conn.transaction():
+            await conn.execute(f"SET LOCAL app.current_user_id = '{user_id}';")
+            delete_case = """
+            DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1
+            """
+            if "case_id1" in created_ids:
+                await conn.execute(
+                    delete_case,
+                    uuid.UUID(created_ids["case_id1"])
+                )
+            if "case_id2" in created_ids:
+                await conn.execute(
+                    delete_case,
+                    uuid.UUID(created_ids["case_id2"])
+                )
         await conn.close()
 
 
-# - 200: Ideal, The outcome is how we want it to look.
-
+# - 200: Ideal
 @pytest.mark.asyncio
 async def test_integration_get_comment_multiple_success(client, fake_comment_context):
-    case_id= fake_comment_context["case_id1"]
+    case_id = fake_comment_context["case_id1"]
 
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
@@ -438,21 +440,21 @@ async def test_integration_get_comment_multiple_success(client, fake_comment_con
     assert response.json()["status"] == "success"
 
     assert len(response.json()["comments"]) == 2
-    first_comment=response.json()["comments"][0]
+    first_comment = response.json()["comments"][0]
 
-    assert first_comment["commentid"]==fake_comment_context["comment_id1"]
-    assert first_comment["username"]==fake_comment_context["comment_1_user"]
-    assert first_comment["comment"]==fake_comment_context["comment_1_comment"]
+    assert first_comment["commentid"] == fake_comment_context["comment_id1"]
+    assert first_comment["username"] == fake_comment_context["comment_1_user"]
+    assert first_comment["comment"] == fake_comment_context["comment_1_comment"]
 
-    second_comment=response.json()["comments"][1]
+    second_comment = response.json()["comments"][1]
 
-    assert second_comment["commentid"]==fake_comment_context["comment_id2"]
-    assert second_comment["username"]==fake_comment_context["comment_2_user"]
-    assert second_comment["comment"]==fake_comment_context["comment_2_comment"]
+    assert second_comment["commentid"] == fake_comment_context["comment_id2"]
+    assert second_comment["username"] == fake_comment_context["comment_2_user"]
+    assert second_comment["comment"] == fake_comment_context["comment_2_comment"]
     
 @pytest.mark.asyncio
 async def test_integration_get_comment_empty_success(client, fake_comment_context):
-    case_id= fake_comment_context["case_id2"]
+    case_id = fake_comment_context["case_id2"]
 
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
@@ -471,8 +473,8 @@ async def test_integration_get_comment_empty_success(client, fake_comment_contex
     
 # - 400: invalid uuid
 @pytest.mark.asyncio
-async def test_integration_get_comment_missing_id_error(client, fake_comment_context):
-    case_id="13"
+async def test_integration_get_comment_invalid_id_format_error(client, fake_comment_context):
+    case_id = "13"
 
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
@@ -485,14 +487,14 @@ async def test_integration_get_comment_missing_id_error(client, fake_comment_con
     response = client.post(f"/api/getComments/{case_id}")
 
     assert response.status_code == 400
-    assert response.json()["detail"]["status"]=="error"
-    assert response.json()["detail"]["message"]=="'13' is not a valid UUID format"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "'13' is not a valid UUID format"
 
 
 # - 404: Missing report id
 @pytest.mark.asyncio
 async def test_integration_get_comment_missing_id_error(client, fake_comment_context):
-    case_id=""
+    case_id = ""
 
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
@@ -510,7 +512,7 @@ async def test_integration_get_comment_missing_id_error(client, fake_comment_con
 # - 401: The JWT errors. (Missing)
 @pytest.mark.asyncio
 async def test_integration_get_comment_missing_cookie_error(client, fake_comment_context):
-    case_id=fake_comment_context["case_id1"]
+    case_id = fake_comment_context["case_id1"]
 
     mock_invest = ""
 
@@ -519,17 +521,16 @@ async def test_integration_get_comment_missing_cookie_error(client, fake_comment
     response = client.post(f"/api/getComments/{case_id}")
 
     assert response.status_code == 401
-    assert response.json()["detail"]["status"]=="error"
-    assert response.json()["detail"]["message"]=="Not authenticated"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "Not authenticated"
 
 
-# - 403: The a normal user tries to get comments
-
+# - 403: A normal user tries to get comments
 @pytest.mark.asyncio
 async def test_integration_get_comment_invalid_cookie_error(client, fake_comment_context):
-    case_id=fake_comment_context["case_id1"]
+    case_id = fake_comment_context["case_id1"]
 
-    mock_invest = mock_invest = {
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": "TestInvest",
         "role": "USER"
@@ -540,22 +541,22 @@ async def test_integration_get_comment_invalid_cookie_error(client, fake_comment
     response = client.post(f"/api/getComments/{case_id}")
 
     assert response.status_code == 403
-    assert response.json()["detail"]["status"]=="error"
-    assert response.json()["detail"]["message"]== "User unauthorized"
+    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "User unauthorized"
 
-#201
+# 201
 @pytest.mark.asyncio
-async def test_integration_create_comment_success(client,fake_comment_context):
-    case_id=fake_comment_context["case_id1"]
-    mock_invest = mock_invest = {
+async def test_integration_create_comment_success(client, fake_comment_context):
+    case_id = fake_comment_context["case_id1"]
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": "TestInvest",
         "role": "INVESTIGATOR"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-    comment="Help me tests my limits"
-    payload={
+    comment = "Help me tests my limits"
+    payload = {
         "case_id": case_id,
         "comment": comment
     }
@@ -600,20 +601,20 @@ async def assert_against_comment_table(user_name):
     finally:
         await conn.close()
 
-#400
+# 400
 @pytest.mark.asyncio
-async def test_integration_create_comment_empty_string(client,fake_comment_context):
-    case_id=fake_comment_context["case_id1"]
-    user_name="MRBeast"
-    mock_invest = mock_invest = {
+async def test_integration_create_comment_empty_string(client, fake_comment_context):
+    case_id = fake_comment_context["case_id1"]
+    user_name = "MRBeast"
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": user_name,
         "role": "INVESTIGATOR"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-    comment=""
-    payload={
+    comment = ""
+    payload = {
         "case_id": case_id,
         "comment": comment
     }
@@ -628,18 +629,18 @@ async def test_integration_create_comment_empty_string(client,fake_comment_conte
     await assert_against_comment_table(user_name)
 
 @pytest.mark.asyncio
-async def test_integration_create_comment_invalid_case_id(client,fake_comment_context):
-    case_id=""
-    user_name="MRBeast"
-    mock_invest = mock_invest = {
+async def test_integration_create_comment_invalid_case_id(client, fake_comment_context):
+    case_id = ""
+    user_name = "MRBeast"
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": user_name,
         "role": "INVESTIGATOR"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-    comment="Beans"
-    payload={
+    comment = "Beans"
+    payload = {
         "case_id": case_id,
         "comment": comment
     }
@@ -651,20 +652,20 @@ async def test_integration_create_comment_invalid_case_id(client,fake_comment_co
     assert response.status_code == 422
     await assert_against_comment_table(user_name)
 
-#403
+# 403
 @pytest.mark.asyncio
-async def test_integration_create_comment_lack_perm(client,fake_comment_context):
-    case_id=fake_comment_context["case_id1"]
-    user_name="MRBeast"
-    mock_invest = mock_invest = {
+async def test_integration_create_comment_invalid_role(client, fake_comment_context):
+    case_id = fake_comment_context["case_id1"]
+    user_name = "MRBeast"
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": user_name,
         "role": "Fred"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-    comment="Good day"
-    payload={
+    comment = "Good day"
+    payload = {
         "case_id": case_id,
         "comment": comment
     }
@@ -679,18 +680,18 @@ async def test_integration_create_comment_lack_perm(client,fake_comment_context)
     await assert_against_comment_table(user_name)
 
 @pytest.mark.asyncio
-async def test_integration_create_comment_lack_perm(client,fake_comment_context):
-    case_id=fake_comment_context["case_id1"]
-    user_name="MRBeast"
-    mock_invest = mock_invest = {
+async def test_integration_create_comment_user_open_case_forbidden(client, fake_comment_context):
+    case_id = fake_comment_context["case_id1"]
+    user_name = "MRBeast"
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": user_name,
         "role": "USER"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-    comment="Good day"
-    payload={
+    comment = "Good day"
+    payload = {
         "case_id": case_id,
         "comment": comment
     }
@@ -704,20 +705,20 @@ async def test_integration_create_comment_lack_perm(client,fake_comment_context)
     assert response.json()["detail"]["message"] == "Users may only comment on closed cases"
     await assert_against_comment_table(user_name)
 
-#404
+# 404
 @pytest.mark.asyncio
-async def test_integration_create_comment_case_not_found(client,fake_comment_context):
-    case_id="2e067604-67c0-4b56-aeab-ca92e702aeb6"
-    user_name="MRBeast"
-    mock_invest = mock_invest = {
+async def test_integration_create_comment_case_not_found(client, fake_comment_context):
+    case_id = "2e067604-67c0-4b56-aeab-ca92e702aeb6"
+    user_name = "MRBeast"
+    mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": user_name,
         "role": "INVESTIGATOR"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-    comment="Good day"
-    payload={
+    comment = "Good day"
+    payload = {
         "case_id": case_id,
         "comment": comment
     }

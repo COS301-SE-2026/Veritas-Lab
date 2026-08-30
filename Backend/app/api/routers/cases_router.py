@@ -1591,19 +1591,28 @@ async def delete_evidence(
         response=await case.delete_evidence(
             media_id=media_id,
             connection=connection,
-            jwt_username=username
+            jwt_username=username,
+            jwt_user_id=payload.get("sub")
         )
         #
         
         return response
     except HTTPException:
         raise
-    except Exception as e:
+    except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={
-                "status": "error", 
-                "message": str(e)
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
 
@@ -1892,7 +1901,8 @@ async def delete_case(
         await delete_case.delete_case(
             username=payload.get("username"),
             role=payload.get("role"),
-            connection=connection
+            connection=connection,
+            executor_id=payload.get("sub"),
         )
 
         
@@ -1917,7 +1927,8 @@ async def _save_annotations(
     connection: asyncpg.Connection,
     connector_id: UUID,
     annotations: str,
-    user_name: str
+    user_name: str,
+    executor_id: str | None = None
 ):
     #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
     #report_id was changed to connector_id to prepare for the database change since the reports need to be de a one-to-many relationship and not one-to-one
@@ -1931,12 +1942,16 @@ async def _save_annotations(
           AND r.ReportId = $2;
     """
     try:
-        await connection.execute(
-            query, 
-            annotations, 
-            connector_id, 
-            user_name
-        )
+        async with connection.transaction():
+            if executor_id:
+                await connection.execute(f"SET LOCAL app.current_user_id = '{executor_id}';")
+
+            await connection.execute(
+                query, 
+                annotations, 
+                connector_id, 
+                user_name
+            )
 
     except asyncpg.PostgresError:
         raise HTTPException(
@@ -2054,6 +2069,7 @@ async def save_annotations(
     # Checking authorization
     verify_not_user(user_role)
     user_name=cookie.get("username")
+    executor_id=cookie.get("sub")
 
     try:
         connector_id=transform_to_uuid(payload.connector_id)
@@ -2062,7 +2078,8 @@ async def save_annotations(
             connection,
             connector_id,
             annotations_json_str,
-            user_name
+            user_name,
+            executor_id
         )
 
         return JSONResponse(
@@ -2074,13 +2091,21 @@ async def save_annotations(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={
-                "status": "error", 
-                "message": str(e)
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
             }
-        ) 
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
 
     
