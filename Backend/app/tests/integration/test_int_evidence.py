@@ -2,23 +2,34 @@ import pytest
 from fastapi.testclient import TestClient
 from app.api.main import app
 import pytest_asyncio
+import asyncpg
 import uuid
 from app.auth.auth import create_token, COOKIE_NAME
-from app.tests.integration.test_int_annotations import get_connection, client
 from app.core.cases import get_object
+from app.tests.integration.conftest import get_connection
 from botocore.exceptions import ClientError
 
+
 @pytest_asyncio.fixture
-async def fake_evidence_context():
+async def fake_evidence_context(ensure_user_exists):
     conn = await get_connection()
     s3_client = get_object()
     created_ids = {}
 
     try:
+        executor_id = str(uuid.uuid4())
+        case_creator = f"TestInvest_{executor_id[:8]}"
+        await ensure_user_exists(
+            conn, 
+            executor_id, 
+            "TestInvest", 
+            "INVESTIGATOR"
+        )
+        await conn.execute(f"SET app.current_user_id = '{executor_id}';")
         media_type_row = await conn.fetchrow(
             """
             SELECT MediaTypeId, MediaBucket, MediaExtension 
-            FROM "Cases_DB"."MediaType" 
+            FROM "Cases_DB"."MediaType"
             LIMIT 1;
             """
         )
@@ -31,7 +42,6 @@ async def fake_evidence_context():
         media_extension = media_type_row["mediaextension"] or ""
 
         case_id = str(uuid.uuid4())
-        case_creator = "TestInvest"
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases" 
@@ -87,7 +97,8 @@ async def fake_evidence_context():
             "media_id": media_id,
             "creator": case_creator,
             "bucket": media_bucket,
-            "file_key": file_key
+            "file_key": file_key,
+            "executor_id": executor_id,
         }
 
     finally:
@@ -102,21 +113,34 @@ async def fake_evidence_context():
                 pass
 
         if "case_id" in created_ids:
+            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                 uuid.UUID(created_ids["case_id"])
             )
 
         if "media_id" in created_ids:
+            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
                 uuid.UUID(created_ids["media_id"])
             )
 
+        if "executor_id" in created_ids:
+            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+            await conn.execute(
+                'DELETE FROM "Users_DB"."Users" WHERE UserId = $1',
+                uuid.UUID(created_ids["executor_id"]),
+            )
+
         await conn.close()
 
 
-async def assert_object_storage_not_deleted(media_id,case_id,context):
+async def assert_object_storage_not_deleted(
+    media_id,
+    case_id,
+    context
+):
     s3_client = get_object()
     s3_response = s3_client.get_object(
         Bucket=context["bucket"],
@@ -132,6 +156,19 @@ async def assert_object_storage_not_deleted(media_id,case_id,context):
             uuid.UUID(media_id)
         )
         assert report_row is not None
+    finally:
+        await conn.close()
+
+
+async def assert_media_audit_row_exists(media_id: str):
+    conn = await get_connection()
+    try:
+        row = await conn.fetchrow(
+            'SELECT * FROM "Cases_DB"."Audit_Media" WHERE old_media_id = $1 AND query_type::text = $2',
+            uuid.UUID(media_id),
+            "DELETE",
+        )
+        assert row is not None, f"Expected a DELETE audit row for media {media_id} in Audit_Media"
     finally:
         await conn.close()
 
@@ -206,7 +243,7 @@ async def test_integration_delete_evidence_investigator_success(client, fake_evi
     creator = fake_evidence_context["creator"]
 
     mock_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": fake_evidence_context["executor_id"],
         "username": creator,
         "role": "INVESTIGATOR"
     }
@@ -219,7 +256,7 @@ async def test_integration_delete_evidence_investigator_success(client, fake_evi
         "status":"success",
         "deleted":media_id
     }
-
+    await assert_media_audit_row_exists(media_id)
 
     s3_client = get_object()
     with pytest.raises(ClientError):
@@ -230,13 +267,24 @@ async def test_integration_delete_evidence_investigator_success(client, fake_evi
 
 #200
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_admin_success(client, fake_evidence_context):
+async def test_integration_delete_evidence_admin_success(
+    client, 
+    fake_evidence_context, 
+    ensure_user_exists
+):
     case_id = fake_evidence_context["case_id"]
     media_id = fake_evidence_context["media_id"]
     creator = "freckles"
 
+    admin_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, admin_id, creator, "ADMIN")
+    finally:
+        await conn.close()
+
     mock_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": admin_id,
         "username": creator,
         "role": "ADMIN"
     }
@@ -249,7 +297,7 @@ async def test_integration_delete_evidence_admin_success(client, fake_evidence_c
         "status":"success",
         "deleted":media_id
     }
-
+    await assert_media_audit_row_exists(media_id)
 
     s3_client = get_object()
     with pytest.raises(ClientError):

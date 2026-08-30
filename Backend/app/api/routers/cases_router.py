@@ -278,7 +278,7 @@ async def create_case(
         case_description=case_request.description
     )
 
-    case_id = await case.create(connection)
+    case_id = await case.create(connection,payload.get("sub"))
 
     return {
         "status": "success",
@@ -1728,6 +1728,7 @@ async def create_comment(
 
     role = payload.get("role")
     username = payload.get("username")
+    executor_id= payload.get("sub")
 
     if not body.comment or not validate_comment_length(body.comment):
         raise HTTPException(
@@ -1744,7 +1745,8 @@ async def create_comment(
         connection,
         username,
         body.comment,
-        role
+        role,
+        executor_id
     )
 
     return JSONResponse(

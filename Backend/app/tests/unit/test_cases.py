@@ -222,6 +222,7 @@ async def test_create_case_with_mock():
 
     fake_db_uuid = "12345678-abcd-ef01-2345-6789abcdef01"
     fake_creation_date = "2026-05-20T16:00:00Z"
+    fake_user_id = "mock-user-id"
 
     mock_connection = AsyncMock()
 
@@ -229,8 +230,9 @@ async def test_create_case_with_mock():
         "caseid": fake_db_uuid,
         "casecreationdate": fake_creation_date
     })
+    mock_connection.execute = AsyncMock()
 
-    case_id = await case.create(mock_connection)
+    case_id = await case.create(mock_connection, fake_user_id)
 
     assert case_id == fake_db_uuid
     assert isinstance(case_id, str)
@@ -257,9 +259,10 @@ async def test_create_case_cannot_be_called_twice():
     case = Case(case_creator="alice_dev", case_name="Test Case")
     case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
     connection = AsyncMock()
+    fake_user_id = "mock-user-id"
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.create(connection)
+        await case.create(connection, fake_user_id)
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == {
@@ -1723,7 +1726,13 @@ async def test_add_comment_case_not_found():
     case.case_id = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_comment(connection, "someone", "comment_ig", "USER")
+        await case.add_comment(
+            connection, 
+            "someone", 
+            "comment_ig", 
+            "USER",
+            "mock-executor-id"
+        )
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {
@@ -1734,6 +1743,7 @@ async def test_add_comment_case_not_found():
 @pytest.mark.asyncio
 async def test_add_comment_user_blocked_on_open_case():
     connection = AsyncMock()
+    connection.execute = AsyncMock()
     connection.fetchrow = AsyncMock(return_value={
         "commentid": None,
         "caseid": None,
@@ -1749,7 +1759,13 @@ async def test_add_comment_user_blocked_on_open_case():
     case.case_id = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_comment(connection, "someone", "comment_ig", "USER")
+        await case.add_comment(
+            connection, 
+            "someone", 
+            "comment_ig", 
+            "USER",
+            "mock-executor-id"
+        )
         
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == {

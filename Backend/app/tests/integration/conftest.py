@@ -58,6 +58,23 @@ async def ensure_user_exists():
                     'DELETE FROM "Users_DB"."Users" WHERE UserId = $1',
                     uuid.UUID(user_id)
                 )
+
+            await cleanup_conn.execute(
+                'TRUNCATE TABLE "Cases_DB"."Audit_Cases"'
+            )
+
+            await cleanup_conn.execute(
+                'TRUNCATE TABLE "Cases_DB"."Audit_Media"'
+            )
+
+            await cleanup_conn.execute(
+                'TRUNCATE TABLE "Cases_DB"."Audit_MediaTypes"'
+            )
+
+            await cleanup_conn.execute(
+                'TRUNCATE TABLE "Cases_DB"."Audit_Comments"'
+            )
+            
         finally:
             await cleanup_conn.close()
 

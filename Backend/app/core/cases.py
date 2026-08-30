@@ -214,7 +214,7 @@ class Case:
             self.case_id = None
         self.case_creation_date = None
 
-    async def create(self, connection: asyncpg.Connection):
+    async def create(self, connection: asyncpg.Connection, user_id):
         if self.case_id  is not None:
             raise HTTPException(
                 status_code=409,
@@ -223,7 +223,7 @@ class Case:
                     "message": CASE_ALREADY_EXISTS
                 }
             )
-        
+        await connection.execute(f"SET app.current_user_id = '{user_id}';")
         row = await connection.fetchrow(
             """
             INSERT INTO "Cases_DB"."Cases"
@@ -593,13 +593,16 @@ class Case:
         connection: asyncpg.Connection, 
         username: str, 
         comment: str, 
-        role: str
+        role: str,
+        executor_id
     ) -> dict:
         if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
             )
+        
+        await connection.execute(f"SET app.current_user_id = '{executor_id}';")
 
         row = await connection.fetchrow(
             """
