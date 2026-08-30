@@ -220,10 +220,17 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
 
 def _row_to_audit_event(row: dict) -> dict:
     return {
+        "timestamp": row["eventtimestamp"].isoformat() if row["eventtimestamp"] else None,
+        "user": row["eventuser"],
+        "action": row["eventaction"]
+    }
+
+def _row_to_audited_case(row: dict) -> dict:
+    return {
         "caseId": str(row["caseid"]),
         "caseName": row["casename"],
         "eventCount": row["eventcount"],
-        "lastEventTimnestamp": row["lasteventtimestamp"].isoformat() if row["lasteventtimestamp"] else None,
+        "lastEventTimestamp": row["lasteventtimestamp"].isoformat() if row["lasteventtimestamp"] else None,
         "caseExists": row["caseexists"]
     }
 
@@ -2114,7 +2121,7 @@ async def save_annotations(
         ) 
 
 @router.get(
-    "/getAllAudit/case.{case_id}",
+    "/getAllAudit/case/{case_id}",
     status_code=status.HTTP_200_OK,
     tags=["Audit"],
     dependencies=[Depends(COOKIE_SCHEME)],
@@ -2195,27 +2202,27 @@ async def get_case_audit_events(
         rows = await connection.fetch(
             """
             SELECT
-                audi_events.eventtimestamp AS eventtimestamp,
-                audi_events.eventuser AS eventuser,
-                audi_events.eventaction AS eventaction
+                audit_events.eventtimestamp AS eventtimestamp,
+                audit_events.eventuser AS eventuser,
+                audit_events.eventaction AS eventaction
             FROM (
                 SELECT
                     audittimestamp AS eventtimestamp,
-                    query_executer_name AS eventuser,
-                    querty_type::text AS eventaction,
-                    'CASE'::text AS eventtype
-                FROM "Cases_DB"."Audit_Comments"
-                WHERE old_caseid = $1::uuid
+                    query_executor_name AS eventuser,
+                    query_type::text AS eventaction,
+                    'CASE'::text AS entitytype
+                FROM "Cases_DB"."Audit_Cases"
+                WHERE old_case_id = $1::uuid
 
                 UNION ALL
 
                 SELECT
                     audittimestamp AS eventtimestamp,
-                    query_executer_name AS eventuser,
-                    querty_type::text AS eventaction,
+                    query_executor_name AS eventuser,
+                    query_type::text AS eventaction,
                     'COMMENT'::text AS entitytype
                 FROM "Cases_DB"."Audit_Comments"
-                WHERE old_caseid = $1::uuid    
+                WHERE old_case_id = $1::uuid    
             ) AS audit_events
             ORDER BY audit_events.eventtimestamp DESC NULLS LAST,
                 audit_events.entitytype ASC
@@ -2317,16 +2324,20 @@ async def get_audited_cases(
             """
             WITH audit_events AS (
                 SELECT old_case_id AS caseid,
-                    audittimestamp AS eventtimestamp
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    query_type::text AS eventaction
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id IS NOT NULL
 
                 UNION ALL
 
-                SELECT old_case_id AS caseid,
-                    audittimestamp AS eventtimestamp
+                SELECT old_caseid AS caseid,
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    query_type::text AS eventaction
                 FROM "Cases_DB"."Audit_Comments"
-                WHERE old_case_id IS NOT NULL
+                WHERE old_caseid IS NOT NULL
             ),
             audit_summary AS (
                 SELECT
@@ -2339,13 +2350,13 @@ async def get_audited_cases(
             SELECT
                 audit_summary.caseid AS caseid,
                 COALESCE(cases.casename,
-                    (SELECT audit_cases.old_case_name
+                    (SELECT audit_cases.old_casename
                     FROM "Cases_DB"."Audit_Cases" AS audit_cases
                     WHERE audit_cases.old_case_id = audit_summary.caseid
                     ORDER BY audit_cases.audittimestamp DESC NULLS LAST
                     LIMIT 1
                 )
-            ) AS casname,
+            ) AS casename,
             audit_summary.eventcount AS eventcount,
             audit_summary.lasteventtimestamp AS lasteventtimestamp,
             (cases.caseid IS NOT NULL) AS caseexists
