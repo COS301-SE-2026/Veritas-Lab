@@ -2297,3 +2297,75 @@ async def get_case_audit_events(
         }
     }
 )
+async def get_audited_cases(
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+
+    if payload.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
+    
+    try:
+        rows = await connection.fetch(
+            """
+            WITH audit_events AS (
+                SELECT old_case_id AS caseid,
+                    audittimestamp AS eventtimestamp
+                FROM "Cases_DB"."Audit_Cases"
+                WHERE old_case_id IS NOT NULL
+
+                UNION ALL
+
+                SELECT old_case_id AS caseid,
+                    audittimestamp AS eventtimestamp
+                FROM "Cases_DB"."Audit_Comments"
+                WHERE old_case_id IS NOT NULL
+            ),
+            audit_summary AS (
+                SELECT
+                    audit_events.caseid AS caseid,
+                    COUNT(*) AS eventcount,
+                    MAX(audit_events.eventtimestamp) AS lasteventtimestamp
+                FROM audit_events
+                GROUP BY audit_events.caseid
+            )
+            SELECT
+                audit_summary.caseid AS caseid,
+                COALESCE(cases.casename,
+                    (SELECT audit_cases.old_case_name
+                    FROM "Cases_DB"."Audit_Cases" AS audit_cases
+                    WHERE audit_cases.old_case_id = audit_summary.caseid
+                    ORDER BY audit_cases.audittimestamp DESC NULLS LAST
+                    LIMIT 1
+                )
+            ) AS casname,
+            audit_summary.eventcount AS eventcount,
+            audit_summary.lasteventtimestamp AS lasteventtimestamp,
+            (cases.caseid IS NOT NULL) AS caseexists
+            FROM audit_summary
+            LEFT JOIN "Cases_DB"."Cases" AS cases
+                ON cases.caseid = audit_summary.caseid
+            ORDER BY audit_summary.lasteventtimestamp DESC NULLS LAST
+            """
+        )
+
+        return {
+            "status": "success",
+            "cases": [_row_to_audit_event(row) for row in rows]
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
