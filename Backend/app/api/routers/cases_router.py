@@ -79,7 +79,7 @@ class audit_event(BaseModel):
     user: str | None = Field(..., examples=["investigator_user"])
     action: str | None = Field(..., examples=["UPDATE"])
 
-class case_auditresponse(BaseModel):
+class case_audit_response(BaseModel):
     status: str = Field(..., examples=["success"])
     caseID: str = Field(..., examples=["12345678-abcd-ef01-2345-6789abcdef01"])
     events: List[audit_event]
@@ -2162,7 +2162,7 @@ async def save_annotations(
 
         401: INVALID_TOKEN_401,
 
-        403: USER_ROLE_FORBIDDEN_403,
+        403: USER_UNAUTHORIZED_403,
 
         500: {
             "model": error_response,
@@ -2180,3 +2180,60 @@ async def save_annotations(
         }
     }
 )
+async def get_case_audit_events(
+    case_id: str,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+
+    verify_not_user(payload.get("role"))
+
+    validated_case_id = Case(case_id=case_id).case_id
+
+    try:
+        rows = await connection.fetch(
+            """
+            SELECT
+                audi_events.eventtimestamp AS eventtimestamp,
+                audi_events.eventuser AS eventuser,
+                audi_events.eventaction AS eventaction
+            FROM (
+                SELECT
+                    audittimestamp AS eventtimestamp,
+                    query_executer_name AS eventuser,
+                    querty_type::text AS eventaction,
+                    'CASE'::text AS eventtype
+                FROM "Cases_DB"."Audit_Comments"
+                WHERE old_caseid = $1::uuid
+
+                UNION ALL
+
+                SELECT
+                    audittimestamp AS eventtimestamp,
+                    query_executer_name AS eventuser,
+                    querty_type::text AS eventaction,
+                    'COMMENT'::text AS entitytype
+                FROM "Cases_DB"."Audit_Comments"
+                WHERE old_caseid = $1::uuid    
+            ) AS audit_events
+            ORDER BY audit_events.eventtimestamp DESC NULLS LAST,
+                audit_events.entitytype ASC
+            """,
+            validated_case_id
+        )
+
+        return {
+            "status": "success",
+            "caseID": validated_case_id,
+            "events": [_row_to_audit_event(row) for row in rows]
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
