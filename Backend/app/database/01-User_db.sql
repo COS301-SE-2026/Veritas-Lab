@@ -18,4 +18,20 @@ CREATE TABLE IF NOT EXISTS "Users_DB"."Users"(
 );
 
 
+-- This needs to be added to the deployed server
+INSERT INTO "Users_DB"."Users" (
+    UserId, 
+    UserEmail, 
+    UserName, 
+    UserRole, 
+    UserPassword
+) VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    'system@internal.local',
+    'SYSTEM_INIT',
+    'ADMIN',
+    'DISABLED'
+)
+ON CONFLICT (UserId) DO NOTHING;
+
 

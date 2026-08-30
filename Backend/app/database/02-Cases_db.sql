@@ -124,6 +124,7 @@ CREATE OR REPLACE FUNCTION "Cases_DB".get_audit_executor(
 ) AS $$
 DECLARE
     v_user_setting TEXT;
+    c_nil_uuid CONSTANT UUID := '00000000-0000-0000-0000-000000000000'::UUID;
 BEGIN
     v_user_setting := NULLIF(current_setting('app.current_user_id', true), '');
     IF v_user_setting IS NULL THEN
@@ -131,12 +132,18 @@ BEGIN
     END IF;
 
     executor_id := v_user_setting::UUID;
+
+    IF executor_id = c_nil_uuid THEN
+        executor_name := 'SYSTEM_INIT';
+        RETURN;
+    END IF;
+    
     SELECT UserName INTO executor_name
     FROM "Users_DB"."Users"
     WHERE UserId = executor_id;
 
     IF executor_name IS NULL THEN
-        RAISE EXCEPTION 'This user is unauthorised to preform this task', executor_id;
+        RAISE EXCEPTION 'This user % is unauthorised to perform this task', executor_id;
     END IF;
 
 END;

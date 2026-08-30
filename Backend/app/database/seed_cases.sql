@@ -1,4 +1,6 @@
 -- Seed cases for development/testing
+SET app.current_user_id = '00000000-0000-0000-0000-000000000000';
+
 
 INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
 VALUES
