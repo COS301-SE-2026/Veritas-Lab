@@ -74,6 +74,27 @@ router = APIRouter(
     tags=["Cases"]
 )
 
+class audit_event(BaseModel):
+    timestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
+    user: str | None = Field(..., examples=["investigator_user"])
+    action: str | None = Field(..., examples=["UPDATE"])
+
+class case_auditresponse(BaseModel):
+    status: str = Field(..., examples=["success"])
+    caseID: str = Field(..., examples=["12345678-abcd-ef01-2345-6789abcdef01"])
+    events: List[audit_event]
+
+class audited_case(BaseModel):
+    caseID: str = Field(..., examples=["12345678-abcd-ef01-2345-6789abcdef01"])
+    caseName: str | None = Field(..., examples=["Reciepts sus"])
+    eventCount: int | None = Field(..., examples=[5])
+    lastEventTimnestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
+    caseExists: bool | None = Field(..., examples=[True])
+
+class audited_cases_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+    cases: List[audited_case]
+
 class CreateCaseRequest(BaseModel):
     title: str | None = None
     description: str | None = None
@@ -195,6 +216,15 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         "reportComments": row["reportcomments"],
         "reportCertainty": row["reportcertainty"],
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
+    }
+
+def _row_to_audit_event(row: dict) -> dict:
+    return {
+        "caseId": str(row["caseid"]),
+        "caseName": row["casename"],
+        "eventCount": row["eventcount"],
+        "lastEventTimnestamp": row["lasteventtimestamp"].isoformat() if row["lasteventtimestamp"] else None,
+        "caseExists": row["caseexists"]
     }
 
 @router.post(
@@ -2083,4 +2113,70 @@ async def save_annotations(
             }
         ) 
 
-    
+@router.get(
+    "/getAllAudit/case.{case_id}",
+    status_code=status.HTTP_200_OK,
+    tags=["Audit"],
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Get all aduit logs for a case",
+    description=(
+        "Returns every audited event recorded against a case."
+        "Comments and evidence changes are included in the audit logs."
+        "A case with no audit logs will return an empty list."
+    ),
+    responses={
+        200: {
+            "model": case_audit_response,
+            "description": "Audit trail retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "caseID": "123e4567-e89b-12d3-a456-426614174000",
+                        "events": [
+                            {
+                                "timestamp": "2026-08-12T11:01:30",
+                                "user": "invetigator_user",
+                                "action": "UPDATE"
+                            }
+                        ]
+                    }
+                }
+            }   
+        },
+
+        400: {
+            "model": error_response,
+            "description": "Bad Request - CaseID is not a valid UUID",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: USER_ROLE_FORBIDDEN_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
