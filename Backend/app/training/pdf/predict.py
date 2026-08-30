@@ -60,15 +60,121 @@ def main():
         dtype=np.float32
     )
 
-    line_basic = (
-        line_basic
-        - np.array(checkpoint["line_mean"], dtype=np.float32)
-    ) / np.array(
+    line_mean = np.array(
+        checkpoint["line_mean"],
+        dtype=np.float32
+    )
+
+    line_std = np.array(
         checkpoint["line_std"],
         dtype=np.float32
     )
 
+    line_basic = (line_basic - line_mean) / line_std
 
+    object_numeric = np.array(
+        [
+            float(features["object_features"].get(key,0))
+            for key in checkpoint["object_keys"]
+        ], dtype=np.float32
+    )
+
+    object_mean = np.array(
+        checkpoint["object_mean"],
+        dtype=np.float32
+    )
+
+    object_std = np.array(
+        checkpoint["object_std"],
+        dtype=np.float32
+    )
+
+    object_numeric = (object_numeric - object_mean) / object_std
+
+    font_numeric = np.array(
+        [
+            float(features["font_features"].get(key,0))
+            for key in checkpoint ["font_keys"]
+        ],
+        dtype=np.float32
+    )
+
+    font_mean = np.array(
+        checkpoint["font_mean"],
+        dtype=np.float32
+    )
+
+    font_std = np.array(
+        checkpoint["font_std"],
+        dtype=np.float32
+    )
+
+    font_numeric = (font_numeric - font_mean) / font_std
+
+    model = PDFDetector(
+        object_vocab_size=len(object_vocab),
+        object_pad_id=object_vocab["<PAD>"],
+        font_vocab_size=len(font_vocab),
+        font_pad_id=font_vocab["<PAD>"],
+        line_basic_dim=len(line_basic),
+        font_numeric_dim=len(font_numeric),
+        object_numeric_dim=len(object_numeric)
+    )
+
+    model.load_state_dict(checkpoint["model_state"])
+
+    model.eval()
+
+    lexical_tensor = torch.tensor(
+        [[lexical_score]],
+        dtype=torch.float32
+    )
+
+    object_ids_tensor = torch.tensor(
+        [object_ids],
+        dtype=torch.long
+    )
+
+    object_numeric_tensor = torch.tensor(
+        object_numeric[None, :],
+        dtype=torch.float32
+    )
+
+    line_basic_tensor = torch.tensor(
+        line_basic[None, :],
+        dtype=torch.float32
+    )
+
+    font_ids_tensor = torch.tensor(
+        [font_ids],
+        dtype=torch.long
+    )
+
+    font_numeric_tensor = torch.tensor(
+        font_numeric[None, :],
+        dtype=torch.float32
+    )
+
+    with torch.no_grad():
+        logit = model(
+            lexical_tensor,
+            object_ids_tensor,
+            object_numeric_tensor,
+            line_basic_tensor,
+            font_ids_tensor,
+            font_numeric_tensor
+        )
+
+        probability = float(torch.sigmoid(logit).item())
+
+    print(f"Lexical AI score: {lexical_score:.4f}")
+    print(f"Final AI probability: {probability:.4f}")
+    print(
+        "Prediction:",
+        "AI-generated"
+        if probability >= 0.5
+        else "Authentic"
+    )
 
 if __name__ == "__main__":
     main()
