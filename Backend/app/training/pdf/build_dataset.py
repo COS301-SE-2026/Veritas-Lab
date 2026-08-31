@@ -4,8 +4,18 @@ from tqdm import tqdm
 from app.training.pdf.features import extract_pdf_features
 from app.training.pdf.lexical import lexical_ai_probability, extract_pdf_text
 
+BASE_DIR = Path.cwd().resolve()
+
 def pdfs(folder):
     return sorted(Path(folder).rglob("*.pdf"))
+
+def safe_output_path(output):
+    path = Path(output).resolve()
+
+    if path != BASE_DIR and BASE_DIR not in path.parents:
+        raise ValueError("Output path must stay inside the project directory")
+
+    return path
 
 def main():
     parser = argparse.ArgumentParser()
@@ -20,10 +30,13 @@ def main():
 
     print("Total PDFs:", len(jobs))
 
-    with open(args.output, "w", encoding="utf-8") as out:
+    output_path = safe_output_path(args.output)
+
+    with output_path.open("w", encoding="utf-8") as out:
         for path, label in tqdm(jobs):
             try:
                 row = extract_pdf_features(path)
+                
                 if args.skip_lexical:
                     lexical_probability = 0.5
                 else:

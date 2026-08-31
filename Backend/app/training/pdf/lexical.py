@@ -65,46 +65,48 @@ def create_model():
         }
     )
 
+def get_ocr_text(page, pdf_path, fallback_text):
+    try:
+        text_page = page.get_textpage_ocr(
+            language="eng",
+            dpi=300,
+            full=True
+        )
+
+        ocr_text = page.get_text(
+            "text",
+            textpage=text_page
+        ).strip()
+
+        return ocr_text or fallback_text
+
+    except Exception as e:
+        print(f"OCR failed for {pdf_path.name} page {page.number + 1}: {e}")
+        return fallback_text
+
+def get_page_text(page, pdf_path):
+    page_text = page.get_text("text").strip()
+
+    if len(page_text) >= MIN_TEXT_LENGTH:
+        return page_text
+
+    if not page_has_ocr_candidate(page):
+        return page_text
+
+    return get_ocr_text(page, pdf_path, page_text)
+
 def extract_pdf_text(pdf_path):
     text = []
 
     with pymupdf.open(pdf_path) as document:
         for page in document:
-            page_text = page.get_text("text").strip()
+            page_text = get_page_text(
+                page,
+                pdf_path
+            )
 
-            if len(page_text) >= MIN_TEXT_LENGTH:
+            if page_text:
                 text.append(page_text)
-                continue
-
-            if not page_has_ocr_candidate(page):
-                if page_text:
-                    text.append(page_text)
-
-                continue
-            
-            try:
-                text_page = page.get_textpage_ocr(
-                    language="eng",
-                    dpi=300,
-                    full=True
-                )
-
-                ocr_text = page.get_text(
-                    "text",
-                    textpage=text_page
-                ).strip()
-
-                if ocr_text:
-                    text.append(ocr_text)
-
-                elif page_text:
-                    text.append(page_text)
-
-            except Exception as e:
-                print(f"OCR failed for {pdf_path.name} page {page.number + 1}: {e}")
-
-                if page_text:
-                    text.append(page_text)
 
     return "\n".join(text).strip()
 

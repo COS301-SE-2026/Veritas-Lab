@@ -22,7 +22,7 @@ def main():
     checkpoint = torch.load(
         args.model,
         map_location="cpu",
-        weights_only=False
+        weights_only=True
     )
 
     features = extract_pdf_features(args.pdf)

@@ -73,6 +73,12 @@ def test_main_with_lexical_analysis(monkeypatch, tmp_path):
     )
 
     monkeypatch.setattr(
+        build_dataset,
+        "safe_output_path",
+        lambda path: Path(path)
+    )
+
+    monkeypatch.setattr(
         sys,
         "argv",
         [
@@ -82,13 +88,14 @@ def test_main_with_lexical_analysis(monkeypatch, tmp_path):
             "--authentic-dir",
             str(authentic_dir),
             "--output",
-            str(output) 
+            str(output)
         ]
     )
 
     build_dataset.main()
 
     lines = output.read_text(encoding="utf-8").splitlines()
+
     assert len(lines) == 2
 
     rows = [
@@ -143,6 +150,12 @@ def test_main_skip_lexical(monkeypatch, tmp_path):
     )
 
     monkeypatch.setattr(
+        build_dataset,
+        "safe_output_path",
+        lambda path: Path(path)
+    )
+
+    monkeypatch.setattr(
         sys,
         "argv",
         [
@@ -160,7 +173,9 @@ def test_main_skip_lexical(monkeypatch, tmp_path):
     build_dataset.main()
 
     lines = output.read_text(encoding="utf-8").splitlines()
+
     assert len(lines) == 1
+
     row = json.loads(lines[0])
 
     assert row["label"] == 1
@@ -204,6 +219,12 @@ def test_main_continues_when_pdf_fails(monkeypatch, tmp_path, capsys):
         build_dataset,
         "lexical_ai_probability",
         lambda text: 0.8
+    )
+
+    monkeypatch.setattr(
+        build_dataset,
+        "safe_output_path",
+        lambda path: Path(path)
     )
 
     monkeypatch.setattr(
@@ -266,6 +287,12 @@ def test_main_prints_total_pdf_count(monkeypatch, tmp_path, capsys):
         build_dataset,
         "lexical_ai_probability",
         lambda text: 0.5
+    )
+
+    monkeypatch.setattr(
+        build_dataset,
+        "safe_output_path",
+        lambda path: Path(path)
     )
 
     monkeypatch.setattr(

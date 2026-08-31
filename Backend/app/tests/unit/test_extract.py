@@ -386,16 +386,41 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
     assert persisted_analysis.Findings == "combined findings string"
 
 @pytest.mark.asyncio
-async def test_pdf_service_ai_analysis_stub():
-    service = PDFService() 
+async def test_pdf_service_ai_analysis(monkeypatch):
+    service = PDFService()
+
+    monkeypatch.setattr(
+        service.ai_detector,
+        "analyse_pdf",
+        lambda path: {
+            "risk_level": 2,
+            "ai_probability": 0.75,
+            "prediction": "AI-generated",
+            "explanations": [
+                "The lexical analysis provides medium evidence in favour of AI-generated content."
+            ],
+            "summary": "The document was classified as AI-generated.",
+            "lexical_ai_probability": 0.65,
+            "branch_contributions": {
+                "lexical": 0.08
+            }
+        }
+    )
 
     result = await service.ai_analysis("some/path.pdf")
 
     assert result == {
-        "risk_level": 0,
-        "ai_probability": None,
-        "classification": "AI analysis not available for PDF",
-        "reasons": []
+        "risk_level": 2,
+        "ai_probability": 0.75,
+        "classification": "AI-generated",
+        "reasons": [
+            "The lexical analysis provides medium evidence in favour of AI-generated content."
+        ],
+        "summary": "The document was classified as AI-generated.",
+        "lexical_ai_probability": 0.65,
+        "branch_contributions": {
+            "lexical": 0.08
+        }
     }
 
 @pytest.mark.asyncio

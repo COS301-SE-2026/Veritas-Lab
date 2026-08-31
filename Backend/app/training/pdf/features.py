@@ -78,52 +78,104 @@ def extract_line_features(pdf_path):
 def clean_font_name(name):
     return re.sub(r"^[A-Z]{6}\+", "", name or "")
 
+def extract_embedded_font(doc, xref, embedded):
+    if xref <= 0:
+        return
+
+    try:
+        info = doc.extract_font(xref)
+
+        if info and len(info) >= 4 and info[3]:
+            embedded.add(xref)
+
+    except (RuntimeError, ValueError):
+        pass
+
+def process_font_item(doc, item, fonts, embedded, subtypes):
+    xref = int(item[0]) if item and item[0] is not None else 0
+    subtype = str(item[2]) if len(item) > 2 else "UNKNOWN"
+    raw_name = str(item[3]) if len(item) > 3 else ""
+    name = clean_font_name(raw_name)
+
+    base14_count = 0
+    subset_count = 0
+
+    if name:
+        fonts.append(name)
+
+        if name in BASE_14:
+            base14_count = 1
+
+    if re.match(r"^[A-Z]{6}\+", raw_name):
+        subset_count = 1
+
+    subtypes[subtype] += 1
+
+    extract_embedded_font(
+        doc,
+        xref,
+        embedded
+    )
+
+    return base14_count, subset_count
+
+def build_font_numeric(
+    fonts,
+    embedded,
+    subtypes,
+    subset_count,
+    base14_count
+):
+    denom = max(len(fonts), 1)
+
+    return {
+        "font_reference_count": float(len(fonts)),
+        "unique_font_count": float(len(set(fonts))),
+        "embedded_font_count": float(len(embedded)),
+        "subset_font_reference_count": float(subset_count),
+        "base14_font_reference_count": float(base14_count),
+        "non_base14_ratio": (len(fonts) - base14_count) / denom,
+        "type0_count": float(subtypes.get("Type0", 0)),
+        "type1_count": float(subtypes.get("Type1", 0)),
+        "truetype_count": float(subtypes.get("TrueType", 0))
+    }
+
 def extract_font_features(pdf_path):
     doc = pymupdf.open(str(pdf_path))
-    fonts, embedded = [], set()
+
+    fonts = []
+    embedded = set()
     subtypes = Counter()
-    subset_count = base14_count = 0
+
+    subset_count = 0
+    base14_count = 0
 
     try:
         for page in doc:
             for item in page.get_fonts(full=True):
-                xref = int(item[0]) if item and item[0] is not None else 0
-                subtype = str(item[2]) if len(item) > 2 else "UNKNOWN"
-                raw_name = str(item[3]) if len(item) > 3 else ""
-                name = clean_font_name(raw_name)
+                base14, subset = process_font_item(
+                    doc,
+                    item,
+                    fonts,
+                    embedded,
+                    subtypes
+                )
 
-                if name:
-                    fonts.append(name)
-                    if name in BASE_14:
-                        base14_count += 1
+                base14_count += base14
+                subset_count += subset
 
-                if re.match(r"^[A-Z]{6}\+", raw_name):
-                    subset_count += 1
-                subtypes[subtype] += 1
+        numeric = build_font_numeric(
+            fonts,
+            embedded,
+            subtypes,
+            subset_count,
+            base14_count
+        )
 
-                if xref > 0:
-                    try:
-                        info = doc.extract_font(xref)
-                        if info and len(info) >= 4 and info[3]:
-                            embedded.add(xref)
-                    except Exception:
-                        pass
-        denom = max(len(fonts), 1)
-        numeric = {
-            "font_reference_count": float(len(fonts)),
-            "unique_font_count": float(len(set(fonts))),
-            "embedded_font_count": float(len(embedded)),
-            "subset_font_reference_count": float(subset_count),
-            "base14_font_reference_count": float(base14_count),
-            "non_base14_ratio": (len(fonts)-base14_count)/denom,
-            "type0_count": float(subtypes.get("Type0", 0)),
-            "type1_count": float(subtypes.get("Type1", 0)),
-            "truetype_count": float(subtypes.get("TrueType", 0)),
-        }
         return sorted(set(fonts)), numeric
+
     finally:
         doc.close()
-
 
 def extract_pdf_features(pdf_path):
     path = Path(pdf_path)

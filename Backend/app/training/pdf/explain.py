@@ -7,27 +7,30 @@ from app.training.pdf.lexical import extract_pdf_text, lexical_ai_probability
 
 from app.training.pdf.model import PDFDetector
 
+PAD = "<PAD>"
+UNK = "<UNK>"
+
 def encode_sequence(sequence, vocab, max_length):
     encoded = [
-        vocab.get(token, vocab["<UNK>"])
+        vocab.get(token, vocab[UNK])
         for token in sequence[:max_length]
     ]
 
-    return (encoded + [vocab["<PAD>"]] * (max_length - len(encoded)))
+    return (encoded + [vocab[PAD]] * (max_length - len(encoded)))
 
 @lru_cache
 def load_detector(model_path):
     checkpoint = torch.load(
         model_path,
         map_location="cpu",
-        weights_only=False
+        weights_only=True
     )
 
     model = PDFDetector(
         object_vocab_size=len(checkpoint["object_vocab"]),
-        object_pad_id=checkpoint["object_vocab"]["<PAD>"],
+        object_pad_id=checkpoint["object_vocab"][PAD],
         font_vocab_size=len(checkpoint["font_vocab"]),
-        font_pad_id=checkpoint["font_vocab"]["<PAD>"],
+        font_pad_id=checkpoint["font_vocab"][PAD],
         line_basic_dim=(len(checkpoint["basic_keys"]) + len(checkpoint["line_keys"])),
         font_numeric_dim=len(checkpoint["font_keys"]),
         object_numeric_dim=len(checkpoint["object_keys"])
@@ -184,8 +187,8 @@ def neutralise_branch(tensors, branch, checkpoint):
         modified["lexical"][:] = 0.5
 
     elif branch == "object_sequence":
-        pad_id = checkpoint["object_vocab"]["<PAD>"]
-        unk_id = checkpoint["object_vocab"]["<UNK>"]
+        pad_id = checkpoint["object_vocab"][PAD]
+        unk_id = checkpoint["object_vocab"][UNK]
 
         modified["object_ids"][:] = pad_id
         modified["object_ids"][:, 0] = unk_id
@@ -198,7 +201,7 @@ def neutralise_branch(tensors, branch, checkpoint):
 
     elif branch == "fonts":
         modified["font_ids"][:] = (
-            checkpoint["font_vocab"]["<PAD>"]
+            checkpoint["font_vocab"][PAD]
         )
 
         modified["font_numeric"].zero_()
