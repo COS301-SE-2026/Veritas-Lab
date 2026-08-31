@@ -68,7 +68,7 @@ def test_get_case_audit_events_success(monkeypatch):
         fetch_return=fake_rows
     )
 
-    response = client.get(f"/api/getAllAudit/case/{CASE_ID}")
+    response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 200
 
@@ -96,7 +96,7 @@ def test_get_case_audit_events_user_unauthorized(monkeypatch):
     role="USER" 
     )
 
-    response = client.get(f"/api/getAllAudit/case/{CASE_ID}")
+    response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 403
     data = response.json() == {
@@ -119,7 +119,7 @@ def test_get_case_audit_events_db_error(monkeypatch):
 
     mock_connection.fetch.side_effect = asyncpg.PostgresError("Database error")
 
-    response = client.get(f"/api/getAllAudit/case/{CASE_ID}")
+    response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 500
     data = response.json() == {
@@ -162,7 +162,7 @@ def test_get_audited_cases_success(monkeypatch):
         fetch_return=fake_rows
     )
 
-    response = client.get("/api/getAuditedCases")
+    response = client.get("/api/getAllAudit")
 
     assert response.status_code == 200
 
@@ -192,7 +192,7 @@ def test_get_audited_cases_investigator_unauthorized(monkeypatch):
 
     _mock_jwt_success(monkeypatch)
 
-    response = client.get("/api/getAuditedCases")
+    response = client.get("/api/getAllAudit")
 
     assert response.status_code == 403
     assert response.json() == {
@@ -215,7 +215,7 @@ def test_get_audited_cases_db_error(monkeypatch):
 
     mock_connection.fetch.side_effect = asyncpg.PostgresError("Database error")
 
-    response = client.get("/api/getAuditedCases")
+    response = client.get("/api/getAllAudit")
 
     assert response.status_code == 500
     assert response.json() == {
@@ -234,7 +234,7 @@ def test_get_case_audit_events_empty_log(monkeypatch):
         fetch_return=[]
     )
 
-    response = client.get(f"/api/getAllAudit/case/{CASE_ID}")
+    response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 200
 
@@ -262,7 +262,7 @@ def test_get_audited_cases_empty_log(monkeypatch):
         fetch_return=[]
     )
 
-    response = client.get("/api/getAuditedCases")
+    response = client.get("/api/getAllAudit")
 
     assert response.status_code == 200
 
