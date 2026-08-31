@@ -1,6 +1,4 @@
 import sys
-from types import SimpleNamespace
-
 import numpy as np
 import pytest
 import torch
@@ -305,7 +303,23 @@ def test_prepare_inputs(monkeypatch):
         ]
     )
 
-    assert np.allclose(tensors["line_basic"].numpy()[0], expected_line) 
+    expected_object_numeric = np.array(
+        [
+            (0.4 - 0.2) / 0.1,
+            (0.7 - 0.3) / 0.2
+        ]
+    )
+
+    expected_font_numeric = np.array(
+        [
+            (4 - 2.0) / 1.0,
+            (1.0 - 0.5) / 0.25
+        ]
+    )
+
+    assert np.allclose(tensors["object_numeric"].numpy()[0], expected_object_numeric)
+    assert np.allclose(tensors["line_basic"].numpy()[0], expected_line)
+    assert np.allclose(tensors["font_numeric"].numpy()[0], expected_font_numeric)
 
 def test_predict_probability():
     class FakeModel:
@@ -363,6 +377,14 @@ def test_neutralise_branch(branch):
     elif branch == "fonts":
         assert torch.all(modified["font_ids"] == 0)
         assert torch.all(modified["font_numeric"] == 0)
+
+    original = make_tensors()
+
+    for key in tensors:
+        assert torch.equal(
+            tensors[key],
+            original[key]
+        )
 
 def test_calculate_branch_contributions(monkeypatch):
     tensors = make_tensors()
@@ -482,3 +504,224 @@ def test_contribution_sentence_positive():
 def test_contribution_sentence_zero():
     result = explain.contribution_sentence("fonts", 0.0)
     assert "does not clearly favour" in result
+
+@pytest.mark.parametrize(
+    "prediction, probability, confidence_text",
+    [
+        (
+            "AI-generated",
+            0.90,
+            "high confidence"
+        ),
+
+        (
+            "AI-generated",
+            0.70,
+            "medium confidence"
+        ),
+
+        (
+            "AI-generated",
+            0.55,
+            "low confidence"
+        ),
+
+        (
+            "Authentic",
+            0.10,
+            "high confidence"
+        ),
+
+        (
+            "Authentic",
+            0.30,
+            "medium confidence"
+        ),
+
+        (
+            "Authentic",
+            0.45,
+            "low confidence"
+        )
+    ]
+)
+def test_create_summary_confidence(prediction, probability, confidence_text):
+    contributions = {
+        "lexical": 0.20,
+        "object_sequence": 0.05,
+        "object_numeric": 0.01,
+        "line_basic": 0.01,
+        "fonts": 0.01
+    }
+
+    result = explain.create_summary(
+        prediction,
+        probability,
+        contributions
+    )
+
+    assert prediction in result
+    assert confidence_text in result
+    assert "lexical analysis" in result
+
+def test_explain_pdf_ai_generated(monkeypatch):
+    tensors = make_tensors()
+
+    monkeypatch.setattr(
+        explain,
+        "load_detector",
+        lambda path: (
+            object(),
+            make_checkpoint()
+        )
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "prepare_inputs",
+        lambda path, checkpoint: (
+            {},
+            0.70,
+            tensors
+        )
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "predict_probability",
+        lambda model, tensors: 0.90
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "calculate_branch_contributions",
+        lambda *args, **kwargs: {
+            "lexical": 0.20,
+            "object_sequence": 0.30,
+            "object_numeric": 0.05,
+            "line_basic": 0.02,
+            "fonts": -0.01
+        }
+    )
+
+    result = explain.explain_pdf("test.pdf")
+    assert result["prediction"] == "AI-generated"
+    assert result["ai_probability"] == 0.90
+    assert result["lexical_ai_probability"] == 0.70
+    assert len(result["explanations"]) == 5
+    keys = list(result["branch_contributions"].keys())
+    assert keys[0] == "object_sequence"
+
+def test_explain_pdf_authentic(monkeypatch):
+    tensors = make_tensors()
+
+    monkeypatch.setattr(
+        explain,
+        "load_detector",
+        lambda path: (
+            object(),
+            make_checkpoint()
+        )
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "prepare_inputs",
+        lambda path, checkpoint: (
+            {},
+            0.20,
+            tensors
+        )
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "predict_probability",
+        lambda model, tensors: 0.20
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "calculate_branch_contributions",
+        lambda *args, **kwargs: {
+            "lexical": -0.20,
+            "object_sequence": -0.10,
+            "object_numeric": -0.05,
+            "line_basic": -0.02,
+            "fonts": -0.01
+        }
+    )
+
+    result = explain.explain_pdf("test.pdf")
+    assert result["prediction"] == "Authentic"
+    assert result["ai_probability"] == 0.20
+
+def test_print_explanation(capsys):
+    explanation = {
+        "prediction": "AI-generated",
+        "ai_probability": 0.9,
+        "lexical_ai_probability": 0.7,
+        "summary": "Example summary",
+        "explanations": [
+            "Reason one",
+            "Reason two"
+        ]
+    }
+
+    explain.print_explanation(explanation)
+    output = capsys.readouterr().out
+
+    assert "Prediction: AI-generated" in output
+    assert "AI probability: 90.00%" in output
+    assert "Lexical AI probability: 70.00%" in output
+    assert "Example summary" in output
+    assert "- Reason one" in output
+    assert "- Reason two" in output
+
+def test_main(monkeypatch):
+    fake_result = {
+        "prediction": "AI-generated",
+        "ai_probability": 0.9,
+        "lexical_ai_probability": 0.8,
+        "summary": "summary",
+        "explanations": []
+    }
+
+    calls = {}
+
+    def fake_explain_pdf(pdf, model):
+        calls["pdf"] = pdf
+        calls["model"] = model
+        return fake_result
+
+    def fake_print(result):
+        calls["printed"] = result
+
+    monkeypatch.setattr(
+        explain,
+        "explain_pdf",
+        fake_explain_pdf
+    )
+
+    monkeypatch.setattr(
+        explain,
+        "print_explanation",
+        fake_print
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "explain.py",
+            "document.pdf",
+            "--model",
+            "custom.pt"
+        ]
+    )
+
+    explain.main()
+
+    assert calls["pdf"] == "document.pdf"
+    assert calls["model"] == "custom.pt"
+    assert calls["printed"] is fake_result
