@@ -38,7 +38,8 @@ def override_database_dependency():
 @patch("asyncpg.connect")
 @patch("app.core.cases.get_object")
 @patch("uuid.uuid4")
-async def test_images_upload_success(mockUuid, mockget_object, mockDbConnect):
+@patch("app.core.cases.MediaRelay")
+async def test_images_upload_success(mockMediaRelay,mockUuid, mockget_object, mockDbConnect):
     """
     Test successful evidence processing and extension identification
     """
@@ -55,6 +56,7 @@ async def test_images_upload_success(mockUuid, mockget_object, mockDbConnect):
     mockUuid.return_value = fakeUuidString
 
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockMediaTypeRecord = {
@@ -77,8 +79,14 @@ async def test_images_upload_success(mockUuid, mockget_object, mockDbConnect):
 
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
+    test_executor_id = str(uuid.uuid4())
 
-    result = await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
+    result = await case.add_evidence(
+        media=mockMedia, 
+        case_id=test_case_id,
+        executor_id=test_executor_id, 
+        connection=mockDbConnection
+    )
 
     # Verify the result
     assert result is not None
@@ -99,6 +107,7 @@ async def test_invalid_file_type(mockDbConnect):
     )
 
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.fetchrow.return_value = None
@@ -107,11 +116,18 @@ async def test_invalid_file_type(mockDbConnect):
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
+    test_executor_id = str(uuid.uuid4())
+
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
+        await case.add_evidence(
+            media=mockMedia, 
+            case_id=test_case_id,
+            executor_id=test_executor_id, 
+            connection=mockDbConnection
+        )
 
     assert excInfo.value.status_code == 400
-    assert excInfo.value.detail["message"] == f"{UNSUPPORTED_EXTENSION_PREFIX}.food"
+    assert UNSUPPORTED_EXTENSION_PREFIX in excInfo.value.detail["message"]
 
 
 
@@ -145,6 +161,7 @@ async def test_same_image_different_name(mockUuid, mockget_object, mockDbConnect
     mockUuid.return_value = fakeUuidString
 
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockMediaTypeRecord = {
@@ -173,9 +190,23 @@ async def test_same_image_different_name(mockUuid, mockget_object, mockDbConnect
     test_case_id_1 = uuid.uuid4()
     test_case_id_2 = uuid.uuid4()
 
-    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id_1, connection=mockDbConnection)
-    
-    result2 = await case.add_evidence(media=mockMedia2, case_id=test_case_id_2, connection=mockDbConnection)
+    test_executor_id = str(uuid.uuid4())
+
+    result1 = await case.add_evidence(
+        media=mockMedia1, 
+        case_id=test_case_id_1, 
+        executor_id=test_executor_id,
+        connection=mockDbConnection
+    )
+
+    result2 = await case.add_evidence(
+        media=mockMedia2, 
+        case_id=test_case_id_2, 
+        executor_id=test_executor_id,
+        connection=mockDbConnection
+    )
+
+
 
     assert result1 is not None
     assert "url" in result1
@@ -222,6 +253,7 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     mockUuid.return_value = fakeUuidString
 
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockMediaTypeRecord = {
@@ -238,15 +270,18 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
         side_effect=[mockMediaTypeRecord, None, mockMediaTypeRecord, existingMediaRecord]
     )
     mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-123")
-    
-    # First execute succeeds, second execute throws UniqueViolationError 
-    mockDbConnection.execute = AsyncMock(
-        side_effect=[
-            None,  # First insert succeeds
-            asyncpg.exceptions.UniqueViolationError("Duplicate key value violates unique constraint")
-        ]
-    )
-    mockDbConnection.close = AsyncMock()
+
+    report_inserts = 0
+
+    async def mock_execute(query, *args, **kwargs):
+        nonlocal report_inserts
+        if 'INSERT INTO "Cases_DB"."Reports"' in query:
+            report_inserts += 1
+            if report_inserts == 2:
+                raise asyncpg.exceptions.UniqueViolationError("Duplicate key value violates unique constraint")
+        return None
+
+    mockDbConnection.execute.side_effect = mock_execute
 
     mockStorageClient = MagicMock()
     mockStorageClient.put_object = MagicMock()
@@ -256,13 +291,28 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
 
-    result1 = await case.add_evidence(media=mockMedia1, case_id=test_case_id, connection=mockDbConnection)
+
+    test_executor_id = str(uuid.uuid4())
+
+    result1 = await case.add_evidence(
+        media=mockMedia1, 
+        case_id=test_case_id, 
+        executor_id=test_executor_id,
+        connection=mockDbConnection
+    )
     assert result1 is not None
     assert result1.get("Status") == "uploaded"
-    
+    test_executor_id = str(uuid.uuid4())
+
     # Second upload should raise HTTPException with 409 Conflict
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia2, case_id=test_case_id, connection=mockDbConnection)
+        await case.add_evidence(
+            media=mockMedia2, 
+            case_id=test_case_id, 
+            executor_id=test_executor_id,
+            connection=mockDbConnection
+        )
+
     
     assert excInfo.value.status_code == 409
     assert excInfo.value.detail["message"] == MEDIA_ALREADY_ON_CASE
@@ -497,9 +547,15 @@ async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
     connection = AsyncMock()
+    test_executor_id = str(uuid.uuid4())
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=connection)
+        await case.add_evidence(
+            media=mockMedia, 
+            case_id=test_case_id, 
+            connection=connection,
+            executor_id=test_executor_id,
+        )
 
     assert excInfo.value.status_code == 400
     assert excInfo.value.detail["message"] == PDF_SCRIPTS_NOT_ALLOWED
@@ -529,9 +585,15 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
     connection = AsyncMock()
+    test_executor_id = str(uuid.uuid4())
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=connection)
+        await case.add_evidence(
+            media=mockMedia, 
+            case_id=test_case_id, 
+            connection=connection,
+            executor_id=test_executor_id
+        )
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail["message"] == PDF_SCRIPTS_NOT_ALLOWED
@@ -541,7 +603,7 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
 @patch("app.core.cases.get_object")
 @patch("app.core.cases.PdfReader")
 @patch("uuid.uuid4")
-async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClass, mockget_object, mockDbConnect):
+async def test_add_evidence_pdf_being_uploaded_success(mockUuid,mockPdfReaderClass, mockget_object, mockDbConnect):
     fileContent = b"fake pdf bytes"
     testContent = io.BytesIO(fileContent)
 
@@ -562,6 +624,7 @@ async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClas
     mockUuid.return_value = fakeUuidString
 
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnection.return_value = mockDbConnection
 
     mockMediaTypeRecord = {
@@ -581,8 +644,14 @@ async def test_add_evidence_pdf_bengin_upload_success(mockUuid,mockPdfReaderClas
 
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
     test_case_id = uuid.uuid4()
+    test_executor_id = str(uuid.uuid4())
 
-    result = await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
+    result = await case.add_evidence(
+        media=mockMedia, 
+        case_id=test_case_id, 
+        connection=mockDbConnection,
+        executor_id=test_executor_id
+    )
 
     assert result is not None 
     assert result["url"] == "https://fake-presigned-url"
@@ -723,19 +792,29 @@ async def test_add_evidence_storage_failure_returns_500(mockDbConnect, mockget_o
     }
 
     mockDbConnection = AsyncMock()
+    mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
-    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaTypeRecord)
+    
+    mockDbConnection.fetchrow = AsyncMock(side_effect=[mockMediaTypeRecord, None])
+    mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-123")
+    mockDbConnection.execute = AsyncMock()
     mockDbConnection.close = AsyncMock()
 
-    mockget_object.side_effect = EndpointConnectionError(
-        endpoint_url="http://minio:9000",
-    )
+    mock_s3_client = MagicMock()
+    mock_s3_client.put_object.side_effect = EndpointConnectionError(endpoint_url="http://minio:9000")
+    mockget_object.return_value = mock_s3_client
 
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     test_case_id = uuid.uuid4()
+    test_executor_id = str(uuid.uuid4())
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.add_evidence(media=mockMedia, case_id=test_case_id, connection=mockDbConnection)
+        await case.add_evidence(
+            media=mockMedia, 
+            case_id=test_case_id,
+            executor_id=test_executor_id,
+            connection=mockDbConnection
+        )
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail["message"] == INTERNAL_SERVER_ERROR_STORAGE

@@ -893,6 +893,7 @@ def test_close_case_success_investigator(monkeypatch):
         }
     
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_row = {"caseid": fake_case_id}
 
     fake_row = {
         "caseid": fake_case_id
@@ -914,7 +915,7 @@ def test_close_case_success_investigator(monkeypatch):
         "connect", 
         mock_connect
     )
-
+    
     response = client.post(
         "/api/closeCase",
         json={"CaseID": fake_case_id}
@@ -934,9 +935,9 @@ def test_close_case_success_investigator(monkeypatch):
 
     assert "UPDATE" in fetchrow_args[0]
     assert "caseclosed = TRUE" in fetchrow_args[0]
-    assert "casecreator = $2" in fetchrow_args[0]
-    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
-    assert fetchrow_args[2] == "investigator_user"
+    assert str(fetchrow_args[1]) == fake_case_id
+    assert fetchrow_args[2] == "INVESTIGATOR"
+    assert fetchrow_args[3] == "investigator_user"
 
 def test_close_case_success_admin(monkeypatch):
     client.cookies.clear()
@@ -948,6 +949,7 @@ def test_close_case_success_admin(monkeypatch):
         }
     
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_row = {"caseid": fake_case_id}
 
     fake_row = {
         "caseid": fake_case_id
@@ -989,9 +991,9 @@ def test_close_case_success_admin(monkeypatch):
 
     assert "UPDATE" in fetchrow_args[0]
     assert "caseclosed = TRUE" in fetchrow_args[0]
-    assert "casecreator = $2" in fetchrow_args[0]
-    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
-    assert fetchrow_args[2] == "investigator_user"
+    assert str(fetchrow_args[1]) == fake_case_id
+    assert fetchrow_args[2] == "ADMIN"
+    assert fetchrow_args[3] == "investigator_user"
 
 def test_close_case_admin_not_case_creator(monkeypatch):
     client.cookies.clear()
@@ -1042,9 +1044,8 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 
     assert "UPDATE" in fetchrow_args[0]
     assert "caseclosed = TRUE" in fetchrow_args[0]
-    assert "casecreator = $2" in fetchrow_args[0]
-    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
-    assert fetchrow_args[2] == "admin_user"
+    assert str(fetchrow_args[1]) == fake_case_id
+    assert fetchrow_args[3] == "admin_user"
 
 def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="investigator_user", role="INVESTIGATOR"):
     def mock_verify_jwt(request):

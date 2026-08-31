@@ -180,10 +180,10 @@ class login_request(BaseModel):
     email: str | None=None
     password: str | None=None
 
-class RegisterRequest(login_request):
+class register_request(login_request):
     username: str | None = None
 
-class ChangeRoleRequest(BaseModel):
+class change_role_request(BaseModel):
     userId: str | None = None
     NewRole: str | None = None
 
@@ -525,7 +525,7 @@ async def login(
     }
 )
 async def register(
-    request: RegisterRequest,
+    request: register_request,
     response: Response,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
@@ -879,7 +879,7 @@ async def fetch_users(
     }
 )
 async def change_user_role(
-    change_role_request: ChangeRoleRequest,
+    change_role_request: change_role_request,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):

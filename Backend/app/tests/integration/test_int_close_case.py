@@ -9,7 +9,8 @@ from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN, NOT_AUTH, EX
 import asyncio
 from jose import jwt
 from test_int_auth import delete_user_by_email
-from app.tests.integration.test_int_auth import client, get_connection, load_admin_user # for sonar
+from app.tests.integration.conftest import get_connection
+from app.tests.integration.test_int_auth import load_admin_user # for sonar
 import app.tests.integration.test_int_auth as auth_tests # for sonar
 from app.api.routers.cases_router import CASE_ID_REQUIRED, INVALID_CASE_ID, CASE_NOT_FOUND_OR_UNAUTHORIZED
 
@@ -18,8 +19,9 @@ USER_SETTINGS = User_Settings()
 @pytest.mark.asyncio
 async def test_integration_close_case_success(client, load_admin_user):
     case_id = None
+    executor_id = str(auth_tests.ADMIN_USER["userid"])
     admin_user = {
-        "id": str(auth_tests.ADMIN_USER["userid"]),
+        "id": executor_id,
         "username": auth_tests.ADMIN_USER["username"],
         "role": "ADMIN"
     }
@@ -77,6 +79,7 @@ async def test_integration_close_case_success(client, load_admin_user):
             connection = await get_connection()
 
             try:
+                await connection.execute(f"SET app.current_user_id = '{executor_id}';")
                 await connection.execute(
                     """
                     DELETE FROM "Cases_DB"."Cases"
@@ -108,8 +111,9 @@ async def test_integration_close_case_success_investigator(client):
 
     assert investigator is not None
 
+    executor_id = str(investigator["userid"])
     investigator_user = {
-        "id": str(investigator["userid"]),
+        "id": executor_id ,
         "username": investigator["username"],
         "role": "INVESTIGATOR"
     }
@@ -151,6 +155,7 @@ async def test_integration_close_case_success_investigator(client):
         connection = await get_connection()
 
         try:
+            
             row = await connection.fetchrow(
                 """
                 SELECT caseclosed
@@ -170,6 +175,8 @@ async def test_integration_close_case_success_investigator(client):
             connection = await get_connection()
 
             try:
+                await connection.execute(f"SET app.current_user_id = '{executor_id}';")
+
                 await connection.execute(
                     """
                     DELETE FROM "Cases_DB"."Cases"
