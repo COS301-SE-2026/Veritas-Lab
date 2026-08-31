@@ -11,8 +11,20 @@ from app.api.main import app
 from app.auth.auth import COOKIE_NAME
 import app.api.routers.cases_router as cases_router
 from app.core.cases import Case
+import pytest
+from app.core.database import get_connection 
+from app.tests.unit.database_override import unit_get_connection
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_connection, None)
 
 VALID_CASE_ID = "12345678-abcd-ef01-2345-6789abcdef01"
 VALID_COMMENT = "This is a valid comment."

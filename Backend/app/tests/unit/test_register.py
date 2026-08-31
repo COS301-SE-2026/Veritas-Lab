@@ -1,18 +1,30 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.api.main import app
 import app.auth.auth as auth
+from app.core.database import get_connection
+from app.tests.unit.database_override import unit_get_connection
 
 client = TestClient(app)
 
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_connection, None)
+
 def test_successful_registration(monkeypatch):
     client.cookies.clear()
-    async def mock_search_users_via_email(email):
+    async def mock_search_users_via_email(email, connection):
         return None
 
-    async def mock_search_users_via_username(username):
+    async def mock_search_users_via_username(username, connection):
         return None
 
-    async def mock_insert_user(email, username, role, hashedPassword):
+    async def mock_insert_user(email, username, role, hashedPassword, connection):
         return {
             "id": "mock-user-id",
             "email": email,
@@ -23,7 +35,7 @@ def test_successful_registration(monkeypatch):
     def mock_create_token(user):
         return "mockedJWTToken"
     
-    async def mock_update_user_JWT_issued(email): 
+    async def mock_update_user_JWT_issued(email, connection):
         return None
 
     monkeypatch.setattr(auth, "search_users_via_email", mock_search_users_via_email)
@@ -124,7 +136,7 @@ def test_missing_username_returns_400():
 
 def test_duplicate_email_returns_409(monkeypatch):
     client.cookies.clear()
-    async def mock_search_users_via_email(email):
+    async def mock_search_users_via_email(email, connection):
         return {
             "id": "existing-id",
             "email": email,
@@ -132,7 +144,7 @@ def test_duplicate_email_returns_409(monkeypatch):
             "role": "USER"
         }
 
-    async def mock_search_users_via_username(username):
+    async def mock_search_users_via_username(username, connection):
         return None
 
     monkeypatch.setattr(
@@ -161,10 +173,10 @@ def test_duplicate_email_returns_409(monkeypatch):
 def test_duplicate_username_returns_409(monkeypatch):
     client.cookies.clear()
 
-    async def mock_search_users_via_email(email):
+    async def mock_search_users_via_email(email, connection):
         return None
 
-    async def mock_search_users_via_username(username):
+    async def mock_search_users_via_username(username, connection):
         return{
             "id": "existing-id",
             "email": "someone@veritas.lab",

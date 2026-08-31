@@ -1,9 +1,21 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.api.main import app
 import app.auth.auth as auth
 from datetime import datetime, timezone, timedelta
+from app.core.database import get_connection
+from app.tests.unit.database_override import unit_get_connection
 
 COOKIE_NAME = auth.COOKIE_NAME
+
+
+@pytest.fixture(autouse=True)
+def override_database_dependency():
+    app.dependency_overrides[get_connection] = unit_get_connection
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_connection, None)
 
 def make_client(token: str | None = None) -> TestClient:
     """Create a TestClient with an optional cookie pre-set."""
@@ -92,7 +104,7 @@ def test_refresh_token_success_within_one_minute(monkeypatch):
         }
         return "new-mock-token"
     
-    async def mock_update_user_jwt_issued_via_user(user):
+    async def mock_update_user_jwt_issued_via_user(user, connection):
         assert user == {
             "id": "mock-user-id",
             "username": "test_user",
@@ -153,7 +165,7 @@ def test_refresh_token_success_when_expired(monkeypatch):
         }
         return "new-token-from-expired-token"
     
-    async def mock_update_user_jwt_issued_via_user(user):
+    async def mock_update_user_jwt_issued_via_user(user, connection):
         assert user == {
             "id": "mock-user-id",
             "username": "test_user",
@@ -286,7 +298,7 @@ def test_refresh_token_update_jwt_issued_fails(monkeypatch):
     def mock_create_token(user):
         return "new-mock-token"
     
-    async def mock_update_user_jwt_issued_via_user(user):
+    async def mock_update_user_jwt_issued_via_user(user, connection):
         raise Exception("Database error")
 
     monkeypatch.setattr(
