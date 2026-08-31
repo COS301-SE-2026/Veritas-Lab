@@ -2121,7 +2121,7 @@ async def save_annotations(
         ) 
 
 @router.get(
-    "/getAllAudit/case/{case_id}",
+    "/getAudit/case/{case_id}",
     status_code=status.HTTP_200_OK,
     tags=["Audit"],
     dependencies=[Depends(COOKIE_SCHEME)],
@@ -2246,7 +2246,7 @@ async def get_case_audit_events(
         )
 
 @router.get(
-    "/getAuditedCases",
+    "/getAllAudit",
     status_code=status.HTTP_200_OK,
     tags=["Audit"],
     dependencies=[Depends(COOKIE_SCHEME)],
