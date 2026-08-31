@@ -24,9 +24,7 @@ export default function LandingNavbar() {
                     ? 'translate-y-0 opacity-100'
                     : '-translate-y-full opacity-0 pointer-events-none'}`}
         >
-            <nav className="flex items-center justify-between gap-4 px-6 sm:px-10 py-3
-                            backdrop-blur-xl border-b border-black/5
-                            shadow-[0_8px_30px_-12px_var(--color-dark)]/10">
+            <nav className="flex items-center justify-between gap-4 px-6 sm:px-10 py-3 backdrop-blur-xl border-b border-black/5 shadow-[0_8px_30px_-12px_var(--color-dark)]/10">
                 <button
                     type="button"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

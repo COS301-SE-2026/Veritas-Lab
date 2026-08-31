@@ -1,6 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { getCookie } from '@/auth/cookie';
+import { useState } from 'react';
 import Button from '@/components/ui/button';
 import DashboardBar from '@/components/common/dashboardBar';
 import CaseCard from '@/components/common/caseCard';
@@ -8,6 +7,7 @@ import DashboardModal from '@/components/common/dashboardModal';
 import DashboardCards from '@/components/common/dashboardCards';
 import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
 import { useUserRole, useCurrentUser } from '@/context/UserRoleContext';
+import Label from '@/components/ui/label';
 //type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 
 export default function Dashboard() {
@@ -67,7 +67,7 @@ export default function Dashboard() {
                     {isLoading ? (
                         <div className="text-sm text-(--color-light)">Loading cases...</div>
                     ) : error ? (
-                        <div className="text-sm text-(--color-error)">{error}</div>
+                        <Label text={error} htmlFor="error" variant="error" />
                     ) : visibleCases.length === 0 ? (
                         <div className="text-sm text-(--color-light)">No cases found.</div>
                     ) : (

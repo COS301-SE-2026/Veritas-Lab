@@ -3,7 +3,8 @@ name: Dev CI
 #obviously if the CI fails you dont merge.
 on:
     pull_request:
-        branches: ["dev"]
+        branches-ignore:
+            - main
     workflow_dispatch:
 jobs:
     backend-unit-tests:

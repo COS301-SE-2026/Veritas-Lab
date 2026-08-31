@@ -41,13 +41,11 @@ export default function Landing() {
                         </div>
                     </div>
 
-                    <h1 className="font-bold text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-8 sm:mt-12 lg:mt-15 max-w-4xl
-                                   drop-shadow-[0_18px_45px_var(--color-dark)]">
+                    <h1 className="font-bold text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl mt-8 sm:mt-12 lg:mt-15 max-w-4xl drop-shadow-[0_18px_45px_var(--color-dark)]">
                         Discover the future of digital forensics
                     </h1>
 
-                    <p className="text-(--color-light) text-base sm:text-lg lg:text-xl mt-4 sm:mt-5 max-w-2xl
-                                  drop-shadow-[0_8px_24px_var(--color-dark)]">
+                    <p className="text-(--color-light) text-base sm:text-lg lg:text-xl mt-4 sm:mt-5 max-w-2xl drop-shadow-[0_8px_24px_var(--color-dark)]">
                         Transform your digital forensics workflow with our cutting-edge platform.
                     </p>
 
@@ -55,24 +53,20 @@ export default function Landing() {
                         <Button
                             text="Sign Up"
                             variant="submit"
-                            className="w-full sm:w-auto px-8 sm:px-20 py-3 text-lg font-semibold
-                                       hover:-translate-y-0.5 transition-all duration-200"
+                            className="w-full sm:w-auto px-8 sm:px-20 py-3 text-lg font-semibold hover:-translate-y-0.5 transition-all duration-200"
                             onClick={() => router.push('/register')}
                         />
                         <Button
                             text="Log In"
                             variant="light"
-                            className="w-full sm:w-auto px-8 sm:px-20 py-3 text-lg font-semibold
-                                       drop-shadow-[0_18px_40px_var(--color-dark)]
-                                       hover:-translate-y-0.5 transition-all duration-200"
+                            className="w-full sm:w-auto px-8 sm:px-20 py-3 text-lg font-semibold drop-shadow-[0_18px_40px_var(--color-dark)] hover:-translate-y-0.5 transition-all duration-200"
                             onClick={() => router.push('/login')}
                         />
                     </div>
                 </div>
             </section>
 
-            <div className="relative z-20 rounded-t-[30px] sm:rounded-t-[30px] overflow-hidden
-                            drop-shadow-[0_-25px_70px_-15px_var(--color-dark)]">
+            <div className="relative z-20 rounded-t-[30px] sm:rounded-t-[30px] overflow-hidden drop-shadow-[0_-25px_70px_-15px_var(--color-dark)]">
                 <section className="bg-white">
                     <div className="flex flex-col w-full px-6 sm:px-10 py-10 sm:py-14">
                         <p className="text-base sm:text-lg lg:text-xl text-(--color-light) tracking-wide">

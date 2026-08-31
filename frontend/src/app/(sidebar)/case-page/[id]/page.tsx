@@ -11,8 +11,10 @@ import useCase from "@/lib/hooks/useCase";
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
 import CaseEditButton from "@/components/common/caseEditButton";
+import Label from "@/components/ui/label";
+import AuditTimeline from "@/components/common/auditTimeline";
 
-const TABS = ['Evidence', 'Comments'] as const;
+const TABS = ['Evidence', 'Comments', 'Audit Log'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -93,10 +95,10 @@ export default function CasePage() {
                         <h1 className="text-2xl font-bold text-[var(--color-text)]">
                             {isLoading ? 'Loading case...' : caseDetails?.caseName ?? 'Case not found'}
                         </h1>
-                        <p className="text-[var(--color-light)] mt-2">
+                        <p className="text-[var(--color-light)] mt-2 mb-4">
                             {caseDetails?.caseDescription ?? 'No description available.'}
                         </p>
-                        {error ? <p className="text-sm text-red-500 mt-2">{error}</p> : null}
+                        {error ? <Label text={error} htmlFor="error" variant="error"/> : null}
                     </div>
                     {(canUploadEvidence || canEditCase) ? (
                         <div className="w-1/5 flex items-end justify-end gap-2">
@@ -149,6 +151,8 @@ export default function CasePage() {
                                 initialComments={caseComments}
                                 currentUsername={currentUser?.username ?? ''}
                             />
+                        ) : activeTab === 'Audit Log' ? (
+                            <AuditTimeline caseId={id} />
                         ) : (
                             <div className="rounded-[28px] border border-dashed border-[var(--color-light)]/30 bg-white p-10 text-center text-sm text-[var(--color-light)]">
                                 {activeTab} is not available yet.
