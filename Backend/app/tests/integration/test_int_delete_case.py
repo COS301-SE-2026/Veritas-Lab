@@ -7,7 +7,7 @@ import json
 import uuid
 from app.core.env import Minio_Settings, R2_Settings, Other_Settings
 from app.auth.auth import create_token, COOKIE_NAME
-from app.tests.integration.test_int_annotations import get_connection, client
+from app.tests.integration.conftest import get_connection
 import boto3
 from botocore.client import Config
 from mypy_boto3_s3 import S3Client
@@ -67,12 +67,16 @@ def get_object(for_presign: bool = False) -> S3Client:
         )
 
 @pytest_asyncio.fixture
-async def fake_delete_case_context():
+async def fake_delete_case_context(ensure_user_exists):
     conn = await get_connection()
     storage =  get_object()
     created_ids = {}
 
     try:
+        executor_id = str(uuid.uuid4())
+        case_creator = f"TestInvest_{executor_id[:8]}"
+        await ensure_user_exists(conn, executor_id, "TestInvest", "INVESTIGATOR")
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
         #fetch the .png incase someone never seeded their db
         media_type_row = await conn.fetchrow(
             """
@@ -91,7 +95,6 @@ async def fake_delete_case_context():
         extension = media_type_row["mediaextension"]
 
         case_id = str(uuid.uuid4())
-        case_creator = "TestInvest"
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
@@ -143,16 +146,19 @@ async def fake_delete_case_context():
             "case_creator": case_creator,
             "media_id": media_id,
             "file_key": file_key,
-            "bucket": bucket_name
+            "bucket": bucket_name,
+            "executor_id": executor_id,
         }
 
     finally:
         if "case_id" in created_ids:
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                 uuid.UUID(created_ids["case_id"])
             )
         if "media_id" in created_ids:
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
                 uuid.UUID(created_ids["media_id"])
@@ -195,13 +201,20 @@ async def test_integration_delete_case_not_found_case(client, fake_delete_case_c
 
 #403
 @pytest.mark.asyncio
-async def test_integration_delete_case_user_perms(client, fake_delete_case_context):
+async def test_integration_delete_case_user_perms(client, fake_delete_case_context, ensure_user_exists):
     case_id = fake_delete_case_context["case_id"]
     creator = fake_delete_case_context["case_creator"]
 
+    user_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, user_id, "Pitbull", "USER")
+    finally:
+        await conn.close()
+
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "Pitbull",
+        "id": user_id,
+        "username": f"Pitbull_{user_id[:8]}",
         "role": "USER"
     }
 
@@ -219,13 +232,20 @@ async def test_integration_delete_case_user_perms(client, fake_delete_case_conte
 
 
 @pytest.mark.asyncio
-async def test_integration_delete_case_not_admin_id(client, fake_delete_case_context):
+async def test_integration_delete_case_not_admin_id(client, fake_delete_case_context, ensure_user_exists):
     case_id = fake_delete_case_context["case_id"]
     creator = fake_delete_case_context["case_creator"]
 
+    investigator_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, investigator_id, "Pitbull", "INVESTIGATOR")
+    finally:
+        await conn.close()
+
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "Pitbull",
+        "id": investigator_id,
+        "username": f"Pitbull_{investigator_id[:8]}",
         "role": "INVESTIGATOR"
     }
 
@@ -266,13 +286,33 @@ async def test_integration_delete_case_missing_case_id(client, fake_delete_case_
 
     
 
+async def assert_case_audit_row_exists(case_id: str):
+    conn = await get_connection()
+    try:
+        row = await conn.fetchrow(
+            'SELECT * FROM "Cases_DB"."Audit_Cases" WHERE old_case_id = $1 AND query_type::text = $2',
+            uuid.UUID(case_id),
+            'DELETE',
+        )
+        assert row is not None, "Expected a DELETE audit row in Audit_Cases"
+    finally:
+        await conn.close()
+
+
 @pytest.mark.asyncio
-async def test_integration_delete_case_success(client, fake_delete_case_context):
+async def test_integration_delete_case_success(client, fake_delete_case_context, ensure_user_exists):
     case_id = fake_delete_case_context["case_id"]
     creator = fake_delete_case_context["case_creator"]
+    executor_id = fake_delete_case_context["executor_id"]
+
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, executor_id, creator, "INVESTIGATOR")
+    finally:
+        await conn.close()
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": executor_id,
         "username": creator,
         "role": "INVESTIGATOR"
     }
@@ -287,6 +327,7 @@ async def test_integration_delete_case_success(client, fake_delete_case_context)
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
+    await assert_case_audit_row_exists(case_id)
 
     conn = await get_connection()
     try:

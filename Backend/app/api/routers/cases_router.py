@@ -13,6 +13,7 @@ from app.core.cases import (
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
     INTERNAL_SERVER_ERROR_STORAGE,
+    set_audit_executor,
 )
 from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
 import asyncpg
@@ -74,17 +75,17 @@ router = APIRouter(
     tags=["Cases"]
 )
 
-class CreateCaseRequest(BaseModel):
+class create_case_request(BaseModel):
     title: str | None = None
     description: str | None = None
 
-class CreateSingleCaseRequest(BaseModel):
+class create_single_case_request(BaseModel):
     CaseID: str | None = None
 
-class UpdateCommentRequest(BaseModel):
+class update_comment_request(BaseModel):
     comment: str
 
-class UpdateCaseRequest(BaseModel):
+class update_case_request(BaseModel):
     CaseID: str | None = None
     CaseName: str | None = None
     CaseDescription: str | None = None
@@ -93,7 +94,7 @@ class create_comment_request(BaseModel):
     case_id: UUID
     comment: str | None = None
 
-class save_snnotations_payload(BaseModel):
+class save_annotations_payload(BaseModel):
     #Mapping from CamelCase to SnakeCase for Sonar to be Happy
     connector_id: str = Field(..., alias="reportId")
     #since the format of the annotations was not specified by frontend we will be accepting any valid JSON
@@ -264,7 +265,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
     }
 )
 async def create_case(
-    case_request: CreateCaseRequest,
+    case_request: create_case_request,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
@@ -278,7 +279,7 @@ async def create_case(
         case_description=case_request.description
     )
 
-    case_id = await case.create(connection)
+    case_id = await case.create(connection,payload.get("sub"))
 
     return {
         "status": "success",
@@ -491,7 +492,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         }
     }
 )
-async def get_single_case(case_request: CreateSingleCaseRequest, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
+async def get_single_case(case_request: create_single_case_request, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
     payload = verify_jwt(request)
 
     if not case_request.CaseID:
@@ -715,11 +716,13 @@ async def upload_evidence(
     verify_not_user(payload.get("role"))
 
     case_creator = payload["username"]
+    executor_id=payload.get("sub")
 
     # Case.__init__ validates the UUID and raises a 400 on a malformed value
     validated_case_id = Case(case_id=case_id).case_id
 
     try:
+        await set_audit_executor(connection, executor_id)
         row = await connection.fetchrow(
             """
             SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -743,7 +746,12 @@ async def upload_evidence(
 
         case = _row_to_case(row)
 
-        result = await case.add_evidence(media, validated_case_id, connection)
+        result = await case.add_evidence(
+            media, 
+            validated_case_id, 
+            connection, 
+            executor_id
+        )
 
         # start the media pipeline
         extension = Path(result["Filename"]).suffix.lower()
@@ -848,13 +856,14 @@ async def upload_evidence(
     }
 )
 async def close_case(
-    case_request: CreateSingleCaseRequest,
+    case_request: create_single_case_request,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
 
     verify_not_user(payload.get("role"))
+    executor_id = payload.get("sub")
     
     if not case_request.CaseID:
         raise HTTPException(
@@ -876,16 +885,18 @@ async def close_case(
             }
         )
 
-    try:    
+    try:
+        await set_audit_executor(connection, executor_id)
         row = await connection.fetchrow(
             """
-            UPDATE "Cases_DB"."Cases"
-            SET caseclosed = TRUE
-            WHERE caseid = $1
-            AND casecreator = $2
-            RETURNING caseid
-            """,
+                UPDATE "Cases_DB"."Cases"
+                SET caseclosed = TRUE
+                WHERE caseid = $1
+                AND ($2::text = 'ADMIN' OR casecreator = $3)
+                RETURNING caseid
+            """ ,
             case_uuid,
+            payload.get("role"),
             payload.get("username")
         )
 
@@ -1027,7 +1038,7 @@ async def close_case(
     }
 )
 async def update_case(
-    case_request: UpdateCaseRequest,
+    case_request: update_case_request,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
@@ -1070,6 +1081,7 @@ async def update_case(
             )
 
     try:
+        await set_audit_executor(connection, payload.get("sub"))
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
@@ -1185,29 +1197,32 @@ async def update_case(
 async def update_comment(
     case_id: str,
     comment_id: int,
-    update_data: UpdateCommentRequest,
+    update_data: update_comment_request,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
 
     case_uuid = Case(case_id=case_id).case_id
-
+    executor_id=payload.get("sub")
+    
     try:
-        row = await connection.fetchrow(
-            """
-            UPDATE "Cases_DB"."Comments"
-            SET comment = $3
-            WHERE caseid = $1
-                AND username = $2
-                AND commentid = $4
-            RETURNING commentid
-            """,
-            case_uuid,
-            payload.get("username"),
-            update_data.comment,
-            comment_id
-        )
+        async with connection.transaction():
+            await set_audit_executor(connection, executor_id)
+            row = await connection.fetchrow(
+                """
+                UPDATE "Cases_DB"."Comments"
+                SET comment = $3
+                WHERE caseid = $1
+                    AND username = $2
+                    AND commentid = $4
+                RETURNING commentid
+                """,
+                case_uuid,
+                payload.get("username"),
+                update_data.comment,
+                comment_id
+            )
 
         if row is None:
             raise HTTPException(
@@ -1288,18 +1303,21 @@ async def delete_comment(
 ):
     payload = verify_jwt(request)
     username = payload.get("username")
+    executor_id=payload.get("sub")
     
     try:
-        row = await connection.fetchrow(
-            """
-            DELETE FROM "Cases_DB"."Comments"
-            WHERE commentid = $1
-            AND username = $2
-            RETURNING commentid
-            """,
-            comment_id,
-            username
-        )
+        async with connection.transaction():
+            await set_audit_executor(connection, executor_id)
+            row = await connection.fetchrow(
+                """
+                DELETE FROM "Cases_DB"."Comments"
+                WHERE commentid = $1
+                AND username = $2
+                RETURNING commentid
+                """,
+                comment_id,
+                username
+            )
 
         if row is None:
             raise HTTPException(
@@ -1591,19 +1609,28 @@ async def delete_evidence(
         response=await case.delete_evidence(
             media_id=media_id,
             connection=connection,
-            jwt_username=username
+            jwt_username=username,
+            jwt_user_id=payload.get("sub")
         )
         #
         
         return response
     except HTTPException:
         raise
-    except Exception as e:
+    except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={
-                "status": "error", 
-                "message": str(e)
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
             }
         )
 
@@ -1719,6 +1746,7 @@ async def create_comment(
 
     role = payload.get("role")
     username = payload.get("username")
+    executor_id= payload.get("sub")
 
     if not body.comment or not validate_comment_length(body.comment):
         raise HTTPException(
@@ -1735,7 +1763,8 @@ async def create_comment(
         connection,
         username,
         body.comment,
-        role
+        role,
+        executor_id
     )
 
     return JSONResponse(
@@ -1867,7 +1896,7 @@ async def create_comment(
     }
 )
 async def delete_case(
-    case_request: CreateSingleCaseRequest,
+    case_request: create_single_case_request,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
@@ -1892,7 +1921,8 @@ async def delete_case(
         await delete_case.delete_case(
             username=payload.get("username"),
             role=payload.get("role"),
-            connection=connection
+            connection=connection,
+            executor_id=payload.get("sub")
         )
 
         
@@ -1917,7 +1947,8 @@ async def _save_annotations(
     connection: asyncpg.Connection,
     connector_id: UUID,
     annotations: str,
-    user_name: str
+    user_name: str,
+    executor_id: str | None = None
 ):
     #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
     #report_id was changed to connector_id to prepare for the database change since the reports need to be de a one-to-many relationship and not one-to-one
@@ -1931,12 +1962,16 @@ async def _save_annotations(
           AND r.ReportId = $2;
     """
     try:
-        await connection.execute(
-            query, 
-            annotations, 
-            connector_id, 
-            user_name
-        )
+        async with connection.transaction():
+            if executor_id:
+                await set_audit_executor(connection, executor_id)
+
+            await connection.execute(
+                query, 
+                annotations, 
+                connector_id, 
+                user_name
+            )
 
     except asyncpg.PostgresError:
         raise HTTPException(
@@ -2045,7 +2080,7 @@ async def _save_annotations(
     }
 )
 async def save_annotations(
-    payload: save_snnotations_payload,
+    payload: save_annotations_payload,
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
@@ -2054,6 +2089,7 @@ async def save_annotations(
     # Checking authorization
     verify_not_user(user_role)
     user_name=cookie.get("username")
+    executor_id=cookie.get("sub")
 
     try:
         connector_id=transform_to_uuid(payload.connector_id)
@@ -2062,7 +2098,8 @@ async def save_annotations(
             connection,
             connector_id,
             annotations_json_str,
-            user_name
+            user_name,
+            executor_id
         )
 
         return JSONResponse(
@@ -2074,13 +2111,21 @@ async def save_annotations(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={
-                "status": "error", 
-                "message": str(e)
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
             }
-        ) 
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
 
     

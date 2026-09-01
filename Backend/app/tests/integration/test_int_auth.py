@@ -8,6 +8,7 @@ import uuid as uuidlib
 from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN
 import asyncio
 from jose import jwt
+from app.tests.integration.conftest import get_connection
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SEETTINGS=Postgres_Settings()
@@ -37,16 +38,6 @@ def load_admin_user():
 
     ADMIN_USER = asyncio.run(fetch_admin())
     assert ADMIN_USER is not None
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=POSTGRES_SEETTINGS.DB_USER,
-        password=POSTGRES_SEETTINGS.DB_PASSWORD,
-        database=POSTGRES_SEETTINGS.DB_NAME,
-        host=POSTGRES_SEETTINGS.DB_HOST,
-        port=POSTGRES_SEETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SEETTINGS.DB_SSL else None,
-    )
 
 
 async def delete_user_by_email(email: str):

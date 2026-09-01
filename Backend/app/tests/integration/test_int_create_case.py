@@ -9,7 +9,8 @@ from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN, NOT_AUTH, EX
 import asyncio
 from jose import jwt
 from test_int_auth import delete_user_by_email
-from app.tests.integration.test_int_auth import client, get_connection, load_admin_user # for sonar
+from app.tests.integration.conftest import get_connection
+from app.tests.integration.test_int_auth import  load_admin_user # for sonar
 import app.tests.integration.test_int_auth as auth_tests # for sonar
 
 
@@ -18,19 +19,15 @@ POSTGRES_SETTINGS=Postgres_Settings()
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 AUTH_SETTINGS = Auth_Settings()
 
-@pytest.fixture
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
 
 @pytest.mark.asyncio
 async def test_integration_create_case_success(client):
     case_name = "Integration Create Case Test"
     case_id = None
-
+    user_id=str(auth_tests.ADMIN_USER["userid"])
     try:
         admin_user = {
-            "id": str(auth_tests.ADMIN_USER["userid"]),
+            "id": user_id,
             "username": auth_tests.ADMIN_USER["username"],
             "role": "ADMIN"
         }
@@ -89,6 +86,7 @@ async def test_integration_create_case_success(client):
             connection = await get_connection()
 
             try:
+                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
                 await connection.execute(
                     """
                     DELETE from "Cases_DB"."Cases"
