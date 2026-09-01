@@ -25,7 +25,7 @@ async def fake_evidence_context(ensure_user_exists):
             "TestInvest", 
             "INVESTIGATOR"
         )
-        await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
         media_type_row = await conn.fetchrow(
             """
             SELECT MediaTypeId, MediaBucket, MediaExtension 
@@ -113,21 +113,21 @@ async def fake_evidence_context(ensure_user_exists):
                 pass
 
         if "case_id" in created_ids:
-            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                 uuid.UUID(created_ids["case_id"])
             )
 
         if "media_id" in created_ids:
-            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
                 uuid.UUID(created_ids["media_id"])
             )
 
         if "executor_id" in created_ids:
-            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Users_DB"."Users" WHERE UserId = $1',
                 uuid.UUID(created_ids["executor_id"]),

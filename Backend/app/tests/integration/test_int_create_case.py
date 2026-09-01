@@ -85,9 +85,8 @@ async def test_integration_create_case_success(client):
         if case_id is not None:
             connection = await get_connection()
 
-            try:    
-                await connection.execute(f"SET app.current_user_id = '{user_id}';")
-
+            try:
+                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
                 await connection.execute(
                     """
                     DELETE from "Cases_DB"."Cases"

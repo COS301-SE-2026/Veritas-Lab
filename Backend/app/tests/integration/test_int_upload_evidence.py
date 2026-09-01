@@ -1,7 +1,8 @@
+import uuid
+
 import pytest
 import pytest_asyncio
-import uuid
-import asyncpg
+
 from fastapi.testclient import TestClient
 
 from app.api.main import app
@@ -9,6 +10,7 @@ from app.auth.auth import COOKIE_NAME, create_token
 from app.core.cases import get_object
 from app.core.env import Postgres_Settings
 from app.core.media_relay import MediaRelay
+from app.tests.integration.conftest import get_connection
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
@@ -18,43 +20,30 @@ EVIDENCE_BUCKET = "images"
 EVIDENCE_EXTENSION = ".png"
 
 
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=POSTGRES_SETTINGS.DB_USER,
-        password=POSTGRES_SETTINGS.DB_PASSWORD,
-        database=POSTGRES_SETTINGS.DB_NAME,
-        host=POSTGRES_SETTINGS.DB_HOST,
-        port=POSTGRES_SETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SETTINGS.DB_SSL else None,
-    )
-
-
-@pytest.fixture
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
-
 @pytest.fixture(autouse=True)
 def stub_media_pipeline(monkeypatch):
     async def no_op(self):
         return None
 
-    monkeypatch.setattr(MediaRelay,"relay_to_service", no_op)
-
-def cookie_for(username: str, role: str) -> str:
-    return create_token({
-        "id": str(uuid.uuid4()),
-        "username": username,
-        "role": role,
-    })
+    monkeypatch.setattr(MediaRelay, "relay_to_service", no_op)
 
 
-# add_evidence dedupes on a sha256 of the file bytes, so every upload that is meant to succeed needs its own content.
+def cookie_for(username: str, role: str, user_id: str | None = None) -> str:
+    return create_token(
+        {
+            "id": user_id or str(uuid.uuid4()),
+            "username": username,
+            "role": role,
+        }
+    )
+
+
 def png_bytes(marker: str) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + marker.encode()
 
 
-async def insert_case(conn, case_id, creator, closed):
+async def insert_case(conn, case_id, creator, closed, user_id):
+    await conn.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
     await conn.execute(
         """
         INSERT INTO "Cases_DB"."Cases"
@@ -70,45 +59,125 @@ async def insert_case(conn, case_id, creator, closed):
 
 
 @pytest_asyncio.fixture
-async def fake_upload_context():
+async def fake_upload_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
 
     try:
-        for key, creator, closed in (
-            ("open_case_id", CASE_CREATOR, False),
-            ("closed_case_id", CASE_CREATOR, True),
-            ("other_case_id", OTHER_INVESTIGATOR, False),
-        ):
-            case_id = str(uuid.uuid4())
-            await insert_case(conn, case_id, creator, closed)
-            created_ids[key] = case_id
+        creator_user_id = str(uuid.uuid4())
+        other_user_id = str(uuid.uuid4())
+        open_case_id = str(uuid.uuid4())
+        other_case_id = str(uuid.uuid4())
+        closed_case_id = str(uuid.uuid4())
 
-        yield created_ids
+        created_ids.update(
+            {
+                "open_case_id": open_case_id,
+                "other_case_id": other_case_id,
+                "closed_case_id": closed_case_id,
+                "creator_user_id": creator_user_id,
+                "other_user_id": other_user_id,
+            }
+        )
+
+        await ensure_user_exists(conn, creator_user_id, CASE_CREATOR, "INVESTIGATOR")
+        await ensure_user_exists(conn, other_user_id, OTHER_INVESTIGATOR, "INVESTIGATOR")
+
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", creator_user_id)
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            uuid.UUID(open_case_id),
+            f"Upload evidence test case {open_case_id[:8]}",
+            CASE_CREATOR,
+            "Integration test case for evidence upload",
+            False,
+        )
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            uuid.UUID(other_case_id),
+            f"Upload evidence test case {other_case_id[:8]}",
+            OTHER_INVESTIGATOR,
+            "Integration test case for evidence upload",
+            False,
+        )
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            uuid.UUID(closed_case_id),
+            f"Upload evidence test case {closed_case_id[:8]}",
+            CASE_CREATOR,
+            "Integration test case for evidence upload",
+            True,
+        )
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."MediaType" (MediaTypeId, MediaBucket, MediaExtension, MediaName)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (MediaExtension) DO NOTHING
+            """,
+            uuid.uuid4(),
+            "evidence-bucket",
+            "png",
+            "PNG Image",
+        )
+
+        yield {
+            "open_case_id": open_case_id,
+            "other_case_id": other_case_id,
+            "closed_case_id": closed_case_id,
+            "creator_user_id": creator_user_id,
+            "other_user_id": other_user_id,
+        }
 
     finally:
+        created_case_ids = [
+            uuid.UUID(created_ids["open_case_id"]),
+            uuid.UUID(created_ids["other_case_id"]),
+            uuid.UUID(created_ids["closed_case_id"]),
+        ]
+
         media_ids = []
-
-        for key in ("open_case_id", "closed_case_id", "other_case_id"):
-            if key not in created_ids:
-                continue
-
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", created_ids["creator_user_id"])
+        for case_id in created_case_ids:
             rows = await conn.fetch(
-                'SELECT MediaId FROM "Cases_DB"."Reports" WHERE CaseId = $1',
-                uuid.UUID(created_ids[key]),
+                'SELECT mediaid FROM "Cases_DB"."Reports" WHERE caseid = $1',
+                case_id,
             )
             media_ids.extend(str(row["mediaid"]) for row in rows)
 
             await conn.execute(
-                'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
-                uuid.UUID(created_ids[key]),
+                'DELETE FROM "Cases_DB"."Cases" WHERE caseid = $1',
+                case_id,
             )
 
         for media_id in media_ids:
             await conn.execute(
-                'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
+                'DELETE FROM "Cases_DB"."Media" WHERE mediaid = $1',
                 uuid.UUID(media_id),
             )
+
+        await conn.execute(
+            'DELETE FROM "Users_DB"."Users" WHERE userid = ANY($1::uuid[])',
+            [
+                uuid.UUID(created_ids["creator_user_id"]),
+                uuid.UUID(created_ids["other_user_id"]),
+            ],
+        )
 
         storage_client = get_object()
         for media_id in media_ids:
@@ -133,7 +202,10 @@ def upload(client, case_id, content, filename="evidence.png"):
 
 @pytest.mark.asyncio
 async def test_integration_upload_evidence_success(client, fake_upload_context):
-    client.cookies.set(COOKIE_NAME, cookie_for(CASE_CREATOR, "INVESTIGATOR"))
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+    )
 
     response = upload(
         client,
@@ -175,7 +247,10 @@ async def test_integration_upload_evidence_success(client, fake_upload_context):
 
 @pytest.mark.asyncio
 async def test_integration_upload_evidence_duplicate_returns_409(client, fake_upload_context):
-    client.cookies.set(COOKIE_NAME, cookie_for(CASE_CREATOR, "INVESTIGATOR"))
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+    )
 
     content = png_bytes("duplicate")
     case_id = fake_upload_context["open_case_id"]
@@ -205,7 +280,10 @@ async def test_integration_upload_evidence_user_forbidden(client, fake_upload_co
 
 @pytest.mark.asyncio
 async def test_integration_upload_evidence_not_case_creator(client, fake_upload_context):
-    client.cookies.set(COOKIE_NAME, cookie_for(CASE_CREATOR, "INVESTIGATOR"))
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+    )
 
     response = upload(
         client,
@@ -218,7 +296,10 @@ async def test_integration_upload_evidence_not_case_creator(client, fake_upload_
 
 @pytest.mark.asyncio
 async def test_integration_upload_evidence_closed_case(client, fake_upload_context):
-    client.cookies.set(COOKIE_NAME, cookie_for(CASE_CREATOR, "INVESTIGATOR"))
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+    )
 
     response = upload(
         client,
@@ -231,17 +312,23 @@ async def test_integration_upload_evidence_closed_case(client, fake_upload_conte
 
 @pytest.mark.asyncio
 async def test_integration_upload_evidence_malformed_case_id(client):
-    client.cookies.set(COOKIE_NAME, cookie_for(CASE_CREATOR, "INVESTIGATOR"))
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", str(uuid.uuid4())),
+    )
 
     response = upload(client, "not-a-valid-uuid", png_bytes("malformed"))
 
     assert response.status_code == 400
-    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"]["message"] == "'not-a-valid-uuid' is not a valid UUID format"
 
 
 @pytest.mark.asyncio
 async def test_integration_upload_evidence_unsupported_extension(client, fake_upload_context):
-    client.cookies.set(COOKIE_NAME, cookie_for(CASE_CREATOR, "INVESTIGATOR"))
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+    )
 
     response = upload(
         client,

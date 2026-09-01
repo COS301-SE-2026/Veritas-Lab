@@ -79,7 +79,7 @@ async def test_integration_close_case_success(client, load_admin_user):
             connection = await get_connection()
 
             try:
-                await connection.execute(f"SET app.current_user_id = '{executor_id}';")
+                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
                 await connection.execute(
                     """
                     DELETE FROM "Cases_DB"."Cases"
@@ -175,8 +175,7 @@ async def test_integration_close_case_success_investigator(client):
             connection = await get_connection()
 
             try:
-                await connection.execute(f"SET app.current_user_id = '{executor_id}';")
-
+                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
                 await connection.execute(
                     """
                     DELETE FROM "Cases_DB"."Cases"

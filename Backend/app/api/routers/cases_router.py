@@ -13,6 +13,7 @@ from app.core.cases import (
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
     INTERNAL_SERVER_ERROR_STORAGE,
+    set_audit_executor,
 )
 from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
 import asyncpg
@@ -721,7 +722,7 @@ async def upload_evidence(
     validated_case_id = Case(case_id=case_id).case_id
 
     try:
-        await connection.execute(f"SET app.current_user_id = '{executor_id}';")
+        await set_audit_executor(connection, executor_id)
         row = await connection.fetchrow(
             """
             SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
@@ -884,8 +885,8 @@ async def close_case(
             }
         )
 
-    try:    
-        await connection.execute(f"SET app.current_user_id = '{executor_id}';")
+    try:
+        await set_audit_executor(connection, executor_id)
         row = await connection.fetchrow(
             """
                 UPDATE "Cases_DB"."Cases"
@@ -1080,6 +1081,7 @@ async def update_case(
             )
 
     try:
+        await set_audit_executor(connection, payload.get("sub"))
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
@@ -1206,7 +1208,7 @@ async def update_comment(
     
     try:
         async with connection.transaction():
-            await connection.execute(f"SET LOCAL app.current_user_id = '{executor_id}';")
+            await set_audit_executor(connection, executor_id)
             row = await connection.fetchrow(
                 """
                 UPDATE "Cases_DB"."Comments"
@@ -1305,7 +1307,7 @@ async def delete_comment(
     
     try:
         async with connection.transaction():
-            await connection.execute(f"SET LOCAL app.current_user_id = '{executor_id}';")
+            await set_audit_executor(connection, executor_id)
             row = await connection.fetchrow(
                 """
                 DELETE FROM "Cases_DB"."Comments"
@@ -1962,7 +1964,7 @@ async def _save_annotations(
     try:
         async with connection.transaction():
             if executor_id:
-                await connection.execute(f"SET LOCAL app.current_user_id = '{executor_id}';")
+                await set_audit_executor(connection, executor_id)
 
             await connection.execute(
                 query, 

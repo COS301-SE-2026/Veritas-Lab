@@ -36,7 +36,7 @@ async def set_audit_executor(connection: asyncpg.Connection, executor_id: str | 
         return
 
     await connection.execute(
-        "SELECT set_config('app.current_user_id', $1, true)",
+        "SELECT set_config('app.current_user_id', $1, false)",
         str(executor_id),
     )
 
@@ -224,7 +224,7 @@ class Case:
                     "message": CASE_ALREADY_EXISTS
                 }
             )
-        await connection.execute(f"SET app.current_user_id = '{user_id}';")
+        await set_audit_executor(connection, user_id)
         row = await connection.fetchrow(
             """
             INSERT INTO "Cases_DB"."Cases"
@@ -597,7 +597,7 @@ class Case:
                 detail=MISSING_CASE_ID
             )
         
-        await connection.execute(f"SET app.current_user_id = '{executor_id}';")
+        await set_audit_executor(connection, executor_id)
 
         row = await connection.fetchrow(
             """

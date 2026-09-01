@@ -76,7 +76,7 @@ async def fake_delete_case_context(ensure_user_exists):
         executor_id = str(uuid.uuid4())
         case_creator = f"TestInvest_{executor_id[:8]}"
         await ensure_user_exists(conn, executor_id, "TestInvest", "INVESTIGATOR")
-        await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
         #fetch the .png incase someone never seeded their db
         media_type_row = await conn.fetchrow(
             """
@@ -152,13 +152,13 @@ async def fake_delete_case_context(ensure_user_exists):
 
     finally:
         if "case_id" in created_ids:
-            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                 uuid.UUID(created_ids["case_id"])
             )
         if "media_id" in created_ids:
-            await conn.execute(f"SET app.current_user_id = '{executor_id}';")
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
                 uuid.UUID(created_ids["media_id"])

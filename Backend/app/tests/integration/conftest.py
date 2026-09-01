@@ -31,8 +31,8 @@ async def ensure_user_exists():
     ):
         unique_username = f"{username}_{user_id[:8]}"
         unique_email = f"{unique_username}@audit-test.local"
-        
-        await conn.execute(f"SET app.current_user_id = '{user_id}';")
+
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
 
         await conn.execute(
             '''
