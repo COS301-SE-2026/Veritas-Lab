@@ -222,6 +222,7 @@ async def test_create_case_with_mock():
 
     fake_db_uuid = "12345678-abcd-ef01-2345-6789abcdef01"
     fake_creation_date = "2026-05-20T16:00:00Z"
+    fake_user_id = "mock-user-id"
 
     mock_connection = AsyncMock()
 
@@ -229,8 +230,9 @@ async def test_create_case_with_mock():
         "caseid": fake_db_uuid,
         "casecreationdate": fake_creation_date
     })
+    mock_connection.execute = AsyncMock()
 
-    case_id = await case.create(mock_connection)
+    case_id = await case.create(mock_connection, fake_user_id)
 
     assert case_id == fake_db_uuid
     assert isinstance(case_id, str)
@@ -257,9 +259,10 @@ async def test_create_case_cannot_be_called_twice():
     case = Case(case_creator="alice_dev", case_name="Test Case")
     case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
     connection = AsyncMock()
+    fake_user_id = "mock-user-id"
 
     with pytest.raises(HTTPException) as exc_info:
-        await case.create(connection)
+        await case.create(connection, fake_user_id)
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail == {
@@ -890,6 +893,7 @@ def test_close_case_success_investigator(monkeypatch):
         }
     
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_row = {"caseid": fake_case_id}
 
     fake_row = {
         "caseid": fake_case_id
@@ -911,7 +915,7 @@ def test_close_case_success_investigator(monkeypatch):
         "connect", 
         mock_connect
     )
-
+    
     response = client.post(
         "/api/closeCase",
         json={"CaseID": fake_case_id}
@@ -931,9 +935,9 @@ def test_close_case_success_investigator(monkeypatch):
 
     assert "UPDATE" in fetchrow_args[0]
     assert "caseclosed = TRUE" in fetchrow_args[0]
-    assert "casecreator = $2" in fetchrow_args[0]
-    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
-    assert fetchrow_args[2] == "investigator_user"
+    assert str(fetchrow_args[1]) == fake_case_id
+    assert fetchrow_args[2] == "INVESTIGATOR"
+    assert fetchrow_args[3] == "investigator_user"
 
 def test_close_case_success_admin(monkeypatch):
     client.cookies.clear()
@@ -945,6 +949,7 @@ def test_close_case_success_admin(monkeypatch):
         }
     
     fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    fake_row = {"caseid": fake_case_id}
 
     fake_row = {
         "caseid": fake_case_id
@@ -986,9 +991,9 @@ def test_close_case_success_admin(monkeypatch):
 
     assert "UPDATE" in fetchrow_args[0]
     assert "caseclosed = TRUE" in fetchrow_args[0]
-    assert "casecreator = $2" in fetchrow_args[0]
-    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
-    assert fetchrow_args[2] == "investigator_user"
+    assert str(fetchrow_args[1]) == fake_case_id
+    assert fetchrow_args[2] == "ADMIN"
+    assert fetchrow_args[3] == "investigator_user"
 
 def test_close_case_admin_not_case_creator(monkeypatch):
     client.cookies.clear()
@@ -1039,9 +1044,8 @@ def test_close_case_admin_not_case_creator(monkeypatch):
 
     assert "UPDATE" in fetchrow_args[0]
     assert "caseclosed = TRUE" in fetchrow_args[0]
-    assert "casecreator = $2" in fetchrow_args[0]
-    assert fetchrow_args[1].hex == "12345678abcdef0123456789abcdef01"
-    assert fetchrow_args[2] == "admin_user"
+    assert str(fetchrow_args[1]) == fake_case_id
+    assert fetchrow_args[3] == "admin_user"
 
 def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="investigator_user", role="INVESTIGATOR"):
     def mock_verify_jwt(request):
@@ -1424,11 +1428,12 @@ def test_delete_case_success_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "investigator_user"
         assert role == "INVESTIGATOR"
+        assert executor_id == "mock-user-id"
     
         return None
     
@@ -1467,11 +1472,12 @@ def test_delete_case_success_admin(monkeypatch):
             "role": "ADMIN"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "admin_user"
         assert role == "ADMIN"
+        assert executor_id == "mock-admin-id"
 
         return None
     
@@ -1625,7 +1631,8 @@ def test_delete_case_not_found(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
+        assert executor_id == "mock-investigator-id"
         raise HTTPException(
             status_code=404,
             detail={
@@ -1671,9 +1678,10 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection):
+    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
         assert username == "other_investigator"
         assert role == "INVESTIGATOR"
+        assert executor_id == "mock-investigator-id"
         
         raise HTTPException(
             status_code=403,
@@ -1719,7 +1727,13 @@ async def test_add_comment_case_not_found():
     case.case_id = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_comment(connection, "someone", "comment_ig", "USER")
+        await case.add_comment(
+            connection, 
+            "someone", 
+            "comment_ig", 
+            "USER",
+            "mock-executor-id"
+        )
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {
@@ -1730,6 +1744,7 @@ async def test_add_comment_case_not_found():
 @pytest.mark.asyncio
 async def test_add_comment_user_blocked_on_open_case():
     connection = AsyncMock()
+    connection.execute = AsyncMock()
     connection.fetchrow = AsyncMock(return_value={
         "commentid": None,
         "caseid": None,
@@ -1745,7 +1760,13 @@ async def test_add_comment_user_blocked_on_open_case():
     case.case_id = uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.add_comment(connection, "someone", "comment_ig", "USER")
+        await case.add_comment(
+            connection, 
+            "someone", 
+            "comment_ig", 
+            "USER",
+            "mock-executor-id"
+        )
         
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == {
