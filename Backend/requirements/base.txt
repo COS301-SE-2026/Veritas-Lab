@@ -51,6 +51,7 @@ moto==5.2.1
 minio==7.2.10
 multidict==6.7.1
 numpy==2.5.1
+opencv-python==4.12.0.88
 opensearch-protobufs==1.2.0
 opensearch-py==3.2.0
 packaging==26.2
