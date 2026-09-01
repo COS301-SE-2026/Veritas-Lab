@@ -4,7 +4,7 @@ import asyncpg
 import asyncio
 import io
 import hashlib
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from pypdf import PdfReader
@@ -13,6 +13,7 @@ import boto3
 from botocore.client import Config
 from app.core.env import Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
+from app.core.media_relay import MediaRelay
 
 CASE_NOT_FOUND = "Case not found"
 MISSING_CASE_ID = "Case id is missing"
@@ -28,6 +29,17 @@ INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Pl
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
 r2_settings= R2_Settings()
+
+
+async def set_audit_executor(connection: asyncpg.Connection, executor_id: str | uuid.UUID | None):
+    if executor_id is None:
+        return
+
+    await connection.execute(
+        "SELECT set_config('app.current_user_id', $1, false)",
+        str(executor_id),
+    )
+
 
 def get_object(for_presign: bool = False) -> S3Client:
     if other_settings.ENVIRONMENT == "development":
@@ -203,7 +215,7 @@ class Case:
             self.case_id = None
         self.case_creation_date = None
 
-    async def create(self, connection: asyncpg.Connection):
+    async def create(self, connection: asyncpg.Connection, user_id):
         if self.case_id  is not None:
             raise HTTPException(
                 status_code=409,
@@ -212,7 +224,7 @@ class Case:
                     "message": CASE_ALREADY_EXISTS
                 }
             )
-        
+        await set_audit_executor(connection, user_id)
         row = await connection.fetchrow(
             """
             INSERT INTO "Cases_DB"."Cases"
@@ -234,7 +246,8 @@ class Case:
         self,
         media: UploadFile,
         case_id: uuid.UUID,
-        connection: asyncpg.Connection
+        connection: asyncpg.Connection,
+        executor_id
     ):
         filename = media.filename
         local_extension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
@@ -247,125 +260,118 @@ class Case:
         # It is impossible for case id to be an invalid uuid since it is typed to UUID
 
         try:
-            type_record = await connection.fetchrow(
-                """
-                SELECT 
-                    MediaTypeId AS "MediaTypeId",
-                    MediaBucket AS "MediaBucket",
-                    MediaExtension AS "MediaExtension"
-                    FROM "Cases_DB"."MediaType"
-                WHERE MediaExtension = $1
-                """,
-                local_extension
-            )
+            async with connection.transaction():
+                await set_audit_executor(connection, executor_id)
 
-            if not type_record:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "status": "error",
-                        "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{local_extension}"
-                    }
-                )
-
-            media_typ_id = type_record["MediaTypeId"]
-            bucket_name = type_record["MediaBucket"]
-            db_extension = type_record["MediaExtension"] 
-            
-                #Hash the image for uniqueness
-            media_hash = hashlib.sha256(file_bytes).hexdigest()
-
-            storage_client = get_object()
-
-            
-            #checking for a duplicate
-            existing_media = await connection.fetchrow(
-                """
-                SELECT MediaId  AS "MediaId" 
-                FROM "Cases_DB"."Media" 
-                WHERE MediaHash = $1
-                """,
-                media_hash
-            )
-
-            if existing_media:
-                media_id=existing_media["MediaId"]
-                target_filename = f"{media_id}{db_extension}"
-                # Need to reproduce the same db report for this case.
-
-
-                    # Insert into the Reports table allowing the report to have the image's name in the image title column
-
-                await connection.execute(
+                type_record = await connection.fetchrow(
                     """
-                    INSERT INTO "Cases_DB"."Reports" (
-                        CaseId, 
-                        MediaId, 
-                        ImageTitle, 
-                        ReportArtifacts, 
-                        ReportFindings, 
-                        ReportComments
-                    )
                     SELECT 
-                        $1,
-                        $2,
-                        $3,
-                        ReportArtifacts, 
-                        ReportFindings, 
-                        ReportComments
-                    FROM "Cases_DB"."Reports"
-                    WHERE MediaId = $2
-                    LIMIT 1;
+                        MediaTypeId AS "MediaTypeId",
+                        MediaBucket AS "MediaBucket",
+                        MediaExtension AS "MediaExtension"
+                    FROM "Cases_DB"."MediaType"
+                    WHERE MediaExtension = $1
                     """,
-                    case_id,
-                    media_id,
-                    filename
+                    local_extension
                 )
 
-            else: 
-                new_media_uuid = uuid.uuid4()
+                if not type_record:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "status": "error",
+                            "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{local_extension}"
+                        }
+                    )
 
-                media_id = await connection.fetchval(
+                media_typ_id = type_record["MediaTypeId"]
+                bucket_name = type_record["MediaBucket"]
+                db_extension = type_record["MediaExtension"] 
+
+                # Hash the image for uniqueness
+                media_hash = hashlib.sha256(file_bytes).hexdigest()
+
+                # Checking for a duplicate
+                existing_media = await connection.fetchrow(
                     """
-                    INSERT INTO "Cases_DB"."Media" (MediaId, MediaType, MediaHash)
-                    VALUES ($1, $2, $3)
-                    RETURNING MediaId
+                    SELECT MediaId AS "MediaId" 
+                    FROM "Cases_DB"."Media" 
+                    WHERE MediaHash = $1
                     """,
-                    new_media_uuid,
-                    media_typ_id,
                     media_hash
                 )
-                target_filename = f"{media_id}{db_extension}"
 
-                await media.seek(0)
-                
-                file_stream = io.BytesIO(file_bytes)
-                storage_client.put_object(
-                    Bucket=bucket_name,
-                    Key=target_filename,
-                    Body=file_stream,
-                    ContentType=media.content_type
-                )
+                if existing_media:
+                    media_id = existing_media["MediaId"]
+                    target_filename = f"{media_id}{db_extension}"
 
-                    # Insesrt into the Reports table allowing the report to have the image's name in the image title column
+                    await connection.execute(
+                        """
+                        INSERT INTO "Cases_DB"."Reports" (
+                            CaseId, 
+                            MediaId, 
+                            ImageTitle, 
+                            ReportArtifacts, 
+                            ReportFindings, 
+                            ReportComments
+                        )
+                        SELECT 
+                            $1,
+                            $2,
+                            $3,
+                            ReportArtifacts, 
+                            ReportFindings, 
+                            ReportComments
+                        FROM "Cases_DB"."Reports"
+                        WHERE MediaId = $2
+                        LIMIT 1;
+                        """,
+                        case_id,
+                        media_id,
+                        filename
+                    )
 
-                await connection.execute(
-                    """
-                    INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                    """,
-                    case_id,
-                    media_id,
-                    filename,
-                    None,
-                    None,
-                    None
-                )
+                else: 
+                    new_media_uuid = uuid.uuid4()
 
-                
+                    media_id = await connection.fetchval(
+                        """
+                        INSERT INTO "Cases_DB"."Media" (MediaId, MediaType, MediaHash)
+                        VALUES ($1, $2, $3)
+                        RETURNING MediaId
+                        """,
+                        new_media_uuid,
+                        media_typ_id,
+                        media_hash
+                    )
+                    target_filename = f"{media_id}{db_extension}"
 
-            #Creation of presigned URL below
-            presign_client = get_object(for_presign=True)# function to get the client until we do the pools
+                    storage_client = get_object()
+                    await media.seek(0)
+                    
+                    file_stream = io.BytesIO(file_bytes)
+                    storage_client.put_object(
+                        Bucket=bucket_name,
+                        Key=target_filename,
+                        Body=file_stream,
+                        ContentType=media.content_type
+                    )
+
+                    await connection.execute(
+                        """
+                        INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        case_id,
+                        media_id,
+                        filename,
+                        None,
+                        None,
+                        None
+                    )
+
+            # Creation of presigned URL below
+            presign_client = get_object(for_presign=True)
 
             file_url = presign_client.generate_presigned_url(
                 'get_object',
@@ -376,7 +382,7 @@ class Case:
                 ExpiresIn=3600 
             )
 
-            return{
+            return {
                 "MediaId": str(media_id),
                 "Filename": filename,
                 "url": file_url,
@@ -395,7 +401,7 @@ class Case:
         except HTTPException as e:
             raise e
 
-        except (BotoCoreError, ClientError):
+        except (BotoCoreError, ClientError,EndpointConnectionError):
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -422,7 +428,8 @@ class Case:
         self,
         media_id: uuid.UUID,
         connection: asyncpg.Connection,
-        jwt_username: str = None
+        jwt_username: str = None,
+        jwt_user_id: str | None = None,
     ):
         if self.case_id is None:
             raise HTTPException(
@@ -434,73 +441,77 @@ class Case:
             )
 
         try:
-            if jwt_username is not None:
+            async with connection.transaction():
+                if jwt_user_id is not None:
+                    await set_audit_executor(connection, jwt_user_id)
 
-                status=await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c 
-                    WHERE r.CaseId = c.CaseId
-                        AND r.CaseId = $1
-                        AND r.MediaId = $2
-                        AND c.CaseCreator = $3;
-                    """,
-                    self.case_id,
-                    media_id,
-                    jwt_username
-                )
+                if jwt_username is not None:
 
-                rows_deleted = int(status.split(" ")[1])
-
-                if rows_deleted == 0:
-                    raise HTTPException(
-                        status_code=403, 
-                        detail={
-                            "status":"error",
-                            "message":"Unauthorized to delete this evidence or record not found."
-                        }
+                    status=await connection.execute(
+                        """
+                        DELETE FROM "Cases_DB"."Reports" r USING "Cases_DB"."Cases" c 
+                        WHERE r.CaseId = c.CaseId
+                            AND r.CaseId = $1
+                            AND r.MediaId = $2
+                            AND c.CaseCreator = $3;
+                        """,
+                        self.case_id,
+                        media_id,
+                        jwt_username
                     )
+
+                    rows_deleted = int(status.split(" ")[1])
+
+                    if rows_deleted == 0:
+                        raise HTTPException(
+                            status_code=403, 
+                            detail={
+                                "status":"error",
+                                "message":"Unauthorized to delete this evidence or record not found."
+                            }
+                        )
 
         # Above this is the normal investigator deleting something
-            else:
-                # This block contain the logic for the Admin deleting
-                status=await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Reports" r WHERE
-                    r.CaseId = $1
-                    AND r.MediaId = $2;
-                    """,
-                    self.case_id,
-                    media_id
-                )
-
-                rows_deleted = int(status.split(" ")[1])
-                if rows_deleted == 0:
-                    raise HTTPException(
-                        status_code=404, 
-                        detail={
-                            "status":"error",
-                            "message": "Media not found."
-                        }
+                else:
+                    # This block contain the logic for the Admin deleting
+                    status=await connection.execute(
+                        """
+                        DELETE FROM "Cases_DB"."Reports" r WHERE
+                        r.CaseId = $1
+                        AND r.MediaId = $2;
+                        """,
+                        self.case_id,
+                        media_id
                     )
 
-            deleted_media = await connection.fetchrow(
-                """
-                DELETE FROM "Cases_DB"."Media" media
-                USING "Cases_DB"."MediaType" mt
-                WHERE media.MediaId = $1
-                AND media.MediaType = mt.MediaTypeId
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM "Cases_DB"."Reports" r
-                    WHERE r.MediaId = media.MediaId
-                )
-                    RETURNING 
-                    media.MediaId,
-                    mt.MediaBucket,
-                    mt.MediaExtension
-                """,
-                    media_id
-                )
+                    rows_deleted = int(status.split(" ")[1])
+                    if rows_deleted == 0:
+                        raise HTTPException(
+                            status_code=404, 
+                            detail={
+                                "status":"error",
+                                "message": "Media not found."
+                            }
+                        )
+
+                deleted_media = await connection.fetchrow(
+                    """
+                    DELETE FROM "Cases_DB"."Media" media
+                    USING "Cases_DB"."MediaType" mt
+                    WHERE media.MediaId = $1
+                    AND media.MediaType = mt.MediaTypeId
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM "Cases_DB"."Reports" r
+                        WHERE r.MediaId = media.MediaId
+                    )
+                        RETURNING 
+                        media.MediaId,
+                        mt.MediaBucket,
+                        mt.MediaExtension
+                    """,
+                        media_id
+                    )
 
             if deleted_media is not None:
                     
@@ -577,13 +588,16 @@ class Case:
         connection: asyncpg.Connection, 
         username: str, 
         comment: str, 
-        role: str
+        role: str,
+        executor_id
     ) -> dict:
         if self.case_id is None:
             raise HTTPException(
                 status_code=400, 
                 detail=MISSING_CASE_ID
             )
+        
+        await set_audit_executor(connection, executor_id)
 
         row = await connection.fetchrow(
             """
@@ -660,7 +674,8 @@ class Case:
         self,
         username: str, 
         role: str,
-        connection: asyncpg.Connection
+        connection: asyncpg.Connection,
+        executor_id: str | None = None,
     ):
         if self.case_id is None:
             raise HTTPException(
@@ -673,7 +688,11 @@ class Case:
         orphan_media = []
 
         try:
+            
             async with connection.transaction():
+                if executor_id is not None:
+                    await set_audit_executor(connection, executor_id)
+
                 case_row = await connection.fetchrow(
                     """
                     SELECT casecreator

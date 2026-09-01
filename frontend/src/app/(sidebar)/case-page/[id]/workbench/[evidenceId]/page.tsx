@@ -39,6 +39,7 @@ export default function WorkbenchPage() {
     // Which workbench tool is open. By default none are open
     const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool | null>(null);
 
+    const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
 
     useEffect(() => {
@@ -49,7 +50,6 @@ export default function WorkbenchPage() {
                 if (cancelled) return;
                 const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
                 setEvidence(match);
-                loadAnnotations(match?.annotations ?? []);
             })
             .catch((error) => {
                 setError(error instanceof Error ? error.message : 'Failed to load evidence media');
@@ -58,8 +58,12 @@ export default function WorkbenchPage() {
         return () => {
             cancelled = true;
         };
-    }, [caseId, evidenceId, loadAnnotations]);
+    }, [caseId, evidenceId]);
 
+    if(evidence !== seededForm) {
+        setSeededForm(evidence);
+        loadAnnotations(evidence?.annotations ?? []);
+    }
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);

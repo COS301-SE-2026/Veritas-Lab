@@ -62,7 +62,7 @@ CREATE TYPE queryType AS ENUM ('INSERT','UPDATE','DELETE');
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Cases"(
     audit_case_id int PRIMARY KEY DEFAULT nextval('case_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_case_id UUID,
@@ -78,7 +78,7 @@ CREATE SEQUENCE IF NOT EXISTS mediatype_audit_seq START WITH 1 INCREMENT BY 1;
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_MediaTypes"(
     audit_mediatype_id int PRIMARY KEY DEFAULT nextval('mediatype_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID  REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_mediatype_id UUID,
@@ -92,7 +92,7 @@ CREATE SEQUENCE IF NOT EXISTS media_audit_seq START WITH 1 INCREMENT BY 1;
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Media"(
     audit_media_id int PRIMARY KEY DEFAULT nextval('media_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_media_id UUID,
@@ -107,7 +107,7 @@ CREATE SEQUENCE IF NOT EXISTS comment_audit_seq START WITH 1 INCREMENT BY 1;
 
 CREATE TABLE IF NOT EXISTS "Cases_DB"."Audit_Comments"(
     audit_comment_id int PRIMARY KEY DEFAULT nextval('comment_audit_seq'),
-    query_executor UUID NOT NULL REFERENCES "Users_DB"."Users"(UserId),
+    query_executor UUID REFERENCES "Users_DB"."Users"(UserId) ON DELETE SET NULL ON UPDATE CASCADE,
     query_executor_name VARCHAR(100) NOT NULL,
     query_type queryType NOT NULL,
     old_comment_id BIGINT,
@@ -124,6 +124,7 @@ CREATE OR REPLACE FUNCTION "Cases_DB".get_audit_executor(
 ) AS $$
 DECLARE
     v_user_setting TEXT;
+    c_nil_uuid CONSTANT UUID := '00000000-0000-0000-0000-000000000000'::UUID;
 BEGIN
     v_user_setting := NULLIF(current_setting('app.current_user_id', true), '');
     IF v_user_setting IS NULL THEN
@@ -131,12 +132,18 @@ BEGIN
     END IF;
 
     executor_id := v_user_setting::UUID;
+
+    IF executor_id = c_nil_uuid THEN
+        executor_name := 'SYSTEM_INIT';
+        RETURN;
+    END IF;
+
     SELECT UserName INTO executor_name
     FROM "Users_DB"."Users"
     WHERE UserId = executor_id;
 
     IF executor_name IS NULL THEN
-        RAISE EXCEPTION 'This user is unauthorised to preform this task', executor_id;
+        RAISE EXCEPTION 'This user % is unauthorised to perform this task', executor_id;
     END IF;
 
 END;
@@ -166,7 +173,7 @@ CREATE OR REPLACE TRIGGER trg_audit_mediatypes_delete
 AFTER DELETE ON "Cases_DB"."MediaType"
 FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_delete_trigger();
 
-CREATE OR REPLACE FUNCTION "Cases_DB".audit_mediatypes_table_modify_trigger()
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_mediatypes_table_modify()
 RETURNS TRIGGER AS $$
 DECLARE
     v_executor_id UUID;
@@ -197,6 +204,183 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trg_audit_mediatypes_upsert
+CREATE OR REPLACE TRIGGER audit_mediatypes_modify_trigger
 AFTER INSERT OR UPDATE ON "Cases_DB"."MediaType"
-FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_table_modify_trigger();
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_mediatypes_table_modify();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_media_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Media" (
+        query_executor, query_executor_name, query_type,
+        old_media_id, old_MediaType, old_MediaHash, old_MediaAnnotations, old_MediaUploadDate
+    ) VALUES (
+        v_executor_id, v_executor_name, 'DELETE'::queryType,
+        OLD.MediaId, OLD.MediaType, OLD.MediaHash, OLD.MediaAnnotations, OLD.MediaUploadDate
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_media_delete_trigger
+AFTER DELETE ON "Cases_DB"."Media"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_media_delete();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_media_modify()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_Media" (
+            query_executor, query_executor_name, query_type,
+            old_media_id, old_MediaType, old_MediaHash, old_MediaAnnotations, old_MediaUploadDate
+        ) VALUES (
+            v_executor_id, v_executor_name, 'INSERT'::queryType,
+            NEW.MediaId, NEW.MediaType, NEW.MediaHash, NEW.MediaAnnotations, NEW.MediaUploadDate
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_Media" (
+            query_executor, query_executor_name, query_type,
+            old_media_id, old_MediaType, old_MediaHash, old_MediaAnnotations, old_MediaUploadDate
+        ) VALUES (
+            v_executor_id, v_executor_name, 'UPDATE'::queryType,
+            OLD.MediaId, OLD.MediaType, OLD.MediaHash, OLD.MediaAnnotations, OLD.MediaUploadDate
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_media_insert_trigger
+AFTER INSERT OR UPDATE ON "Cases_DB"."Media"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_media_modify();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_comments_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Comments" (
+        query_executor, query_executor_name, query_type,
+        old_comment_id, old_CaseId, old_Username, old_Comment, old_CommentTimestamp
+    ) VALUES (
+        v_executor_id, v_executor_name, 'DELETE'::queryType,
+        OLD.CommentID, OLD.CaseId, OLD.Username, OLD.Comment, OLD.CommentTimestamp
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_comments_delete_trigger
+AFTER DELETE ON "Cases_DB"."Comments"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_comments_delete();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_comments_modify()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_Comments" (
+            query_executor, query_executor_name, query_type,
+            old_comment_id, old_CaseId, old_Username, old_Comment, old_CommentTimestamp
+        ) VALUES (
+            v_executor_id, v_executor_name, 'INSERT'::queryType,
+            NEW.CommentID, NEW.CaseId, NEW.Username, NEW.Comment, NEW.CommentTimestamp
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_Comments" (
+            query_executor, query_executor_name, query_type,
+            old_comment_id, old_CaseId, old_Username, old_Comment, old_CommentTimestamp
+        ) VALUES (
+            v_executor_id, v_executor_name, 'UPDATE'::queryType,
+            OLD.CommentID, OLD.CaseId, OLD.Username, OLD.Comment, OLD.CommentTimestamp
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_comments_modifed_trigger
+AFTER INSERT OR UPDATE ON "Cases_DB"."Comments"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_comments_modify();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Cases" (
+        query_executor, query_executor_name, query_type,
+        old_case_id, old_CaseName, old_CaseCreator, old_CaseDescription, old_CaseClosed, old_CaseCreationDate
+    ) VALUES (
+        v_executor_id, v_executor_name, 'DELETE'::queryType,
+        OLD.CaseId, OLD.CaseName, OLD.CaseCreator, OLD.CaseDescription, OLD.CaseClosed, OLD.CaseCreationDate
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_cases_delete_trigger
+AFTER DELETE ON "Cases_DB"."Cases"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_delete();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_modify()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, query_executor_name, query_type,
+            old_case_id, old_CaseName, old_CaseCreator, old_CaseDescription, old_CaseClosed, old_CaseCreationDate
+        ) VALUES (
+            v_executor_id, v_executor_name, 'INSERT'::queryType,
+            NEW.CaseId, NEW.CaseName, NEW.CaseCreator, NEW.CaseDescription, NEW.CaseClosed, NEW.CaseCreationDate
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, query_executor_name, query_type,
+            old_case_id, old_CaseName, old_CaseCreator, old_CaseDescription, old_CaseClosed, old_CaseCreationDate
+        ) VALUES (
+            v_executor_id, v_executor_name, 'UPDATE'::queryType,
+            OLD.CaseId, OLD.CaseName, OLD.CaseCreator, OLD.CaseDescription, OLD.CaseClosed, OLD.CaseCreationDate
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER audit_cases_modified_trigger
+AFTER INSERT OR UPDATE ON "Cases_DB"."Cases"
+FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_modify();

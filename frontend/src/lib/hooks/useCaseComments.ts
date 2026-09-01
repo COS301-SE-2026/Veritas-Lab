@@ -44,12 +44,9 @@ export default function useCaseComments({ caseId, initialComments }: UseCaseComm
         }
     };
     const removeComment = async (commentId: number) => {
-        try {
-            await deleteCommentRequest(commentId);
-            setComments((current) => current.filter((c) => c.commentId !== commentId));
-        } catch (removeError) {
-            setError(removeError instanceof Error ? removeError.message : 'Failed to remove comment');
-        }
+        setComments((current) =>
+            current.filter((c) => c.commentId !== commentId)
+        );
     };
 
     return {

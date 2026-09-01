@@ -3,7 +3,7 @@ import pytest_asyncio
 import uuid
 import asyncpg
 from fastapi.testclient import TestClient
-
+from app.tests.integration.conftest import get_connection
 from app.api.main import app
 from app.core.env import Postgres_Settings
 from app.auth.auth import create_token, COOKIE_NAME
@@ -14,30 +14,15 @@ POSTGRES_SETTINGS = Postgres_Settings()
 OWNER_USERNAME = "TestUpdateOwner"
 OTHER_USERNAME = "TestUpdateOther"
 
+OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
+OTHER_USER_ID = "00000000-0000-0000-0000-000000000002"
+
 ORIGINAL_NAME = "Integration Test - update case"
 ORIGINAL_DESCRIPTION = "The original description"
 
-
-async def get_connection():
-    return await asyncpg.connect(
-        user=POSTGRES_SETTINGS.DB_USER,
-        password=POSTGRES_SETTINGS.DB_PASSWORD,
-        database=POSTGRES_SETTINGS.DB_NAME,
-        host=POSTGRES_SETTINGS.DB_HOST,
-        port=POSTGRES_SETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SETTINGS.DB_SSL else None,
-    )
-
-
-@pytest.fixture
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
-
-
 def owner_cookie():
     return create_token({
-        "id": str(uuid.uuid4()),
+        "id": OWNER_USER_ID,
         "username": OWNER_USERNAME,
         "role": "INVESTIGATOR"
     })
@@ -45,7 +30,7 @@ def owner_cookie():
 
 def other_investigator_cookie():
     return create_token({
-        "id": str(uuid.uuid4()),
+        "id": OTHER_USER_ID,
         "username": OTHER_USERNAME,
         "role": "INVESTIGATOR"
     })
@@ -71,13 +56,17 @@ async def fetch_case(conn, case_id):
 
 
 @pytest_asyncio.fixture
-async def fake_update_case_context():
+async def fake_update_case_context(ensure_user_exists):
     conn = await get_connection()
-    created_ids = {}
+    created_ids = {"connection": conn}
 
     try:
+        await ensure_user_exists(conn, OWNER_USER_ID, OWNER_USERNAME, "INVESTIGATOR")
+        await ensure_user_exists(conn, OTHER_USER_ID, OTHER_USERNAME, "INVESTIGATOR")
+
         for label, creator in (("owned", OWNER_USERNAME), ("foreign", OTHER_USERNAME)):
             case_id = str(uuid.uuid4())
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", OWNER_USER_ID)
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases"
@@ -88,22 +77,16 @@ async def fake_update_case_context():
                 f"{ORIGINAL_NAME} - {label}",
                 creator,
                 ORIGINAL_DESCRIPTION,
-                False
+                False,
             )
             created_ids[f"{label}_case_id"] = case_id
-
-        created_ids["connection"] = conn
-
         yield created_ids
-
     finally:
-        for label in ("owned", "foreign"):
-            if f"{label}_case_id" in created_ids:
-                await conn.execute(
-                    'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
-                    uuid.UUID(created_ids[f"{label}_case_id"])
-                )
-
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", OWNER_USER_ID)
+        for case_id in (created_ids.get("owned_case_id"), created_ids.get("foreign_case_id")):
+            if case_id:
+                await conn.execute('DELETE FROM "Cases_DB"."Cases" WHERE caseid = $1', uuid.UUID(case_id))
+        await conn.execute("SELECT set_config('app.current_user_id', '', false)")
         await conn.close()
 
 

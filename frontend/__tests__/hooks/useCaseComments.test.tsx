@@ -1,11 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import useCaseComments from '@/lib/hooks/useCaseComments';
-import { addComment, deleteComment, editComment } from '@/lib/api/case';
+import { addComment, editComment } from '@/lib/api/case';
 import type { CaseComment } from '@/types/api';
 jest.mock('@/lib/api/case', () => ({
     addComment: jest.fn(),
     editComment: jest.fn(),
-    deleteComment: jest.fn(),//hook tests for edit and delete
 }));
 //hook tests - now reviewed and updated!
 describe('useCaseComments', () => {
@@ -136,14 +135,16 @@ describe('useCaseComments', () => {
         expect(result.current.comments[0].comment).toBe('Existing comment');
     });
     //delete tests
-    it('removes a comment after a successful delete', async () => {
-        const mockedDeleteComment = deleteComment as jest.MockedFunction<typeof deleteComment>;
-        mockedDeleteComment.mockResolvedValue({ status: 'success' });
-        const { result } = renderHook(() => useCaseComments({ caseId: 'case-1', initialComments }));
+    it('removes a comment from state after delete', async () => {
+        const { result } = renderHook(() =>
+            useCaseComments({
+                caseId: 'case-1',
+                initialComments,
+            })
+        );
         await act(async () => {
-            await result.current.removeComment(1);
+            result.current.removeComment(1);
         });
-        expect(mockedDeleteComment).toHaveBeenCalledWith(1);
         expect(result.current.comments).toHaveLength(0);
     });
 

@@ -1,3 +1,5 @@
+SET app.current_user_id = '00000000-0000-0000-0000-000000000000';
+
 INSERT INTO "Cases_DB"."MediaType" (MediaName,MediaBucket, MediaExtension) VALUES
 ('Portable Network Graphics','images', '.png'),
 ('Joint Photographic Experts Group','images', '.jpeg'),

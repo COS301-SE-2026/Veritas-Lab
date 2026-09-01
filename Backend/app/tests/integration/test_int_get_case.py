@@ -1,17 +1,23 @@
+import uuid
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 from app.api.main import app
-import pytest_asyncio
-import uuid
 from app.auth.auth import create_token, COOKIE_NAME
-from app.tests.integration.test_int_annotations import get_connection, client
+from app.tests.integration.conftest import get_connection
 
 @pytest_asyncio.fixture
-async def fake_get_cases_context():
+async def fake_get_cases_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
 
     try:
+        user_id = str(uuid.uuid4())
+        await ensure_user_exists(conn, user_id, "TestInvestigator", "INVESTIGATOR")
+
+        # Set the session variable required by the Postgres audit trigger
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
+
         open_case_id = str(uuid.uuid4())
         await conn.execute(
             """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
@@ -55,7 +61,6 @@ async def fake_get_cases_context():
 
 @pytest.mark.asyncio
 async def test_integration_get_cases_investigator(client, fake_get_cases_context):
-    
     mock_investigator_user = {
         "id": str(uuid.uuid4()),
         "username": "test_investigator",
@@ -77,7 +82,6 @@ async def test_integration_get_cases_investigator(client, fake_get_cases_context
 
 @pytest.mark.asyncio
 async def test_integration_get_cases_regular_user(client, fake_get_cases_context):
-
     mock_regular_user = {
         "id": str(uuid.uuid4()),
         "username": "test_user",
@@ -98,7 +102,6 @@ async def test_integration_get_cases_regular_user(client, fake_get_cases_context
 
 @pytest.mark.asyncio
 async def test_integration_get_cases_unauthorized(client):
-
     client.cookies.clear()
 
     response = client.request("POST", "/api/getCases")
