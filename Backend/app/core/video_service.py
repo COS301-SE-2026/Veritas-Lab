@@ -10,7 +10,11 @@ class VideoService(MediaService):
         return await self.ai_detector.analyse_video(path)
 
     async def analyse_metadata(self, metadata: dict) -> AnalysisFindings:
+        # This is the method for analysing metadat. will be completed at a later stage
         pass
 
     def create_findings_string(self, input: dict) -> str:
+        # This is the method that combines the metadata analysis and ai analysis into an easy to read output.
+        # Will be completed when the metadata analysis is completed
+        # Yes, these comments are for Sonar
         pass

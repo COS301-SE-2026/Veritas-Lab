@@ -61,7 +61,7 @@ def read_video_frames(path: str | Path, num_frames: int = 8, image_size: int = 2
         if idx in by_index:
             f = by_index[idx]
         else:
-            nearest = min(available, key=lambda x: abs(x - int(idx)))
+            nearest = min(available, key=lambda x, idx=idx: abs(x - int(idx)))
             f = by_index[nearest]
 
         sampled.append(f)

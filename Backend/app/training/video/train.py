@@ -161,7 +161,7 @@ def main():
 
 
     print("\nLoading best checkpoint...")
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=True)
 
     model.load_state_dict(checkpoint["model_state_dict"])
     test_loss, test_accuracy = validate(model, test_loader, criterion, device)
