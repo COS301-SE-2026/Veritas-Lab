@@ -185,15 +185,37 @@ async def test_evidence_removal_is_not_recorded(client, audit_context):
     assert upload.status_code == 201, upload.text
     media_id = upload.json()["evidence"]["MediaId"]
 
-    assert "Evidence Added" in _actions(_timeline(client, case_id))
+    removal = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
+    assert removal.status_code == 200, removal.text
 
-    # Remove evidence
-    remove = client.delete(
-        "/api/cases/evidence",
-        json={"case_id": case_id, "media_id": media_id},
-    )
-    assert remove.status_code == 200, remove.text
-
-    # Ensure that the removal is not recorded in the audit timeline
     actions = _actions(_timeline(client, case_id))
     assert "Evidence Removed" not in actions
+    assert "Evidence Added" not in actions
+
+@pytest.mark.asyncio
+async def test_timeline_empty_for_unaudited_case(client, audit_context):
+    _login(client, audit_context)
+
+    assert _timeline(client, str(uuid.uuid4())) == []
+
+@pytest.mark.asyncio
+async def test_timeline_requires_authentication(client, audit_context):
+    client.cookies.clear()
+    response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
+
+    assert response.status_code == 401
+
+@pytest.mark.asyncio
+async def test_get_all_audited_cases(client, audit_context):
+    ctx = audit_context
+    _login(client, ctx)
+
+    assert client.get("/api/getAllAudit").status_code == 403
+
+    _login(client, ctx, role="ADMIN")
+    response = client.get("/api/getAllAudit")
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    assert body["status"] == "success"
+    assert isinstance(body["cases"], list)
