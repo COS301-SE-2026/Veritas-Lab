@@ -219,7 +219,7 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
     }
 
-def _row_to_audit_event(row: dict) -> dict:
+def row_to_audit_event(row: dict) -> dict:
     return {
         "timestamp": row["eventtimestamp"].isoformat() if row["eventtimestamp"] else None,
         "user": row["eventuser"],
@@ -2335,7 +2335,7 @@ async def get_case_audit_events(
         return {
             "status": "success",
             "caseID": validated_case_id,
-            "events": [_row_to_audit_event(row) for row in rows]
+            "events": [row_to_audit_event(row) for row in rows]
         }
 
     except asyncpg.PostgresError:

@@ -61,7 +61,7 @@ async def audit_context(ensure_user_exists):
                 )
     await conn.close()
 
-def _login(client, ctx, role="INVESTIGATOR"):
+def login(client, ctx, role="INVESTIGATOR"):
     if role == "ADMIN":
         client.cookies.set(
             COOKIE_NAME, cookie_for(ctx["admin_name"], "ADMIN", ctx["admin_id"])
@@ -72,7 +72,7 @@ def _login(client, ctx, role="INVESTIGATOR"):
             cookie_for(ctx["investigator_name"], "INVESTIGATOR", ctx["investigator_id"]),
         )
 
-def _create_case(client, ctx, title="Audit timeline case"):
+def create_case(client, ctx, title="Audit timeline case"):
     response = client.post(
         "/api/createCase",
         json={"title": title, "description": "Testfor audit"},
@@ -82,21 +82,21 @@ def _create_case(client, ctx, title="Audit timeline case"):
     ctx["cases"].append(case_id)
     return case_id
 
-def _timeline(client, case_id):
+def timeline(client, case_id):
     response = client.get(f"/api/getAudit/caseID/{case_id}")
     assert response.status_code == 200, response.text
     return response.json()["events"]
 
-def _actions(events):
+def actions(events):
     #since the endpoint returns newest first, we then read the oldest by reversing the list
     return [event["action"] for event in reversed(events)]
 
 @pytest.mark.asyncio
 async def test_case_lifecycle_actions(client, audit_context):
     ctx = audit_context
-    _login(client, ctx)
+    login(client, ctx)
 
-    case_id = _create_case(client, ctx)
+    case_id = create_case(client, ctx)
 
     rename = client.post(
         f"/api/updateCase", json={"CaseID": case_id, "CaseName": "Renamed Case"}
@@ -112,9 +112,9 @@ async def test_case_lifecycle_actions(client, audit_context):
     close = client.post("/api/closeCase", json={"CaseID": case_id})
     assert close.status_code == 200, close.text
 
-    events = _timeline(client, case_id)
+    events = timeline(client, case_id)
 
-    assert _actions(events) == [
+    assert actions(events) == [
         "Case Created",
         "Case Renamed",
         "Case Description Updated",
@@ -125,22 +125,22 @@ async def test_case_lifecycle_actions(client, audit_context):
 @pytest.mark.asyncio
 async def test_case_deletion_is_recorded(client, audit_context):
     ctx = audit_context
-    _login(client, ctx)
+    login(client, ctx)
 
-    case_id = _create_case(client, ctx)
+    case_id = create_case(client, ctx)
 
     delete = client.request("DELETE", "/api/deleteCase", json={"CaseID": case_id})
     assert delete.status_code == 200, delete.text
     ctx["cases"].remove(case_id)
 
-    assert _actions(_timeline(client, case_id)) == ["Case Created", "Case Deleted"]
+    assert actions(timeline(client, case_id)) == ["Case Created", "Case Deleted"]
 
 @pytest.mark.asyncio
 async def test_evidence_added_and_annotated(client, audit_context):
     ctx = audit_context
-    _login(client, ctx)
+    login(client, ctx)
 
-    case_id = _create_case(client, ctx)
+    case_id = create_case(client, ctx)
 
     # Add evidence
     upload = client.post(
@@ -151,7 +151,7 @@ async def test_evidence_added_and_annotated(client, audit_context):
     assert upload.status_code == 201, upload.text
     media_id = upload.json()["evidence"]["MediaId"]
 
-    assert "Evidence Added" in _actions(_timeline(client, case_id))
+    assert "Evidence Added" in actions(timeline(client, case_id))
 
     conn = ctx["conn"]
     report_id = await conn.fetchval(
@@ -165,16 +165,16 @@ async def test_evidence_added_and_annotated(client, audit_context):
     )
 
     assert annotate.status_code == 200, annotate.text
-    assert "Evidence Annotated" in _actions(_timeline(client, case_id))
+    assert "Evidence Annotated" in actions(timeline(client, case_id))
 
 #This test ensures that when evidence is removed, it does not create an audit event for "Evidence Removed". 
 #The audit trail should only record the addition and annotation of evidence, not its removal.
 @pytest.mark.asyncio
 async def test_evidence_removal_is_not_recorded(client, audit_context):
     ctx = audit_context
-    _login(client, ctx)
+    login(client, ctx)
 
-    case_id = _create_case(client, ctx)
+    case_id = create_case(client, ctx)
 
     # Add evidence
     upload = client.post(
@@ -188,15 +188,15 @@ async def test_evidence_removal_is_not_recorded(client, audit_context):
     removal = client.post(f"/api/delete/case/{case_id}/evidence/{media_id}")
     assert removal.status_code == 200, removal.text
 
-    actions = _actions(_timeline(client, case_id))
-    assert "Evidence Removed" not in actions
-    assert "Evidence Added" not in actions
+    actions_act = actions(timeline(client, case_id))
+    assert "Evidence Removed" not in actions_act
+    assert "Evidence Added" not in actions_act
 
 @pytest.mark.asyncio
 async def test_timeline_empty_for_unaudited_case(client, audit_context):
-    _login(client, audit_context)
+    login(client, audit_context)
 
-    assert _timeline(client, str(uuid.uuid4())) == []
+    assert timeline(client, str(uuid.uuid4())) == []
 
 @pytest.mark.asyncio
 async def test_timeline_requires_authentication(client, audit_context):
@@ -208,11 +208,11 @@ async def test_timeline_requires_authentication(client, audit_context):
 @pytest.mark.asyncio
 async def test_get_all_audited_cases(client, audit_context):
     ctx = audit_context
-    _login(client, ctx)
+    login(client, ctx)
 
     assert client.get("/api/getAllAudit").status_code == 403
 
-    _login(client, ctx, role="ADMIN")
+    login(client, ctx, role="ADMIN")
     response = client.get("/api/getAllAudit")
     assert response.status_code == 200, response.text
 
