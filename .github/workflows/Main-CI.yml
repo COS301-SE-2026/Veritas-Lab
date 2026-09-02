@@ -1,100 +1,15 @@
-name: Dev CI
-#we want the CI to only run when we create a pull request to dev or when that PR is updated
-#obviously if the CI fails you dont merge.
+#Test can be called from here instead of duplicating it in both CI/CD files
+name: Main CI
+
 on:
     pull_request:
-        branches-ignore:
-            - main
-    workflow_dispatch:
+        branches: ["main"]
+    workflow_dispatch: 
+
+permissions: 
+    contents: read
+
 jobs:
-    docker-build:
-        runs-on: ubuntu-latest
-        timeout-minutes: 15
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: build Docker images
-              env:
-                  ENVIRONMENT: development
-                  FRONTEND_ORIGIN: http://localhost:3000
-                  STORAGE_URL: http://localhost:9000
-                  MINIO_EXTERNAL_URL: http://localhost:9000
-                  DB_HOST: localhost
-                  DB_USER: postgres
-                  DB_PASSWORD: postgres
-                  DB_NAME: test_db
-                  DB_PORT: 5432
-                  DB_SSL: false
-                  JWT_SECRET: test-secret
-                  HASH: HS256
-                  TOKEN_EXPIRE: 5
-                  MINIO_ROOT_USER: minioadmin
-                  MINIO_ROOT_PASSWORD: minioadmin
-                  MINIO_API_PORT: 9000
-                  MINIO_CONSOLE_PORT: 9001
-                  AWS_REGION: af-south-1
-                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
-                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
-                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
-                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
-                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
-                  NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-                  R2_URL: ${{ secrets.R2_URL }}
-                  R2_TOKEN_VALUE: ${{ secrets.R2_TOKEN_VALUE }}
-                  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-                  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-                  AWS_ACCESS_KEY_ID: ${{ env.MINIO_ROOT_USER }}
-                  AWS_SECRET_ACCESS_KEY: ${{ env.MINIO_ROOT_PASSWORD }}
-                  AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-              run: |
-                  docker compose up -d --build
-
-            - name: cleaner
-              env:
-                  ENVIRONMENT: development
-                  FRONTEND_ORIGIN: http://localhost:3000
-                  STORAGE_URL: http://localhost:9000
-                  MINIO_EXTERNAL_URL: http://localhost:9000
-                  DB_HOST: localhost
-                  DB_USER: postgres
-                  DB_PASSWORD: postgres
-                  DB_NAME: test_db
-                  DB_PORT: 5432
-                  DB_SSL: false
-                  JWT_SECRET: test-secret
-                  HASH: HS256
-                  TOKEN_EXPIRE: 5
-                  MINIO_ROOT_USER: minioadmin
-                  MINIO_ROOT_PASSWORD: minioadmin
-                  MINIO_API_PORT: 9000
-                  MINIO_CONSOLE_PORT: 9001
-                  AWS_REGION: af-south-1
-                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
-                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
-                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
-                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
-                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
-                  NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-                  R2_URL: ${{ secrets.R2_URL }}
-                  R2_TOKEN_VALUE: ${{ secrets.R2_TOKEN_VALUE }}
-                  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-                  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-                  AWS_ACCESS_KEY_ID: ${{ env.MINIO_ROOT_USER }}
-                  AWS_SECRET_ACCESS_KEY: ${{ env.MINIO_ROOT_PASSWORD }}
-                  AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-              if: always()
-              run: |
-                  docker compose down -v --rmi all --remove-orphans
-
     backend-unit-tests:
         runs-on: ubuntu-latest
         timeout-minutes: 10
@@ -177,7 +92,6 @@ jobs:
 
     backend-integration-tests:
         needs:
-            - docker-build
             - backend-unit-tests
             - frontend-unit-tests
         runs-on: ubuntu-latest
@@ -321,14 +235,12 @@ jobs:
 
     frontend-integration-tests:
         needs:
-            - docker-build
             - backend-unit-tests
             - frontend-unit-tests
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
-
             - name: set up Node
               uses: actions/setup-node@v4
               with:
@@ -343,3 +255,141 @@ jobs:
               run: |
                   cd frontend
                   npx jest "__tests__/integration"
+
+    e2e-tests:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        needs: [backend-integration-tests, frontend-integration-tests]
+        steps:
+            - uses: actions/checkout@v4
+ 
+            #create local env used by docker compose for integration tests.
+            - name: create CI env
+              env:
+                  ENVIRONMENT: development
+                  FRONTEND_ORIGIN: http://localhost:3000
+                  STORAGE_URL: http://localhost:9000
+                  MINIO_EXTERNAL_URL: http://localhost:9000
+                  DB_HOST: localhost
+                  DB_USER: postgres
+                  DB_PASSWORD: postgres
+                  DB_NAME: test_db
+                  DB_PORT: 5432
+                  DB_SSL: false
+                  JWT_SECRET: test-secret
+                  HASH: HS256
+                  TOKEN_EXPIRE: 5
+                  MINIO_ROOT_USER: minioadmin
+                  MINIO_ROOT_PASSWORD: minioadmin
+                  MINIO_API_PORT: 9000
+                  MINIO_CONSOLE_PORT: 9001
+                  AWS_REGION: af-south-1
+                  NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+                  R2_URL: ${{ secrets.R2_URL }}
+                  R2_TOKEN_VALUE: ${{ secrets.R2_TOKEN_VALUE }}
+                  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+                  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+                  AWS_ACCESS_KEY_ID: ${{ env.MINIO_ROOT_USER }}
+                  AWS_SECRET_ACCESS_KEY: ${{ env.MINIO_ROOT_PASSWORD }}
+                  AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
+                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
+              run: |
+                  cat <<EOF > .env.ci
+                  DB_USER=$DB_USER
+                  DB_PASSWORD=$DB_PASSWORD
+                  DB_NAME=$DB_NAME
+                  DB_PORT=$DB_PORT
+                  DB_HOST=$DB_HOST
+                  DB_SSL=$DB_SSL
+                  JWT_SECRET=$JWT_SECRET
+                  HASH=$HASH
+                  TOKEN_EXPIRE=$TOKEN_EXPIRE
+                  MINIO_ROOT_USER=$MINIO_ROOT_USER
+                  MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
+                  MINIO_API_PORT=$MINIO_API_PORT
+                  MINIO_CONSOLE_PORT=$MINIO_CONSOLE_PORT
+                  AWS_REGION=$AWS_REGION
+                  STORAGE_URL=$STORAGE_URL
+                  MINIO_EXTERNAL_URL=$MINIO_EXTERNAL_URL
+                  NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+                  ENVIRONMENT=$ENVIRONMENT
+                  FRONTEND_ORIGIN=$FRONTEND_ORIGIN
+                  E2E_INVESTIGATOR_NAME=$E2E_INVESTIGATOR_NAME
+                  E2E_INVESTIGATOR_EMAIL=$E2E_INVESTIGATOR_EMAIL
+                  E2E_INVESTIGATOR_PASSWORD=$E2E_INVESTIGATOR_PASSWORD
+                  ADMIN_NAME=$ADMIN_NAME
+                  ADMIN_EMAIL=$ADMIN_EMAIL
+                  ADMIN_PASSWORD=$ADMIN_PASSWORD
+                  E2E_USER_NAME=$E2E_USER_NAME
+                  E2E_USER_EMAIL=$E2E_USER_EMAIL
+                  E2E_USER_PASSWORD=$E2E_USER_PASSWORD
+                  EOF
+
+            #build and start the docker-compose
+            - name: start services
+              run: docker compose --env-file .env.ci up -d --build
+ 
+            #check the backend endpoint until it is ready or fails
+            - name: wait on backend
+              run: |
+                  for i in {1..30}; do
+                      if curl -fsS http://localhost:8000/docs > /dev/null; then
+                          exit 0
+                      fi
+                      sleep 2
+                  done
+                  echo "Backend did not become ready";
+                  docker compose logs backend;
+                  exit 1
+ 
+            #check the frontend endpoint until it is ready or fails
+            - name: wait on frontend
+              run: |
+                  for i in {1..30}; do
+                      if curl -fsS http://localhost:3000 > /dev/null; then
+                          exit 0
+                      fi
+                      sleep 2
+                  done
+                  echo "Frontend did not become ready";
+                  docker compose logs frontend;
+                  exit 1
+ 
+            - name: set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+ 
+            - name: install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+                  npx playwright install --with-deps
+ 
+            - name: run Playwright
+              env:
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
+                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
+              run: |
+                  cd frontend
+                  npx playwright test --project=chromium --project=firefox
+ 
+            #shut down services and remove volumes after the run
+            - name: Remover
+              if: always()
+              run: docker compose --env-file .env.ci down -v
