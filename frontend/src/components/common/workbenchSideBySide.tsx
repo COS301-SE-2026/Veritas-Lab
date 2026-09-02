@@ -4,16 +4,16 @@ import {
     badExampleData,
     exampleLabels,
 } from '@/lib/data/referenceMetadata';
-import type { MediaKind } from '@/types/workbench';
+import type { MediaKindSideBySide } from '@/types/workbench';
 
 type MetadataComparisonProps = {
-    mediaKind: MediaKind;
+    mediaKind: MediaKindSideBySide;
     mediaName: string;
     reportArtifacts?: Record<string, unknown> | null;
 };
 
 type MetadataEntry = [string, string];
-const PNG_TRIAGE_KIND: MediaKind = 'image';
+const PNG_TRIAGE_KIND: MediaKindSideBySide = 'image';
 const JUMBF_PRIORITY_PATTERN = /(SoftwareAgent|Claim_Generator)/i;
 const MAX_METADATA_ENTRIES = 25;
 function isJumbfKey(key: string): boolean {
@@ -24,7 +24,7 @@ function isPriorityJumbfKey(key: string): boolean {
     return isJumbfKey(key) && JUMBF_PRIORITY_PATTERN.test(key);
 }
 
-function isPngTriageKind(kind: MediaKind): boolean {
+function isPngTriageKind(kind: MediaKindSideBySide): boolean {
     return kind === PNG_TRIAGE_KIND;
 }
 
@@ -55,7 +55,7 @@ function selectPngMetadataEntries(metadata: Record<string, unknown>): MetadataEn
         .map(([key, value]) => [key, formatValue(value)] as MetadataEntry);
 }
 
-function buildEntries(mediaKind: MediaKind, metadata: Record<string, unknown>): MetadataEntry[] {
+function buildEntries(mediaKind: MediaKindSideBySide, metadata: Record<string, unknown>): MetadataEntry[] {
     if (isPngTriageKind(mediaKind)) {
         return selectPngMetadataEntries(metadata);
     }

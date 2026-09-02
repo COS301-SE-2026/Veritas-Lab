@@ -14,7 +14,7 @@ import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { getMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
-import type { WorkbenchTool } from '@/types/workbench';
+import type { MediaKindSideBySide, WorkbenchTool } from '@/types/workbench';
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -79,6 +79,7 @@ export default function WorkbenchPage() {
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);
+    const mediaKindSideBySide: MediaKindSideBySide = mediaKind === 'video' ? 'unsupported' : mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
@@ -125,7 +126,7 @@ export default function WorkbenchPage() {
 
                     {comparisonActive ? (
                         <MetadataComparison
-                            mediaKind={mediaKind}
+                            mediaKind={mediaKindSideBySide}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
                         />
