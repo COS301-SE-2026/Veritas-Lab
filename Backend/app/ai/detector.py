@@ -4,6 +4,7 @@ import torch
 from app.training.image.model import AIImageDetector as TrainedAIImageDetector
 from app.training.image.prediction import predict_and_explain
 from app.training.pdf.explain import explain_pdf, load_detector
+from app.training.video.analyser import video_combined_analysis
 
 MODEL_PATH = Path("app/ai/best_model.pth")
 PDF_MODEL_PATH = Path("app/ai/pdf_detector.pt")
@@ -78,4 +79,29 @@ class AIPDFDetector:
             risk_level = 1
 
         result["risk_level"] = risk_level
+        return result
+
+class AIVideoDetector:
+    def __init__(self) -> None:
+        self.model = video_combined_analysis()
+
+    async def analyse_video(self, video_path: str | Path) -> dict:
+        video_path = Path(video_path)
+        result = await self.model.analyse(video_path)
+
+        confidence = (
+            result["ai_probability"]
+            if result["prediction"] == "AI-generated"
+            else result["authentic_probability"]
+        )
+
+        if confidence >= 0.80:
+            risk_level = 3
+        elif confidence >= 0.60:
+            risk_level = 2
+        else:
+            risk_level = 1
+
+        result["risk_level"] = risk_level
+
         return result
