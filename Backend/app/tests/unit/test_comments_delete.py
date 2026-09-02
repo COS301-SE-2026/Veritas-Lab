@@ -1,53 +1,76 @@
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 import asyncpg
+from fastapi import HTTPException
+import pytest
+from fastapi.testclient import TestClient
+
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
 from app.auth.auth import INVALID_TOKEN
-from fastapi import HTTPException
-import pytest
 from app.core.database import get_connection
-from app.tests.unit.database_override import unit_get_connection
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def override_database_dependency():
-    app.dependency_overrides[get_connection] = unit_get_connection
-    try:
-        yield
-    finally:
-        app.dependency_overrides.pop(get_connection, None)
+def cleanup_dependency_overrides():
+    yield
+    app.dependency_overrides.clear()
 
-class MockConnectionSuccess:
+
+def create_mock_transaction():
+    tx = MagicMock()
+    tx.__aenter__ = AsyncMock(return_value=None)
+    tx.__aexit__ = AsyncMock(return_value=None)
+    return tx
+
+
+class mock_connection_success:
     def __init__(self):
         self.fetchrow = AsyncMock(return_value={"commentid": 5})
+        self.execute = AsyncMock(return_value="SET")
+        self.fetchval = AsyncMock(return_value="system-user")
+        self.fetch = AsyncMock(return_value=[])
         self.close = AsyncMock()
+        self.transaction = MagicMock(return_value=create_mock_transaction())
 
-class MockConnectionNoRow:
+
+class mock_connection_no_row:
     def __init__(self):
         self.fetchrow = AsyncMock(return_value=None)
+        self.execute = AsyncMock(return_value="SET")
+        self.fetchval = AsyncMock(return_value=None)
+        self.fetch = AsyncMock(return_value=[])
         self.close = AsyncMock()
+        self.transaction = MagicMock(return_value=create_mock_transaction())
 
-class MockConnectionDatabaseError:
+
+class mock_connection_database_error:
     def __init__(self):
+        self.execute = AsyncMock(return_value="SET")
+        self.fetchval = AsyncMock(return_value="SET")
+        self.fetch = AsyncMock(return_value=[])
         self.close = AsyncMock()
+        self.transaction = MagicMock(return_value=create_mock_transaction())
 
-    async def fetchrow(self,*args, **kwargs):
+    async def fetchrow(self, *args, **kwargs):
         raise asyncpg.PostgresError("Database error")
 
-async def mock_connect_success(*args, **kwargs):
-    return MockConnectionSuccess()
 
-async def mock_connect_no_row(*args, **kwargs):
-    return MockConnectionNoRow()
+def override_get_connection(mock_conn):
+    async def _mock_get_conn():
+        try:
+            yield mock_conn
+        finally:
+            await mock_conn.close()
 
-async def mock_connect_database_error(*args, **kwargs):
-    return MockConnectionDatabaseError()
+    app.dependency_overrides[get_connection] = _mock_get_conn
+    return mock_conn
+
 
 def test_delete_comment_success(monkeypatch):
     client.cookies.clear()
+    override_get_connection(mock_connection_success())
 
     def mock_verify_jwt(request):
         return {
@@ -55,43 +78,32 @@ def test_delete_comment_success(monkeypatch):
             "username": "Normal User",
             "role": "USER"
         }
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_success
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
     assert response.status_code == 200
     assert response.json() == {
-        "status":"success",
+        "status": "success",
         "message": "Comment deleted successfully."
     }
 
+
 def test_delete_comment_invalid_jwt(monkeypatch):
     client.cookies.clear()
+    override_get_connection(mock_connection_success())
 
     def mock_verify_jwt(request):
         raise HTTPException(
-        status_code=401,
-        detail={
-            "status": "error",
-            "message": INVALID_TOKEN
-        }
-    )
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -103,8 +115,10 @@ def test_delete_comment_invalid_jwt(monkeypatch):
         }
     }
 
+
 def test_delete_comment_missing_jwt_cookie(monkeypatch):
     client.cookies.clear()
+    override_get_connection(mock_connection_success())
 
     def mock_verify_jwt(request):
         raise HTTPException(
@@ -114,12 +128,8 @@ def test_delete_comment_missing_jwt_cookie(monkeypatch):
                 "message": "Missing authentication cookie"
             }
         )
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -131,8 +141,10 @@ def test_delete_comment_missing_jwt_cookie(monkeypatch):
         }
     }
 
+
 def test_delete_comment_not_found(monkeypatch):
     client.cookies.clear()
+    override_get_connection(mock_connection_no_row())
 
     def mock_verify_jwt(request):
         return {
@@ -140,17 +152,8 @@ def test_delete_comment_not_found(monkeypatch):
             "username": "Normal User",
             "role": "USER"
         }
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_no_row
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/999")
 
@@ -162,8 +165,10 @@ def test_delete_comment_not_found(monkeypatch):
         }
     }
 
+
 def test_delete_comment_unauthorized_user(monkeypatch):
     client.cookies.clear()
+    override_get_connection(mock_connection_no_row())
 
     def mock_verify_jwt(request):
         return {
@@ -171,17 +176,8 @@ def test_delete_comment_unauthorized_user(monkeypatch):
             "username": "Different User",
             "role": "USER"
         }
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_no_row
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -193,8 +189,10 @@ def test_delete_comment_unauthorized_user(monkeypatch):
         }
     }
 
+
 def test_delete_comment_database_error(monkeypatch):
     client.cookies.clear()
+    override_get_connection(mock_connection_database_error())
 
     def mock_verify_jwt(request):
         return {
@@ -203,16 +201,7 @@ def test_delete_comment_database_error(monkeypatch):
             "role": "USER"
         }
 
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_database_error
-    )
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -224,37 +213,28 @@ def test_delete_comment_database_error(monkeypatch):
         }
     }
 
+
 def test_delete_comment_invalid_comment_id_type():
     client.cookies.clear()
+    override_get_connection(mock_connection_success())
 
     response = client.delete("/api/deleteComment/comment/not-an-int")
 
     assert response.status_code == 422
 
+
 def test_delete_comment_uses_comment_id_and_username(monkeypatch):
     client.cookies.clear()
+    mock_connection = override_get_connection(mock_connection_success())
 
-    mock_connection = MockConnectionSuccess()
-    async def mock_connect_same_connection(*args, **kwargs):
-        return mock_connection
-    
     def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_same_connection
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
@@ -271,62 +251,38 @@ def test_delete_comment_uses_comment_id_and_username(monkeypatch):
     assert fetchrow_args[1] == 5
     assert fetchrow_args[2] == "Normal User"
 
+
 def test_delete_comment_closes_connection_on_success(monkeypatch):
     client.cookies.clear()
+    mock_connection = override_get_connection(mock_connection_success())
 
-    mock_connection = MockConnectionSuccess()
-
-    async def mock_connect_same_connection(*args, **kwargs):
-        return mock_connection
-    
     def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_same_connection
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 
     assert response.status_code == 200
     mock_connection.close.assert_awaited_once()
 
+
 def test_delete_comment_closes_connection_on_database_error(monkeypatch):
     client.cookies.clear()
+    mock_connection = override_get_connection(mock_connection_database_error())
 
-    mock_connection = MockConnectionDatabaseError()
-
-    async def mock_connect_same_connection(*args, **kwargs):
-        return mock_connection
-    
     def mock_verify_jwt(request):
         return {
             "sub": "user-id",
             "username": "Normal User",
             "role": "USER"
         }
-    
-    monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
-        mock_verify_jwt
-    )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        mock_connect_same_connection
-    )
+
+    monkeypatch.setattr(cases_router, "verify_jwt", mock_verify_jwt)
 
     response = client.delete("/api/deleteComment/comment/5")
 

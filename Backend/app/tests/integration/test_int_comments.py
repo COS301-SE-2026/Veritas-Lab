@@ -8,6 +8,7 @@ import uuid as uuidlib
 from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN
 import asyncio
 from jose import jwt
+from app.tests.integration.conftest import get_connection
 
 USER_SETTINGS=User_Settings()
 POSTGRES_SEETTINGS=Postgres_Settings()
@@ -16,20 +17,6 @@ AUTH_SETTINGS = Auth_Settings()
 INVEST_USER = None
 ADMIN_USER = None
 
-@pytest.fixture
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
-
-async def get_connection() -> asyncpg.Connection:
-    return await asyncpg.connect(
-        user=POSTGRES_SEETTINGS.DB_USER,
-        password=POSTGRES_SEETTINGS.DB_PASSWORD,
-        database=POSTGRES_SEETTINGS.DB_NAME,
-        host=POSTGRES_SEETTINGS.DB_HOST,
-        port=POSTGRES_SEETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SEETTINGS.DB_SSL else None,
-    )
 
 @pytest.fixture(scope="session", autouse=True)
 def load_investigator_user():

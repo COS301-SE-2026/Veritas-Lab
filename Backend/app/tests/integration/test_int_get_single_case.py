@@ -3,27 +3,13 @@ import pytest_asyncio
 import uuid
 import asyncpg
 from fastapi.testclient import TestClient
-
+from app.tests.integration.conftest import get_connection
 from app.api.main import app
 from app.core.env import Postgres_Settings
 from app.auth.auth import create_token, COOKIE_NAME 
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
-async def get_connection():
-    return await asyncpg.connect(
-        user=POSTGRES_SETTINGS.DB_USER,
-        password=POSTGRES_SETTINGS.DB_PASSWORD,
-        database=POSTGRES_SETTINGS.DB_NAME,
-        host=POSTGRES_SETTINGS.DB_HOST,
-        port=POSTGRES_SETTINGS.DB_PORT,
-        ssl="require" if POSTGRES_SETTINGS.DB_SSL else None,
-    )
-
-@pytest.fixture
-def client():
-    with TestClient(app) as test_client:
-        yield test_client
 
 def investigator_cookie():
     return create_token({
@@ -40,11 +26,17 @@ def user_cookie():
     })
 
 @pytest_asyncio.fixture
-async def fake_get_single_case_context():
+async def fake_get_single_case_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
 
     try:
+        admin_id = str(uuid.uuid4())
+        await ensure_user_exists(conn, admin_id, "admin_user", role="ADMIN")
+        created_ids["admin_id"] = admin_id
+
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", admin_id)
+
         media_type_id = str(uuid.uuid4())
         unique_suffix = uuid.uuid4().hex[:6]
         await conn.execute(
@@ -139,7 +131,6 @@ async def test_integration_get_single_case_investigator_open_case(client, fake_g
     assert data["case"]["caseId"] == fake_get_single_case_context["open_case_id"]
     assert data["case"]["caseClosed"] is False
 
-    # privileged callers get a presigned url for the evifence
     assert len(data["evidence"]) == 1
     assert data["evidence"][0]["mediaUrl"] != ""
 
@@ -159,7 +150,6 @@ async def test_integration_get_single_case_user_closed_case(client, fake_get_sin
     assert data["case"]["caseId"] == fake_get_single_case_context["closed_case_id"]
     assert data["case"]["caseClosed"] is True
 
-    #media url is blanked for regular users thus imahe stays hidden
     assert len(data["evidence"]) == 1
     assert data["evidence"][0]["mediaUrl"] == ""
 

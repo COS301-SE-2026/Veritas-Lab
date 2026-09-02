@@ -4,7 +4,7 @@ All DB and auth calls are mocked. No real db here.
 """
 
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from fastapi import HTTPException
 
 from app.api.main import app
@@ -47,6 +47,7 @@ def _jwt_mock(role="INVESTIGATOR", username="investigator_user"):
 def _mock_connection():
     conn = AsyncMock()
     conn.close = AsyncMock(return_value=None)
+    conn.transaction = MagicMock(return_value=AsyncMock())
     return conn
 
 
@@ -71,11 +72,8 @@ def _setup(
         "verify_jwt", 
         _jwt_mock(role, username)
     )
-    monkeypatch.setattr(
-        cases_router, 
-        "get_connection", 
-        AsyncMock(return_value=_mock_connection())
-    )
+    
+    app.dependency_overrides[get_connection] = lambda: _mock_connection()
     monkeypatch.setattr(
         Case, 
         "add_comment", 
@@ -83,15 +81,14 @@ def _setup(
     )
 
 
-def _edit_comment_connection(fetchrow_result):
-    class MockConnection:
-        async def fetchrow(self, query, *args):
-            return fetchrow_result
-        async def close(self):
-            pass
-    async def mock_connect(*args, **kwargs):
-        return MockConnection()
-    return mock_connect
+def _edit_comment_connection(return_data):
+    async def _get_conn():
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=None)
+        mock_conn.fetchrow = AsyncMock(return_value=return_data)
+        mock_conn.transaction = MagicMock(return_value=AsyncMock())
+        return mock_conn
+    return _get_conn
 
 
 # Auth tests
@@ -293,13 +290,9 @@ def test_update_comment_success(monkeypatch):
     monkeypatch.setattr(
         cases_router, 
         "verify_jwt", 
-        lambda _: INVESTIGATOR_JWT
+        _jwt_mock()
     )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        _edit_comment_connection({"commentid": 7})
-    )
+    app.dependency_overrides[get_connection] = _edit_comment_connection({"commentid": 7})
 
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/7",
@@ -365,13 +358,9 @@ def test_update_comment_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(
         cases_router, 
         "verify_jwt", 
-        lambda _: INVESTIGATOR_JWT
+        _jwt_mock()
     )
-    monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
-        _edit_comment_connection(None)
-    )
+    app.dependency_overrides[get_connection] = _edit_comment_connection(None)
 
     response = client.post(
         "/api/editComment/case/11111111-1111-1111-1111-111111111111/comment/404",
