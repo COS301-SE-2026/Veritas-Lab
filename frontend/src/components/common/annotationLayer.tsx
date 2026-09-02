@@ -52,7 +52,7 @@ export default function AnnotationLayer({
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         const bounds = overlayRef.current?.getBoundingClientRect();
         if (!active || !bounds || activeTool !== 'Draw') return;
-        event.currentTarget.setPointerCapture(event.pointerId);
+        event.currentTarget.setPointerCapture?.(event.pointerId);
         setDrawingPoints([toRelativePoint(event, bounds)]);
     };
 
@@ -63,7 +63,7 @@ export default function AnnotationLayer({
     };
 
     const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-        event.currentTarget.releasePointerCapture(event.pointerId);
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
         if (!active || activeTool !== 'Draw' || !drawingPoints) return;
         onAddShape(drawingPoints, page);
         setDrawingPoints(null);
