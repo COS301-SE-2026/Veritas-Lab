@@ -2252,7 +2252,7 @@ async def get_case_audit_events(
                     audit_case_id AS ordinal,
                     audittimestamp,
                     query_executor_name,
-                    query_type::text AS qury_type,
+                    query_type::text AS query_type,
                     old_casename,
                     old_casedescription,
                     old_caseclosed
@@ -2316,7 +2316,7 @@ async def get_case_audit_events(
                         WHEN 'INSERT' THEN 'Evidence Added'
                         ELSE 'Evidence Annotated'
                     END AS eventaction
-                    FROM "Cases_DB"."Audit_Comments" AS audit_media
+                    FROM "Cases_DB"."Audit_Media" AS audit_media
                     INNER JOIN "Cases_DB"."Reports" AS reports
                         ON reports.mediaid = audit_media.old_media_id
                     WHERE reports.caseid = $1::uuid
