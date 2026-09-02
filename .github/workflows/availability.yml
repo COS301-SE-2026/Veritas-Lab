@@ -1,8 +1,8 @@
 name: Availability check
 
 on:
-  #schedule:
-  #- cron: "2-59/10 * * * *"
+  schedule:
+  - cron: "2-59/10 * * * *"
 
   workflow_dispatch:
 
@@ -11,15 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check backend availability
-        run: |
-          curl --fail --silent --show-error \
-          --max-time 10 \
-          https://veritas-lab-api-asgpged7esdpakas.uaenorth-01.azurewebsites.net/
-
-      - name: Check frontend availability
+      - name: Check availability
         run: |
           curl --fail --silent --show-error \
             --max-time 10 \
             --location \
-            https://veritsalab.vercel.app/login
+            https://veritaslab.app
