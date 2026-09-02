@@ -2259,6 +2259,56 @@ async def get_case_audit_events(
                     old_caseclosed
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
+
+
+            UNION ALL
+
+            SELECT
+                214783647,
+                NULL::timestamptz,
+                NULL::varchar,
+                NULL::text,
+                cases.casename,
+                cases.casedescription,
+                cases.caseclosed
+            FROM "Cases_DB"."Cases" AS cases
+            WHERE cases.caseid = $1::uuid
+            ),
+            case_transitions AS (
+                SELECT
+                    audittimestamp,
+                    query_executor_name,
+                    query_type,
+                    old_casename,
+                    old_casedescription,
+                    old_caseclosed,
+                    LEAD(old_casename) OVER (ORDER BY ordinal) AS next_casename,
+                    LEAD(old_casedescription) OVER (ORDER BY ordinal) AS next_casedescription,
+                    LEAD(old_caseclosed) OVER (ORDER BY ordinal) AS next_caseclosed
+                FROM case_audit 
+            ),
+            audit_events AS (
+                SELECT
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    CASE
+                        WHEN query_type = 'INSERT' THEN 'Case Created'
+                        WHEN query_type = 'DELETE' THEN 'Case Deleted'
+                        WHEN old_caseclosed = FALSE AND next_caseclosed = TRUE 
+                            THEN 'Case Closed'
+                        WHEN old_casename IS DISTINCT FROM next_casename 
+                            THEN 'Case Renamed'
+                        WHEN old_casedescription IS DISTINCT FROM next_casedescription 
+                            THEN 'Case Description Updated'
+                        WHEN old_casename IS DISTINCT FROM next_casename 
+                            AND old_casedescription IS DISTINCT FROM next_casedescription
+                            THEN 'Case Renamed and Description Updated'
+                        ELSE 'Case Updated'
+                    END AS eventaction
+                FROM case_transitions
+                WHERE query_type IS NOT NULL
+
+
             """,
             validated_case_id
         )
