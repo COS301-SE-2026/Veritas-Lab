@@ -144,6 +144,13 @@ jobs:
               run: |
                   docker compose up -d --build
 
+            - name: install dependencies
+              run: |
+                  cd Backend
+                  python -m pip install --upgrade pip
+                  python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+                  python -m pip install -r requirements/base.txt
+
             - name: run PyTest integration tests
               env:
                   ENVIRONMENT: development
