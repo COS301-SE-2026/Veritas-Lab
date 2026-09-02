@@ -25,8 +25,9 @@ type AnnotationLayerProps = {
     annotations: Annotation[];
     selectedId: string | null;
     onSelectAnnotation: (id: string | null) => void;
-    onAddShape: (points: AnnotationPoint[], page: number) => void;
-    onAddNote: (position: AnnotationPoint, text: string, page: number) => void;
+    onAddShape: (points: AnnotationPoint[], page: number, timeStamp?: number) => void;
+    onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
+    selectedAnnotation?: boolean;
 };
 
 export default function AnnotationLayer({
@@ -38,12 +39,13 @@ export default function AnnotationLayer({
     onSelectAnnotation,
     onAddShape,
     onAddNote,
+    selectedAnnotation = false,
 }: Readonly<AnnotationLayerProps>) {
     const overlayRef = useRef<HTMLDivElement>(null);
     const [drawingPoints, setDrawingPoints] = useState<AnnotationPoint[] | null>(null);
     const [draftNotePosition, setDraftNotePosition] = useState<AnnotationPoint | null>(null);
 
-    const pageAnnotations = annotations.filter((annotation) => annotation.page === page);
+    const pageAnnotations = annotations.filter((annotation) => annotation.page === page && (!selectedAnnotation || annotation.id === selectedId));
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         const bounds = overlayRef.current?.getBoundingClientRect();
