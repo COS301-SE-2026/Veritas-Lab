@@ -2308,7 +2308,27 @@ async def get_case_audit_events(
                 FROM case_transitions
                 WHERE query_type IS NOT NULL
 
+                UNION ALL
 
+                SELECT
+                    audit_media.audittimestamp AS eventtimestamp,
+                    audit_media.query_executor_name AS eventuser,
+                    CASE audit_media.query_type::text
+                        WHEN 'INSERT' THEN 'Evidence Added'
+                        ELSE 'Evidence Annotated'
+                    END AS eventaction
+                    FROM "Cases_DB"."Audit_Comments" AS audit_media
+                    INNER JOIN "Cases_DB"."Reports" AS reports
+                        ON reports.mediaid = audit_media.old_media_id
+                    WHERE reports.caseid = $1::uuid
+                        AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
+            )
+            SELECT
+                audit_events.eventtimestamp AS eventtimestamp,
+                audit_events.eventuser AS eventuser,
+                audit_events.eventaction AS eventaction
+            FROM audit_events
+            ORDER BY audit_events.eventtimestamp DESC NULLS LAST
             """,
             validated_case_id
         )
