@@ -166,3 +166,34 @@ async def test_evidence_added_and_annotated(client, audit_context):
 
     assert annotate.status_code == 200, annotate.text
     assert "Evidence Annotated" in _actions(_timeline(client, case_id))
+
+#This test ensures that when evidence is removed, it does not create an audit event for "Evidence Removed". 
+#The audit trail should only record the addition and annotation of evidence, not its removal.
+@pytest.mark.asyncio
+async def test_evidence_removal_is_not_recorded(client, audit_context):
+    ctx = audit_context
+    _login(client, ctx)
+
+    case_id = _create_case(client, ctx)
+
+    # Add evidence
+    upload = client.post(
+        "/api/cases/evidence",
+        data={"case_id": case_id},
+        files={"media": ("evidence.png", png_bytes(), "image/png")},
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["evidence"]["MediaId"]
+
+    assert "Evidence Added" in _actions(_timeline(client, case_id))
+
+    # Remove evidence
+    remove = client.delete(
+        "/api/cases/evidence",
+        json={"case_id": case_id, "media_id": media_id},
+    )
+    assert remove.status_code == 200, remove.text
+
+    # Ensure that the removal is not recorded in the audit timeline
+    actions = _actions(_timeline(client, case_id))
+    assert "Evidence Removed" not in actions
