@@ -2174,7 +2174,8 @@ async def save_annotations(
     summary="Get all aduit logs for a case",
     description=(
         "Returns every audited event recorded against a case."
-        "Comments and evidence changes are included in the audit logs."
+        "Covers case creation, renaming, description edits, closing "
+        "and deletion, as along with evidence added to or annotated on the case. "
         "A case with no audit logs will return an empty list."
     ),
     responses={
@@ -2190,7 +2191,7 @@ async def save_annotations(
                             {
                                 "timestamp": "2026-08-12T11:01:30",
                                 "user": "invetigator_user",
-                                "action": "UPDATE"
+                                "action": "Case Closed"
                             }
                         ]
                     }
