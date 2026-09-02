@@ -45,7 +45,7 @@ export default function WorkbenchPage() {
 
     const pickSelectedAnnotation = (id: string | null) => {
         setSelectedId(id);
-        if (id !== null) return;
+        if (id === null) return;
 
         const chosen = annotations.find((annotation) => annotation.id === id);
         if(video.current && (chosen?.timeStamp !== undefined)) {

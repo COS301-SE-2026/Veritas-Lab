@@ -27,20 +27,22 @@ export default function WorkbenchVideo({
     onAddNote
 }: Readonly<WorkbenchVideoProps>) {
     const [paused, setPaused] = useState(true);
+    const aspectRatio = 16 / 9;
     return (
-        <div className="relative w-full overflow-hidden rounded-2xl border border-(--color-light)">
+        <div className="relative w-full overflow-hidden rounded-2xl border border-(--color-light) bg-black/5" style={{ aspectRatio }}>
             <video 
                 src={mediaUrl} 
                 ref={video}
                 title={mediaName}  
                 controls 
+                className="size-full"
                 onPause={() => setPaused(true)}
                 onPlay={() => setPaused(false)}
             />
 
             <AnnotationLayer
                 page={1}
-                active={active && !paused}
+                active={active && paused}
                 annotations={annotations}
                 selectedId={selectedId}
                 onSelectAnnotation={onSelectAnnotation}
@@ -48,6 +50,7 @@ export default function WorkbenchVideo({
                 onAddNote={(position, text, page) => onAddNote(position, text, page, video?.current?.currentTime)}
                 activeTool={activeTool}
                 selectedAnnotation
+                isOn={activeTool === 'Select'}
             />
         </div>
     );
