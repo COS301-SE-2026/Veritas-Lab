@@ -54,12 +54,12 @@ def test_get_case_audit_events_success(monkeypatch):
         {
             "eventtimestamp": datetime(2024, 6, 1, 12, 0, tzinfo=timezone.utc),
             "eventuser": "investigator_user",
-            "eventaction": "UPDATE",
+            "eventaction": "Case Closed",
         },
         {
             "eventtimestamp": datetime(2024, 6, 2, 15, 30, tzinfo=timezone.utc),
             "eventuser": "admin_user",
-            "eventaction": "INSERT",
+            "eventaction": "Evidence Added",
         }
     ]
 
@@ -81,7 +81,7 @@ def test_get_case_audit_events_success(monkeypatch):
     assert data["events"][0] == {
         "timestamp": "2024-06-01T12:00:00+00:00",
         "user": "investigator_user",
-        "action": "UPDATE"
+        "action": "Case Closed"
     }
 
     mock_connect.assert_called_once()

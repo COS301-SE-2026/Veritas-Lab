@@ -96,7 +96,6 @@ class audited_cases_response(BaseModel):
     status: str = Field(..., examples=["success"])
     cases: List[audited_case]
 
-class CreateCaseRequest(BaseModel):
 class create_case_request(BaseModel):
     title: str | None = None
     description: str | None = None
