@@ -89,7 +89,7 @@ class audited_case(BaseModel):
     caseID: str = Field(..., examples=["12345678-abcd-ef01-2345-6789abcdef01"])
     caseName: str | None = Field(..., examples=["Reciepts sus"])
     eventCount: int | None = Field(..., examples=[5])
-    lastEventTimnestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
+    lastEventTimestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
     caseExists: bool | None = Field(..., examples=[True])
 
 class audited_cases_response(BaseModel):
