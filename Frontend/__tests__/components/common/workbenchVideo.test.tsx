@@ -1,4 +1,5 @@
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, } from '@testing-library/react';
+import AnnotationLayer from '@/components/common/annotationLayer';
 import WorkbenchVideo from '@/components/common/workbenchVideo';
 jest.mock('@/components/common/annotationLayer', () => ({
     __esModule: true,
@@ -27,11 +28,22 @@ describe('WorkbenchVideo', () => {
     })
 
     it('toggles paused state on play and pause events', () => {
-        const { getByTitle } = render(<WorkbenchVideo {...mockProps} />);
-        const videoElement = getByTitle('Evidence Video') as HTMLVideoElement;
+        const mock = render(<WorkbenchVideo {...mockProps} />);
+        const videoElement = mock.getByTitle('Evidence Video') as HTMLVideoElement;
         fireEvent.play(videoElement);
         expect(mockProps.active = true && videoElement.paused === false).toBe(false);
         fireEvent.pause(videoElement);
         expect(mockProps.active = true && videoElement.paused === true).toBe(true);
+    });
+
+    it('calls onAddShape and onAddNote when adding annotations', () => {
+        render(<WorkbenchVideo {...mockProps} />);
+
+        const annotationLayerProps = (AnnotationLayer as jest.Mock).mock.lastCall[0];
+        annotationLayerProps.onAddShape([{ x: 0, y: 0 }, { x: 1, y: 1 }], 1);
+        annotationLayerProps.onAddNote({ x: 0, y: 0 }, 'Testy Test', 1);
+
+        expect(mockProps.onAddShape).toHaveBeenCalled();
+        expect(mockProps.onAddNote).toHaveBeenCalled();
     });
 });
