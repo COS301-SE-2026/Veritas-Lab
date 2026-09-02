@@ -25,4 +25,13 @@ describe('WorkbenchVideo', () => {
         expect(mock.getByTestId('annotation-layer')).toBeInTheDocument();
         expect(mock.getByTestId('annotation-layer')).toHaveAttribute('data-active', 'true');
     })
+
+    it('toggles paused state on play and pause events', () => {
+        const { getByTitle } = render(<WorkbenchVideo {...mockProps} />);
+        const videoElement = getByTitle('Evidence Video') as HTMLVideoElement;
+        fireEvent.play(videoElement);
+        expect(mockProps.active = true && videoElement.paused === false).toBe(false);
+        fireEvent.pause(videoElement);
+        expect(mockProps.active = true && videoElement.paused === true).toBe(true);
+    });
 });
