@@ -2248,31 +2248,17 @@ async def get_case_audit_events(
     try:
         rows = await connection.fetch(
             """
-            SELECT
-                audit_events.eventtimestamp AS eventtimestamp,
-                audit_events.eventuser AS eventuser,
-                audit_events.eventaction AS eventaction
-            FROM (
+            WITH case_audit AS (
                 SELECT
-                    audittimestamp AS eventtimestamp,
-                    query_executor_name AS eventuser,
-                    query_type::text AS eventaction,
-                    'CASE'::text AS entitytype
+                    audit_case_id AS ordinal,
+                    audittimestamp,
+                    query_executor_name,
+                    query_type::text AS qury_type,
+                    old_casename,
+                    old_casedescription,
+                    old_caseclosed
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
-
-                UNION ALL
-
-                SELECT
-                    audittimestamp AS eventtimestamp,
-                    query_executor_name AS eventuser,
-                    query_type::text AS eventaction,
-                    'COMMENT'::text AS entitytype
-                FROM "Cases_DB"."Audit_Comments"
-                WHERE old_case_id = $1::uuid    
-            ) AS audit_events
-            ORDER BY audit_events.eventtimestamp DESC NULLS LAST,
-                audit_events.entitytype ASC
             """,
             validated_case_id
         )
