@@ -7,6 +7,25 @@ on:
             - main
     workflow_dispatch:
 jobs:
+    docker-build:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: build Docker images
+              env:
+                  MINIO_API_PORT: 9000
+                  MINIO_CONSOLE_PORT: 9001
+              run: |
+                  docker compose up --build
+
+            - name: cleaner
+              if: always()
+              run: |
+                  docker compose down -v --rmi all --remove-orphans
+
     backend-unit-tests:
         runs-on: ubuntu-latest
         timeout-minutes: 10
@@ -25,7 +44,7 @@ jobs:
                   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
                   python -m pip install -r requirements/base.txt
 
-            - name: run PyTest
+            - name: run PyTest unit tests
               env:
                   ENVIRONMENT: development
                   FRONTEND_ORIGIN: http://localhost:3000
@@ -85,4 +104,90 @@ jobs:
             - name: run Jest
               run: |
                   cd frontend
-                  npx jest
+                  npx jest "__tests__/components" "__tests__/hooks"
+
+    backend-integration-tests:
+        needs:
+            - backend-unit-tests
+            - frontend-unit-tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: install dependencies
+              run: |
+                  cd Backend
+                  python -m pip install --upgrade pip
+                  python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+                  python -m pip install -r requirements/base.txt
+
+            - name: run PyTest integration tests
+              env:
+                  ENVIRONMENT: development
+                  FRONTEND_ORIGIN: http://localhost:3000
+                  STORAGE_URL: http://localhost:9000
+                  MINIO_EXTERNAL_URL: http://localhost:9000
+                  DB_HOST: localhost
+                  DB_USER: postgres
+                  DB_PASSWORD: postgres
+                  DB_NAME: test_db
+                  DB_PORT: 5432
+                  DB_SSL: false
+                  JWT_SECRET: test-secret
+                  HASH: HS256
+                  TOKEN_EXPIRE: 5
+                  MINIO_ROOT_USER: minioadmin
+                  MINIO_ROOT_PASSWORD: minioadmin
+                  MINIO_API_PORT: 9000
+                  MINIO_CONSOLE_PORT: 9001
+                  AWS_REGION: af-south-1
+                  E2E_INVESTIGATOR_EMAIL: ${{ secrets.E2E_INVESTIGATOR_EMAIL }}
+                  E2E_INVESTIGATOR_PASSWORD: ${{ secrets.E2E_INVESTIGATOR_PASSWORD }}
+                  E2E_INVESTIGATOR_NAME: ${{ secrets.E2E_INVESTIGATOR_NAME }}
+                  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+                  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+                  ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+                  E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+                  E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+                  E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
+                  NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+                  R2_URL: ${{ secrets.R2_URL }}
+                  R2_TOKEN_VALUE: ${{ secrets.R2_TOKEN_VALUE }}
+                  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+                  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+                  AWS_ACCESS_KEY_ID: ${{ env.MINIO_ROOT_USER }}
+                  AWS_SECRET_ACCESS_KEY: ${{ env.MINIO_ROOT_PASSWORD }}
+                  AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+              run: |
+                  cd Backend
+                  python -m pytest app/tests/integration --asyncio-mode=auto --cov=app
+
+    frontend-integration-tests:
+        needs:
+            - backend-unit-tests
+            - frontend-unit-tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+
+            - name: run Jest
+              run: |
+                  cd frontend
+                  npx jest "__tests__/integration"
