@@ -70,14 +70,14 @@ export default function CasePage() {
             setIsLoading(false);
         }
     };
-
+    //permissions reviewed and updated
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
-    const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
-    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed;
-    const canDeleteEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') //role of admin needs to be discussed and reviewed on frontend but for now giving it access.
-    const canEditCase = userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username; //agaian might need to review these permissions
+    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //creator
+    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed; //creator
+    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed //investigator that is owner or any admin
+    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //owner and not closed
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
