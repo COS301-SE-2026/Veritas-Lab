@@ -1,7 +1,7 @@
-name: Main CI-CD
+name: Main CD
 #Only runs when codes gets on main so either a merged PR or a direct push.
 on:
-    pull_request:
+    push:
         branches: ["main"]
     workflow_dispatch:
 
@@ -11,13 +11,8 @@ permissions:
     id-token: write
 
 jobs:
-    #This runs the tests again when anything gets on main not just when we do PR's
-    tests:
-        uses: ./.github/workflows/Main-Tests.yml
-        secrets: inherit
-    
     deploy-azure:
-        needs: tests
+        environment: Prod
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
@@ -37,7 +32,7 @@ jobs:
                     context: ./frontend
                     push: true
                     tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
-            - uses: azure/login@v2
+            - uses: azure/login@v3
               with:
                     client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
                     tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
@@ -70,10 +65,9 @@ jobs:
         name: rollback
         needs: [deploy-azure]
         if: failure()
+        environment: Prod
         runs-on: ubuntu-latest
         timeout-minutes: 20
-        environment:
-            name: Prod
         steps:
             - uses: actions/checkout@v7
               with:
