@@ -5,10 +5,9 @@ from pathlib import Path
 import torch
 from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
 
-from app.training.audio.predict import predict_audio
 from app.training.video.dataset import read_video_frames
 from app.training.video.model import ai_video_classifier
-from app.training.video.predict import analyse_audio, predict_probability, calculate_frame_importance, build_explanation,  extract_audio_from_video
+from app.training.video.predict import predict_probability, calculate_frame_importance, build_explanation,  extract_audio_from_video
 
 VIDEO_MODEL_PATH = Path("app/ai/best_video_model.pt")
 AUDIO_MODEL_PATH = Path("app/ai/audio")
@@ -88,6 +87,7 @@ class ai_audio_classifier:
             confidence = authentic_probability
 
         return {
+            "available": True,
             "prediction": prediction,
             "confidence": confidence,
             "authentic_probability": authentic_probability,
@@ -127,11 +127,8 @@ class video_combined_analysis:
 
     async def analyse(self, video_path: str | Path, threshold: float = 0.5) -> dict:
         video_path = Path(video_path)
-
         video = read_video_frames(video_path, num_frames=self.num_frames)
-
         video = video.unsqueeze(0).to(self.device)
-
         audio_path = extract_audio_from_video(video_path)
 
         visual_task = asyncio.to_thread(
@@ -143,23 +140,11 @@ class video_combined_analysis:
         if audio_path is not None:
             try:
                 audio_task = asyncio.to_thread(
-                    self.audio_model.predict,
+                    self.analyse_audio_safe,
                     audio_path
                 )
 
                 visual_probability, audio_result = await asyncio.gather(visual_task, audio_task)
-                
-
-            except Exception as exc:
-                print(
-                    f"Audio analysis failed: {exc}"
-                )
-
-                visual_probability = (
-                    await visual_task
-                )
-
-                audio_result = None
 
             finally:
                 Path(audio_path).unlink(missing_ok=True)
@@ -180,10 +165,8 @@ class video_combined_analysis:
         else:
             audio_probability = None
 
-            final_probability = (
-                visual_probability
-            )
-
+            final_probability = visual_probability
+            
             visual_weight = 1.0
             audio_weight = 0.0
 
@@ -235,4 +218,12 @@ class video_combined_analysis:
                 "audio_weight": audio_weight
             }
         }
+
+    def analyse_audio_safe(self, audio_path: str | Path) -> dict | None:
+        try:
+            return self.audio_model.predict(audio_path)
+
+        except Exception as e:
+            print(f"Audio analysis failed: {e}")
+            return None
 
