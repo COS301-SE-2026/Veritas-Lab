@@ -6,14 +6,10 @@ import tempfile
 from pathlib import Path
 
 import torch
-from PIL import Image, ImageDraw
 
 from app.training.audio.predict import predict_audio
 from app.training.video.dataset import read_video_frames
 from app.training.video.model import ai_video_classifier
-
-CLIP_MEAN = torch.tensor([0.48145466, 0.4578275, 0.40821073]).view(1, 3, 1, 1)
-CLIP_STD = torch.tensor([0.26862954, 0.26130258, 0.27577711]).view(1, 3, 1, 1)
 
 VISUAL_WEIGHT = 0.7
 AUDIO_WEIGHT = 0.3
@@ -70,49 +66,9 @@ def analyse_audio(video_path):
             missing_ok=True
         )
 
-def mask_region(video, row, col, zones_per_dim):
-    masked = video.clone()
-
-    _, _, _, h, w = masked.shape
-
-    rh = h // zones_per_dim
-    rw = w // zones_per_dim
-
-    y1 = row * rh
-    y2 = h if row == zones_per_dim - 1 else (row + 1) * rh
-    
-    x1 = col * rw
-    x2 = w if col == zones_per_dim - 1 else (col + 1) * rw
-
-    masked[:, :, :, y1:y2, x1:x2] = 0.0
-    return masked
-
 def mask_frame(video, frame_index):
     masked = video.clone()
     masked[:, frame_index, :, :, :] = 0.0
-    return masked
-
-def mask_frame_region(
-    video,
-    frame_index,
-    row,
-    col,
-    zones_per_dim
-):
-    masked = video.clone()
-
-    _, _, _, h, w = masked.shape
-
-    rh = h // zones_per_dim
-    rw = w // zones_per_dim
-
-    y1 = row * rh
-    y2 = h if row == zones_per_dim - 1 else (row + 1) * rh
-    
-    x1 = col * rw
-    x2 = w if col == zones_per_dim - 1 else (col + 1) * rw
-    
-    masked[:, frame_index, :, y1:y2, x1:x2] = 0.0
     return masked
 
 def calculate_decision_importance(original_probability, masked_probability, prediction):
@@ -120,47 +76,6 @@ def calculate_decision_importance(original_probability, masked_probability, pred
         return original_probability - masked_probability
         
     return masked_probability-original_probability
-    
-def calculate_region_importance(
-    model,
-    video,
-    original_probability,
-    zones_per_dim,
-    prediction
-):
-    results = []
-
-    for row in range(zones_per_dim):
-        for col in range(zones_per_dim):
-            masked = mask_region(video, row, col, zones_per_dim)
-
-            masked_probability = (
-                predict_probability(
-                    model,
-                    masked
-                )
-            )
-
-            importance = (
-                calculate_decision_importance(
-                    original_probability,
-                    masked_probability,
-                    prediction
-                )
-            )
-
-            results.append(
-                {
-                    "row": row,
-                    "col": col,
-                    "masked_probability":
-                        masked_probability,
-                    "importance":
-                        importance
-                }
-            )
-
-    return results
 
 def calculate_frame_importance(
     model,
@@ -194,248 +109,21 @@ def calculate_frame_importance(
 
     return results
 
-def calculate_spatiotemporal_importance(
-    model,
-    video,
-    original_probability,
-    zones_per_dim,
-    prediction
-):
-    results = []
-
-    num_frames = video.shape[1]
-
-    for frame_index in range(
-        num_frames
-    ):
-        for row in range(
-            zones_per_dim
-        ):
-            for col in range(
-                zones_per_dim
-            ):
-                masked = (
-                    mask_frame_region(
-                        video,
-                        frame_index,
-                        row,
-                        col,
-                        zones_per_dim
-                    )
-                )
-
-                masked_probability = (
-                    predict_probability(
-                        model,
-                        masked
-                    )
-                )
-
-                importance = (
-                    calculate_decision_importance(
-                        original_probability,
-                        masked_probability,
-                        prediction
-                    )
-                )
-
-                results.append(
-                    {
-                        "sampled_frame": frame_index,
-                        "row": row,
-                        "col": col,
-                        "masked_probability": masked_probability,
-                        "importance": importance
-                    }
-                )
-
-    return results
-
-def region_name(row, col, zones_per_dim):
-    if zones_per_dim == 2:
-        names = {
-            (0, 0): "top-left",
-            (0, 1): "top-right",
-            (1, 0): "bottom-left",
-            (1, 1): "bottom-right"
-        }
-
-        return names[(row, col)]
-
-    return f"row {row + 1}, column {col + 1}"
-
-def normalize_positive_importances(items):
-    positives = [max(0.0, item["importance"]) for item in items]
-
-    total = sum(positives)
-
-    if total <= 1e-12:
-        return [0.0 for _ in items]
-
-    return [
-        (value/total) * 100.0
-        for value in positives
-    ]
-
-def tensor_frames_to_uint8(video):
-    frames = video[0].detach().cpu()
-
-    mean = CLIP_MEAN[0]
-    std = CLIP_STD[0]
-
-    frames = frames * std +mean
-    frames = frames.clamp(0.0, 1.0)
-    frames = (frames * 255.0).byte()
-    frames = frames.permute(0,2,3,1).numpy()
-
-    return frames
-
-def save_explanation_images(
-    video,
-    spatiotemporal_results,
-    output_dir,
-    zones_per_dim,
-    top_k=3
-):
-    output_dir = Path(output_dir)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    frames = tensor_frames_to_uint8(video)
-
-    ranked = sorted(
-        [
-            item for item in spatiotemporal_results
-            if item["importance"] > 0
-        ],
-        key=lambda x: x["importance"],
-        reverse=True
-    )
-
-    saved = []
-
-    for rank, item in enumerate(ranked[:top_k], start=1):
-        frame_index = item["sampled_frame"]
-
-        row = item["row"]
-        col = item["col"]
-
-        image = Image.fromarray(frames[frame_index].copy())
-        draw = ImageDraw.Draw(image)
-        w, h = image.size
-
-        rw = w // zones_per_dim
-        rh = h// zones_per_dim
-        x1 = col * rw
-        y1 = row * rh
-
-        x2 = w - 1 if col == zones_per_dim - 1 else (col + 1) * rw - 1
-
-        y2 = h - 1 if row == zones_per_dim - 1 else (row + 1) * rh - 1
-        
-        draw.rectangle(
-            (
-                x1,
-                y1,
-                x2,
-                y2
-            ),
-            outline=(
-                255,
-                0,
-                0
-            ),
-            width=5
-        )
-
-        filename = (
-            f"evidence_{rank}"
-            f"_frame_"
-            f"{frame_index + 1}.jpg"
-        )
-
-        path = (
-            output_dir
-            / filename
-        )
-
-        image.save(
-            path,
-            quality=95
-        )
-
-        saved.append(
-            {
-                "rank":
-                    rank,
-                "sampled_frame":
-                    frame_index,
-                "region":
-                    region_name(
-                        row,
-                        col,
-                        zones_per_dim
-                    ),
-                "importance":
-                    item[
-                        "importance"
-                    ],
-                "file":
-                    str(path)
-            }
-        )
-
-    return saved
-
-def build_explanation(
-    prediction,
-    probability,
-    region_results,
-    frame_results,
-    spatiotemporal_results,
-    zones_per_dim
-):
-    strongest_region = max(region_results, key=lambda x: x["importance"])
+def build_explanation(prediction, probability, frame_results):
     strongest_frame = max(frame_results, key=lambda x: x["importance"])
-    strongest_local = max(spatiotemporal_results, key=lambda x: x["importance"])
 
     if prediction == "AI-generated":
-        explanation = f"The visual model classified this video as AI-generated with a {probability * 100:.2f}% probability."
-
+        explanation = f"The visual model classified this video as AI-generated with {probability * 100:.2f}% probability."
     else:
-        explanation = f"The visual model classified this video as authentic with a {(1.0 - probability) * 100:.2f}% probability."
+        explanation = f"The visual model classified this video as authentic with {(1.0 - probability) * 100:.2f}% probability."
 
-    no_positive_evidence = strongest_region["importance"] <= 0 and strongest_frame["importance"] <= 0 and strongest_local["importance"] <= 0
-    
-    if no_positive_evidence:
-        return explanation + " The occlusion analysis did not identify a specific region or sampled frame that positively supported the visual prediction."
-        
-    if strongest_region["importance"] > 0:
-        region = region_name(strongest_region["row"],strongest_region["col"],zones_per_dim)
+    if strongest_frame["importance"] <= 0:
+        return explanation + " The frame occlusion analysis did not identify a sampled frame that positively supported the visual prediction."
 
-        if prediction == "AI-generated":
-            explanation += (
-                f" The strongest spatial evidence came from the {region} region. "
-                f"Masking this region changed the AI-generated probability from {probability * 100:.2f}% to {strongest_region['masked_probability'] * 100:.2f}%."
-            )
-
-        else:
-            explanation += (
-                f" The strongest spatial evidence supporting authenticity came from the {region} region. "
-                f"When this region was masked, the AI-generated probability increased from {probability * 100:.2f}% to {strongest_region['masked_probability'] * 100:.2f}%."
-            )
-
-    if (strongest_frame["importance"] > 0):
-        explanation += f" The most influential sampled frame was frame {strongest_frame['sampled_frame'] + 1}."
-
-    if (strongest_local["importance"] > 0):
-        local_region = region_name(
-            strongest_local["row"],
-            strongest_local["col"],
-            zones_per_dim
-        )
-
-        explanation += f" The strongest combined space-time evidence occurred in the {local_region} region of sampled frame {strongest_local['sampled_frame'] + 1}."
+    explanation += (
+        f" The most influential sampled frame was frame {strongest_frame['sampled_frame'] + 1}. "
+        f"Masking this frame changed the AI-generated probability to {strongest_frame['masked_probability'] * 100:.2f}%."
+    )
 
     return explanation
 
@@ -467,3 +155,194 @@ def build_multimodal_summary(
         summary += "The visual and audio models agreed on the classification."
 
     return summary
+
+async def main():
+    parser = argparse.ArgumentParser(description="Predict Authentic vs AI-generated video using visual and audio analysis.")
+    parser.add_argument("video", help="Path to the file")
+    parser.add_argument(
+        "--checkpoint",
+        required=True,
+        help="Path to the trained video .pt checkpoint"
+    )
+
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="AI classification threshold (default: 0.5)"   
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        default="explanations",
+        help="Directory for explanation JSON"
+    )
+
+    args = parser.parse_args()
+    device = torch.device("cpu")
+    print(f"Device: {device}")
+
+    checkpoint = torch.load(args.checkpoint, map_location=device)
+    num_frames = checkpoint.get("num_frames", 8)
+
+    zones = checkpoint.get("zones",2)
+
+    temporal_hidden_dim = checkpoint.get("temporal_hidden_dim", 256)
+    classifier_hidden_dim = checkpoint.get("classifier_hidden_dim",256)
+
+    model = ai_video_classifier(
+        num_frames=num_frames,
+        zones_per_dim=zones,
+        freeze_encoder=True,
+        temporal_hidden_dim=(temporal_hidden_dim),
+        classifier_hidden_dim=(classifier_hidden_dim)
+    )
+
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(device)
+    model.eval()
+
+    video = read_video_frames(args.video, num_frames=num_frames)
+    video = video.unsqueeze(0).to(device)
+    
+    print("\nRunning visual and audio analysis...")
+
+    visual_task = asyncio.to_thread(predict_probability, model, video)
+    audio_task = asyncio.to_thread(analyse_audio, args.video)
+    visual_probability, audio_result = await asyncio.gather(visual_task, audio_task)
+
+    visual_prediction = "AI-generated" if visual_probability >= args.threshold else "Authentic"
+    if audio_result is not None:
+        audio_probability = audio_result["ai_probability"]
+
+        final_probability = VISUAL_WEIGHT * visual_probability + AUDIO_WEIGHT * audio_probability
+        effective_visual_weight = VISUAL_WEIGHT
+
+        effective_audio_weight = AUDIO_WEIGHT
+
+    else:
+        audio_probability = None
+        final_probability = visual_probability
+        effective_visual_weight = 1.0
+        effective_audio_weight = 0.0
+    
+    final_prediction = "AI-generated" if final_probability >= args.threshold else "Authentic"
+
+    print("\nRunning visual explainability analysis...")
+
+    frame_results = calculate_frame_importance(
+        model,
+        video,
+        visual_probability,
+        visual_prediction
+    )
+        
+    output_dir = Path(args.output_dir)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    visual_explanation = build_explanation(
+        visual_prediction,
+        visual_probability,
+        frame_results
+    )
+
+    multimodal_summary = build_multimodal_summary(
+        final_prediction,
+        final_probability,
+        visual_prediction,
+        visual_probability,
+        audio_result
+    )
+
+    strongest_frame = max(frame_results, key=lambda x: x["importance"])  
+
+    report = {
+        "video":str(args.video),
+        "prediction": final_prediction,
+        "ai_probability": final_probability,
+        "authentic_probability": 1.0- final_probability,
+        "threshold": args.threshold,
+        "summary": multimodal_summary,
+
+        "visual_analysis": {
+            "prediction": visual_prediction,
+            "ai_probability": visual_probability,
+            "authentic_probability": 1.0- visual_probability,
+            "explanation_method":"frame occlusion sensitivity",
+            "summary":visual_explanation,
+
+            "most_influential_sampled_frame": {
+                "sampled_frame": strongest_frame["sampled_frame"],
+                "display_frame_number": strongest_frame["sampled_frame"] + 1,
+                "importance": strongest_frame["importance"],
+                "masked_ai_probability": strongest_frame["masked_probability"]
+            },
+
+            "frame_importance": frame_results
+        },
+
+        "audio_analysis": (
+            audio_result
+            if audio_result is not None
+            else {
+                "available": False
+            }
+        ),
+
+        "fusion": {
+            "visual_weight": effective_visual_weight,
+
+            "audio_weight": effective_audio_weight
+        }
+    }
+
+    json_path = output_dir/ "explanation.json"
+
+    with open(json_path, "w", encoding="utf-8") as file:
+        json.dump(report, file, indent=2)
+
+    print("\nVIDEO AUTHENTICITY RESULT")
+    print()
+    print(f"Final prediction: {final_prediction}")
+    print(f"Final AI probability: {final_probability * 100:.2f}%")
+    print(f"Final Authentic probability: {(1.0 - final_probability) * 100:.2f}%")
+    print(f"Threshold: {args.threshold:.2f}")
+    print("\nVISUAL ANALYSIS")
+    print(f"Prediction: {visual_prediction}")
+    print(f"AI probability: {visual_probability * 100:.2f}%")
+    print(f"Authentic probability: {(1.0 - visual_probability) * 100:.2f}%")
+    print("\nAUDIO ANALYSIS")
+
+    if audio_result is not None:
+        audio_prediction = ("AI-generated" if audio_probability >= 0.5 else "Authentic")
+        print(f"Prediction: {audio_prediction}")
+        print(f"AI probability: {audio_probability * 100:.2f}%")
+
+        print(f"Authentic probability: {(1.0 - audio_probability) * 100:.2f}%")
+
+    else:
+        print("No usable audio track was found.")
+
+    print("\nMULTIMODAL SUMMARY")
+    print()
+    print(multimodal_summary)
+
+    print("\nVISUAL EXPLANATION")
+    print()
+    print(visual_explanation)
+
+    print("\nMOST INFLUENTIAL SAMPLED FRAMES")
+    print()
+
+    for item in sorted(frame_results, key=lambda x: x["importance"], reverse=True)[:3]:
+        print(
+            f"Frame {item['sampled_frame'] + 1}: "
+            f"importance={item['importance']:.4f}, "
+            f"AI score after masking={item['masked_probability'] * 100:.2f}%"
+        )
+
+    print(f"\nExplanation JSON: {json_path}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
