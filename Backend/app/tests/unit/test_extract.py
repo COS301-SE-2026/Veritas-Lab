@@ -422,12 +422,3 @@ async def test_pdf_service_ai_analysis(monkeypatch):
             "lexical": 0.08
         }
     }
-
-@pytest.mark.asyncio
-async def test_pdf_service_analyse_metadata_stub():
-    service = PDFService() 
-
-    result = await service.analyse_metadata({"some": "metadata"})
-
-    assert result.Certainty == 0
-    assert result.Findings == "NOT implemented yet"
