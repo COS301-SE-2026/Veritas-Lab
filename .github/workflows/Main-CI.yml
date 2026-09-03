@@ -98,6 +98,8 @@ jobs:
         timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
+              with:
+                  lfs: true
 
             - name: set up Python
               uses: actions/setup-python@v5
