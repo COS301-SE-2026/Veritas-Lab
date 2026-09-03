@@ -169,7 +169,78 @@ class VideoService(MediaService):
         return analysis_findings
 
     def create_findings_string(self, input: dict) -> str:
-        # This is the method that combines the metadata analysis and ai analysis into an easy to read output.
-        # Will be completed when the metadata analysis is completed
-        # Yes, these comments are for Sonar
-        pass
+        if input is None or input == {}:
+            return "No findings"
+
+        output = "Metadata:\n"
+
+        if input.get("findings") is None or input.get("findings") == "":
+            output += "No metadata findings.\n"
+        else:
+            output += f"{input['findings']}\n"
+
+        output += "AI Video Classifier:\n"
+
+        ai_probability = input.get("ai_probability")
+        classification = input.get("prediction")
+
+        if ai_probability is not None:
+            output += f"The video classifier found an AI probability of {ai_probability * 100:.2f}%.\n"
+        else:
+            output += "Video classifier analysis unavailable.\n"
+            return output
+
+        if classification:
+            output += f"Classification: {classification}\n"
+
+        visual = input.get("visual")
+
+        if visual:
+            output += "Visual Analysis:\n"
+
+            visual_probability = visual.get("ai_probability")
+            visual_prediction = visual.get("prediction")
+            explanation = visual.get("explanation")
+
+            if visual_probability is not None:
+                output += f" - AI probability: {visual_probability * 100:.2f}%\n"
+                    
+            if visual_prediction:
+                output += f" - Classification: {visual_prediction}\n"
+
+            if explanation:
+                output += f" - Explanation: {explanation}\n"
+
+        audio = input.get("audio")
+
+        if audio and audio.get("available"):
+            output += "Audio Analysis:\n"
+
+            audio_probability = audio.get("ai_probability")
+            audio_prediction = audio.get("prediction")
+
+            if audio_probability is not None:
+                output += f" - AI probability: {audio_probability * 100:.2f}%\n"
+
+            if audio_prediction:
+                output += f" - Classification: {audio_prediction}\n"
+
+        else:
+            output += "Audio Analysis:\n"
+            output += " - No usable audio was available for analysis.\n"
+
+        fusion = input.get("fusion")
+
+        if fusion:
+            visual_weight = fusion.get("visual_weight")
+            audio_weight = fusion.get("audio_weight")
+
+            output += "Combined Analysis:\n"
+
+            if visual_weight is not None:
+                output += f" - Visual weight: {visual_weight * 100:.0f}%\n"
+
+            if audio_weight is not None:
+                output += f" - Audio weight: {audio_weight * 100:.0f}%\n"
+
+        return output
