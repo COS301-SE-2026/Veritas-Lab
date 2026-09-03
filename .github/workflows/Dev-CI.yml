@@ -184,6 +184,8 @@ jobs:
         timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
+              with:
+                  lfs: true
 
             - name: set up Python
               uses: actions/setup-python@v5
@@ -236,6 +238,8 @@ jobs:
                   python -m pip install --upgrade pip
                   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
                   python -m pip install -r requirements/base.txt
+                  sudo apt-get update
+                  sudo apt-get install -y libimage-exiftool-perl ffmpeg
 
             - name: run PyTest integration tests
               env:
