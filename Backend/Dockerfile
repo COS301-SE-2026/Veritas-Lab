@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y \
     libmagic1 \
     libglib2.0-0 \
     tesseract-ocr \
+    ffmpeg\
     tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
