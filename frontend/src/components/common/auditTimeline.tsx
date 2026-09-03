@@ -26,14 +26,15 @@ export default function AuditTimeline({ caseId }: AuditTimelineProps) {
         "Evidence Annotated": <SquarePen className="size-[28px] text-(--color-secondary)" />,
     };
 
+    if (error) {
+        return <Label text={error} htmlFor="error" variant="error" />;
+    }
+    
     if (isLoading) {
         return <Label text="Loading timeline..." htmlFor="loading" variant="info" />;
     }
     if (!timeline) {
         return <Label text="No timeline data available." htmlFor="no-timeline" variant="info" />;
-    }
-    if (error) {
-        return <Label text={error} htmlFor="error" variant="error" />;
     }
 
     return(
