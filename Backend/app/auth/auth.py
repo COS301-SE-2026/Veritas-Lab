@@ -187,6 +187,10 @@ class change_role_request(BaseModel):
     userId: str | None = None
     NewRole: str | None = None
 
+class change_password_request(BaseModel):
+    currentPassword: str | None = None
+    newPassword: str | None = None
+
 async def update_user_jwt_issued(email: str, connection: asyncpg.Connection):
     await connection.execute(
             """
@@ -1167,6 +1171,197 @@ async def delete_user(
     return {
         "status": "success", 
         "message": "User deleted successfully."
+    }
+
+@router.post(
+    "/changePassword",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Change Password",
+    description="Allows the authenticated user to change their own password. The current password must match before the new password is set.",
+    responses={
+        200: {
+            "description": "Password successfully changed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Password changed successfully"
+                    }
+                }
+            }
+        },
+        # error codes
+        400: {
+            "description": "Invalid password change request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "MissingFields": {
+                            "summary": "Missing current or new password",
+                            "description": "Triggered when currentPassword or newPassword is missing.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Missing currentPassword or newPassword field."
+                                }
+                            }
+                        },
+
+                        "InvalidNewPassword": {
+                            "summary": "New password fails validation",
+                            "description": "Triggered when newPassword does not meet the password requirements.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid or missing new password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+                                }
+                            }
+                        },
+
+                        "IncorrectCurrentPassword": {
+                            "summary": "Current password does not match",
+                            "description": "Triggered when currentPassword does not match the user's stored password.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Current password is incorrect."
+                                }
+                            }
+                        },
+
+                        "SameAsCurrentPassword": {
+                            "summary": "New password matches current password",
+                            "description": "Triggered when newPassword is the same as currentPassword.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "New password must be different from your current password."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "No user found for the authenticated account."
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": DATABASE_ERROR,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def change_password(
+    change_password_request: change_password_request,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+    current_password = change_password_request.currentPassword
+    new_password = change_password_request.newPassword
+    if not current_password or not new_password:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Missing currentPassword or newPassword field."
+            }
+        )
+
+    if not validate_password(new_password):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Invalid or missing new password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+            }
+        )
+
+    try:
+        user = await search_users_via_username(payload.get("username"), connection)
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR
+            }
+        )
+
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "error",
+                "message": "No user found for the authenticated account."
+            }
+        )
+
+    if not verify_password(current_password, user["password"]):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Current password is incorrect."
+            }
+        )
+
+    #prevent new password from being the same as the old one
+    if verify_password(new_password, user["password"]):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "New password must be different from your current password."
+            }
+        )
+    hashed_password = hash_password(new_password)
+
+    try:
+        await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userpassword = $1
+            WHERE userid = $2
+            """,
+            hashed_password, user["id"]
+        )
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR
+            }
+        )
+
+    return {
+        "status": "success",
+        "message": "Password changed successfully"
     }
 
 @router.post(

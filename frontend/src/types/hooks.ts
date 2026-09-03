@@ -12,6 +12,12 @@ export type RegisterFormState = {
     confirmPassword: string;
 };
 
+export type ChangePasswordFormState = {
+    currentPassword: string;
+    newPassword: string;
+    confirmNewPassword: string;
+};
+ 
 export type FormStatusState = {
     error: string | null;
     success: string | null;

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from '@/context/SidebarContext';
@@ -8,15 +9,17 @@ import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-    ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle,
+    ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle, Settings,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
+import ResetPasswordModal from '@/components/common/resetPasswordModal';
 
 export default function Sidebar() {
     const pathname = usePathname();
     const userRole = useUserRole();
     const { collapsed, toggle } = useSidebar();
     const { logOut } = useLogOut();
+    const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', icon: Home },
@@ -71,7 +74,16 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            <footer className={`pb-6 ${collapsed ? 'pl-2' : 'pl-7'}`}>
+            <footer className={`pb-6 ${collapsed ? 'pl-2' : 'pl-7'} space-y-4`}>
+                <button
+                    onClick={() => setIsResetPasswordOpen(true)}
+                    className={`flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/8 text-white/90 hover:bg-white/15 -translate-x-1 hover:translate-x-0 transition-[transform,background-color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`}
+                >
+                    {/* used same styling as logout button */}
+                    <Settings size={18} className="shrink-0" />
+                    {!collapsed && <span>Settings</span>}
+                </button>
+
                 <button
                     onClick={logOut}
                     className={`flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/8 text-white/90 hover:bg-white/15 -translate-x-1 hover:translate-x-0 transition-[transform,background-color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`}
@@ -80,6 +92,11 @@ export default function Sidebar() {
                     {!collapsed && <span>Log Out</span>}
                 </button>
             </footer>
+
+            <ResetPasswordModal
+                isOpen={isResetPasswordOpen}
+                onClose={() => setIsResetPasswordOpen(false)}
+            />
         </div>
     );
 }

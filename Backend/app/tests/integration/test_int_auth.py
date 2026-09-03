@@ -970,6 +970,323 @@ async def test_integration_delete_user_no_auth(client):
     response = client.delete("/api/users/550e8400-e29b-41d4-a716-446655440000")
     assert response.status_code == 401
 
+#change password integration tests
+@pytest.mark.asyncio
+async def test_integration_change_password_success(client):
+    email = "changepassword@example.com"
+    old_password = "ValidPassword!123"
+    new_password = "NewValidPassword!456"
+    await delete_user_by_email(email)
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "changepassword_user",
+                "password": old_password
+            }
+        )
+        assert register_response.status_code == 201
+        connection = await get_connection()
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+        response = client.post(
+            "/api/changePassword",
+            json={
+                "currentPassword": old_password,
+                "newPassword": new_password
+            }
+        )
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "success",
+            "message": "Password changed successfully"
+        }
+        client.cookies.clear()
+        login_response = client.post(
+            "/api/login",
+            json={
+                "email": email,
+                "password": new_password
+            }
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["status"] == "success"
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_password_incorrect_current_password(client):
+    email = "changepasswordwrong@example.com"
+    old_password = "ValidPassword!123"
+    await delete_user_by_email(email)
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "changepasswordwrong_user",
+                "password": old_password
+            }
+        )
+        assert register_response.status_code == 201
+        connection = await get_connection()
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+        response = client.post(
+            "/api/changePassword",
+            json={
+                "currentPassword": "WrongP@ssword12334567",
+                "newPassword": "NewValidPassword!456"
+            }
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "Current password is incorrect."
+            }
+        }
+        client.cookies.clear()
+        login_response = client.post(
+            "/api/login",
+            json={
+                "email": email,
+                "password": old_password
+            }
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["status"] == "success"
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_password_same_as_current(client):
+    email = "changepasswordsame@example.com"
+    old_password = "ValidPassword!123"
+    await delete_user_by_email(email)
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "changepasswordsame_user",
+                "password": old_password
+            }
+        )
+        assert register_response.status_code == 201
+        connection = await get_connection()
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+        response = client.post(
+            "/api/changePassword",
+            json={
+                "currentPassword": old_password,
+                "newPassword": old_password
+            }
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "New password must be different from your current password."
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_password_invalid_new_password(client):
+    email = "changepasswordweak@example.com"
+    old_password = "ValidPassword!123"
+    await delete_user_by_email(email)
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "changepasswordweak_user",
+                "password": old_password
+            }
+        )
+        assert register_response.status_code == 201
+        connection = await get_connection()
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+        response = client.post(
+            "/api/changePassword",
+            json={
+                "currentPassword": old_password,
+                "newPassword": "weak"
+            }
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "Invalid or missing new password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_password_missing_fields(client):
+    email = "changepasswordmissing@example.com"
+    old_password = "ValidPassword!123"
+    await delete_user_by_email(email)
+    try:
+        register_response = client.post(
+            "/api/register",
+            json={
+                "email": email,
+                "username": "changepasswordmissing_user",
+                "password": old_password
+            }
+        )
+        assert register_response.status_code == 201
+        connection = await get_connection()
+        try:
+            user = await connection.fetchrow(
+                """
+                SELECT userid, username
+                FROM "Users_DB"."Users"
+                WHERE useremail = $1
+                """,
+                email
+            )
+        finally:
+            await connection.close()
+
+        assert user is not None
+        user_token = create_token({
+            "id": str(user["userid"]),
+            "username": user["username"],
+            "role": "USER"
+        })
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            user_token
+        )
+        response = client.post(
+            "/api/changePassword",
+            json={
+                "currentPassword": old_password
+            }
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": {
+                "status": "error",
+                "message": "Missing currentPassword or newPassword field."
+            }
+        }
+    finally:
+        await delete_user_by_email(email)
+
+@pytest.mark.asyncio
+async def test_integration_change_password_no_auth(client):
+    client.cookies.clear()
+    response = client.post(
+        "/api/changePassword",
+        json={
+            "currentPassword": "ValidPassword!123",
+            "newPassword": "NewValidPassword!456"
+        }
+    )
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Not authenticated"
+        }
+    }
+
 @pytest.mark.asyncio
 async def test_integration_refresh_token_not_needed(client):
     user = {
