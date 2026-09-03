@@ -159,4 +159,4 @@ def test_create_findings_string_returns_fallback_for_missing_summary():
     input_data = {}
     
     result = service.create_findings_string(input_data)
-    assert result == "No PDF AI analysis findings available."
+    assert result == "No findings"

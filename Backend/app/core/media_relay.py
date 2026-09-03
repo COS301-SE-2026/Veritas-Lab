@@ -1,5 +1,6 @@
 from app.core.image_service import ImageService
 from app.core.pdf_service import PDFService
+from app.core.video_service import VideoService
 from uuid import UUID
 
 class MediaRelay:
@@ -13,6 +14,9 @@ class MediaRelay:
 
         elif self.extension == ".pdf":
             service = PDFService()
+
+        elif self.extension == ".mp4":
+            service = VideoService()
 
         else:
             raise ValueError(f"Unsupported media extension: {self.extension}")
