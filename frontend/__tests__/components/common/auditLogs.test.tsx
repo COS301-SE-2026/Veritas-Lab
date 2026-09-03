@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import useAuditLog from '@/lib/hooks/useAuditLog';
 import AuditLogs from '@/components/common/auditLogs';
-import { stat } from 'fs';
 jest.mock('@/lib/hooks/useAuditLog', () => ({
     __esModule: true,
     default: jest.fn(),
@@ -78,7 +77,7 @@ describe('AuditLogs', () => {
         expect(screen.queryByText('Loading audit logs...')).not.toBeInTheDocument();
         expect(screen.queryByTestId('error-label')).not.toBeInTheDocument();
         expect(screen.getAllByTestId('audit-log-case-card')).toHaveLength(2);
-        
+
         expect(screen.getByText('case-1')).toBeInTheDocument();
         expect(screen.getByText('Case 1')).toBeInTheDocument();
         expect(screen.getByText('2')).toBeInTheDocument();
