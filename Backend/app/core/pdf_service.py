@@ -149,7 +149,48 @@ class PDFService(MediaService):
         }
 
     def create_findings_string(self, input: dict) -> str:
-        return input.get(
-            "summary",
-            "No PDF AI analysis findings available."
-        )
+        if input is None or input == {}:
+            return "No findings"
+
+        output = "Metadata:\n"
+
+        if input.get("findings") is None or input.get("findings") == "":
+            output += "No metadata findings.\n"
+        else:
+            output += f"{input['findings']}\n"
+
+        output += "AI Classifier:\n"
+
+        ai_probability = input.get("ai_probability")
+        classification = input.get("classification")
+        reasons = input.get("reasons", [])
+        summary = input.get("summary")
+
+        if ai_probability is not None:
+            output += (
+                f"The AI classifier found an AI probability of "
+                f"{ai_probability * 100:.2f}%.\n"
+            )
+        else:
+            output += "AI classifier analysis unavailable.\n"
+            return output
+
+        if classification:
+            output += f"Classification: {classification}\n"
+
+        if summary:
+            output += f"Summary: {summary}\n"
+
+        if reasons:
+            output += "Reasons:\n"
+
+            for reason in reasons:
+                if isinstance(reason, dict):
+                    message = reason.get("message")
+
+                    if message:
+                        output += f" - {message}\n"
+                else:
+                    output += f" - {reason}\n"
+
+        return output
