@@ -28,20 +28,20 @@ export default function useAnnotations() {
     const [activeTool, setActiveTool] = useState<AnnotationTool>('Select');
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
-    const addShape = (points: AnnotationPoint[], page: number) => {
+    const addShape = (points: AnnotationPoint[], page: number, timeStamp?: number) => {
         // A single point isn't a meaningful shape, ignore accidental clicks.
         if (points.length < 2) return;
 
-        const shape: Annotation = { id: createAnnotationId(), kind: 'shape', page, points };
+        const shape: Annotation = { id: createAnnotationId(), kind: 'shape', page, points, timeStamp };
         setAnnotations((current) => [...current, shape]);
         setSelectedId(shape.id);
     };
 
-    const addNote = (position: AnnotationPoint, text: string, page: number) => {
+    const addNote = (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => {
         const trimmedText = text.trim();
         if (!trimmedText) return;
 
-        const note: Annotation = { id: createAnnotationId(), kind: 'note', page, position, text: trimmedText };
+        const note: Annotation = { id: createAnnotationId(), kind: 'note', page, position, text: trimmedText, timeStamp };
         setAnnotations((current) => [...current, note]);
         setSelectedId(note.id);
     };

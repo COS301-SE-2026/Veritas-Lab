@@ -3,6 +3,13 @@ import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import type { AnnotationListProps } from '@/types/workbench';
 
 export default function AnnotationList({ annotations, selectedId, onSelect, onRemove }: Readonly<AnnotationListProps>) {
+    
+    const formatTimestamp = (seconds: number): string => {
+        const min = Math.floor(seconds / 60);
+        const remainder = seconds - (min * 60);
+        return `${min.toString()}:${remainder.toFixed(2).padStart(5, '0')}`;
+    }
+    
     return (
         <div className="shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-[21px] p-4">
             <h2 className="text-xl font-bold text-(--color-text)">Annotations</h2>
@@ -36,6 +43,11 @@ export default function AnnotationList({ annotations, selectedId, onSelect, onRe
                                             <MessageSquare size={16} className="mt-0.5 shrink-0" />
                                         )}
                                         <span className="line-clamp-2 flex-1">{label}</span>
+                                        {annotation.timeStamp !== undefined ? (
+                                            <div className= "rounded-md px-2 py-0.5 text-xs font-medium text-(--color-text) bg-(--color-lightest)">
+                                                {formatTimestamp(annotation.timeStamp)}
+                                            </div>
+                                        ) : null}
                                     </button>
                                     <button
                                         type="button"

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, FileText } from 'lucide-react';
@@ -14,7 +14,7 @@ import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { getMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
-import type { WorkbenchTool } from '@/types/workbench';
+import type { MediaKindSideBySide, WorkbenchTool } from '@/types/workbench';
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -41,6 +41,18 @@ export default function WorkbenchPage() {
 
     const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
+    const video = useRef<HTMLVideoElement | null>(null);
+
+    const pickSelectedAnnotation = (id: string | null) => {
+        setSelectedId(id);
+        if (id === null) return;
+
+        const chosen = annotations.find((annotation) => annotation.id === id);
+        if(video.current && (chosen?.timeStamp !== undefined)) {
+            video.current.pause();
+            video.current.currentTime = chosen.timeStamp;
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -67,6 +79,7 @@ export default function WorkbenchPage() {
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);
+    const mediaKindSideBySide: MediaKindSideBySide = mediaKind === 'video' ? 'unsupported' : mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
@@ -98,6 +111,7 @@ export default function WorkbenchPage() {
             <div className="mt-6 flex gap-6">
                 <div className="flex-1">
                     <WorkbenchCanvas
+                        video={video}
                         mediaUrl={mediaUrl}
                         mediaKind={mediaKind}
                         mediaName={mediaName}
@@ -105,14 +119,14 @@ export default function WorkbenchPage() {
                         activeTool={activeTool}
                         annotations={annotations}
                         selectedId={selectedId}
-                        onSelectAnnotation={setSelectedId}
+                        onSelectAnnotation={pickSelectedAnnotation}
                         onAddShape={addShape}
                         onAddNote={addNote}
                     />
 
                     {comparisonActive ? (
                         <MetadataComparison
-                            mediaKind={mediaKind}
+                            mediaKind={mediaKindSideBySide}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
                         />
@@ -126,7 +140,7 @@ export default function WorkbenchPage() {
                     onToolChange={setActiveTool}
                     annotations={annotations}
                     selectedId={selectedId}
-                    onSelectAnnotation={setSelectedId}
+                    onSelectAnnotation={pickSelectedAnnotation}
                     onRemoveAnnotation={removeAnnotation}
                     onClearAll={clearAll}
                     onSave={handleSave}

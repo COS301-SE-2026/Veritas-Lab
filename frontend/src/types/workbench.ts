@@ -22,6 +22,7 @@ export type ShapeAnnotation = {
     kind: 'shape';
     page: number;
     points: AnnotationPoint[];
+    timeStamp?: number;
 };
 
 /** A text note pinned to a specific point on the media. */
@@ -31,6 +32,7 @@ export type NoteAnnotation = {
     page: number;
     position: AnnotationPoint;
     text: string;
+    timeStamp?: number;
 };
 
 export type Annotation = ShapeAnnotation | NoteAnnotation;
@@ -44,8 +46,9 @@ export type WorkbenchCanvasProps = {
     annotations: Annotation[];
     selectedId: string | null;
     onSelectAnnotation: (id: string | null) => void;
-    onAddShape: (points: AnnotationPoint[], page: number) => void;
-    onAddNote: (position: AnnotationPoint, text: string, page: number) => void;
+    onAddShape: (points: AnnotationPoint[], page: number, timeStamp?: number) => void;
+    onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
+    video?: React.RefObject<HTMLVideoElement | null>;
 };
 
 export type AnnotationNoteProps = {
@@ -92,7 +95,8 @@ export type LoadAnnotationsParams = {
 };
 
 // How a piece of evidence should be previewed on the canvas
-export type MediaKind = 'image' | 'pdf' | 'unsupported';
+export type MediaKind = 'image' | 'pdf' | 'video' | 'unsupported';
+export type MediaKindSideBySide = 'image' | 'pdf' | 'unsupported';
 
 export type ReportModalProps = {
     isOpen: boolean;
