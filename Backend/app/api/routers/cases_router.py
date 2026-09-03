@@ -75,6 +75,27 @@ router = APIRouter(
     tags=["Cases"]
 )
 
+class audit_event(BaseModel):
+    timestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
+    user: str | None = Field(..., examples=["investigator_user"])
+    action: str | None = Field(..., examples=["UPDATE"])
+
+class case_audit_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+    caseID: str = Field(..., examples=["12345678-abcd-ef01-2345-6789abcdef01"])
+    events: List[audit_event]
+
+class audited_case(BaseModel):
+    caseID: str = Field(..., examples=["12345678-abcd-ef01-2345-6789abcdef01"])
+    caseName: str | None = Field(..., examples=["Reciepts sus"])
+    eventCount: int | None = Field(..., examples=[5])
+    lastEventTimestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
+    caseExists: bool | None = Field(..., examples=[True])
+
+class audited_cases_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+    cases: List[audited_case]
+
 class create_case_request(BaseModel):
     title: str | None = None
     description: str | None = None
@@ -196,6 +217,22 @@ def _format_case_evidence(row: dict, user : bool) -> dict:
         "reportComments": row["reportcomments"],
         "reportCertainty": row["reportcertainty"],
         "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
+    }
+
+def row_to_audit_event(row: dict) -> dict:
+    return {
+        "timestamp": row["eventtimestamp"].isoformat() if row["eventtimestamp"] else None,
+        "user": row["eventuser"],
+        "action": row["eventaction"]
+    }
+
+def _row_to_audited_case(row: dict) -> dict:
+    return {
+        "caseId": str(row["caseid"]),
+        "caseName": row["casename"],
+        "eventCount": row["eventcount"],
+        "lastEventTimestamp": row["lasteventtimestamp"].isoformat() if row["lasteventtimestamp"] else None,
+        "caseExists": row["caseexists"]
     }
 
 @router.post(
@@ -2128,4 +2165,320 @@ async def save_annotations(
             }
         )
 
+@router.get(
+    "/getAudit/caseID/{case_id}",
+    status_code=status.HTTP_200_OK,
+    tags=["Audit"],
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Get all aduit logs for a case",
+    description=(
+        "Returns every audited event recorded against a case."
+        "Covers case creation, renaming, description edits, closing "
+        "and deletion, as along with evidence added to or annotated on the case. "
+        "A case with no audit logs will return an empty list."
+    ),
+    responses={
+        200: {
+            "model": case_audit_response,
+            "description": "Audit trail retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "caseID": "123e4567-e89b-12d3-a456-426614174000",
+                        "events": [
+                            {
+                                "timestamp": "2026-08-12T11:01:30",
+                                "user": "invetigator_user",
+                                "action": "Case Closed"
+                            }
+                        ]
+                    }
+                }
+            }   
+        },
+
+        400: {
+            "model": error_response,
+            "description": "Bad Request - CaseID is not a valid UUID",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: USER_UNAUTHORIZED_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_case_audit_events(
+    case_id: str,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+
+    verify_not_user(payload.get("role"))
+
+    validated_case_id = Case(case_id=case_id).case_id
+
+    try:
+        rows = await connection.fetch(
+            """
+            WITH case_audit AS (
+                SELECT
+                    audit_case_id AS ordinal,
+                    audittimestamp,
+                    query_executor_name,
+                    query_type::text AS query_type,
+                    old_casename,
+                    old_casedescription,
+                    old_caseclosed
+                FROM "Cases_DB"."Audit_Cases"
+                WHERE old_case_id = $1::uuid
+
+
+            UNION ALL
+
+            SELECT
+                214783647,
+                NULL::timestamptz,
+                NULL::varchar,
+                NULL::text,
+                cases.casename,
+                cases.casedescription,
+                cases.caseclosed
+            FROM "Cases_DB"."Cases" AS cases
+            WHERE cases.caseid = $1::uuid
+            ),
+            case_transitions AS (
+                SELECT
+                    audittimestamp,
+                    query_executor_name,
+                    query_type,
+                    old_casename,
+                    old_casedescription,
+                    old_caseclosed,
+                    LEAD(old_casename) OVER (ORDER BY ordinal) AS next_casename,
+                    LEAD(old_casedescription) OVER (ORDER BY ordinal) AS next_casedescription,
+                    LEAD(old_caseclosed) OVER (ORDER BY ordinal) AS next_caseclosed
+                FROM case_audit 
+            ),
+            audit_events AS (
+                SELECT
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    CASE
+                        WHEN query_type = 'INSERT' THEN 'Case Created'
+                        WHEN query_type = 'DELETE' THEN 'Case Deleted'
+                        WHEN old_caseclosed = FALSE AND next_caseclosed = TRUE 
+                            THEN 'Case Closed'
+                        WHEN old_casename IS DISTINCT FROM next_casename 
+                            THEN 'Case Renamed'
+                        WHEN old_casedescription IS DISTINCT FROM next_casedescription 
+                            THEN 'Case Description Updated'
+                        WHEN old_casename IS DISTINCT FROM next_casename 
+                            AND old_casedescription IS DISTINCT FROM next_casedescription
+                            THEN 'Case Renamed and Description Updated'
+                        ELSE 'Case Updated'
+                    END AS eventaction
+                FROM case_transitions
+                WHERE query_type IS NOT NULL
+
+                UNION ALL
+
+                SELECT
+                    audit_media.audittimestamp AS eventtimestamp,
+                    audit_media.query_executor_name AS eventuser,
+                    CASE audit_media.query_type::text
+                        WHEN 'INSERT' THEN 'Evidence Added'
+                        ELSE 'Evidence Annotated'
+                    END AS eventaction
+                    FROM "Cases_DB"."Audit_Media" AS audit_media
+                    INNER JOIN "Cases_DB"."Reports" AS reports
+                        ON reports.mediaid = audit_media.old_media_id
+                    WHERE reports.caseid = $1::uuid
+                        AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
+            )
+            SELECT
+                audit_events.eventtimestamp AS eventtimestamp,
+                audit_events.eventuser AS eventuser,
+                audit_events.eventaction AS eventaction
+            FROM audit_events
+            ORDER BY audit_events.eventtimestamp DESC NULLS LAST
+            """,
+            validated_case_id
+        )
+
+        return {
+            "status": "success",
+            "caseID": validated_case_id,
+            "events": [row_to_audit_event(row) for row in rows]
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.get(
+    "/getAllAudit",
+    status_code=status.HTTP_200_OK,
+    tags=["Audit"],
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Get all cases with audit logs",
+    description=(
+        "Returns the different cases that have at least one audit entry, with the number of recorded events"
+        " and when the most recent one happened. Amdin only."
+    ),
+    responses={
+        200: {
+            "model": audited_cases_response,
+            "description": "Audited cases retrieved successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "cases": [
+                            {
+                                "caseId": "123e4567-e89b-12d3-a456-426614174000",
+                                "caseName": "Reciepts sus",
+                                "eventCount": 5,
+                                "lastEventTimnestamp": "2026-08-12T11:01:30",
+                                "caseExists": True
+                            },
+                            {
+                                "caseId": "987e6543-e21b-12d3-a456-426614174000",
+                                "caseName": "Idk ig",
+                                "eventCount": 2,
+                                "lastEventTimnestamp": None,
+                                "caseExists": False
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+
+        401: INVALID_TOKEN_401,
+
+        403: USER_UNAUTHORIZED_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_audited_cases(
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+
+    if payload.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
     
+    try:
+        rows = await connection.fetch(
+            """
+            WITH audit_events AS (
+                SELECT old_case_id AS caseid,
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    query_type::text AS eventaction
+                FROM "Cases_DB"."Audit_Cases"
+                WHERE old_case_id IS NOT NULL
+
+                UNION ALL
+
+                SELECT old_caseid AS caseid,
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    query_type::text AS eventaction
+                FROM "Cases_DB"."Audit_Comments"
+                WHERE old_caseid IS NOT NULL
+            ),
+            audit_summary AS (
+                SELECT
+                    audit_events.caseid AS caseid,
+                    COUNT(*) AS eventcount,
+                    MAX(audit_events.eventtimestamp) AS lasteventtimestamp
+                FROM audit_events
+                GROUP BY audit_events.caseid
+            )
+            SELECT
+                audit_summary.caseid AS caseid,
+                COALESCE(cases.casename,
+                    (SELECT audit_cases.old_casename
+                    FROM "Cases_DB"."Audit_Cases" AS audit_cases
+                    WHERE audit_cases.old_case_id = audit_summary.caseid
+                    ORDER BY audit_cases.audittimestamp DESC NULLS LAST
+                    LIMIT 1
+                )
+            ) AS casename,
+            audit_summary.eventcount AS eventcount,
+            audit_summary.lasteventtimestamp AS lasteventtimestamp,
+            (cases.caseid IS NOT NULL) AS caseexists
+            FROM audit_summary
+            LEFT JOIN "Cases_DB"."Cases" AS cases
+                ON cases.caseid = audit_summary.caseid
+            ORDER BY audit_summary.lasteventtimestamp DESC NULLS LAST
+            """
+        )
+
+        return {
+            "status": "success",
+            "cases": [_row_to_audited_case(row) for row in rows]
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )

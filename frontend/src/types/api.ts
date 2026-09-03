@@ -78,3 +78,31 @@ export type CaseResponse = {
     comments: CaseComment[];
     evidence: CaseEvidence[];
 };
+
+export type AuditTimelineResponse = {
+    caseID: string,
+    events: AuditEvents[],
+}
+
+export type AuditEvents = {
+    timestamp: string;
+    user: string;
+    action: string;
+}
+
+// export type AuditLogResponse = {
+//     auditLogs: AuditTimelineResponse[];
+// }
+
+export type AuditLogResponse = {
+    status: string;
+    cases: AuditLogCase[];
+}
+
+export type AuditLogCase = {
+    caseId: string;
+    caseName: string;
+    eventCount: number;
+    lastEventTimestamp: string;
+    caseExists: boolean;
+}
