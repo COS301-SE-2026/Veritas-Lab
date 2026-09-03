@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import Dashboard from '../../../src/app/(sidebar)/dashboard/page';
 import useCaseDashboard from '../../../src/lib/hooks/useCaseDashboard';
+import { useUserRole } from '../../../src/context/UserRoleContext'; //use actual context to prevent further issues with permissions based changes
 
 jest.mock('../../../src/lib/hooks/useCaseDashboard');
-
+jest.mock('../../../src/context/UserRoleContext');
 const mockUseCaseDashboard = useCaseDashboard as jest.MockedFunction<typeof useCaseDashboard>;
-
+const mockUseUserRole = useUserRole as jest.MockedFunction<typeof useUserRole>; //fix for permission error
 const baseHookState = {
     searchQuery: '',
     setSearchQuery: jest.fn(),
@@ -13,8 +14,6 @@ const baseHookState = {
     setStatusFilter: jest.fn(),
     sortKey: 'caseCreationDate',
     setSortKey: jest.fn(),
-    userRole: 'USER',
-    setUserRole: jest.fn(),
     visibleCases: [
         {
             caseId: '4f2f5e15-2f2b-4d18-9c5b-8b7b7cbe1b7d',
@@ -30,6 +29,7 @@ const baseHookState = {
 
 describe('Dashboard page', () => {
     beforeEach(() => {
+        mockUseUserRole.mockReturnValue('USER');
         mockUseCaseDashboard.mockReturnValue({ ...baseHookState });
     });
     //the asserts match the visible case
@@ -45,12 +45,11 @@ describe('Dashboard page', () => {
 
     //ensures that only the investigator can see the create button and their own dashboard cards.
     it('shows dashboard cards and create button for investigators', () => {
+        mockUseUserRole.mockReturnValue('INVESTIGATOR'); //fix for permission based error
         mockUseCaseDashboard.mockReturnValue({
             ...baseHookState,
             showDashboardCards: true,
-            userRole: 'INVESTIGATOR',
         });
-
         render(<Dashboard />);
         expect(screen.getByText('Total Cases')).toBeInTheDocument();
         expect(screen.getByText('New Case')).toBeInTheDocument();
