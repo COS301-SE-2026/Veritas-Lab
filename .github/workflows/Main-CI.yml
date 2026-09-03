@@ -150,6 +150,8 @@ jobs:
                   python -m pip install --upgrade pip
                   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
                   python -m pip install -r requirements/base.txt
+                  sudo apt-get update
+                  sudo apt-get install -y libimage-exiftool-perl
 
             - name: run PyTest integration tests
               env:
