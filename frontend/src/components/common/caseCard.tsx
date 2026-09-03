@@ -10,17 +10,19 @@ export default function CaseCard({ caseTitle, caseDescription, caseStatus, href,
         <div className="border rounded-lg p-4 shadow-md transition duration-150 hover:shadow-lg hover:border-[var(--color-primary)]">
             <div className="text-lg font-bold text-[var(--color-text)]">{caseTitle}</div>
             <p className="text-(--color-light)">{caseDescription}</p>
-            <div className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-(--color-secondary) text-(--color-text)">
-                {caseStatus}
-            </div>
-            {risk && (
-                <div
-                        className="items-center px-2 py-1 text-xs font-semibold rounded-full"
-                        style={{ backgroundColor: `${risk.colorVar}20`, color: risk.colorVar }}
-                    >
-                    Average Risk Score: {riskScore} ({risk.label})
+            <div className="justify-between flex mt-2 items-center">
+                <div className="px-2 py-1 text-xs font-semibold rounded-full bg-(--color-secondary) text-(--color-text)">
+                    {caseStatus}
                 </div>
-            )}
+                {risk && (
+                    <div
+                            className="px-2 py-1 text-xs font-semibold rounded-full"
+                            style={{ backgroundColor: `${risk.colorVar}20`, color: risk.colorVar }}
+                        >
+                        Average Risk Score: {riskScore} ({risk.label})
+                    </div>
+                )}
+            </div>
         </div>
     );
     //this will work similar to how the evidence delete worked
