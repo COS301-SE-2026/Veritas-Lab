@@ -1,17 +1,31 @@
 from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
-from app.ai.detector import AIImageDetector
-from starlette.concurrency import run_in_threadpool
+from app.ai.detector import AIVideoDetector
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
-class ImageService(MediaService):
-
+class VideoService(MediaService):
     def __init__(self) -> None:
-        self.detector = AIImageDetector()
-    
+        self.ai_detector = AIVideoDetector()
+
+    async def ai_analysis(self, path: str | Path) -> dict:
+        return await self.ai_detector.analyse_video(path)
+
     def is_stripped(self, metadata: dict) -> bool:
-        return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
+        video_date_keys = (
+            "EXIF:DateTimeOriginal", 
+            "QuickTime:CreateDate", 
+            "Keys:CreationDate", 
+            "UserData:DateTimeOriginal"
+        )
+        video_model_keys = (
+            "EXIF:Model", 
+            "QuickTime:Model", 
+            "Keys:Model"
+        )
+        has_date = any(k in metadata for k in video_date_keys)
+        has_model = any(k in metadata for k in video_model_keys)
+        return not (has_date or has_model)
 
     def check_firmware(self,val_lower: str, dev_model:str, dev_make:str ) -> bool:
         return (
@@ -22,23 +36,46 @@ class ImageService(MediaService):
 
     def find_software_traces(self, metadata: dict) -> list[str]:
         found = []
-        known_editors = [
-            "adobe", 
-            "photoshop", 
-            "lightroom", 
-            "gimp", 
-            "canva", 
-            "snapseed", 
-            "picsart", 
-            "vsco", 
-            "pixlr", 
-            "fotor", 
-            "corel", 
-            "paint.net", 
-            "photopea"
+        known_tags = [
+            "premiere",
+            "after effects",
+            "davinci",
+            "resolve",
+            "final cut",
+            "capcut",
+            "vegas",
+            "imovie",
+            "shotcut",
+            "inshot",
+            "kinemaster",
+            "ffmpeg",
+            "handbrake",
+            "mencoder",
+            "streamclip",
+            "topaz",
+            "rife",
+            "ebsynth",
+            #Ai generation
+            "sora",
+            "runway",
+            "pika",
+            "kling",
+            "luma",
+            "haiper",
+            "hunyuan",
+            "cogvideo"
         ]
-        software_keys = ["EXIF:Software", "XMP:CreatorTool", 
-        "XMP:HistorySoftwareAgent", "EXIF:ProcessingSoftware"]
+        software_keys = software_keys = [
+            "EXIF:Software", 
+            "XMP:CreatorTool", 
+            "XMP:HistorySoftwareAgent", 
+            "EXIF:ProcessingSoftware",
+            "QuickTime:Software",
+            "QuickTime:Encoder",
+            "UserData:HandlerDescription",
+            "Encoder",
+            "WritingApp"
+        ]
         
         dev_model = str(metadata.get("EXIF:Model", "")).lower()
         dev_make = str(metadata.get("EXIF:Make", "")).lower()
@@ -50,21 +87,16 @@ class ImageService(MediaService):
                 val_lower = val_str.lower()
                 
                 is_firmware = self.check_firmware(val_lower,dev_model,dev_make)
-                is_known_editor = any(editor in val_lower for editor in known_editors)
+                is_known_tags = any(editor in val_lower for editor in known_tags)
                 
-                if is_known_editor:
+                if is_known_tags:
                     found.append(f"  * {key} (Confirmed Editor): {val_str}")
                 elif is_firmware:
                     continue
                 else:
                     found.append(f"  * {key} (Unverified Software/Firmware): {val_str}")
 
-        xmp_about = str(metadata.get("XMP:About", "")).lower()
-        if "faf5bdd5-ba3d-11da-ad31-d33d75182f1b" in xmp_about:
-            found.append("  * XMP:About (Confirmed Editor): Microsoft Paint / Windows Photo tool signature detected")
-            
         if metadata.get("EXIF:HostComputer", "") == "Mac OS X":
-            # Safely check firmware without relying on loop variables
             host_val = str(metadata.get("EXIF:HostComputer", "")).lower()
             if not self.check_firmware(host_val,dev_model,dev_make):
                 found.append("  * EXIF:HostComputer (Unverified Software): Image was processed by a Mac/iOS device post-capture")
@@ -89,6 +121,12 @@ class ImageService(MediaService):
             report_lines.append("  * C2PA data is present, but no explicit software claims were extracted.")
             
         return report_lines, True, claims_found
+
+    def empty_findings(self, findings: str) -> str:
+        if not findings:
+            return "The metadata analyser could not find anything obviously wrong with the metadata."
+        else:
+            return findings
 
     async def analyse_metadata(self, metadata: dict) -> AnalysisFindings:
         analysis_findings = AnalysisFindings(Certainty=0, Findings="")
@@ -123,51 +161,15 @@ class ImageService(MediaService):
                 
 
         if not has_c2pa and not found and stripped:
-            report_lines.append("This image contains no camera metadata. It has likely been stripped by an external application or messaging platform or it is a screenshot.")
+            report_lines.append("This video is missing crucial metadata. It has likely been stripped by an external application or messaging platform or it is a screenshot.")
 
         analysis_findings.Findings = "\n".join(report_lines)
+
+        analysis_findings.Findings = self.empty_findings(analysis_findings.Findings)            
         return analysis_findings
 
-    async def ai_analysis(self, path: str| Path) ->dict:
-        return await run_in_threadpool(
-            self.detector.analyse_image,
-            path
-        )
-
     def create_findings_string(self, input: dict) -> str:
-        if input is None or input == {}:
-            return "No findings"
-
-        output: str = "Metadata:\n"
-
-        if input.get("findings") is None or input.get("findings") == "":
-            output += "No metadata findings.\n"
-        else:
-            output += f"{input['findings']}\n"
-
-        output += "Binary Classifier:\n"
-
-        ai_probability = input.get("ai_probability")
-        confidence = input.get("confidence_percentage")
-        classification = input.get("classification")
-        reasons = input.get("reasons", [])
-
-        if ai_probability is not None and confidence is not None:
-            output += (f"The binary classifier found an AI probability of {ai_probability}% with a confidence of {confidence}%.\n")
-        else:
-            output += "Binary classifier analysis unavailable.\n"
-            return output
-
-        if classification:
-            output += f"Classification: {classification}\n"
-
-        if reasons:
-            output += "Reasons:\n"
-
-            for reason in reasons:
-                message = reason.get("message")
-
-                if message:
-                    output += f" - {message}\n"
-
-        return output
+        # This is the method that combines the metadata analysis and ai analysis into an easy to read output.
+        # Will be completed when the metadata analysis is completed
+        # Yes, these comments are for Sonar
+        pass
