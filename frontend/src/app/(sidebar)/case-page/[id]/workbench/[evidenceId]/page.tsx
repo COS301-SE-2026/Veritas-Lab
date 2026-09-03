@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, FileText } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
-import MetadataComparison from '@/components/common/workbenchSideBySide';
+import MetadataComparison from '@/components/common/workbenchMetadataComp';
 import ReportModal from '@/components/common/reportModal';
 import Button from '@/components/ui/button';
 import useAnnotations from '@/lib/hooks/useAnnotations';
@@ -14,7 +14,7 @@ import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { getMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
-import type { MediaKindSideBySide, WorkbenchTool } from '@/types/workbench';
+import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -79,7 +79,7 @@ export default function WorkbenchPage() {
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);
-    const mediaKindSideBySide: MediaKindSideBySide = mediaKind === 'video' ? 'unsupported' : mediaKind;
+    const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind === 'video' ? 'unsupported' : mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
@@ -126,7 +126,7 @@ export default function WorkbenchPage() {
 
                     {comparisonActive ? (
                         <MetadataComparison
-                            mediaKind={mediaKindSideBySide}
+                            mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
                         />

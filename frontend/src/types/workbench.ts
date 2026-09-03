@@ -96,7 +96,7 @@ export type LoadAnnotationsParams = {
 
 // How a piece of evidence should be previewed on the canvas
 export type MediaKind = 'image' | 'pdf' | 'video' | 'unsupported';
-export type MediaKindSideBySide = 'image' | 'pdf' | 'unsupported';
+export type MediaKindMetadataComp = 'image' | 'pdf' | 'unsupported';
 
 export type ReportModalProps = {
     isOpen: boolean;
