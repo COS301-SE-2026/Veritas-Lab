@@ -11,7 +11,7 @@ export default function useCaseRiskScores(cases: CaseSummary[]) {
     const [scores, setScores] = useState<RiskScore[]>([]);
     
     useEffect(() => {
-        if (cases.length === 0) {
+        if (!cases || cases.length === 0) {
             setScores([]);
             return;
         }
