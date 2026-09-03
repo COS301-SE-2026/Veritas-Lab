@@ -36,7 +36,7 @@ class VideoService(MediaService):
 
     def find_software_traces(self, metadata: dict) -> list[str]:
         found = []
-        known_editors = [
+        known_tags = [
             "premiere",
             "after effects",
             "davinci",
@@ -87,9 +87,9 @@ class VideoService(MediaService):
                 val_lower = val_str.lower()
                 
                 is_firmware = self.check_firmware(val_lower,dev_model,dev_make)
-                is_known_editor = any(editor in val_lower for editor in known_editors)
+                is_known_tags = any(editor in val_lower for editor in known_tags)
                 
-                if is_known_editor:
+                if is_known_tags:
                     found.append(f"  * {key} (Confirmed Editor): {val_str}")
                 elif is_firmware:
                     continue
