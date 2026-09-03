@@ -26,6 +26,12 @@ UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
 MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
 INTERNAL_SERVER_ERROR = "Internal server error"
 INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Please try again."
+
+FILE_TOO_LARGE = "File exceeds the maximum allowed size of 50MB"
+ 
+MAX_UPLOAD_SIZE_BYTES = 50 * 1048576  # 50MB this is later going to be a env
+# 1MB = 1024 times 1024
+
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
 r2_settings= R2_Settings()
@@ -110,6 +116,31 @@ def check_case_creator_valid(case_creator):
                 "message":"Name is too long. Must be 100 characters or less"
             }
         )
+
+# The helper function that checks the file chunk by chunk
+async def read_upload_with_size_limit(media: UploadFile) -> bytes:
+    chunks = []
+    total = 0
+ 
+    while True:
+        chunk = await media.read(1048576)
+        if not chunk:
+            break
+ 
+        total += len(chunk)
+        if total > MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "status": "error",
+                    "message": FILE_TOO_LARGE
+                }
+            )
+ 
+        chunks.append(chunk)
+ 
+    return b"".join(chunks)
+ 
 
 # pdf script detection helper
 def pdf_script_helper(file_bytes):
@@ -251,7 +282,8 @@ class Case:
     ):
         filename = media.filename
         local_extension = Path(filename).suffix.lower() #extract of the extension (e.g: .png)
-        file_bytes = await media.read()
+        #Cannot trust the supplied extension ever
+        file_bytes = await read_upload_with_size_limit(media) # Cannot trust supplied file size.
         await media.seek(0)
         #script detection
         if local_extension == ".pdf":
