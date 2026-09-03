@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch 
 
 import pytest
 import torch
@@ -7,7 +7,7 @@ from app.ai.detector import AIImageDetector
 from app.ai.detector import AIVideoDetector
 
 @pytest.fixture
-def mock_video_detector():
+def mock_video_detector_dependencies():
     mock_analysis_model = MagicMock()
     mock_analysis_model.analyse = AsyncMock()
 
