@@ -262,7 +262,7 @@ test('investigator can search cases, create a case, close case, upload media, ad
 
     await expect(
         page.getByRole('button', {
-            name: 'View side by side',
+            name: 'View Metadata Comparison',
             exact: true
         })
     ).toBeVisible();
@@ -335,15 +335,15 @@ test('investigator can search cases, create a case, close case, upload media, ad
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 
-    const sideBySideButton = page.getByRole('button', {
-        name: 'View side by side',
+    const metadataToolButton = page.getByRole('button', {
+        name: 'View Metadata Comparison',
         exact: true
     });
 
-    await sideBySideButton.click();
+    await metadataToolButton.click();
 
     await expect(
-        page.getByText('Metadata side-by-side', {
+        page.getByText('Metadata comparison', {
             exact: true
         })
     ).toBeVisible()

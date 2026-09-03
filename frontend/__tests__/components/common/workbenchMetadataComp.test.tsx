@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import MetadataComparison from '@/components/common/workbenchSideBySide';
+import MetadataComparison from '@/components/common/workbenchMetadataComp';
 
 jest.mock('lucide-react', () => ({
     __esModule: true,
@@ -31,7 +31,7 @@ describe('MetadataComparison', () => {
         expect(
             screen.getByText("Metadata comparison isnt available for this file type.")
         ).toBeInTheDocument();
-        expect(screen.queryByText('Metadata side-by-side')).not.toBeInTheDocument();
+        expect(screen.queryByText('Metadata comparison')).not.toBeInTheDocument();
     });
 
     it('reads metadata out of the nested reportArtifacts.metadata field, not the envelope', () => {

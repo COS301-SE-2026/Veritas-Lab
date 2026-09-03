@@ -96,7 +96,7 @@ describe('WorkbenchPage (integration)', () => {
         expect(screen.getByAltText('Suspicious Screenshot.png')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Back to case/i })).toHaveAttribute('href', '/case-page/case-1');
         expect(screen.getByRole('button', { name: 'Annotations' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'View side by side' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'View Metadata Comparison' })).toBeInTheDocument();
         expect(screen.queryByText('Click an annotation to view its details.')).not.toBeInTheDocument();
     });
     it('shows pre loaded annotations from the fetched evidence once the Annotations tool is active', async () => {
@@ -169,12 +169,12 @@ describe('WorkbenchPage (integration)', () => {
         expect(screen.getByText('No annotations yet. Use the Draw or Comment tool on the media.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /^Clear$/ })).toBeDisabled();
     });
-    //side by side
-    it('shows the side by side metadata comparison', async () => {
+    //metadata comparison tool
+    it('shows the metadata comparison', async () => {
         render(<WorkbenchPage />);
         await screen.findByAltText('Suspicious Screenshot.png');
-        fireEvent.click(screen.getByRole('button', { name: 'View side by side' }));
-        expect(screen.getByText('Metadata side-by-side')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'View Metadata Comparison' }));
+        expect(screen.getByText('Metadata comparison')).toBeInTheDocument();
         expect(screen.getByText('EXIF:CameraModel')).toBeInTheDocument();
         expect(screen.getByText('Canon EOS 90D')).toBeInTheDocument();
         expect(screen.getByText('Known bad example (image)')).toBeInTheDocument();
