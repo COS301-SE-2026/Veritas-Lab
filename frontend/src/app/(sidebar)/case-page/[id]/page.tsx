@@ -75,8 +75,8 @@ export default function CasePage() {
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
     const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //creator
-    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed; //creator
-    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed //investigator that is owner or any admin
+    const canCloseCase = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //invest that is case owner or any admin
+    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //investigator that is owner or any admin
     const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //owner and not closed
 
     function formatCaseDate(dateValue?: string | null) {
