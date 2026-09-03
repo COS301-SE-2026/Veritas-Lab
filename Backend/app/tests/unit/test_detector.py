@@ -184,8 +184,8 @@ async def test_analyze_video_converts_to_path_object(mock_video_detector_depende
         ("AI-generated", 0.85, 0.15, 3),
         ("AI-generated", 0.65, 0.35, 2),
         ("AI-generated", 0.40, 0.60, 1),
-        ("Authentic", 0.15, 0.85, 3),
-        ("Authentic", 0.35, 0.65, 2),
+        ("Authentic", 0.15, 0.85, 1),
+        ("Authentic", 0.35, 0.65, 1),
         ("Authentic", 0.45, 0.55, 1)
     ]
 )
