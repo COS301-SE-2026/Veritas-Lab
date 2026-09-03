@@ -10,6 +10,7 @@ test('investigator can search cases, create a case, close case, upload media, ad
     const caseTitle = `investigator-case-${uniqueId}`;
     const caseDescription = 'Investigator created case from the E2E flow.';
     const reviewText = `E2E review ${uniqueId}`;
+    const newPassword = 'NewPassword!123';
 
     const testImagePath = path.join(
         process.cwd(),
@@ -157,10 +158,17 @@ test('investigator can search cases, create a case, close case, upload media, ad
         })
     ).toBeVisible();
 
-    await page.getByRole('button', {
+    const uploadEvidenceButton = page.getByRole('button', {
         name: 'Upload Evidence',
         exact: true
-    }).click();
+    });
+    await expect(uploadEvidenceButton).toBeVisible();
+    const closeCaseButton = page.getByRole('button', {
+        name: 'Close Case',
+        exact: true
+    });
+    await expect(closeCaseButton).toBeVisible();
+    await uploadEvidenceButton.click();
 
     const uploadMediaButton = page.getByRole('button', {
         name: 'Upload Media',
@@ -187,15 +195,28 @@ test('investigator can search cases, create a case, close case, upload media, ad
 
     await expect(uploadedEvidence).toContainText(uploadedFileName);
     await expect(uploadedEvidence).toContainText('.png');
+    //audit timeline e2e
+    await page.getByRole('button', {
+        name: 'Audit Timeline',
+        exact: true
+    }).click();
+
+    await expect(
+        page.getByText('Evidence Added', {
+            exact: true
+        })
+    ).toBeVisible({
+        timeout: 15_000
+    });
 
     await page.getByRole('button', {
-        name: 'Reviews',
+        name: 'Comments',
         exact: true
     }).click();
 
     await expect(
         page.getByRole('heading', {
-            name: 'Reviews',
+            name: 'Comments',
             exact: true
         })
     ).toBeVisible();
@@ -408,12 +429,7 @@ test('investigator can search cases, create a case, close case, upload media, ad
         exact: true
     }).click();
 
-    await expect(page).toHaveURL(/\/case-page\/[^/]+\/?$/);
-
-    const closeCaseButton = page.getByRole('button', {
-        name: 'Close Case',
-        exact: true
-    });
+     await expect(page).toHaveURL(/\/case-page\/[^/]+\/?$/);
 
     await expect(closeCaseButton).toBeVisible();
 
@@ -430,5 +446,44 @@ test('investigator can search cases, create a case, close case, upload media, ad
         page.getByText('Status: Closed', {
             exact: true
         })
+    ).toBeVisible();
+    //investigator change password
+    await page.getByRole('button', {
+        name: 'Settings',
+        exact: true
+    }).click();
+
+    await expect(
+        page.getByRole('heading', {
+            name: 'Change Password',
+            exact: true
+        })
+    ).toBeVisible();
+
+    const currentPasswordInput = page.getByLabel('Current Password');
+    const newPasswordInput = page.getByLabel('New Password');
+    const confirmNewPasswordInput = page.getByLabel('Confirm New Password');
+    await expect(currentPasswordInput).toBeVisible();
+    await expect(newPasswordInput).toBeVisible();
+    await expect(confirmNewPasswordInput).toBeVisible();
+    await currentPasswordInput.fill(password);
+    await newPasswordInput.fill(newPassword);
+    await confirmNewPasswordInput.fill(newPassword);
+    const savePasswordButton = page.getByRole('button', {
+        name: 'Save Password',
+        exact: true
+    });
+
+    await expect(savePasswordButton).toBeEnabled();
+    const [changePasswordResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            response.url().includes('/api/changePassword') && response.request().method() === 'POST'
+        ),
+        savePasswordButton.click()
+    ]);
+
+    expect(changePasswordResponse.ok()).toBeTruthy();
+    await expect(
+        page.getByRole('status')
     ).toBeVisible();
 });
