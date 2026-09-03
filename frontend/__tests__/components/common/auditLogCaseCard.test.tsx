@@ -1,57 +1,59 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import AuditLogCaseCard from '@/components/common/auditLogCaseCard';
-import { AuditEvents } from '@/types/api';
+import { AuditLogCase } from '@/types/api';
 jest.mock('lucide-react', () => ({
     __esModule: true,
     ChevronDown: jest.fn(() => <div data-testid="chevron-icon">ChevronDown Icon</div>),
-    FolderPlus: jest.fn(() => <div data-testid="folder-plus-icon">FolderPlus Icon</div>),
 }));
 
 describe('AuditLogCaseCard', () => {
-    const mockedCaseId = 'case-1';
-    const mockedEvents: AuditEvents[] = [
-            {
-                timestamp: '2026-05-01T05:00:00.000Z',
-                action: 'Created case',
-                user: 'Invest Admin',
-            },
-            {
-                timestamp: '2026-05-02T10:30:00.000Z',
-                action: 'Added evidence',
-                user: 'Invest Admin',
-            },
-        ];
+    const mockedCase: AuditLogCase = {
+        caseId: 'case-1',
+        caseName: 'Case 1',
+        eventCount: 2,
+        lastEventTimestamp: '2026-09-11T11:30:00.000Z',
+        caseExists: true,
+    };
     afterEach(() => {
         jest.clearAllMocks();
     });
 
     it('renders case ID in closed state', () => {
-        render(<AuditLogCaseCard caseId={mockedCaseId} events={mockedEvents} />);
-        expect(screen.getByText(mockedCaseId)).toBeInTheDocument();
-        expect(screen.queryByText('Created case')).not.toBeInTheDocument();
-        expect(screen.queryByText('Added evidence')).not.toBeInTheDocument();
+        render(<AuditLogCaseCard cases={mockedCase}  />);
+        expect(screen.getByText('case-1')).toBeInTheDocument();
+        expect(screen.queryByText('Case Name: Case 1')).not.toBeInTheDocument();
+        expect(screen.queryByText('Events: 2')).not.toBeInTheDocument();
+        expect(screen.queryByText('Last Event: 2026-09-11T11:30:00.000Z')).not.toBeInTheDocument();
+        expect(screen.queryByText('Exists: true')).not.toBeInTheDocument();
     });
 
     it('renders case ID and events in open state', () => {
-        render(<AuditLogCaseCard caseId={mockedCaseId} events={mockedEvents} />);
+        render(<AuditLogCaseCard cases={mockedCase} />);
         const chevy = screen.getByTestId('chevron-icon');
         fireEvent.click(chevy);
 
-        expect(screen.getByText('Created case')).toBeInTheDocument();
-        expect(screen.getByText('Added evidence')).toBeInTheDocument();
-
-        const folderPlusIcon = screen.getAllByTestId('folder-plus-icon');
-        expect(folderPlusIcon).toHaveLength(2);
+        expect(screen.getByText('case-1')).toBeInTheDocument();
+        expect(screen.getByText('Case ID: case-1')).toBeInTheDocument();
+        expect(screen.getByText('Case Name: Case 1')).toBeInTheDocument();
+        expect(screen.getByText('Events: 2')).toBeInTheDocument();
+        expect(screen.getByText('Last Event: 2026-09-11T11:30:00.000Z')).toBeInTheDocument();
+        expect(screen.getByText('Exists: true')).toBeInTheDocument();
     });
 
     it('collapses events when clicking the chevron icon again', () => {
-        render(<AuditLogCaseCard caseId={mockedCaseId} events={mockedEvents} />);
+        render(<AuditLogCaseCard cases={mockedCase} />);
         const chevy = screen.getByTestId('chevron-icon');
         fireEvent.click(chevy);
-        expect(screen.getByText('Created case')).toBeInTheDocument();
-        expect(screen.getByText('Added evidence')).toBeInTheDocument();
+        expect(screen.getByText('Case ID: case-1')).toBeInTheDocument();
+        expect(screen.getByText('Case Name: Case 1')).toBeInTheDocument();
+        expect(screen.getByText('Events: 2')).toBeInTheDocument();
+        expect(screen.getByText('Last Event: 2026-09-11T11:30:00.000Z')).toBeInTheDocument();
+        expect(screen.getByText('Exists: true')).toBeInTheDocument();
         fireEvent.click(chevy);
-        expect(screen.queryByText('Created case')).not.toBeInTheDocument();
-        expect(screen.queryByText('Added evidence')).not.toBeInTheDocument();
+        expect(screen.queryByText('Case ID: case-1')).not.toBeInTheDocument();
+        expect(screen.queryByText('Case Name: Case 1')).not.toBeInTheDocument();
+        expect(screen.queryByText('Events: 2')).not.toBeInTheDocument();
+        expect(screen.queryByText('Last Event: 2026-09-11T11:30:00.000Z')).not.toBeInTheDocument();
+        expect(screen.queryByText('Exists: true')).not.toBeInTheDocument();
     });
 })

@@ -2,7 +2,7 @@ import { ApiError } from "@/types/api";
 import { AuditTimelineResponse, AuditLogResponse } from "@/types/api";
 
 export async function getAudit(caseID: string): Promise<AuditTimelineResponse>  {
-    const res = await fetch(`/api/getAudit/CaseID/${caseID}`, {
+    const res = await fetch(`/api/getAudit/caseID/${caseID}`, {
         method: 'GET',
         credentials: 'include',
         headers: {

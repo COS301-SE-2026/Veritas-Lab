@@ -14,6 +14,7 @@ jest.mock('@/components/ui/label', () => ({
 jest.mock('lucide-react', () => ({
     __esModule: true,
     FolderPlus: jest.fn(() => <div>FolderPlus Icon</div>),
+    RouteOff: jest.fn(() => <div>RouteOff Icon</div>),
 }));
 
 describe('AuditTimeline', () => {
@@ -45,31 +46,31 @@ describe('AuditTimeline', () => {
         auditTimelineMock.mockReturnValue(mockedResponse);
 
         render(<AuditTimeline caseId="case-1" />);
-        // Commented out for now until the api is integrated
-        // const errorLabel = screen.getByTestId('error-label');
-        // expect(errorLabel).toBeInTheDocument();
-        // expect(errorLabel).toHaveTextContent('Failed to load audit timeline');
+        const errorLabel = screen.getByTestId('error-label');
+        expect(errorLabel).toBeInTheDocument();
+        expect(errorLabel).toHaveTextContent('Failed to load audit timeline');
         expect(auditTimelineMock).toHaveBeenCalledWith('case-1');
     });
 
     it('renders timeline events', () => {
         const auditTimelineMock = useAuditTimeline as jest.Mock;
-        const mockedResponse = {
-            timeline: {
+        const mockTimeline =  {
                 caseID: 'case-1',
                 events: [
                     {
-                        action: 'Created case',
+                        action: 'Case Created',
                         user: 'Invest Admin',
                         timestamp: '2026-05-01T05:00:00.000Z',
                     },
                     {
-                        action: 'Closed case',
-                        user: 'Invest Admin',
+                        action: 'Case Closed',
+                        user: 'Invest',
                         timestamp: '2026-05-01T07:00:00.000Z',
                     },
                 ],
-            },
+            };
+        const mockedResponse = {
+            timeline: mockTimeline,
             isLoading: false,
             error: null,
         };
@@ -77,15 +78,11 @@ describe('AuditTimeline', () => {
 
         render(<AuditTimeline caseId="case-1" />);
 
-        // For now the mocked timeline items are tested until the auditTimeline component is rid of mocks
-        const createCaseEvent = screen.getAllByText('Case Created');
-        expect(createCaseEvent.length).toBeGreaterThan(0);
-        const usersNameJoe = screen.getAllByText('John Doe');
-        expect(usersNameJoe.length).toBeGreaterThan(0);
-        const usersNameJane = screen.getAllByText('Jane Smith');
-        expect(usersNameJane.length).toBeGreaterThan(0);
-        const icons = screen.getAllByText('FolderPlus Icon');
-        expect(icons.length).toBeGreaterThan(0);
+        expect(screen.getByText('Case Created')).toBeInTheDocument();
+        expect(screen.getByText('Case Closed')).toBeInTheDocument();
+        expect(screen.getByText('Invest Admin')).toBeInTheDocument();
+        expect(screen.getByText('FolderPlus Icon')).toBeInTheDocument();
+        expect(screen.getByText('RouteOff Icon')).toBeInTheDocument();
         expect(auditTimelineMock).toHaveBeenCalledWith('case-1');
     });
 })

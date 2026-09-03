@@ -30,9 +30,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Veritas Lab API",
     description="This is the backend REST API for Veritas Lab",
-    docs_url=None if other_settings.ENVIRONMENT == "production" else "/docs",
-    redoc_url=None if other_settings.ENVIRONMENT == "production" else "/redoc",
-    openapi_url=None if other_settings.ENVIRONMENT == "production" else "/openapi.json",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
     lifespan=lifespan
 )
 
