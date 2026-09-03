@@ -17,11 +17,11 @@ export default function AuditLogCaseCard({ cases }: { cases: AuditLogCase }) {
                     <div>
                             <div className="flex gap-1 p-2 border-t border-[var(--color-light)]/30 items-center">
                                 <div className="flex flex-1 gap-1 text-lg font-semibold text-[var(--color-text)]">
-                                    <div className="text-sm text-[var(--color-text)]">{cases.caseId}</div>
-                                    <div className="text-sm text-[var(--color-light)]">{cases.caseName}</div>
-                                    <div className="text-sm text-[var(--color-text)]">{cases.eventCount}</div>
-                                    <div className="text-sm text-[var(--color-text)]">{cases.lastEventTimestamp}</div>
-                                    <div className="text-sm text-[var(--color-light)]">{cases.caseExists}</div>
+                                    <div className="text-sm text-[var(--color-text)]">Case ID: {cases.caseId}</div>
+                                    <div className="text-sm text-[var(--color-light)]">Case Name: {cases.caseName}</div>
+                                    <div className="text-sm text-[var(--color-text)]">Events: {cases.eventCount}</div>
+                                    <div className="text-sm text-[var(--color-text)]">Last Event: {cases.lastEventTimestamp}</div>
+                                    <div className="text-sm text-[var(--color-light)]">Exists: {cases.caseExists ? 'true' : 'false'}</div>
                                 </div>
                             </div>
                     </div>

@@ -16,7 +16,7 @@ export default function AuditLogs() {
         return <Label text={error} htmlFor="error" variant="error" />;
     }
 
-    if (!auditLogs || auditLogs.cases.length === 0) {
+    if (!auditLogs || !auditLogs.cases || auditLogs.cases.length === 0) {
         return <Label text="No audit logs found" htmlFor="no-logs" variant="info" />;
     }
 
