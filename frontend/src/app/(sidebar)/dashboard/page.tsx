@@ -41,7 +41,7 @@ export default function Dashboard() {
                     <div className="text-[16px] text-(--color-light)">Manage and Track Cases</div>
                 </div>
                 <div  className="justify-end flex items-center ">
-                    {showDashboardCards && (
+                    {showDashboardCards && userRole !== 'USER' && (
                         <div>
                             <Button variant="submit" onClick={openModal}>
                                 <div className="text-[16px] font-bold">New Case</div>
@@ -90,7 +90,7 @@ export default function Dashboard() {
                 </div>
             </div>
         </div>
-        {showDashboardCards && (
+        {showDashboardCards && userRole !== 'USER' && (
             <DashboardModal isOpen={isModalOpen} onClose={closeModal} onCreated={() => { closeModal(); void refreshCases(); }} />
         )}
         </>

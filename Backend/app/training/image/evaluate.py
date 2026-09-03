@@ -5,9 +5,9 @@ import argparse
 import torch
 from torch import nn
 
-from app.training.data import create_data_loaders
-from app.training.metrics import evaluate_model
-from app.training.model import AIImageDetector
+from app.training.image.data import create_data_loaders
+from app.training.image.metrics import evaluate_model
+from app.training.image.model import AIImageDetector
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate the AI detector.")

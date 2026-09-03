@@ -4,9 +4,9 @@ import argparse
 import json
 import torch
 
-from app.training.model import AIImageDetector
-from app.training.paths import validate_model_path
-from app.training.prediction import predict_and_explain
+from app.training.image.model import AIImageDetector
+from app.training.image.paths import validate_model_path
+from app.training.image.prediction import predict_and_explain
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(

@@ -104,6 +104,15 @@ describe('CasePage (integration)', () => {
     });
 
     it('loads the case and shows full management controls for the owning investigator', async () => {
+        mockUseUserRole.mockReturnValue('INVESTIGATOR');
+        mockUseCurrentUser.mockReturnValue({ username: 'investigator.one' });
+        mockedFetchCase.mockResolvedValueOnce({
+            ...baseCase,
+            case: {
+                ...baseCase.case,
+                caseCreator: 'investigator.one',
+            },
+        } as Awaited<ReturnType<typeof fetchCase>>);
         render(<CasePage />);
         expect(screen.getByText('Loading case...')).toBeInTheDocument();
         expect(await screen.findByText('Alpha Fraud')).toBeInTheDocument();
@@ -115,25 +124,48 @@ describe('CasePage (integration)', () => {
         expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
         expect(screen.getByText('Screenshot.png')).toBeInTheDocument();
         expect(screen.getByAltText('Screenshot.png')).toBeInTheDocument();
+        expect(within(screen.getByText('Screenshot.png').closest('div.relative')!).getByRole('button')).toBeInTheDocument();
     }); 
+    //
+    it('shows all management controls for an admin that owns the case', async () => {
+        mockUseUserRole.mockReturnValue('ADMIN');
+        mockUseCurrentUser.mockReturnValue({ username: 'admin.user' });
+        mockedFetchCase.mockResolvedValueOnce({
+            ...baseCase,
+            case: {
+                ...baseCase.case,
+                caseCreator: 'admin.user',
+            },
+        } as Awaited<ReturnType<typeof fetchCase>>);
+        render(<CasePage />);
+        await screen.findByText('Alpha Fraud');
+        expect(screen.getByRole('button', { name: 'Edit Case' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Upload Evidence' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
+        expect(within(screen.getByText('Screenshot.png').closest('div.relative')!).getByRole('button')).toBeInTheDocument();
+    });
 
-    it('hides all management controls and the evidence delete button for normal user', async () => {
-        mockUseUserRole.mockReturnValue('USER');
+    //deals with admin that is not owner
+    it('shows close and delete controls for an admin who doesnt own the case but not edit or upload', async () => {
+        mockUseUserRole.mockReturnValue('ADMIN');
+        mockUseCurrentUser.mockReturnValue({ username: 'admin.user' });
+        render(<CasePage />);
+        await screen.findByText('Alpha Fraud');
+        expect(screen.queryByRole('button', { name: 'Edit Case' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Upload Evidence' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
+        expect(within(screen.getByText('Screenshot.png').closest('div.relative')!).getByRole('button')).toBeInTheDocument();
+    });
+    //reviewed for new permissions
+    it('hides all management controls for an investigator who does not own the case', async () => {
+        mockUseUserRole.mockReturnValue('INVESTIGATOR');
+        mockUseCurrentUser.mockReturnValue({ username: 'someone.else' });
         render(<CasePage />);
         await screen.findByText('Alpha Fraud');
         expect(screen.queryByRole('button', { name: 'Edit Case' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Upload Evidence' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Close Case' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: '' })).not.toBeInTheDocument();
-    });
-
-    it('hides the edit button for an investigator who does not own the case but keeps upload/close', async () => {
-        mockUseCurrentUser.mockReturnValue({ username: 'someone.else' });//potentially need to review this because permissions are weird
-        render(<CasePage />);
-        await screen.findByText('Alpha Fraud');
-        expect(screen.queryByRole('button', { name: 'Edit Case' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Upload Evidence' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     });
 
     it('shows an error message when the case fails to load', async () => {

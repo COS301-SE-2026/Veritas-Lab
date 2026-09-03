@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 #this may need to be revised upon
-from app.training.metrics import evaluate_model
+from app.training.image.metrics import evaluate_model
 
 class FixedOutputModel(nn.Module):
     def __init__(self, logits: list[float]):

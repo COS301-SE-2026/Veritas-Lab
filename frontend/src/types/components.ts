@@ -60,6 +60,11 @@ export type DashboardModalProps = {
     onCreated?: () => void;
 };
 
+export type ResetPasswordModalProps = {
+    isOpen: boolean;
+    onClose: () => void;
+};
+
 export type DashboardBarProps = {
     searchValue?: string;
     onSearchChange?: (value: string) => void;

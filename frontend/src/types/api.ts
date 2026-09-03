@@ -16,6 +16,11 @@ export type RegisterResponse = {
     message: string;
 };
 
+export type ChangePasswordResponse = {
+    status: 'success' | 'error';
+    message: string;
+};
+
 export type DashboardCase = {
     caseId: string;
     caseReviews: Record<string, unknown> | null;

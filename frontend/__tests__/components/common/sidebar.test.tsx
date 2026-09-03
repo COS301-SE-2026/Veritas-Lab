@@ -24,6 +24,17 @@ jest.mock('../../../src/lib/hooks/useLogOut', () => ({
 		logOut: mockLogOut,
 	}),
 }));
+//mock for resetpassword
+jest.mock('../../../src/components/common/resetPasswordModal', () => ({
+	__esModule: true,
+	default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+		isOpen ? (
+			<div data-testid="reset-password-modal">
+				<button onClick={onClose}>Close</button>
+			</div>
+		) : null
+	),
+}));
 //
 describe('Sidebar', () => {
 	beforeEach(() => {
@@ -62,5 +73,24 @@ describe('Sidebar', () => {
 		expect(screen.getByText('Veritas Lab')).toBeInTheDocument();
 		fireEvent.click(screen.getAllByRole('button')[0]);
 		expect(screen.queryByText('Veritas Lab')).not.toBeInTheDocument();
+	});
+	//reset password tests:
+	it('does not render the reset password modal by default', () => {
+		renderWithWrapper();
+		expect(screen.queryByTestId('reset-password-modal')).not.toBeInTheDocument();
+	});
+
+	it('opens the reset password modal when the settings button is clicked', () => {
+		renderWithWrapper();
+		fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+		expect(screen.getByTestId('reset-password-modal')).toBeInTheDocument();
+	});
+
+	it('closes the reset password modal when onClose is called', () => {
+		renderWithWrapper();
+		fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+		expect(screen.getByTestId('reset-password-modal')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+		expect(screen.queryByTestId('reset-password-modal')).not.toBeInTheDocument();
 	});
 });
