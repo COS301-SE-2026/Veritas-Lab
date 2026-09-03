@@ -19,7 +19,7 @@ def make_checkpoint(num_frames=2, zones=2, temporal_hidden_dim=4, classifier_hid
 
 @patch("app.training.video.analyser.AutoModelForAudioClassification.from_pretrained")
 @patch("app.training.video.analyser.AutoFeatureExtractor.from_pretrained")
-def test_audio_classifier_initialisation(mock_feature_extractor_from_pretrained, mock_model_from_pretrained):
+def test_audio_classifier_initialises(mock_feature_extractor_from_pretrained, mock_model_from_pretrained):
     mock_model = MagicMock()
     mock_model.to.return_value = mock_model
     mock_model_from_pretrained.return_value = mock_model
@@ -32,9 +32,9 @@ def test_audio_classifier_initialisation(mock_feature_extractor_from_pretrained,
     assert classifier.device == torch.device("cpu")
 
 @patch("app.training.video.analyser.librosa.load")
-@patch("app.training.video.analyser.AutoForAudioClassification.from_pretrained")
+@patch("app.training.video.analyser.AutoModelForAudioClassification.from_pretrained")
 @patch("app.training.video.analyser.AutoFeatureExtractor.from_pretrained")
-def test_audio_classifier_predict(mock_feature_extractor_from_pretrained, mock_model_from_pretrained, mock_librosa_load):
+def test_audio_classifier_predict_weight_average(mock_feature_extractor_from_pretrained, mock_model_from_pretrained, mock_librosa_load):
     mock_model = MagicMock()
     mock_model.to.return_value = mock_model
     mock_model_from_pretrained.return_value = mock_model
@@ -47,13 +47,46 @@ def test_audio_classifier_predict(mock_feature_extractor_from_pretrained, mock_m
     mock_librosa_load.return_value = (np.zeros(6, dtype=np.float32), 4)
 
     output1 = MagicMock()
-    output1.logits = torch.tensor()
+    output1.logits = torch.tensor([[math.log(0.2), math.log(0.8)]])
 
-    # Mock the model's forward pass to return logits
-    mock_model.return_value = torch.tensor([[0.1, 0.9]])
+    output2 = MagicMock()
+    output2.logits = torch.tensor([[math.log(0.8), math.log(0.2)]])
 
-    result = classifier.predict("fake/audio/path")
+    mock_model.side_effect = [output1, output2]
 
-    mock_librosa_load.assert_called_once_with("fake/audio/path", sr=16000, mono=True)
-    mock_feature_extractor.assert_called()
-    mock_model.assert_called()
+    classifier = ai_audio_classifier(model_path="fake/path", sample_rate=4, duration_seconds=1)
+    result = classifier.predict("audio.wav")
+
+    assert result["available"] is True
+    assert result["prediction"] == "AI-generated"
+    assert result["ai_probability"] == pytest.approx(0.6)
+    assert result["authentic_probability"] == pytest.approx(0.4)
+    assert result["confidence"] == pytest.approx(0.6)
+
+@patch("app.training.video.analyser.librosa.load")
+@patch("app.training.video.analyser.AutoModelForAudioClassification.from_pretrained")
+@patch("app.training.video.analyser.AutoFeatureExtractor.from_pretrained")
+def test_audio_classifier_predict_authentic(
+    mock_feature_extractor_from_pretrained,
+    mock_model_from_pretrained,
+    mock_librosa_load
+):
+    mock_model = MagicMock()
+    mock_model.to.return_value = mock_model
+    mock_model_from_pretrained.return_value = mock_model
+
+    mock_feature_extractor = MagicMock()
+    mock_feature_extractor.return_value = {"input_values": torch.zeros((1, 4))}
+    mock_feature_extractor_from_pretrained.return_value = mock_feature_extractor
+
+    mock_librosa_load.return_value = (np.zeros(4, dtype=np.float32), 4)
+
+    output = MagicMock()
+    output.logits = torch.tensor([[math.log(0.9), math.log(0.1)]])
+    mock_model.return_value = output
+
+    classifier = ai_audio_classifier(model_path="fake/path", sample_rate=4, duration_seconds=1)
+    result = classifier.predict("audio.wav")
+
+    assert result["prediction"] is "Authentic"
+    assert result["confidence"] == pytest.approx(0.9)
