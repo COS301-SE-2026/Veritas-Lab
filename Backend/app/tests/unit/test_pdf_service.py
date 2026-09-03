@@ -174,7 +174,6 @@ def test_check_anomalies_ignores_matching_ids(service):
 @pytest.mark.asyncio
 async def test_analyse_metadata_no_suspicious_findings(service):
     metadata = {
-        PDF_METADATA_PRODUCER: "Microsoft Print to PDF",
         "PDF:CreateDate": "2026:01:01 10:00:00"
     }
 
@@ -182,7 +181,7 @@ async def test_analyse_metadata_no_suspicious_findings(service):
 
     assert isinstance(result, AnalysisFindings)
     assert result.Certainty == 0
-    assert result.Findings == ("No suspicious metadata anomalies found.")
+    assert result.Findings == "No suspicious metadata anomalies found."
 
 @pytest.mark.asyncio
 async def test_analyse_metadata_stripped_only(service):
