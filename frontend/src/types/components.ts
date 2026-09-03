@@ -11,6 +11,8 @@ export type CaseCardProps = {
     caseId?: string;
     canDelete?: boolean;
     onDeleted?: () => void | Promise<void>;
+    riskScore?: number | null;
+    evidenceCount?: number;
 };
 export type CaseEditButtonProps = {
     caseId: string;

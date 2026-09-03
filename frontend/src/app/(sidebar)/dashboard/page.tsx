@@ -8,6 +8,7 @@ import DashboardCards from '@/components/common/dashboardCards';
 import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
 import { useUserRole, useCurrentUser } from '@/context/UserRoleContext';
 import Label from '@/components/ui/label';
+import useCaseRiskScores from '@/lib/hooks/useCaseRiskScores';
 //type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 
 export default function Dashboard() {
@@ -28,7 +29,7 @@ export default function Dashboard() {
         isLoading,
         error,
     } = useCaseDashboard({ initialRole: userRole });
-    
+    const riskScores = useCaseRiskScores(allCases);
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
 
@@ -73,6 +74,7 @@ export default function Dashboard() {
                     ) : (
                         visibleCases.map((item) => {
                             const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' && item.caseCreator === currentUser?.username);
+                            const risk = riskScores.find((score) => score.caseId === item.caseId);
                             return (
                                 <CaseCard
                                     key={item.caseId}
@@ -83,6 +85,8 @@ export default function Dashboard() {
                                     caseId={item.caseId}
                                     canDelete={canDeleteCase}
                                     onDeleted={refreshCases}
+                                    riskScore={risk?.average}
+                                    evidenceCount={risk?.count}
                                 />
                             );
                         })
