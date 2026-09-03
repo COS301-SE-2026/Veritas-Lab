@@ -85,6 +85,19 @@ export type AuditEvents = {
     action: string;
 }
 
+// export type AuditLogResponse = {
+//     auditLogs: AuditTimelineResponse[];
+// }
+
 export type AuditLogResponse = {
-    auditLogs: AuditTimelineResponse[];
+    status: string;
+    cases: AuditLogCase[];
+}
+
+export type AuditLogCase = {
+    caseId: string;
+    caseName: string;
+    eventCount: number;
+    lastEventTimestamp: string;
+    caseExists: boolean;
 }
