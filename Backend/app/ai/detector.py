@@ -65,15 +65,11 @@ class AIPDFDetector:
 
         result = explain_pdf(pdf_path, str(self.model_path))
 
-        confidence = (
-            result["ai_probability"]
-            if result["prediction"] == "AI-generated"
-            else 1.0 - result["ai_probability"]
-        )
+        ai_probability = result["ai_probability"]
 
-        if confidence >= 0.80:
+        if ai_probability >= 0.80:
             risk_level = 3
-        elif confidence >= 0.60:
+        elif ai_probability >= 0.60:
             risk_level = 2
         else:
             risk_level = 1
@@ -89,15 +85,11 @@ class AIVideoDetector:
         video_path = Path(video_path)
         result = await self.model.analyse(video_path)
 
-        confidence = (
-            result["ai_probability"]
-            if result["prediction"] == "AI-generated"
-            else result["authentic_probability"]
-        )
+        ai_probability = result["ai_probability"]
 
-        if confidence >= 0.80:
+        if ai_probability >= 0.80:
             risk_level = 3
-        elif confidence >= 0.60:
+        elif ai_probability >= 0.60:
             risk_level = 2
         else:
             risk_level = 1
