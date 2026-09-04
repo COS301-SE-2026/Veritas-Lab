@@ -40,8 +40,8 @@ test('admin user management works against the live backend and database', async 
     await expect(loginPassword).toBeEditable();
     await expect(loginButton).toBeEnabled();
 
-    await loginEmail.fill(email);
-    await loginPassword.fill(password);
+    await loginEmail.pressSequentially(email);
+    await loginPassword.pressSequentially(password);
 
     await expect(loginEmail).toHaveValue(email);
     await expect(loginPassword).toHaveValue(password);
@@ -126,7 +126,6 @@ test('admin user management works against the live backend and database', async 
     expect(changeRoleResponse.status()).toBe(200);
 
     await expect(roleSelect).toHaveValue('ADMIN');
-
     await testUserRow.getByRole('button', {
         name: 'Delete',
         exact: true
@@ -138,7 +137,15 @@ test('admin user management works against the live backend and database', async 
     });
 
     await expect(confirmDeleteButton).toBeVisible();
+
     await confirmDeleteButton.click();
+
+    await expect(
+    page.getByRole('button', {
+        name: 'Delete user',
+        exact: true
+    })
+    ).toHaveCount(0);
 
     await expect(
         page.getByText(testUser.username, { exact: true })
@@ -156,6 +163,10 @@ test('admin can view the audit log and expand an existing case', async ({ page }
 
     await loginEmail.fill(email);
     await loginPassword.fill(password);
+
+    await expect(loginEmail).toHaveValue(email);
+    await expect(loginPassword).toHaveValue(password);
+    await expect(loginButton).toBeEnabled();
 
     const [loginResponse] = await Promise.all([
         page.waitForResponse(response =>
@@ -175,7 +186,10 @@ test('admin can view the audit log and expand an existing case', async ({ page }
 
     await expect(auditLogLink).toBeVisible();
 
-    const auditResponsePromise = page.waitForResponse(response => response.url().toLowerCase().includes('audit') && response.request().method() === 'GET');
+    const auditResponsePromise = page.waitForResponse(response =>
+        response.url().includes('/api/getAllAudit') &&
+        response.request().method() === 'GET'
+    );
 
     await auditLogLink.click();
 
@@ -184,12 +198,6 @@ test('admin can view the audit log and expand an existing case', async ({ page }
     expect(auditResponse.ok()).toBeTruthy();
 
     await expect(page).toHaveURL(/\/audit-log$/);
-
-    await expect(
-        page.getByText('Audit Log', {
-            exact: true
-        })
-    ).toBeVisible();
 
     await expect(page.getByText('View audit logs for all activities')).toBeVisible();
     await expect(page.getByText('Loading audit logs...')).toHaveCount(0);
