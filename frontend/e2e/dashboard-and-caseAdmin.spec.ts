@@ -40,8 +40,8 @@ test('admin user management works against the live backend and database', async 
     await expect(loginPassword).toBeEditable();
     await expect(loginButton).toBeEnabled();
 
-    await loginEmail.fill(email);
-    await loginPassword.fill(password);
+    await loginEmail.pressSequentially(email);
+    await loginPassword.pressSequentially(password);
 
     await expect(loginEmail).toHaveValue(email);
     await expect(loginPassword).toHaveValue(password);
@@ -126,7 +126,6 @@ test('admin user management works against the live backend and database', async 
     expect(changeRoleResponse.status()).toBe(200);
 
     await expect(roleSelect).toHaveValue('ADMIN');
-
     await testUserRow.getByRole('button', {
         name: 'Delete',
         exact: true
@@ -138,9 +137,108 @@ test('admin user management works against the live backend and database', async 
     });
 
     await expect(confirmDeleteButton).toBeVisible();
+
     await confirmDeleteButton.click();
+
+    await expect(
+    page.getByRole('button', {
+        name: 'Delete user',
+        exact: true
+    })
+    ).toHaveCount(0);
 
     await expect(
         page.getByText(testUser.username, { exact: true })
     ).toHaveCount(0);
+});
+//audit log which is only virewable to admins.
+test('admin can view the audit log and expand an existing case', async ({ page }) => {
+    const { email, password } = getAdminCredentials();
+
+    await page.goto('/login', {waitUntil: 'domcontentloaded'});
+
+    const loginEmail = page.getByLabel('Email');
+    const loginPassword = page.getByLabel('Password');
+    const loginButton = page.getByRole('button', {name: 'Login', exact: true});
+
+    await loginEmail.fill(email);
+    await loginPassword.fill(password);
+
+    await expect(loginEmail).toHaveValue(email);
+    await expect(loginPassword).toHaveValue(password);
+    await expect(loginButton).toBeEnabled();
+
+    const [loginResponse] = await Promise.all([
+        page.waitForResponse(response =>
+            response.url().includes('/api/login') &&
+            response.request().method() === 'POST'
+        ),
+        loginButton.click()
+    ]);
+
+    expect(loginResponse.status()).toBe(200);
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    const auditLogLink = page.getByRole('link', {
+        name: 'Audit Logs',
+        exact: true
+    });
+
+    await expect(auditLogLink).toBeVisible();
+
+    const auditResponsePromise = page.waitForResponse(response =>
+        response.url().includes('/api/getAllAudit') &&
+        response.request().method() === 'GET'
+    );
+
+    await auditLogLink.click();
+
+    const auditResponse = await auditResponsePromise;
+
+    expect(auditResponse.ok()).toBeTruthy();
+
+    await expect(page).toHaveURL(/\/audit-log$/);
+
+    await expect(page.getByText('View audit logs for all activities')).toBeVisible();
+    await expect(page.getByText('Loading audit logs...')).toHaveCount(0);
+    await expect(page.getByText('No audit logs found')).toHaveCount(0);
+
+    const caseNames = page.locator('div.rounded-\\[21px\\]');
+
+    await expect(caseNames.first()).toBeVisible();
+
+    const firstCaseButton = caseNames.first().getByRole('button');
+
+    await expect(firstCaseButton).toBeVisible();
+    await firstCaseButton.click();
+
+    await expect(
+        page.getByText('Case ID:', {
+            exact: false
+        }).first()
+    ).toBeVisible();
+
+    await expect(
+        page.getByText('Case Name:', {
+            exact: false
+        }).first()
+    ).toBeVisible();
+
+    await expect(
+        page.getByText('Events:', {
+            exact: false
+        }).first()
+    ).toBeVisible();
+
+    await expect(
+        page.getByText('Last Event:', {
+            exact: false
+        }).first()
+    ).toBeVisible();
+
+    await expect(
+        page.getByText('Exists:', {
+            exact: false
+        }).first()
+    ).toBeVisible();
 });

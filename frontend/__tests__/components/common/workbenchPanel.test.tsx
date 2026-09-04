@@ -117,26 +117,26 @@ describe('WorkbenchPanel', () => {
         expect(await screen.findByText('network error')).toBeInTheDocument();
     });
 
-    it('renders the View side by side tool button', () => {
+    it('renders the View Metadata Comparison tool button', () => {
         renderPanel();
-        expect(screen.getByText('View side by side')).toBeInTheDocument();
+        expect(screen.getByText('View Metadata Comparison')).toBeInTheDocument();
     });
 
     it('calls onSelectWorkbenchTool with Compare when clicked while inactive', () => {
         const props = renderPanel({ activeWorkbenchTool: null });
-        fireEvent.click(screen.getByText('View side by side'));
+        fireEvent.click(screen.getByText('View Metadata Comparison'));
         expect(props.onSelectWorkbenchTool).toHaveBeenCalledWith('Compare');
     });
 
     it('calls onSelectWorkbenchTool with null when Compare is clicked while already active', () => {
         const props = renderPanel({ activeWorkbenchTool: 'Compare' });
-        fireEvent.click(screen.getByText('View side by side'));
+        fireEvent.click(screen.getByText('View Metadata Comparison'));
         expect(props.onSelectWorkbenchTool).toHaveBeenCalledWith(null);
     });
 
     it('marks the Compare button as pressed only when Compare is the active tool', () => {
         renderPanel({ activeWorkbenchTool: 'Compare' });
-        expect(screen.getByText('View side by side').closest('button')).toHaveAttribute(
+        expect(screen.getByText('View Metadata Comparison').closest('button')).toHaveAttribute(
             'aria-pressed',
             'true'
         );

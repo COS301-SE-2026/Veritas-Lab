@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import MetadataComparison from '@/components/common/workbenchSideBySide';
+import MetadataComparison from '@/components/common/workbenchMetadataComp';
 
 jest.mock('lucide-react', () => ({
     __esModule: true,
@@ -12,10 +12,12 @@ jest.mock('@/lib/data/referenceMetadata', () => ({
     badExampleData: {
         image: { 'JUMBF:ActionsSoftwareAgentName': 'mock-agent' },
         pdf: { 'PDF:Producer': 'Mock Producer' },
+        video: { 'JUMBF:ActionsSoftwareAgentName': 'mock-video-agent' },
     },
     exampleLabels: {
         image: 'Known bad example (image)',
-        pdf: 'Known bad example (PDF)',
+        pdf: 'Known bad example (metadata stripped pdf)',
+        video: 'Known bad example (video)',
     },
 }));
 
@@ -31,7 +33,7 @@ describe('MetadataComparison', () => {
         expect(
             screen.getByText("Metadata comparison isnt available for this file type.")
         ).toBeInTheDocument();
-        expect(screen.queryByText('Metadata side-by-side')).not.toBeInTheDocument();
+        expect(screen.queryByText('Metadata comparison')).not.toBeInTheDocument();
     });
 
     it('reads metadata out of the nested reportArtifacts.metadata field, not the envelope', () => {
@@ -63,9 +65,15 @@ describe('MetadataComparison', () => {
 
     it('renders the static example metadata for a PDF, not the image example', () => {
         render(<MetadataComparison mediaKind="pdf" mediaName="evidence.pdf" reportArtifacts={null} />);
-        expect(screen.getByText('Known bad example (PDF)')).toBeInTheDocument();
+        expect(screen.getByText('Known bad example (metadata stripped pdf)')).toBeInTheDocument();
         expect(screen.getByText('PDF:Producer')).toBeInTheDocument();
         expect(screen.queryByText('JUMBF:ActionsSoftwareAgentName')).not.toBeInTheDocument();
+    });
+
+    it('renders the static example metadata for a video, not the image or pdf example', () => {
+        render(<MetadataComparison mediaKind="video" mediaName="evidence.mp4" reportArtifacts={null} />);
+        expect(screen.getByText('Known bad example (video)')).toBeInTheDocument();
+        expect(screen.getByText('mock-video-agent')).toBeInTheDocument();
     });
 
     it('shows a placeholder when there is no real metadata yet', () => {
@@ -167,6 +175,67 @@ describe('MetadataComparison', () => {
             render(<MetadataComparison mediaKind="pdf" mediaName="evidence.pdf" reportArtifacts={{ metadata }} />);
             const realColumn = getColumn('evidence.pdf');
             expect(realColumn.querySelectorAll('dt')).toHaveLength(30);
+        });
+    });
+    //metadata tests
+    describe('video metadata extraction', () => {
+        it('shows all metadata unfiltered when there is no agent/claim-generator signal', () => {
+            render(
+                <MetadataComparison
+                    mediaKind="video"
+                    mediaName="evidence.mp4"
+                    reportArtifacts={{
+                        metadata: {
+                            'JUMBF:Hash': '(Binary data 32 bytes, use -b option to extract)',
+                            'File:FileName': 'evidence.mp4',
+                        },
+                    }}
+                />
+            );
+            const realColumn = getColumn('evidence.mp4');
+            expect(within(realColumn).getByText('JUMBF:Hash')).toBeInTheDocument();
+            expect(within(realColumn).getByText('File:FileName')).toBeInTheDocument();
+        });
+        it('surfaces agent/claim-generator JUMBF keys first and drops other JUMBF noise', () => {
+            render(
+                <MetadataComparison
+                    mediaKind="video"
+                    mediaName="evidence.mp4"
+                    reportArtifacts={{
+                        metadata: {
+                            'JUMBF:Hash': '(Binary data 32 bytes, use -b option to extract)',
+                            'JUMBF:ActionsAction': ['c2pa.opened'],
+                            'File:FileName': 'evidence.mp4',
+                            'JUMBF:ActionsSoftwareAgentName': 'Claude',
+                            'JUMBF:Claim_Generator_InfoName': 'Anthropic Files',
+                        },
+                    }}
+                />
+            );
+            const realColumn = getColumn('evidence.mp4');
+            expect(within(realColumn).getByText('JUMBF:ActionsSoftwareAgentName')).toBeInTheDocument();
+            expect(within(realColumn).getByText('JUMBF:Claim_Generator_InfoName')).toBeInTheDocument();
+            expect(within(realColumn).getByText('File:FileName')).toBeInTheDocument();
+            expect(within(realColumn).queryByText('JUMBF:Hash')).not.toBeInTheDocument();
+            expect(within(realColumn).queryByText('JUMBF:ActionsAction')).not.toBeInTheDocument();
+            const keyOrder = Array.from(realColumn.querySelectorAll('dt')).map((el) => el.textContent);
+            expect(keyOrder.indexOf('JUMBF:ActionsSoftwareAgentName')).toBeLessThan(
+                keyOrder.indexOf('File:FileName')
+            );
+        });
+        it('caps the displayed entries at 25 once a flag is raised', () => {
+            const metadata: Record<string, unknown> = {
+                'JUMBF:Claim_Generator_InfoName': 'Claude',
+            };
+            for (let i = 0; i < 30; i += 1) {
+                metadata[`File:Key${i}`] = `value-${i}`;
+            }
+            render(<MetadataComparison mediaKind="video" mediaName="evidence.mp4" reportArtifacts={{ metadata }} />);
+            const realColumn = getColumn('evidence.mp4');
+            expect(realColumn.querySelectorAll('dt')).toHaveLength(25);
+            expect(within(realColumn).getByText('JUMBF:Claim_Generator_InfoName')).toBeInTheDocument();
+            expect(within(realColumn).getByText('File:Key0')).toBeInTheDocument();
+            expect(within(realColumn).queryByText('File:Key29')).not.toBeInTheDocument();
         });
     });
 });

@@ -14,7 +14,7 @@ import CaseEditButton from "@/components/common/caseEditButton";
 import Label from "@/components/ui/label";
 import AuditTimeline from "@/components/common/auditTimeline";
 
-const TABS = ['Evidence', 'Comments', 'Audit Log'] as const;
+const TABS = ['Evidence', 'Comments', 'Audit Timeline'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -151,7 +151,7 @@ export default function CasePage() {
                                 initialComments={caseComments}
                                 currentUsername={currentUser?.username ?? ''}
                             />
-                        ) : activeTab === 'Audit Log' ? (
+                        ) : activeTab === 'Audit Timeline' ? (
                             <AuditTimeline caseId={id} />
                         ) : (
                             <div className="rounded-[28px] border border-dashed border-[var(--color-light)]/30 bg-white p-10 text-center text-sm text-[var(--color-light)]">

@@ -70,7 +70,7 @@ export default function WorkbenchPanel({
                     }`}
             >
                 <Columns2 size={16} className="shrink-0" />
-                View side by side
+                View Metadata Comparison
             </button>
 
             {/* Annotation controls only exist while the Annotations tool is active */}
