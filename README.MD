@@ -1,13 +1,22 @@
-<h1 align="center" style="border: none; padding: 0"> Veritas Lab </h1>
-<h4 align="center" style="none; margin: 0"> in partnership with Naked Insurance </h5>
-<h1></h1>
+<p align="center">
+  <img src="frontend/public/VL_Banner.svg" alt="Veritas Lab Banner" width="600"/>
+</p>
+<br>
+<h4 align="center" style="none; margin: 0"> in partnership with Naked Insurance </h4>
+<br>
 
 <div align="center">
 
-[![Main CI](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml)
-[![Main CD](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CD.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CD.yml)
-[![Availability check](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml/badge.svg)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml)
-![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritaslab.app)
+[![Main CI](https://img.shields.io/github/actions/workflow/status/COS301-SE-2026/Veritas-Lab/Main-CI.yml?branch=main&style=for-the-badge&logo=githubactions&label=Main%20CI)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml)
+[![Main CD](https://img.shields.io/github/actions/workflow/status/COS301-SE-2026/Veritas-Lab/Main-CD.yml?branch=main&style=for-the-badge&logo=githubactions&label=Main%20CD)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CD.yml)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/COS301-SE-2026/Veritas-Lab/Main-CI.yml?branch=main&style=for-the-badge&logo=githubactions&label=Deploy)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/Main-CI.yml)
+[![Availability check](https://img.shields.io/github/actions/workflow/status/COS301-SE-2026/Veritas-Lab/availability.yml?branch=main&style=for-the-badge&logo=githubactions&label=Availability)](https://github.com/COS301-SE-2026/Veritas-Lab/actions/workflows/availability.yml)
+![Website](https://img.shields.io/website?url=https%3A%2F%2Fveritaslab.app&style=for-the-badge&logo=googlechrome&logoColor=white&label=Website&up_message=online&up_color=3FB950&down_message=offline&down_color=F85149)
+[![Codecov](https://img.shields.io/codecov/c/gh/COS301-SE-2026/Veritas-Lab/main?style=for-the-badge&logo=codecov&label=Coverage&color=F01F7A)](https://codecov.io/gh/COS301-SE-2026/Veritas-Lab)
+[![Open Issues](https://img.shields.io/github/issues/COS301-SE-2026/Veritas-Lab?style=for-the-badge&color=F0883E&label=Open%20Issues)](https://github.com/COS301-SE-2026/Veritas-Lab/issues)
+[![Closed Issues](https://img.shields.io/github/issues-closed/COS301-SE-2026/Veritas-Lab?style=for-the-badge&color=A371F7&label=Closed%20Issues)](https://github.com/COS301-SE-2026/Veritas-Lab/issues?q=is%3Aissue+is%3Aclosed)
+
+
 
 </div>
 
@@ -48,6 +57,16 @@ Demo 2
 |[Coding Standard Document](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Coding-Standards-Demo2)| Coding Standard Doc|
 |[User Manual](Docs/Demo_2/User-Manual-Veritas-Lab.pdf)| The user manual|
 |[Testing Policy](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Testing-Policy-Document-Demo-2)| Testing Policy Doc|'
+
+Demo 3
+
+| Resources | Description |
+|-----------|-------------|
+|[SRS Use Case Diagram](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Use-Case-Diagrams-Demo-3)| Updated use case diagram|
+|[SAS Deployment Diagram](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/Deployment-Demo-3)| Updated deployment diagram|
+|[SAS Service Contracts](https://veritaslab.app/api/docs)| Service contracts |
+|[SAS NFR Testing](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/NFR-Testing-Demo-3)| NFR Testing|
+|[SAS NFR Traceability Matrix](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/NFR-Traceability-Matrix-Demo-3)| NFR Traceability Matrix|
 
 </div>
 </div>
