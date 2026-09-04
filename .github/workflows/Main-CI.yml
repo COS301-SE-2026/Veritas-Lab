@@ -67,7 +67,11 @@ jobs:
                   AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
               run: |
                   cd Backend
-                  python -m pytest app/tests/unit --asyncio-mode=auto --cov=app
+                  python -m pytest app/tests/unit --asyncio-mode=auto --cov=app --cov-report=xml
+            - name: Upload results to Codecov
+              uses: codecov/codecov-action@v5
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }}
 
     frontend-unit-tests:
         runs-on: ubuntu-latest
@@ -88,7 +92,11 @@ jobs:
             - name: run Jest
               run: |
                   cd frontend
-                  npx jest "__tests__/components" "__tests__/hooks"
+                  npx jest "__tests__/components" "__tests__/hooks" --coverage
+            - name: Upload results to Codecov
+              uses: codecov/codecov-action@v5
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }}
 
     backend-integration-tests:
         needs:
@@ -194,7 +202,11 @@ jobs:
                   AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
               run: |
                   cd Backend
-                  python -m pytest app/tests/integration --asyncio-mode=auto --cov=app
+                  python -m pytest app/tests/integration --asyncio-mode=auto --cov=app --cov-report=xml
+            - name: Upload results to Codecov
+              uses: codecov/codecov-action@v5
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }}
 
             - name: cleaner
               env:
@@ -258,7 +270,11 @@ jobs:
             - name: run Jest
               run: |
                   cd frontend
-                  npx jest "__tests__/integration"
+                  npx jest "__tests__/integration" --coverage
+            - name: Upload results to Codecov
+              uses: codecov/codecov-action@v5
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }}
 
     e2e-tests:
         runs-on: ubuntu-latest
