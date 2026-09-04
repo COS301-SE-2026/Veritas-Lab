@@ -391,7 +391,7 @@ jobs:
                   E2E_USER_NAME: ${{ secrets.E2E_USER_NAME }}
               run: |
                   cd frontend
-                  npx playwright test --project=chromium --project=firefox
+                  npx playwright test --project=chromium --project=firefox --workers=1
  
             #shut down services and remove volumes after the run
             - name: Remover
