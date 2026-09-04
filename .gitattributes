@@ -1,0 +1,2 @@
+*.safetensors filter=lfs diff=lfs merge=lfs -text
+Backend/app/ai/best_video_model.pt filter=lfs diff=lfs merge=lfs -text

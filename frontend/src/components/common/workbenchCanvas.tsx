@@ -9,6 +9,11 @@ const WorkbenchPdf = dynamic(() => import('@/components/common/workbenchPdf'), {
     loading: () => <p className="text-sm text-(--color-light)">Loading viewer…</p>,
 });
 
+const WorkbenchVideo = dynamic(() => import('@/components/common/workbenchVideo'), {
+    ssr: false,
+    loading: () => <p className="text-sm text-(--color-light)">Loading video...</p>,
+});
+
 const TOOL_HINTS: Record<AnnotationTool, string> = {
     Select: 'Click an annotation to view its details.',
     Draw: 'Click and drag to circle the area you want to flag.',
@@ -26,6 +31,7 @@ export default function WorkbenchCanvas({
     onSelectAnnotation,
     onAddShape,
     onAddNote,
+    video
 }: Readonly<WorkbenchCanvasProps>) {
     const sharedLayerProps = { active, activeTool, annotations, selectedId, onSelectAnnotation, onAddShape, onAddNote };
 
@@ -46,6 +52,9 @@ export default function WorkbenchCanvas({
         );
     } else if (mediaUrl && mediaKind === 'pdf') {
         media = <WorkbenchPdf url={mediaUrl} mediaName={mediaName} {...sharedLayerProps} />;
+
+    } else if (mediaUrl && mediaKind === 'video') {
+        media = <WorkbenchVideo mediaUrl={mediaUrl} mediaName={mediaName} video={video} {...sharedLayerProps} />;
     } else {
         media = (
             <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-2xl border border-(--color-light) bg-black/5 text-(--color-light)">

@@ -10,7 +10,7 @@ class ImageService(MediaService):
     def __init__(self) -> None:
         self.detector = AIImageDetector()
     
-    def _is_stripped(self, metadata: dict) -> bool:
+    def is_stripped(self, metadata: dict) -> bool:
         return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
 
     def check_firmware(self,val_lower: str, dev_model:str, dev_make:str ) -> bool:
@@ -20,7 +20,7 @@ class ImageService(MediaService):
             any(char in val_lower for char in ["emui", "magicos", "android", "ios"])
         )
 
-    def _find_software_traces(self, metadata: dict) -> list[str]:
+    def find_software_traces(self, metadata: dict) -> list[str]:
         found = []
         known_editors = [
             "adobe", 
@@ -71,7 +71,7 @@ class ImageService(MediaService):
 
         return found
 
-    def _process_c2pa(self, metadata: dict) -> tuple[list[str], bool, bool]:
+    def process_c2pa(self, metadata: dict) -> tuple[list[str], bool, bool]:
         report_lines = []
         c2pa_keys = [k for k in metadata.keys() if k.startswith(("C2PA:", "JUMBF:"))]
         
@@ -95,11 +95,11 @@ class ImageService(MediaService):
         report_lines = []
         
 
-        stripped = self._is_stripped(metadata)
+        stripped = self.is_stripped(metadata)
         if stripped:
             analysis_findings.Certainty = 1
             
-        found = self._find_software_traces(metadata)
+        found = self.find_software_traces(metadata)
         if found:
             if stripped:
                 report_lines.append(FRAUD_MESSAGE)
@@ -111,7 +111,7 @@ class ImageService(MediaService):
             editor_confirmed = any("Confirmed" in line for line in found)
             analysis_findings.Certainty = max(analysis_findings.Certainty, 2 if editor_confirmed else 1)
             
-        c2pa_lines, has_c2pa, claims_found = self._process_c2pa(metadata)
+        c2pa_lines, has_c2pa, claims_found = self.process_c2pa(metadata)
         if has_c2pa:
             report_lines.extend(c2pa_lines)
             if not claims_found:

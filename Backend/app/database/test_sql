@@ -1,0 +1,89 @@
+INSERT INTO "Users_DB"."Users" (
+    UserEmail, 
+    UserName, 
+    UserRole, 
+    UserPassword
+) 
+VALUES (
+    'admin@example.com', 
+    'admin_user', 
+    'ADMIN', 
+    'hashed_password_123'
+);
+
+DO $$ 
+DECLARE 
+    v_user_id TEXT;
+BEGIN 
+    SELECT UserId::TEXT INTO v_user_id 
+    FROM "Users_DB"."Users" 
+    WHERE UserName = 'admin_user';
+    
+    PERFORM set_config('app.current_user_id', v_user_id, false);
+END $$;
+
+
+INSERT INTO "Cases_DB"."MediaType" (MediaName,MediaBucket, MediaExtension) VALUES
+('Portable Network Graphics','images', '.png'),
+('Joint Photographic Experts Group','images', '.jpeg'),
+('JPEG Image','images', '.jpg'),
+('Portable Document Format','pdf', '.pdf')
+ON CONFLICT (MediaName) DO NOTHING;
+
+-- Tests the triggers involving the audit table 
+INSERT INTO "Cases_DB"."MediaType" (MediaName, MediaBucket, MediaExtension) VALUES
+('Video','MP#','.mp#')
+ON CONFLICT (MediaName) DO NOTHING;
+
+UPDATE "Cases_DB"."MediaType" SET MediaBucket='MP3' WHERE MediaExtension='.mp#';
+
+DELETE FROM "Cases_DB"."MediaType" WHERE MediaExtension='.mp#';
+
+SELECT * FROM "Cases_DB"."Audit_MediaTypes";
+
+SELECT * FROM "Cases_DB"."Audit_MediaTypes";
+
+SELECT * FROM "Cases_DB"."Audit_Comments";
+
+INSERT INTO "Cases_DB"."Media" (MediaType, MediaHash, MediaAnnotations)
+VALUES (
+    (SELECT MediaTypeId FROM "Cases_DB"."MediaType" WHERE MediaExtension = '.png' LIMIT 1),
+    'f43c3933c0bd73c683b54407da5a90fb', 
+    '{"resolution": "1920x1080", "camera": "Canon EOS 90D"}'::JSONB
+) ON CONFLICT (MediaHash) DO NOTHING;
+
+UPDATE "Cases_DB"."Media" SET mediauploaddate= '2026-08-29 13:35:49.714705+00' WHERE  MediaHash = 'f43c3933c0bd73c683b54407da5a90fb';
+
+DELETE FROM "Cases_DB"."Media" WHERE MediaHash = 'f43c3933c0bd73c683b54407da5a90fb';
+
+SELECT * FROM "Cases_DB"."Audit_Media";
+
+WITH new_case AS (
+    INSERT INTO "Cases_DB"."Cases" (CaseName, CaseCreator, CaseDescription)
+    VALUES ('Operation Alpha', 'admin_user', 'Investigating a test anomaly.')
+    RETURNING CaseId
+)
+INSERT INTO "Cases_DB"."Comments" (CaseId, Username, Comment)
+SELECT CaseId, 'admin_user', 'This is a test comment to verify the audit trigger.'
+FROM new_case;
+
+UPDATE "Cases_DB"."Comments" SET Username = 'deleted_user' WHERE Comment = 'This is a test comment to verify the audit trigger.';
+
+DELETE FROM "Cases_DB"."Comments" 
+WHERE Comment = 'This is a test comment to verify the audit trigger.';
+
+SELECT * FROM "Cases_DB"."Audit_Comments";
+
+INSERT INTO "Cases_DB"."Cases" (CaseName, CaseCreator, CaseDescription)
+VALUES (
+    'Operation Bravo', 
+    'admin_user', 
+    'This case was created specifically to test the delete trigger.'
+);
+
+UPDATE "Cases_DB"."Cases" SET CaseDescription='This is a useless attribute to have on a case' WHERE CaseName = 'Operation Bravo';
+
+DELETE FROM "Cases_DB"."Cases" 
+WHERE CaseName = 'Operation Bravo';
+
+SELECT * FROM "Cases_DB"."Audit_Cases";

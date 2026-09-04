@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, FileText } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
-import MetadataComparison from '@/components/common/workbenchSideBySide';
+import MetadataComparison from '@/components/common/workbenchMetadataComp';
 import ReportModal from '@/components/common/reportModal';
 import Button from '@/components/ui/button';
 import useAnnotations from '@/lib/hooks/useAnnotations';
@@ -14,10 +14,11 @@ import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { getMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
-import type { WorkbenchTool } from '@/types/workbench';
+import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
+    const [error, setError] = useState<string | null>(null);
     const caseId = params.id;
     const evidenceId = params.evidenceId;
 
@@ -38,28 +39,47 @@ export default function WorkbenchPage() {
     // Which workbench tool is open. By default none are open
     const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool | null>(null);
 
+    const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
+    const video = useRef<HTMLVideoElement | null>(null);
+
+    const pickSelectedAnnotation = (id: string | null) => {
+        setSelectedId(id);
+        if (id === null) return;
+
+        const chosen = annotations.find((annotation) => annotation.id === id);
+        if(video.current && (chosen?.timeStamp !== undefined)) {
+            video.current.pause();
+            video.current.currentTime = chosen.timeStamp;
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
-
+        
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
                 const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
                 setEvidence(match);
-                loadAnnotations(match?.annotations ?? []);
             })
-            .catch((error) => console.error('Failed to load evidence media:', error));
+            .catch((error) => {
+                setError(error instanceof Error ? error.message : 'Failed to load evidence media');
+            });
 
         return () => {
             cancelled = true;
         };
-    }, [caseId, evidenceId, loadAnnotations]);
+    }, [caseId, evidenceId]);
 
+    if(evidence !== seededForm) {
+        setSeededForm(evidence);
+        loadAnnotations(evidence?.annotations ?? []);
+    }
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = getMediaKind(evidence?.mediaExtension);
+    const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind === 'video' ? 'unsupported' : mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
@@ -91,6 +111,7 @@ export default function WorkbenchPage() {
             <div className="mt-6 flex gap-6">
                 <div className="flex-1">
                     <WorkbenchCanvas
+                        video={video}
                         mediaUrl={mediaUrl}
                         mediaKind={mediaKind}
                         mediaName={mediaName}
@@ -98,14 +119,14 @@ export default function WorkbenchPage() {
                         activeTool={activeTool}
                         annotations={annotations}
                         selectedId={selectedId}
-                        onSelectAnnotation={setSelectedId}
+                        onSelectAnnotation={pickSelectedAnnotation}
                         onAddShape={addShape}
                         onAddNote={addNote}
                     />
 
                     {comparisonActive ? (
                         <MetadataComparison
-                            mediaKind={mediaKind}
+                            mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
                         />
@@ -119,7 +140,7 @@ export default function WorkbenchPage() {
                     onToolChange={setActiveTool}
                     annotations={annotations}
                     selectedId={selectedId}
-                    onSelectAnnotation={setSelectedId}
+                    onSelectAnnotation={pickSelectedAnnotation}
                     onRemoveAnnotation={removeAnnotation}
                     onClearAll={clearAll}
                     onSave={handleSave}

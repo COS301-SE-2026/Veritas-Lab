@@ -8,6 +8,30 @@ export type CaseCardProps = {
     caseDescription: string;
     caseStatus: 'Open' | 'Closed' | 'In Progress';
     href?: string;
+    caseId?: string;
+    canDelete?: boolean;
+    onDeleted?: () => void | Promise<void>;
+    riskScore?: number | null;
+    evidenceCount?: number;
+};
+export type CaseEditButtonProps = {
+    caseId: string;
+    initialName: string;
+    initialDescription: string;
+    onUpdated?: () => void | Promise<void>;
+    className?: string;
+};
+export type CaseDeleteButtonProps = {
+    caseId: string;
+    caseTitle: string;
+    onDeleted?: () => void | Promise<void>;
+};
+export type CommentEditButtonProps = {
+    caseId: string;
+    commentId: number;
+    initialComment: string;
+    onUpdated?: (commentId: number, newComment: string) => void | Promise<void>;
+    onDeleted?: (commentId: number) => void | Promise<void>;
 };
 
 export type DashboardCardsProps = {
@@ -19,12 +43,28 @@ export type EvidenceCardProps = {
     mediaUrl: string;
     mediaExtension: string;
     href?: string;
+    mediaId?: string;
+    caseId?: string;
+    canDelete?: boolean;
+    onDeleted?: () => void | Promise<void>;
+};
+//case evidence delete
+export type EvidenceDeleteButtonProps = {
+    caseId: string;
+    mediaId: string;
+    mediaName: string;
+    onDeleted?: () => void | Promise<void>;
 };
 
 export type DashboardModalProps = {
     isOpen: boolean;
     onClose: () => void;
     onCreated?: () => void;
+};
+
+export type ResetPasswordModalProps = {
+    isOpen: boolean;
+    onClose: () => void;
 };
 
 export type DashboardBarProps = {
@@ -119,7 +159,9 @@ export type InputProps = {
 };
 
 export type labelProps = {
-    text: string;
+    children?: ReactNode;
+    variant?: 'default' | 'error' | 'success' | 'info';
+    text: string | null;
     htmlFor: string;
     className?: string;
 };

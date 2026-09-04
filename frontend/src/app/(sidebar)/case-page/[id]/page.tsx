@@ -9,9 +9,12 @@ import MediaUploadModal from "@/components/common/mediaUploadModal";
 import CaseCloseButton from "@/components/common/caseCloseButton";
 import useCase from "@/lib/hooks/useCase";
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
-import CaseReviewsPanel from '@/components/common/caseReviewsPanel';
+import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
+import CaseEditButton from "@/components/common/caseEditButton";
+import Label from "@/components/ui/label";
+import AuditTimeline from "@/components/common/auditTimeline";
 
-const TABS = ['Evidence', 'Reviews'] as const;
+const TABS = ['Evidence', 'Comments', 'Audit Timeline'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -68,12 +71,14 @@ export default function CasePage() {
             setIsLoading(false);
         }
     };
-
+    //permissions reviewed and updated
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
-    const canUploadEvidence = userRole === 'INVESTIGATOR' && !caseDetails?.caseClosed;
-    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && !caseDetails.caseClosed;
+    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //creator
+    const canCloseCase = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //invest that is case owner or any admin
+    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //investigator that is owner or any admin
+    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //owner and not closed
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
@@ -90,14 +95,25 @@ export default function CasePage() {
                         <h1 className="text-2xl font-bold text-[var(--color-text)]">
                             {isLoading ? 'Loading case...' : caseDetails?.caseName ?? 'Case not found'}
                         </h1>
-                        <p className="text-[var(--color-light)] mt-2">
+                        <p className="text-[var(--color-light)] mt-2 mb-4">
                             {caseDetails?.caseDescription ?? 'No description available.'}
                         </p>
-                        {error ? <p className="text-sm text-red-500 mt-2">{error}</p> : null}
+                        {error ? <Label text={error} htmlFor="error" variant="error"/> : null}
                     </div>
-                    {canUploadEvidence ? (
-                        <div className="w-1/5 flex items-end justify-end">
-                            <Button variant="submit" className="py-4" text="Upload Evidence" onClick={openModal} disabled={!caseDetails} />
+                    {(canUploadEvidence || canEditCase) ? (
+                        <div className="w-1/5 flex items-end justify-end gap-2">
+                            {canEditCase ? (
+                                <CaseEditButton
+                                    caseId={id}
+                                    initialName={caseDetails?.caseName ?? ''}
+                                    initialDescription={caseDetails?.caseDescription ?? ''}
+                                    onUpdated={reloadCaseData}
+                                    className="py-4"
+                                />
+                            ) : null}
+                            {canUploadEvidence ? (
+                                <Button variant="submit" className="py-4" text="Upload Evidence" onClick={openModal} disabled={!caseDetails} />
+                            ) : null}
                         </div>
                     ) : null}
                 </div>
@@ -120,17 +136,23 @@ export default function CasePage() {
                                         mediaUrl={evidence.mediaUrl}
                                         mediaExtension={evidence.mediaExtension}
                                         href={`/case-page/${id}/workbench/${evidence.reportId}`}
+                                        mediaId={evidence.mediaId}
+                                        caseId={id}
+                                        canDelete={canDeleteEvidence}
+                                        onDeleted={reloadCaseData}
                                     />
                                 )) : (
                                     <p className="text-sm text-[var(--color-light)]">No evidence uploaded yet.</p>
                                 )}
                             </div>
-                        ) : activeTab === 'Reviews' ? (
-                            <CaseReviewsPanel
+                        ) : activeTab === 'Comments' ? (
+                            <CaseCommentsPanel
                                 caseId={id}
                                 initialComments={caseComments}
                                 currentUsername={currentUser?.username ?? ''}
                             />
+                        ) : activeTab === 'Audit Timeline' ? (
+                            <AuditTimeline caseId={id} />
                         ) : (
                             <div className="rounded-[28px] border border-dashed border-[var(--color-light)]/30 bg-white p-10 text-center text-sm text-[var(--color-light)]">
                                 {activeTab} is not available yet.

@@ -1,18 +1,20 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { getCookie } from '@/auth/cookie';
+import { useState } from 'react';
 import Button from '@/components/ui/button';
 import DashboardBar from '@/components/common/dashboardBar';
 import CaseCard from '@/components/common/caseCard';
 import DashboardModal from '@/components/common/dashboardModal';
 import DashboardCards from '@/components/common/dashboardCards';
 import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
-import { useUserRole } from '@/context/UserRoleContext';
+import { useUserRole, useCurrentUser } from '@/context/UserRoleContext';
+import Label from '@/components/ui/label';
+import useCaseRiskScores from '@/lib/hooks/useCaseRiskScores';
 //type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 
 export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const userRole = useUserRole();
+    const currentUser = useCurrentUser();
     const {
         searchQuery,
         setSearchQuery,
@@ -27,7 +29,7 @@ export default function Dashboard() {
         isLoading,
         error,
     } = useCaseDashboard({ initialRole: userRole });
-    
+    const riskScores = useCaseRiskScores(allCases);
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
 
@@ -40,7 +42,7 @@ export default function Dashboard() {
                     <div className="text-[16px] text-(--color-light)">Manage and Track Cases</div>
                 </div>
                 <div  className="justify-end flex items-center ">
-                    {showDashboardCards && (
+                    {showDashboardCards && userRole !== 'USER' && (
                         <div>
                             <Button variant="submit" onClick={openModal}>
                                 <div className="text-[16px] font-bold">New Case</div>
@@ -66,24 +68,33 @@ export default function Dashboard() {
                     {isLoading ? (
                         <div className="text-sm text-(--color-light)">Loading cases...</div>
                     ) : error ? (
-                        <div className="text-sm text-(--color-error)">{error}</div>
+                        <Label text={error} htmlFor="error" variant="error" />
                     ) : visibleCases.length === 0 ? (
                         <div className="text-sm text-(--color-light)">No cases found.</div>
                     ) : (
-                        visibleCases.map((item) => (
-                            <CaseCard
-                                key={item.caseId}
-                                caseTitle={item.caseName}
-                                caseDescription={`Created by ${item.caseCreator}`}
-                                caseStatus={item.caseClosed ? 'Closed' : 'Open'}
-                                href={`/case-page/${item.caseId}`}
-                            />
-                        ))
+                        visibleCases.map((item) => {
+                            const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' && item.caseCreator === currentUser?.username);
+                            const risk = riskScores.find((score) => score.caseId === item.caseId);
+                            return (
+                                <CaseCard
+                                    key={item.caseId}
+                                    caseTitle={item.caseName}
+                                    caseDescription={`Created by ${item.caseCreator}`}
+                                    caseStatus={item.caseClosed ? 'Closed' : 'Open'}
+                                    href={`/case-page/${item.caseId}`}
+                                    caseId={item.caseId}
+                                    canDelete={canDeleteCase}
+                                    onDeleted={refreshCases}
+                                    riskScore={risk?.average}
+                                    evidenceCount={risk?.count}
+                                />
+                            );
+                        })
                     )}
                 </div>
             </div>
         </div>
-        {showDashboardCards && (
+        {showDashboardCards && userRole !== 'USER' && (
             <DashboardModal isOpen={isModalOpen} onClose={closeModal} onCreated={() => { closeModal(); void refreshCases(); }} />
         )}
         </>

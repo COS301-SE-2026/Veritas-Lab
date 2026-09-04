@@ -10,6 +10,7 @@ import type { MediaUploadModalProps } from '@/types/components';
 export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }: MediaUploadModalProps) {
     const { addEvidence } = useCase();
     const [file, setFile] = useState<File | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,6 +20,7 @@ export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }
 
     const handleClose = () => {
         setFile(null);
+        setError(null);
         onClose();
     };
 
@@ -28,8 +30,14 @@ export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }
         if (!file || !caseId) {
             return;
         }
-        await addEvidence(file, caseId);
-        await onUploaded?.();
+        try {
+            await addEvidence(file, caseId);
+            await onUploaded?.();
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Failed to upload media');
+            return;
+        }
+        
         setFile(null);
         onClose();
     };
@@ -46,12 +54,14 @@ export default function MediaUploadModal({ isOpen, onClose, caseId, onUploaded }
                     p-10 cursor-pointer hover:border-[var(--color-primary)] hover:bg-gray-50 transition-colors duration-200"
                 >
                     <UploadCloud size={36} className="text-[var(--color-primary)]" />
-                    {file
-                        ? <p className="text-sm font-medium text-[var(--color-text)]">{file.name}</p>
-                        : <>
-                            <p className="text-sm font-semibold text-[var(--color-text)]">Click to browse</p>
-                            <p className="text-xs text-gray-400">PNG/PDF file types supported</p>
-                        </>
+                    {error ? (<Label text={error} htmlFor="error" variant="error" />
+                    ) : (file
+                            ? <p className="text-sm font-medium text-[var(--color-text)]">{file.name}</p>
+                            : <>
+                                <p className="text-sm font-semibold text-[var(--color-text)]">Click to browse</p>
+                                <p className="text-xs text-gray-400">Images/PDFs/MP4s file types supported</p>
+                            </>
+                        )
                     }
                 </div>
 

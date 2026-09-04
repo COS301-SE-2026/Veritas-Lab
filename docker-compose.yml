@@ -47,6 +47,13 @@ services:
             - MINIO_ROOT_USER=${MINIO_ROOT_USER}
             - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
             - MINIO_EXTERNAL_URL=${MINIO_EXTERNAL_URL}
+            - MINIO_API_PORT=${MINIO_API_PORT}
+            - MINIO_CONSOLE_PORT=${MINIO_CONSOLE_PORT}
+            - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+            - R2_URL=${R2_URL}
+            - R2_TOKEN_VALUE=${R2_TOKEN_VALUE}
+            - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+            - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
             - STORAGE_URL=${STORAGE_URL}
             - FRONTEND_ORIGIN=${FRONTEND_ORIGIN}
             - STORAGE_URL=${STORAGE_URL}
@@ -103,14 +110,15 @@ services:
             - POSTGRES_USER=${DB_USER}
             - POSTGRES_PASSWORD=${DB_PASSWORD}
             - POSTGRES_DB=${DB_NAME}
+            - PGDATA=/var/lib/postgresql/data
         ports:
             - "5432:5432"
         volumes:
-            - postgres_data:/var/lib/postgresql
-            - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/schema-users.sql
-            - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/schema-cases.sql
-            - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/seed-cases.sql
-            - ./Backend/app/database/seed_cases.sql:/docker-entrypoint-initdb.d/seed-cases-extra.sql
+            - postgres_data:/var/lib/postgresql/data
+            - ./Backend/app/database/01-User_db.sql:/docker-entrypoint-initdb.d/00-users.sql
+            - ./Backend/app/database/02-Cases_db.sql:/docker-entrypoint-initdb.d/01-cases.sql
+            - ./Backend/app/database/init_cases.sql:/docker-entrypoint-initdb.d/init-cases.sql
+            - ./Backend/app/database/seed_cases.sql:/docker-entrypoint-initdb.d/seed-cases.sql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
             interval: 5s
@@ -154,7 +162,8 @@ services:
             /bin/sh -c "
             /usr/bin/mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
             /usr/bin/mc mb minio/images --ignore-existing &&
-            /usr/bin/mc mb minio/pdf --ignore-existing
+            /usr/bin/mc mb minio/pdf --ignore-existing &&
+            /usr/bin/mc mb minio/videos --ignore-existing
             "
         depends_on:
             minio:

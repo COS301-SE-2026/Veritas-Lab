@@ -25,8 +25,10 @@ type AnnotationLayerProps = {
     annotations: Annotation[];
     selectedId: string | null;
     onSelectAnnotation: (id: string | null) => void;
-    onAddShape: (points: AnnotationPoint[], page: number) => void;
-    onAddNote: (position: AnnotationPoint, text: string, page: number) => void;
+    onAddShape: (points: AnnotationPoint[], page: number, timeStamp?: number) => void;
+    onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
+    selectedAnnotation?: boolean;
+    isOn?: boolean;
 };
 
 export default function AnnotationLayer({
@@ -38,16 +40,19 @@ export default function AnnotationLayer({
     onSelectAnnotation,
     onAddShape,
     onAddNote,
+    selectedAnnotation = false,
+    isOn = false,
 }: Readonly<AnnotationLayerProps>) {
     const overlayRef = useRef<HTMLDivElement>(null);
     const [drawingPoints, setDrawingPoints] = useState<AnnotationPoint[] | null>(null);
     const [draftNotePosition, setDraftNotePosition] = useState<AnnotationPoint | null>(null);
 
-    const pageAnnotations = annotations.filter((annotation) => annotation.page === page);
+    const pageAnnotations = annotations.filter((annotation) => annotation.page === page && (!selectedAnnotation || annotation.id === selectedId));
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         const bounds = overlayRef.current?.getBoundingClientRect();
         if (!active || !bounds || activeTool !== 'Draw') return;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
         setDrawingPoints([toRelativePoint(event, bounds)]);
     };
 
@@ -57,7 +62,8 @@ export default function AnnotationLayer({
         setDrawingPoints((current) => (current ? [...current, toRelativePoint(event, bounds)] : current));
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
         if (!active || activeTool !== 'Draw' || !drawingPoints) return;
         onAddShape(drawingPoints, page);
         setDrawingPoints(null);
@@ -94,7 +100,7 @@ export default function AnnotationLayer({
             onPointerUp={handlePointerUp}
             onClick={handleOverlayClick}
             onKeyDown={handleOverlayKeyDown}
-            className={`absolute inset-0 select-none ${active ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
+            className={`absolute inset-0 select-none ${active && !isOn ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
         >
             {active ? (
                 <>

@@ -1,10 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 import torch
-from app.training.model import AIImageDetector as TrainedAIImageDetector
-from app.training.prediction import predict_and_explain
+from app.training.image.model import AIImageDetector as TrainedAIImageDetector
+from app.training.image.prediction import predict_and_explain
+from app.training.pdf.explain import explain_pdf, load_detector
+from app.training.video.analyser import video_combined_analysis
 
 MODEL_PATH = Path("app/ai/best_model.pth")
+PDF_MODEL_PATH = Path("app/ai/pdf_detector.pt")
 
 class AIImageDetector:
     def __init__(self) -> None:
@@ -50,4 +53,47 @@ class AIImageDetector:
         }
 
         result["risk_level"] = risk_mapping[result["risk_level"]]
+        return result
+
+class AIPDFDetector:
+    def __init__(self) -> None:
+        self.model_path = PDF_MODEL_PATH
+        load_detector(str(self.model_path))
+
+    def analyse_pdf(self, pdf_path: str | Path):
+        pdf_path = Path(pdf_path)
+
+        result = explain_pdf(pdf_path, str(self.model_path))
+
+        ai_probability = result["ai_probability"]
+
+        if ai_probability >= 0.80:
+            risk_level = 3
+        elif ai_probability >= 0.60:
+            risk_level = 2
+        else:
+            risk_level = 1
+
+        result["risk_level"] = risk_level
+        return result
+
+class AIVideoDetector:
+    def __init__(self) -> None:
+        self.model = video_combined_analysis()
+
+    async def analyse_video(self, video_path: str | Path) -> dict:
+        video_path = Path(video_path)
+        result = await self.model.analyse(video_path)
+
+        ai_probability = result["ai_probability"]
+
+        if ai_probability >= 0.80:
+            risk_level = 3
+        elif ai_probability >= 0.60:
+            risk_level = 2
+        else:
+            risk_level = 1
+
+        result["risk_level"] = risk_level
+
         return result
