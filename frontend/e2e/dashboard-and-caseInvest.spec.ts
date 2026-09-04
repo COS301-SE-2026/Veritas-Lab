@@ -223,7 +223,7 @@ test('investigator can search cases, create a case, close case, upload media, ad
 
     await expect(
         page.getByText(
-            'No reviews yet. Start the conversation below.',
+            'No comments yet. Start the conversation below.',
             { exact: true }
         )
     ).toBeVisible();
@@ -231,7 +231,7 @@ test('investigator can search cases, create a case, close case, upload media, ad
     const reviewInput = page.getByPlaceholder('Write your comment here');
 
     const sendReviewButton = page.getByRole('button', {
-        name: 'Send Review',
+        name: 'Send Comment',
         exact: true
     });
 
