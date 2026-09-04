@@ -361,7 +361,7 @@ jobs:
             - name: wait on backend
               run: |
                   for i in {1..30}; do
-                      if curl -fsS http://localhost:8000/docs > /dev/null; then
+                      if curl -fsS http://localhost:8000/api/docs > /dev/null; then
                           exit 0
                       fi
                       sleep 2
