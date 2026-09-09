@@ -77,7 +77,10 @@ describe('useCaseComments', () => {
         });
 
         mockedAddComment.mockReturnValueOnce(pendingComment as Promise<Awaited<ReturnType<typeof addComment>>>);
-        const firstSubmit = result.current.submitComment();
+        let firstSubmit: ReturnType<typeof result.current.submitComment>;
+        await act(async () => {
+            firstSubmit = result.current.submitComment();
+        });
         await waitFor(() => {
             expect(result.current.isSubmitting).toBe(true);
         });
