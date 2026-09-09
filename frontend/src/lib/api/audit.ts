@@ -1,10 +1,10 @@
 import { ApiError } from "@/types/api";
 import { AuditTimelineResponse, AuditLogResponse } from "@/types/api";
+import { apiFetch } from "./client";
 
 export async function getAudit(caseID: string): Promise<AuditTimelineResponse>  {
-    const res = await fetch(`/api/getAudit/caseID/${caseID}`, {
+    const res = await apiFetch(`/api/getAudit/caseID/${caseID}`, {
         method: 'GET',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -19,9 +19,8 @@ export async function getAudit(caseID: string): Promise<AuditTimelineResponse>  
 }
 
 export async function getAllAudit(): Promise<AuditLogResponse> {
-    const res = await fetch(`/api/getAllAudit`, {
+    const res = await apiFetch(`/api/getAllAudit`, {
         method: 'GET',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },

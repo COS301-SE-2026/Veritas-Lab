@@ -1,4 +1,5 @@
 import type { ApiError, CaseResponse } from '@/types/api';
+import { apiFetch } from './client';
 
 function normalizeComment(comment: Record<string, unknown>) {
     return {
@@ -11,9 +12,8 @@ function normalizeComment(comment: Record<string, unknown>) {
 }
 //conirfmed that all endpoints match the API service contract
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
-    const res = await fetch(`/api/getSingleCase`, {
+    const res = await apiFetch(`/api/getSingleCase`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -35,9 +35,8 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
     formData.append('case_id', uuid);
     formData.append('media', evidence);
 
-    const res = await fetch(`/api/cases/evidence`, {
+    const res = await apiFetch(`/api/cases/evidence`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
         },
         body: formData
@@ -50,9 +49,8 @@ export async function addEvidence(evidence: File, uuid: string): Promise<unknown
     return data;
 }
 export async function addComment(caseId: string, comment: string) {
-    const res = await fetch(`/api/cases/comments`, {
+    const res = await apiFetch(`/api/cases/comments`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -68,9 +66,8 @@ export async function addComment(caseId: string, comment: string) {
 }
 
 export async function closeCase(caseId: string): Promise<{ status: string; message?: string }> {
-    const res = await fetch(`/api/closeCase`, {
+    const res = await apiFetch(`/api/closeCase`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -86,9 +83,8 @@ export async function closeCase(caseId: string): Promise<{ status: string; messa
 }
 
 export async function deleteEvidence(caseId: string, mediaId: string): Promise<{ status: string; message?: string }> {
-    const res = await fetch(`/api/delete/case/${caseId}/evidence/${mediaId}`, {
+    const res = await apiFetch(`/api/delete/case/${caseId}/evidence/${mediaId}`, {
         method: 'POST',
-        credentials: 'include',
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
@@ -99,9 +95,8 @@ export async function deleteEvidence(caseId: string, mediaId: string): Promise<{
 }
 
 export async function updateCase(caseId: string, updates: { caseName?: string; caseDescription?: string }): Promise<{ status: string; message?: string }> {
-    const res = await fetch(`/api/updateCase`, {
+    const res = await apiFetch(`/api/updateCase`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             CaseID: caseId,
@@ -118,9 +113,8 @@ export async function updateCase(caseId: string, updates: { caseName?: string; c
 }
 
 export async function editComment(caseId: string, commentId: number, comment: string): Promise<{ status: string; message?: string }> {
-    const res = await fetch(`/api/editComment/case/${caseId}/comment/${commentId}`, {
+    const res = await apiFetch(`/api/editComment/case/${caseId}/comment/${commentId}`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment }),
     });
@@ -133,9 +127,8 @@ export async function editComment(caseId: string, commentId: number, comment: st
 }
 
 export async function deleteComment(commentId: number): Promise<{ status: string; message?: string }> {
-    const res = await fetch(`/api/deleteComment/comment/${commentId}`, {
+    const res = await apiFetch(`/api/deleteComment/comment/${commentId}`, {
         method: 'DELETE',
-        credentials: 'include',
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
