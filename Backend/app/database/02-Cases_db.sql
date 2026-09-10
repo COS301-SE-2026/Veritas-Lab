@@ -514,3 +514,35 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- New triggers for business logic
+
+CREATE OR REPLACE FUNCTION "Cases_DB".prevent_assigned_on_insert()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.CaseAssigned IS NOT NULL THEN
+        RAISE EXCEPTION 'A case cannot be assigned upon creation. CaseAssigned must be NULL.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_prevent_assigned_on_insert
+BEFORE INSERT ON "Cases_DB"."Cases"
+FOR EACH ROW
+EXECUTE FUNCTION "Cases_DB".prevent_assigned_on_insert();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".prevent_self_assignment_on_update()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.CaseAssigned IS NOT NULL AND NEW.CaseAssigned = NEW.CaseCreator THEN
+        RAISE EXCEPTION 'CaseCreator cannot be assigned to their own case.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_prevent_self_assignment_on_update
+BEFORE UPDATE ON "Cases_DB"."Cases"
+FOR EACH ROW
+EXECUTE FUNCTION "Cases_DB".prevent_self_assignment_on_update();
