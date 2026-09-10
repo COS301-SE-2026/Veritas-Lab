@@ -402,3 +402,115 @@ ALTER TABLE "Cases_DB"."Audit_Cases"
     ADD COLUMN IF NOT EXISTS old_CasePublishDate TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS old_CaseCloseDate TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS old_CaseAssigned VARCHAR(100);
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Cases" (
+        query_executor, 
+        query_executor_name, 
+        query_type,
+        old_case_id, 
+        old_CaseName, 
+        old_CaseCreator, 
+        old_CaseDescription, 
+        old_CaseCreationDate,
+        old_CaseState,
+        old_CasePublishDate,
+        old_CaseCloseDate,
+        old_CaseAssigned
+    ) VALUES (
+        v_executor_id, 
+        v_executor_name, 
+        'DELETE'::queryType,
+        OLD.CaseId, 
+        OLD.CaseName, 
+        OLD.CaseCreator, 
+        OLD.CaseDescription, 
+        OLD.CaseCreationDate,
+        OLD.CaseState,
+        OLD.CasePublishDate,
+        OLD.CaseCloseDate,
+        OLD.CaseAssigned
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_modify()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, 
+            query_executor_name, 
+            query_type,
+            old_case_id, 
+            old_CaseName, 
+            old_CaseCreator, 
+            old_CaseDescription, 
+            old_CaseCreationDate,
+            old_CaseState,
+            old_CasePublishDate,
+            old_CaseCloseDate,
+            old_CaseAssigned
+        ) VALUES (
+            v_executor_id, 
+            v_executor_name, 
+            'INSERT'::queryType,
+            NEW.CaseId, 
+            NEW.CaseName, 
+            NEW.CaseCreator, 
+            NEW.CaseDescription, 
+            NEW.CaseCreationDate,
+            NEW.CaseState,
+            NEW.CasePublishDate,
+            NEW.CaseCloseDate,
+            NEW.CaseAssigned
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, 
+            query_executor_name, 
+            query_type,
+            old_case_id, 
+            old_CaseName, 
+            old_CaseCreator, 
+            old_CaseDescription, 
+            old_CaseCreationDate,
+            old_CaseState,
+            old_CasePublishDate,
+            old_CaseCloseDate,
+            old_CaseAssigned
+        ) VALUES (
+            v_executor_id, 
+            v_executor_name, 
+            'UPDATE'::queryType,
+            OLD.CaseId, 
+            OLD.CaseName, 
+            OLD.CaseCreator, 
+            OLD.CaseDescription, 
+            OLD.CaseCreationDate,
+            OLD.CaseState,
+            OLD.CasePublishDate,
+            OLD.CaseCloseDate,
+            OLD.CaseAssigned
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
