@@ -70,14 +70,14 @@ async def fake_get_single_case_context(ensure_user_exists):
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases"
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
                 uuid.UUID(case_id),
                 f"Integration Test - {label} case",
                 "TestInvestigator",
                 f"This case is currently {label}",
-                closed
+                "CLOSED" if closed else "OPEN"
             )
             created_ids[f"{label}_case_id"] = case_id
 
@@ -129,7 +129,7 @@ async def test_integration_get_single_case_investigator_open_case(client, fake_g
 
     assert data["status"] == "success"
     assert data["case"]["caseId"] == fake_get_single_case_context["open_case_id"]
-    assert data["case"]["caseClosed"] is False
+    assert data["case"]["caseState"] == "OPEN"
 
     assert len(data["evidence"]) == 1
     assert data["evidence"][0]["mediaUrl"] != ""
@@ -148,7 +148,7 @@ async def test_integration_get_single_case_user_closed_case(client, fake_get_sin
 
     assert data["status"] == "success"
     assert data["case"]["caseId"] == fake_get_single_case_context["closed_case_id"]
-    assert data["case"]["caseClosed"] is True
+    assert data["case"]["caseState"] == "CLOSED"
 
     assert len(data["evidence"]) == 1
     assert data["evidence"][0]["mediaUrl"] == ""

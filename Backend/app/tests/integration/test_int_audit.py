@@ -62,10 +62,10 @@ async def seed_case(ctx, closed=False):
     await conn.execute(
         """
         INSERT INTO "Cases_DB"."Cases" 
-        (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-        VALUES ($1, $2, $3, $4, $5)
+        (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+        VALUES ($1, $2, $3, $4, $5::case_state_enum)
         """,
-        case_id, "Audit test case", ctx["investigator_id"], "This is a test case for auditing.", closed
+        case_id, "Audit test case", ctx["investigator_id"], "This is a test case for auditing", "CLOSED" if closed else "OPEN"
     )
     ctx["cases"].append(str(case_id))
     return str(case_id)
@@ -105,7 +105,7 @@ async def test_case_lifecycle_actions(client, audit_context):
         case_id, "Updated description"
     )
     await conn.execute(
-        'UPDATE "Cases_DB"."Cases" SET caseclosed = TRUE WHERE CaseId = $1',
+        'UPDATE "Cases_DB"."Cases" SET casestate = \'CLOSED\'::case_state_enum WHERE CaseId = $1',
         case_id
     )
 

@@ -45,14 +45,14 @@ async def fake_evidence_context(ensure_user_exists):
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases" 
-            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """,
             uuid.UUID(case_id),
             "Delete Evidence Integration Test",
             case_creator,
             "Temporary case for testing evidence deletion",
-            False
+            "OPEN"
         )
         created_ids["case_id"] = case_id
 

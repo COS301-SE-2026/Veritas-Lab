@@ -47,14 +47,14 @@ async def insert_case(conn, case_id, creator, closed, user_id):
     await conn.execute(
         """
         INSERT INTO "Cases_DB"."Cases"
-        (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-        VALUES ($1, $2, $3, $4, $5)
+        (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+        VALUES ($1, $2, $3, $4, $5::case_state_enum)
         """,
         uuid.UUID(case_id),
         f"Upload evidence test case {case_id[:8]}",
         creator,
         "Integration test case for evidence upload",
-        closed,
+        "CLOSED" if closed else "OPEN",
     )
 
 
@@ -88,40 +88,40 @@ async def fake_upload_context(ensure_user_exists):
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases"
-            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """,
             uuid.UUID(open_case_id),
             f"Upload evidence test case {open_case_id[:8]}",
             CASE_CREATOR,
             "Integration test case for evidence upload",
-            False,
+            "OPEN",
         )
 
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases"
-            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """,
             uuid.UUID(other_case_id),
             f"Upload evidence test case {other_case_id[:8]}",
             OTHER_INVESTIGATOR,
             "Integration test case for evidence upload",
-            False,
+            "OPEN",
         )
 
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases"
-            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """,
             uuid.UUID(closed_case_id),
             f"Upload evidence test case {closed_case_id[:8]}",
             CASE_CREATOR,
             "Integration test case for evidence upload",
-            True,
+            "CLOSED",
         )
 
         await conn.execute(

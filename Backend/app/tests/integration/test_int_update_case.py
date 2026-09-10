@@ -70,14 +70,14 @@ async def fake_update_case_context(ensure_user_exists):
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases"
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
                 uuid.UUID(case_id),
                 f"{ORIGINAL_NAME} - {label}",
                 creator,
                 ORIGINAL_DESCRIPTION,
-                False,
+                "OPEN",
             )
             created_ids[f"{label}_case_id"] = case_id
         yield created_ids
