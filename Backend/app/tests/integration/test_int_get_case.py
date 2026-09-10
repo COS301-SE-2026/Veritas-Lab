@@ -20,27 +20,27 @@ async def fake_get_cases_context(ensure_user_exists):
 
         open_case_id = str(uuid.uuid4())
         await conn.execute(
-            """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+            """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
             uuid.UUID(open_case_id),
             "Integration Test - Open Case",
             "TestInvestigator",
             "This case is currently open",
-            False
+            "OPEN"
         )
         created_ids["open_case_id"] = open_case_id
 
         closed_case_id = str(uuid.uuid4())
         await conn.execute(
-            """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+            """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
             uuid.UUID(closed_case_id),
             "Integration Test - Closed Case",
             "TestInvestigator",
             "This case is currently closed",
-            True
+            "CLOSED"
         )
         created_ids["closed_case_id"] = closed_case_id
 

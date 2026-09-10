@@ -97,14 +97,14 @@ async def fake_delete_case_context(ensure_user_exists):
         case_id = str(uuid.uuid4())
         await conn.execute(
             """
-            INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """,
             uuid.UUID(case_id),
             "Integration Test Delete Case",
             case_creator,
             "Case description for deletion test",
-            False
+            "OPEN"
         )
         created_ids["case_id"] = case_id
 

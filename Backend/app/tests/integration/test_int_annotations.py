@@ -64,14 +64,14 @@ async def fake_report_context(ensure_user_exists):
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases" 
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
                 uuid.UUID(case_id), 
                 "Integration Test Investigation Case", 
                 "TestInvest", 
                 "Integration test case description", 
-                False
+                "OPEN"
             )
             created_ids["case_id"] = case_id
 
@@ -340,8 +340,8 @@ async def fake_comment_context(ensure_user_exists):
             case_creation_literal = """
             INSERT INTO "Cases_DB"."Cases" 
             (CaseId, CaseName, 
-            CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """
 
             await conn.execute(
@@ -349,7 +349,7 @@ async def fake_comment_context(ensure_user_exists):
                 uuid.UUID(case_id1), 
                 "Test Case", "Creator",
                 "To test comments", 
-                False
+                "OPEN"
             )
 
             created_ids["case_id1"] = case_id1
@@ -361,7 +361,7 @@ async def fake_comment_context(ensure_user_exists):
                 "Test separation", 
                 "TestInvest", 
                 "For more Tests", 
-                True
+                "OPEN"
             )
             created_ids["case_id2"] = case_id2
 

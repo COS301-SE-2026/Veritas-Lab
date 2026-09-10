@@ -384,3 +384,165 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER audit_cases_modified_trigger
 AFTER INSERT OR UPDATE ON "Cases_DB"."Cases"
 FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_modify();
+
+-- New changes for states changes
+DROP TYPE IF EXISTS case_state_enum CASCADE;
+CREATE TYPE case_state_enum AS ENUM ('OPEN','PUBLISHED','CLOSED');
+
+ALTER TABLE "Cases_DB"."Cases" 
+    DROP COLUMN IF EXISTS CaseClosed,
+    ADD COLUMN IF NOT EXISTS CaseState case_state_enum NOT NULL DEFAULT 'OPEN',
+    ADD COLUMN IF NOT EXISTS CasePublishDate TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS CaseCloseDate TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS CaseAssigned varchar(100);
+
+ALTER TABLE "Cases_DB"."Audit_Cases"
+    DROP COLUMN IF EXISTS old_CaseClosed,
+    ADD COLUMN IF NOT EXISTS old_CaseState case_state_enum NOT NULL DEFAULT 'OPEN',
+    ADD COLUMN IF NOT EXISTS old_CasePublishDate TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS old_CaseCloseDate TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS old_CaseAssigned VARCHAR(100);
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    INSERT INTO "Cases_DB"."Audit_Cases" (
+        query_executor, 
+        query_executor_name, 
+        query_type,
+        old_case_id, 
+        old_CaseName, 
+        old_CaseCreator, 
+        old_CaseDescription, 
+        old_CaseCreationDate,
+        old_CaseState,
+        old_CasePublishDate,
+        old_CaseCloseDate,
+        old_CaseAssigned
+    ) VALUES (
+        v_executor_id, 
+        v_executor_name, 
+        'DELETE'::queryType,
+        OLD.CaseId, 
+        OLD.CaseName, 
+        OLD.CaseCreator, 
+        OLD.CaseDescription, 
+        OLD.CaseCreationDate,
+        OLD.CaseState,
+        OLD.CasePublishDate,
+        OLD.CaseCloseDate,
+        OLD.CaseAssigned
+    );
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_modify()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_executor_id UUID;
+    v_executor_name VARCHAR(100);
+BEGIN
+    SELECT executor_id, executor_name INTO v_executor_id, v_executor_name 
+    FROM "Cases_DB".get_audit_executor();
+
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, 
+            query_executor_name, 
+            query_type,
+            old_case_id, 
+            old_CaseName, 
+            old_CaseCreator, 
+            old_CaseDescription, 
+            old_CaseCreationDate,
+            old_CaseState,
+            old_CasePublishDate,
+            old_CaseCloseDate,
+            old_CaseAssigned
+        ) VALUES (
+            v_executor_id, 
+            v_executor_name, 
+            'INSERT'::queryType,
+            NEW.CaseId, 
+            NEW.CaseName, 
+            NEW.CaseCreator, 
+            NEW.CaseDescription, 
+            NEW.CaseCreationDate,
+            NEW.CaseState,
+            NEW.CasePublishDate,
+            NEW.CaseCloseDate,
+            NEW.CaseAssigned
+        );
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO "Cases_DB"."Audit_Cases" (
+            query_executor, 
+            query_executor_name, 
+            query_type,
+            old_case_id, 
+            old_CaseName, 
+            old_CaseCreator, 
+            old_CaseDescription, 
+            old_CaseCreationDate,
+            old_CaseState,
+            old_CasePublishDate,
+            old_CaseCloseDate,
+            old_CaseAssigned
+        ) VALUES (
+            v_executor_id, 
+            v_executor_name, 
+            'UPDATE'::queryType,
+            OLD.CaseId, 
+            OLD.CaseName, 
+            OLD.CaseCreator, 
+            OLD.CaseDescription, 
+            OLD.CaseCreationDate,
+            OLD.CaseState,
+            OLD.CasePublishDate,
+            OLD.CaseCloseDate,
+            OLD.CaseAssigned
+        );
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- New triggers for business logic
+
+CREATE OR REPLACE FUNCTION "Cases_DB".prevent_assigned_on_insert()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.CaseAssigned IS NOT NULL THEN
+        RAISE EXCEPTION 'A case cannot be assigned upon creation. CaseAssigned must be NULL.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_prevent_assigned_on_insert
+BEFORE INSERT ON "Cases_DB"."Cases"
+FOR EACH ROW
+EXECUTE FUNCTION "Cases_DB".prevent_assigned_on_insert();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".prevent_self_assignment_on_update()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.CaseAssigned IS NOT NULL AND NEW.CaseAssigned = NEW.CaseCreator THEN
+        RAISE EXCEPTION 'CaseCreator cannot be assigned to their own case.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_prevent_self_assignment_on_update
+BEFORE UPDATE ON "Cases_DB"."Cases"
+FOR EACH ROW
+EXECUTE FUNCTION "Cases_DB".prevent_self_assignment_on_update();

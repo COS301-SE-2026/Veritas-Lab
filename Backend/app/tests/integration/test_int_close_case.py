@@ -62,7 +62,7 @@ async def test_integration_close_case_success(client, load_admin_user):
         try:
             row = await connection.fetchrow(
                 """
-                SELECT caseclosed
+                SELECT casestate
                 FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
                 """,
@@ -72,7 +72,7 @@ async def test_integration_close_case_success(client, load_admin_user):
             await connection.close()
 
         assert row is not None
-        assert row["caseclosed"] is True
+        assert row["casestate"] == "CLOSED"
 
     finally:
         if case_id is not None:
@@ -158,7 +158,7 @@ async def test_integration_close_case_success_investigator(client):
             
             row = await connection.fetchrow(
                 """
-                SELECT caseclosed
+                SELECT casestate
                 FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
                 """,
@@ -168,7 +168,7 @@ async def test_integration_close_case_success_investigator(client):
             await connection.close()
 
         assert row is not None
-        assert row["caseclosed"] is True
+        assert row["casestate"] == "CLOSED"
 
     finally:
         if case_id is not None:

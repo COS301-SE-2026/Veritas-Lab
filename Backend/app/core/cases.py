@@ -228,7 +228,7 @@ class Case:
         self.case_creator = None if case_creator is None else case_creator.strip()
         self.case_name = None if case_name is None else case_name.strip()
         self.case_description = case_description
-        self.case_closed = False
+        self.case_state = "OPEN"
         if case_id is not None:
             cleaned_id = case_id.strip()
             try:
@@ -259,14 +259,14 @@ class Case:
         row = await connection.fetchrow(
             """
             INSERT INTO "Cases_DB"."Cases"
-            (casecreator, casename, casedescription, caseclosed)
-            VALUES ($1, $2, $3, $4)
+            (casecreator, casename, casedescription, casestate)
+            VALUES ($1, $2, $3, $4::case_state_enum)
             RETURNING caseid, casecreationdate
             """,
             self.case_creator,
             self.case_name,
             self.case_description,
-            self.case_closed
+            self.case_state
         )
 
         self.case_id=row["caseid"]
@@ -588,7 +588,7 @@ class Case:
             "caseName": self.case_name,
             "caseCreator": self.case_creator,
             "caseDescription": self.case_description,
-            "caseClosed": self.case_closed,
+            "caseState": self.case_state,
             "caseCreationDate": self.case_creation_date.isoformat() if self.case_creation_date else None
         }
 
@@ -634,7 +634,7 @@ class Case:
         row = await connection.fetchrow(
             """
             WITH case_check AS (
-                SELECT caseid, caseclosed
+                SELECT caseid, casestate
                 FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
             ),
@@ -644,7 +644,7 @@ class Case:
                 FROM case_check
                 WHERE (
                     $4 = 'ADMIN'
-                    OR ($4 = 'USER' AND caseclosed = TRUE)
+                    OR ($4 = 'USER' AND casestate = 'CLOSED')
                     OR ($4 = 'INVESTIGATOR')
                 )
                 RETURNING commentid, caseid, username, comment, commenttimestamp
@@ -655,7 +655,7 @@ class Case:
                 i.username,
                 i.comment,
                 i.commenttimestamp,
-                c.caseclosed,
+                c.casestate,
                 (c.caseid IS NOT NULL) AS case_exists,
                 (i.commentid IS NOT NULL) AS comment_inserted
             FROM case_check c

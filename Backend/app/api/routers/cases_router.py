@@ -174,7 +174,7 @@ def _row_to_case(row: dict) -> Case:
     )
 
     case.case_id = row["caseid"]
-    case.case_closed = row["caseclosed"]
+    case.case_state = row["casestate"]
     case.case_creation_date = row["casecreationdate"]
 
     return case
@@ -344,7 +344,7 @@ async def create_case(
                                 "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
                                 "caseName": "Reciepts sus",
                                 "caseDescription": "Sus receipts case",
-                                "caseClosed": False,
+                                "caseState": "OPEN",
                                 "caseCreationDate": "2026-05-20T19:43:02+00:00",
                             }
                         ]
@@ -416,9 +416,9 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
 
         rows = await connection.fetch(
             """
-            SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
             FROM "Cases_DB"."Cases"
-            WHERE $1::boolean IS FALSE OR caseclosed IS TRUE
+            WHERE $1::boolean IS FALSE OR casestate = 'CLOSED'
             ORDER BY casecreationdate DESC
             """,
             is_standard_user
@@ -461,7 +461,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                             "caseName": "Flood in Westville",
                             "caseCreator": "investigator_user",
                             "caseDescription": "Flood investigation case",
-                            "caseClosed": False,
+                            "caseState": "OPEN",
                             "caseCreationDate": "2026-05-20T19:43:02+00:00"
                         },
                         "comments": [],
@@ -548,10 +548,10 @@ async def get_single_case(case_request: create_single_case_request, request: Req
 
         row = await connection.fetchrow(
             """
-            SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
             FROM "Cases_DB"."Cases"
             WHERE caseid = $1
-                AND ($2::boolean IS FALSE OR caseclosed IS TRUE)
+                AND ($2::boolean IS FALSE OR casestate = 'CLOSED')
             """,
             case_id,
             is_standard_user
@@ -762,11 +762,11 @@ async def upload_evidence(
         await set_audit_executor(connection, executor_id)
         row = await connection.fetchrow(
             """
-            SELECT caseid, casecreator, casename, casedescription, caseclosed, casecreationdate
+            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
             FROM "Cases_DB"."Cases"
             WHERE caseid = $1
                 AND casecreator = $2
-                AND caseclosed = FALSE
+                AND casestate = 'OPEN'
             """,
             validated_case_id,
             case_creator
@@ -927,7 +927,8 @@ async def close_case(
         row = await connection.fetchrow(
             """
                 UPDATE "Cases_DB"."Cases"
-                SET caseclosed = TRUE
+                SET casestate = 'CLOSED'::case_state_enum,
+                    caseclosedate = CURRENT_TIMESTAMP
                 WHERE caseid = $1
                 AND ($2::text = 'ADMIN' OR casecreator = $3)
                 RETURNING caseid
@@ -2255,7 +2256,7 @@ async def get_case_audit_events(
                     query_type::text AS query_type,
                     old_casename,
                     old_casedescription,
-                    old_caseclosed
+                    old_casestate
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
 
@@ -2269,7 +2270,7 @@ async def get_case_audit_events(
                 NULL::text,
                 cases.casename,
                 cases.casedescription,
-                cases.caseclosed
+                cases.casestate
             FROM "Cases_DB"."Cases" AS cases
             WHERE cases.caseid = $1::uuid
             ),
@@ -2280,10 +2281,10 @@ async def get_case_audit_events(
                     query_type,
                     old_casename,
                     old_casedescription,
-                    old_caseclosed,
+                    old_casestate,
                     LEAD(old_casename) OVER (ORDER BY ordinal) AS next_casename,
                     LEAD(old_casedescription) OVER (ORDER BY ordinal) AS next_casedescription,
-                    LEAD(old_caseclosed) OVER (ORDER BY ordinal) AS next_caseclosed
+                    LEAD(old_casestate) OVER (ORDER BY ordinal) AS next_casestate
                 FROM case_audit 
             ),
             audit_events AS (
@@ -2293,7 +2294,7 @@ async def get_case_audit_events(
                     CASE
                         WHEN query_type = 'INSERT' THEN 'Case Created'
                         WHEN query_type = 'DELETE' THEN 'Case Deleted'
-                        WHEN old_caseclosed = FALSE AND next_caseclosed = TRUE 
+                        WHEN old_casestate = 'OPEN' AND next_casestate = 'CLOSED'
                             THEN 'Case Closed'
                         WHEN old_casename IS DISTINCT FROM next_casename 
                             THEN 'Case Renamed'

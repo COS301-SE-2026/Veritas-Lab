@@ -35,7 +35,7 @@ def test_case_creation_with_valid_data():
     assert case.case_name == "Flood in Durban"
     assert case.case_id is None
     assert case.case_creation_date is None
-    assert case.case_closed is False
+    assert case.case_state == "OPEN"
 
 def test_case_creation_Does_Not_Require_Creator():
     test_case = Case(case_name="Flood in Durban")
@@ -43,7 +43,7 @@ def test_case_creation_Does_Not_Require_Creator():
     assert test_case.case_name == "Flood in Durban"
     assert test_case.case_id is None
     assert test_case.case_creation_date is None
-    assert test_case.case_closed is False
+    assert test_case.case_state == "OPEN"
 
 def test_case_creation_Does_Not_Require_CaseName():
     test_case = Case(case_creator="Terry")
@@ -51,7 +51,7 @@ def test_case_creation_Does_Not_Require_CaseName():
     assert test_case.case_name is None
     assert test_case.case_id is None
     assert test_case.case_creation_date is None
-    assert test_case.case_closed is False
+    assert test_case.case_state == "OPEN"
 
 @pytest.mark.asyncio
 async def test_case_creation_Rejects_Blank_Creator():
@@ -168,7 +168,7 @@ def test_case_to_json_before_create():
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
         "caseDescription": "This is a test description",
-        "caseClosed": False,
+        "caseState": "OPEN",
         "caseCreationDate": None
     }
 
@@ -181,7 +181,7 @@ def test_case_to_json_after_create_values_set():
     )
 
     case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
-    case.case_closed = True
+    case.case_state = "CLOSED"
     case.case_creation_date = datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
 
     result = case.to_json()
@@ -191,7 +191,7 @@ def test_case_to_json_after_create_values_set():
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
         "caseDescription": "This is a test description",
-        "caseClosed": True,
+        "caseState": "CLOSED",
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
     }
 
@@ -207,7 +207,7 @@ def test_case_to_json_with_no_description_or_reviews():
         "caseName": "Test Case",
         "caseCreator": "alice_dev",
         "caseDescription": None,
-        "caseClosed": False,
+        "caseState": "OPEN",
         "caseCreationDate": None
     }
 
@@ -248,7 +248,7 @@ async def test_create_case_with_mock():
         case.case_creator,
         case.case_name,
         case.case_description,
-        case.case_closed
+        case.case_state
     )
 
     mock_connection.fetchrow.assert_called_once()
@@ -342,7 +342,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
             "casecreator": "admin_user",
             "casename": "Flood in Durban",
             "casedescription": "Flood investigation case",
-            "caseclosed": False,
+            "casestate": "OPEN",
             "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
         },
         {
@@ -350,7 +350,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
             "casecreator": "investigator_user",
             "casename": "Fake Evidence Case",
             "casedescription": "Media verification case",
-            "caseclosed": False,
+            "casestate": "OPEN",
             "casecreationdate": datetime(2026, 5, 21, 10, 30, 0, tzinfo=timezone.utc)
         }
     ]
@@ -389,7 +389,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
         "caseName": "Flood in Durban",
         "caseCreator": "admin_user",
         "caseDescription": "Flood investigation case",
-        "caseClosed": False,
+        "caseState": "OPEN",
         "caseCreationDate": "2026-05-20T19:43:02+00:00"
     }
 
@@ -398,7 +398,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
         "caseName": "Fake Evidence Case",
         "caseCreator": "investigator_user",
         "caseDescription": "Media verification case",
-        "caseClosed": False,
+        "caseState": "OPEN",
         "caseCreationDate": "2026-05-21T10:30:00+00:00"
     }
 
@@ -622,7 +622,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
         "casecreator": "admin_user",
         "casename": "Flood in Durban",
         "casedescription": "Flood investigation case",
-        "caseclosed": False,
+        "casestate": "OPEN",
         "casecreationdate": datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
     }
 
@@ -685,7 +685,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
             "caseName": "Flood in Durban",
             "caseCreator": "admin_user",
             "caseDescription": "Flood investigation case",
-            "caseClosed": False,
+            "caseState": "OPEN",
             "caseCreationDate": "2026-05-20T19:43:02+00:00"
         },
         "comments": [],
@@ -727,7 +727,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
         "casename": "Public Closed Case",
         "casedescription": "Visible to standard users",
         "caseid": case_uuid,
-        "caseclosed": True,
+        "casestate": "CLOSED",
         "casecreationdate": datetime.now(timezone.utc),
     }
 
@@ -934,7 +934,7 @@ def test_close_case_success_investigator(monkeypatch):
     fetchrow_args = mock_connection.fetchrow.call_args[0]
 
     assert "UPDATE" in fetchrow_args[0]
-    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casestate = 'CLOSED'::case_state_enum" in fetchrow_args[0]
     assert str(fetchrow_args[1]) == fake_case_id
     assert fetchrow_args[2] == "INVESTIGATOR"
     assert fetchrow_args[3] == "investigator_user"
@@ -990,7 +990,7 @@ def test_close_case_success_admin(monkeypatch):
     fetchrow_args = mock_connection.fetchrow.call_args[0]
 
     assert "UPDATE" in fetchrow_args[0]
-    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casestate = 'CLOSED'::case_state_enum" in fetchrow_args[0]
     assert str(fetchrow_args[1]) == fake_case_id
     assert fetchrow_args[2] == "ADMIN"
     assert fetchrow_args[3] == "investigator_user"
@@ -1043,7 +1043,7 @@ def test_close_case_admin_not_case_creator(monkeypatch):
     fetchrow_args = mock_connection.fetchrow.call_args[0]
 
     assert "UPDATE" in fetchrow_args[0]
-    assert "caseclosed = TRUE" in fetchrow_args[0]
+    assert "casestate = 'CLOSED'::case_state_enum" in fetchrow_args[0]
     assert str(fetchrow_args[1]) == fake_case_id
     assert fetchrow_args[3] == "admin_user"
 
@@ -1751,7 +1751,7 @@ async def test_add_comment_user_blocked_on_open_case():
         "username": None,
         "comment": None,
         "commenttimestamp": None,
-        "caseclosed": False,
+        "casestate": "OPEN",
         "case_exists": True,
         "comment_inserted": False
     })

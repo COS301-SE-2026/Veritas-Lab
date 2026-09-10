@@ -66,7 +66,7 @@ async def test_integration_create_case_success(client):
                     casecreator,
                     casename,
                     casedescription,
-                    caseclosed
+                    casestate
                 FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
                 """,
@@ -80,7 +80,7 @@ async def test_integration_create_case_success(client):
         assert created_case["casecreator"] == auth_tests.ADMIN_USER["username"]
         assert created_case["casename"] == case_name
         assert created_case["casedescription"] == "Case created during integration testing."
-        assert created_case["caseclosed"] is False
+        assert created_case["casestate"] == "OPEN"
     finally:
         if case_id is not None:
             connection = await get_connection()
