@@ -20,6 +20,12 @@ describe('useSessionKeepAlive', () => {
         jest.useRealTimers();
     });
 
+    let currentVisibility = 'visible'
+    Object.defineProperty(document, 'visibilityState', {
+            get: () => currentVisibility,
+            configurable: true,
+        });
+
     it('trigger refreshSession on window events', () => {
         renderHook(() => useSessionKeepAlive());
 
@@ -31,7 +37,7 @@ describe('useSessionKeepAlive', () => {
         expect(refreshSession).toHaveBeenCalledTimes(1);
         window.dispatchEvent(new Event('mousemove'));
         expect(refreshSession).toHaveBeenCalledTimes(1);
-    })
+    });
 
     it('refreshSession is not called again within the threshold', () => {
         renderHook(() => useSessionKeepAlive());
@@ -47,7 +53,18 @@ describe('useSessionKeepAlive', () => {
         jest.setSystemTime(time + (5*60*1001))
         window.dispatchEvent(new Event('keydown'));
         expect(refreshSession).toHaveBeenCalledTimes(2);
+    });
 
-    })
+    it('refresh when document becomes visible and threshold has passed', () => {
+        renderHook(() => useSessionKeepAlive());
+
+        currentVisibility = 'visible'
+        document.dispatchEvent(new Event('visibilitychange'));
+        expect(refreshSession).toHaveBeenCalledTimes(1);
+        
+        currentVisibility = 'hidden'
+        document.dispatchEvent(new Event('visibilitychange'));
+        expect(refreshSession).toHaveBeenCalledTimes(1);
+    });
 })
 
