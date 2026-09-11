@@ -385,7 +385,12 @@ CREATE OR REPLACE TRIGGER audit_cases_modified_trigger
 AFTER INSERT OR UPDATE ON "Cases_DB"."Cases"
 FOR EACH ROW EXECUTE FUNCTION "Cases_DB".audit_cases_modify();
 
--- New changes for states changes
+-- New changes for states changes and evidence
+CREATE TYPE "Cases_DB".evidence_type AS (
+    evidence_id UUID,
+    case_perspective TEXT
+);
+
 DROP TYPE IF EXISTS case_state_enum CASCADE;
 CREATE TYPE case_state_enum AS ENUM ('OPEN','PUBLISHED','CLOSED');
 
@@ -394,14 +399,17 @@ ALTER TABLE "Cases_DB"."Cases"
     ADD COLUMN IF NOT EXISTS CaseState case_state_enum NOT NULL DEFAULT 'OPEN',
     ADD COLUMN IF NOT EXISTS CasePublishDate TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS CaseCloseDate TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS CaseAssigned varchar(100);
+    ADD COLUMN IF NOT EXISTS CaseAssigned varchar(100),
+    ADD COLUMN IF NOT EXISTS evidence "Cases_DB".evidence_type[];
+
 
 ALTER TABLE "Cases_DB"."Audit_Cases"
     DROP COLUMN IF EXISTS old_CaseClosed,
     ADD COLUMN IF NOT EXISTS old_CaseState case_state_enum NOT NULL DEFAULT 'OPEN',
     ADD COLUMN IF NOT EXISTS old_CasePublishDate TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS old_CaseCloseDate TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS old_CaseAssigned VARCHAR(100);
+    ADD COLUMN IF NOT EXISTS old_CaseAssigned VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS old_evidence "Cases_DB".evidence_type[];
 
 CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_delete()
 RETURNS TRIGGER AS $$
