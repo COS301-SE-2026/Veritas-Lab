@@ -35,10 +35,14 @@ async def fake_get_single_case_context(ensure_user_exists):
         await ensure_user_exists(conn, admin_id, "admin_user", role="ADMIN")
         created_ids["admin_id"] = admin_id
 
-        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", admin_id)
+        await conn.execute(
+            "SELECT set_config('app.current_user_id', $1, false)",
+            admin_id
+        )
 
         media_type_id = str(uuid.uuid4())
         unique_suffix = uuid.uuid4().hex[:6]
+
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."MediaType"
@@ -50,10 +54,13 @@ async def fake_get_single_case_context(ensure_user_exists):
             "test-bucket",
             f".{unique_suffix}"
         )
+
         created_ids["media_type_id"] = media_type_id
 
+        # Investigator-owned OPEN and CLOSED cases
         for label, closed in (("open", False), ("closed", True)):
             media_id = str(uuid.uuid4())
+
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Media"
@@ -64,9 +71,11 @@ async def fake_get_single_case_context(ensure_user_exists):
                 uuid.UUID(media_type_id),
                 uuid.uuid4().hex
             )
+
             created_ids[f"{label}_media_id"] = media_id
 
             case_id = str(uuid.uuid4())
+
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases"
@@ -79,6 +88,52 @@ async def fake_get_single_case_context(ensure_user_exists):
                 f"This case is currently {label}",
                 "CLOSED" if closed else "OPEN"
             )
+
+            created_ids[f"{label}_case_id"] = case_id
+
+            await conn.execute(
+                """
+                INSERT INTO "Cases_DB"."Reports"
+                (CaseId, MediaId, ImageTitle)
+                VALUES ($1, $2, $3)
+                """,
+                uuid.UUID(case_id),
+                uuid.UUID(media_id),
+                f"{label}-evidence"
+            )
+
+        # USER-owned OPEN and CLOSED cases
+        for label, closed in (("user_open", False), ("user_closed", True)):
+            media_id = str(uuid.uuid4())
+
+            await conn.execute(
+                """
+                INSERT INTO "Cases_DB"."Media"
+                (MediaId, MediaType, MediaHash)
+                VALUES ($1, $2, $3)
+                """,
+                uuid.UUID(media_id),
+                uuid.UUID(media_type_id),
+                uuid.uuid4().hex
+            )
+
+            created_ids[f"{label}_media_id"] = media_id
+
+            case_id = str(uuid.uuid4())
+
+            await conn.execute(
+                """
+                INSERT INTO "Cases_DB"."Cases"
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
+                """,
+                uuid.UUID(case_id),
+                f"Integration Test - {label} case",
+                "Testuser",
+                f"This case belongs to Testuser and is {label}",
+                "CLOSED" if closed else "OPEN"
+            )
+
             created_ids[f"{label}_case_id"] = case_id
 
             await conn.execute(
@@ -95,12 +150,18 @@ async def fake_get_single_case_context(ensure_user_exists):
         yield created_ids
 
     finally:
-        for label in ("open", "closed"):
+        for label in (
+            "open",
+            "closed",
+            "user_open",
+            "user_closed",
+        ):
             if f"{label}_case_id" in created_ids:
                 await conn.execute(
                     'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                     uuid.UUID(created_ids[f"{label}_case_id"])
                 )
+
             if f"{label}_media_id" in created_ids:
                 await conn.execute(
                     'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
@@ -119,7 +180,8 @@ async def fake_get_single_case_context(ensure_user_exists):
 async def test_integration_get_single_case_investigator_open_case(client, fake_get_single_case_context):
     client.cookies.set(COOKIE_NAME, investigator_cookie())
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": fake_get_single_case_context["open_case_id"]}
     )
@@ -138,38 +200,60 @@ async def test_integration_get_single_case_investigator_open_case(client, fake_g
 async def test_integration_get_single_case_user_closed_case(client, fake_get_single_case_context):
     client.cookies.set(COOKIE_NAME, user_cookie())
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
-        json={"CaseID": fake_get_single_case_context["closed_case_id"]}
+        json={"CaseID": fake_get_single_case_context["user_closed_case_id"]}
     )
 
     assert response.status_code == 200
     data = response.json()
 
     assert data["status"] == "success"
-    assert data["case"]["caseId"] == fake_get_single_case_context["closed_case_id"]
+    assert data["case"]["caseId"] == fake_get_single_case_context["user_closed_case_id"]
     assert data["case"]["caseState"] == "CLOSED"
 
     assert len(data["evidence"]) == 1
-    assert data["evidence"][0]["mediaUrl"] == ""
+    assert data["evidence"][0]["mediaUrl"] != ""
 
 @pytest.mark.asyncio
-async def test_integration_get_single_case_user_cannot_see_open_case(client, fake_get_single_case_context):
+async def test_integration_get_single_case_user_can_see_open_case_without_report(client, fake_get_single_case_context):
     client.cookies.set(COOKIE_NAME, user_cookie())
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
-        json={"CaseID": fake_get_single_case_context["open_case_id"]}
+        json={"CaseID": fake_get_single_case_context["user_open_case_id"]}
     )
 
-    assert response.status_code == 404
-    assert response.json()["detail"]["message"] == "Case not found"
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert data["case"]["caseId"] == fake_get_single_case_context["user_open_case_id"]
+    assert data["case"]["caseState"] == "OPEN"
+
+    assert len(data["evidence"]) == 1
+
+    evidence = data["evidence"][0]
+
+    assert evidence["mediaUrl"] != ""
+
+    assert "annotations" not in evidence
+    assert "reportId" not in evidence
+    assert "reportArtifacts" not in evidence
+    assert "reportFindings" not in evidence
+    assert "reportComments" not in evidence
+    assert "reportCertainty" not in evidence
+    assert "reportDateCreation" not in evidence
 
 @pytest.mark.asyncio
 async def test_integration_get_single_case_unknown_case(client):
     client.cookies.set(COOKIE_NAME, investigator_cookie())
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": str(uuid.uuid4())}
     )
@@ -181,7 +265,8 @@ async def test_integration_get_single_case_unknown_case(client):
 async def test_integration_get_single_case_malformed_case_id(client):
     client.cookies.set(COOKIE_NAME, investigator_cookie())
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": "not-a-valid-uuid"}
     )
@@ -193,7 +278,8 @@ async def test_integration_get_single_case_malformed_case_id(client):
 async def test_integration_get_single_case_missing_case_id(client):
     client.cookies.set(COOKIE_NAME, investigator_cookie())
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={}
     )
@@ -203,7 +289,8 @@ async def test_integration_get_single_case_missing_case_id(client):
 
 @pytest.mark.asyncio
 async def test_integration_get_single_case_unauthorized(client):
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": str(uuid.uuid4())}
     )

@@ -287,7 +287,7 @@ def test_get_cases_missing_jwt(monkeypatch):
         mock_verify_jwt
     )
 
-    response = client.post("/api/getCases", json={})
+    response = client.request("GET","/api/getCases",json={})
 
     assert response.status_code == 401
     assert response.json() == {
@@ -314,10 +314,7 @@ def test_get_cases_invalid_jwt(monkeypatch):
         mock_verify_jwt
     )
 
-    response = client.post(
-        "/api/getCases",
-        json={}
-    )
+    response = client.request("GET", "/api/getCases", json={})
 
     assert response.status_code == 401
     assert response.json() == {
@@ -372,10 +369,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
         mock_connect
     )
 
-    response = client.post(
-        "/api/getCases",
-        json={}
-    )
+    response = client.request("GET", "/api/getCases", json={})
 
     assert response.status_code == 200
 
@@ -408,6 +402,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
 
 def test_get_cases_investigator_returns_empty_list(monkeypatch):
     client.cookies.clear()
+
     def mock_verify_jwt(request):
         return {
             "sub": "mock-investigator-id",
@@ -422,20 +417,17 @@ def test_get_cases_investigator_returns_empty_list(monkeypatch):
     mock_connect = AsyncMock(return_value=mock_connection)
 
     monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
+        cases_router,
+        "verify_jwt",
         mock_verify_jwt
     )
     monkeypatch.setattr(
-        cases_router.asyncpg, 
-        "connect", 
+        cases_router.asyncpg,
+        "connect",
         mock_connect
     )
 
-    response = client.post(
-        "/api/getCases",
-        json={}
-    )
+    response = client.request("GET", "/api/getCases", json={})
 
     assert response.status_code == 200
     assert response.json() == {
@@ -464,7 +456,7 @@ def test_get_single_case_missing_jwt(monkeypatch):
         mock_verify_jwt_
     )
 
-    response = client.post("/api/getSingleCase", json={})
+    response = client.request("GET", "/api/getSingleCase", json={})
 
     assert response.status_code == 401
     assert response.json() == {
@@ -491,7 +483,8 @@ def test_get_single_case_invalid_jwt(monkeypatch):
         mock_verify_jwt_
     )
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
@@ -519,10 +512,7 @@ def test_get_single_case_missing_case_id(monkeypatch):
         mock_verify_jwt_
     )
 
-    response = client.post(
-        "/api/getSingleCase",
-        json={}
-    )
+    response = client.request("GET", "/api/getSingleCase", json={})
 
     assert response.status_code == 400
     assert response.json() == {
@@ -547,7 +537,8 @@ def test_get_single_case_invalid_case_id(monkeypatch):
         mock_verify_jwt_
     )
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": "not-a-valid-uuid"}
     )
@@ -582,7 +573,8 @@ def test_get_single_case_not_found(monkeypatch):
         mock_connect
     )
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
     )
@@ -672,7 +664,8 @@ def test_get_single_case_admin_returns_case(monkeypatch):
     with patch("app.api.routers.cases_router.Case.get_comments", new_callable=AsyncMock) as mock_get_comments:
         mock_get_comments.return_value = []
 
-        response = client.post(
+        response = client.request(
+            "GET",
             "/api/getSingleCase",
             json={"CaseID": fake_case_id}
         )
@@ -723,7 +716,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
     media_type_uuid = uuid4()
 
     mock_case_row = {
-        "casecreator": "investigator1",
+        "casecreator": "standard_user",
         "casename": "Public Closed Case",
         "casedescription": "Visible to standard users",
         "caseid": case_uuid,
@@ -765,7 +758,8 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
         mock_connect
     )
 
-    response = client.post(
+    response = client.request(
+        "GET",
         "/api/getSingleCase",
         json={"CaseID": str(case_uuid)}
     )
@@ -774,7 +768,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
     data = response.json()
     assert data["status"] == "success"
 
-    assert data["evidence"][0]["mediaUrl"] == ""
+    assert data["evidence"][0]["mediaUrl"] != ""
 
 def test_close_case_user_unauthorized(monkeypatch):
     client.cookies.clear()
