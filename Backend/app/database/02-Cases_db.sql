@@ -411,6 +411,20 @@ ALTER TABLE "Cases_DB"."Audit_Cases"
     ADD COLUMN IF NOT EXISTS old_CaseAssigned VARCHAR(100),
     ADD COLUMN IF NOT EXISTS old_evidence "Cases_DB".evidence_type[];
 
+ALTER TABLE "Cases_DB"."Media"
+    ADD COLUMN IF NOT EXISTS ReportArtifacts JSONB,
+    ADD COLUMN IF NOT EXISTS ReportFindings TEXT,
+    ADD COLUMN IF NOT EXISTS ReportComments TEXT,
+    ADD COLUMN IF NOT EXISTS ReportCertainty SMALLINT CHECK (ReportCertainty <= 3),
+    ADD COLUMN IF NOT EXISTS ReportDateCreation TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE "Cases_DB"."Audit_Media"
+    ADD COLUMN IF NOT EXISTS old_ReportArtifacts JSONB,
+    ADD COLUMN IF NOT EXISTS old_ReportFindings TEXT,
+    ADD COLUMN IF NOT EXISTS old_ReportComments TEXT,
+    ADD COLUMN IF NOT EXISTS old_ReportCertainty SMALLINT,
+    ADD COLUMN IF NOT EXISTS old_ReportDateCreation TIMESTAMPTZ;
+
 CREATE OR REPLACE FUNCTION "Cases_DB".audit_cases_delete()
 RETURNS TRIGGER AS $$
 DECLARE
