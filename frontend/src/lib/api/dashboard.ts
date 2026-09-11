@@ -1,9 +1,9 @@
 import type { ApiError, DashboardCase } from '@/types/api';
+import { apiFetch } from '@/lib/api/client';
 
 export async function fetchCases(): Promise<DashboardCase[]> {
-	const res = await fetch(`/api/getCases`, {
+	const res = await apiFetch(`/api/getCases`, {
 		method: 'POST',
-		credentials: 'include',
 		headers: {
 			'Content-Type': 'application/json',
 		},
@@ -21,9 +21,8 @@ export async function fetchCases(): Promise<DashboardCase[]> {
 }
 
 export async function createCase(title: string, description?: string): Promise<{ CaseId: string }> {
-	const res = await fetch(`/api/createCase`, {
+	const res = await apiFetch(`/api/createCase`, {
 		method: 'POST',
-		credentials: 'include',
 		headers: {
 			'Content-Type': 'application/json',
 		},
@@ -40,9 +39,8 @@ export async function createCase(title: string, description?: string): Promise<{
 }
 
 export async function deleteCase(caseId: string): Promise<{ status: string; message?: string }> {
-	const res = await fetch(`/api/deleteCase`, {
+	const res = await apiFetch(`/api/deleteCase`, {
 		method: 'DELETE',
-		credentials: 'include',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ CaseID: caseId }),
 	});
