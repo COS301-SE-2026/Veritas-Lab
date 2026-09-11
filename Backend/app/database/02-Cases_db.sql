@@ -666,3 +666,28 @@ CREATE OR REPLACE TRIGGER trg_prevent_self_assignment_on_update
 BEFORE UPDATE ON "Cases_DB"."Cases"
 FOR EACH ROW
 EXECUTE FUNCTION "Cases_DB".prevent_self_assignment_on_update();
+
+CREATE OR REPLACE FUNCTION "Cases_DB".prevent_duplicate_evidence_in_array()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.evidence IS NOT NULL AND array_length(NEW.evidence, 1) > 0 THEN
+        IF EXISTS (
+            SELECT 1
+            FROM unnest(NEW.evidence) AS elem
+            GROUP BY elem.evidence_id
+            HAVING COUNT(*) > 1
+        ) THEN
+            RAISE EXCEPTION 'Duplicate evidence error: Each evidence_id in the array must be unique.';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_prevent_duplicate_evidence
+BEFORE INSERT OR UPDATE ON "Cases_DB"."Cases"
+FOR EACH ROW
+EXECUTE FUNCTION "Cases_DB".prevent_duplicate_evidence_in_array();
+
+DROP TABLE "Cases_DB"."Reports";
