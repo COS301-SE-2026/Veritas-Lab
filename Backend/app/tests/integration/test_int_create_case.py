@@ -279,7 +279,7 @@ async def test_integration_create_case_name_too_long(client):
         }
     }
 
-async def test_integration_create_case_user_role_can_create(client, enssure_user_exists):
+async def test_integration_create_case_user_role_can_create(client, ensure_user_exists):
     user_id = str(uuidlib.uuid4())
 
     username = f"case_user_{user_id[:8]}"
