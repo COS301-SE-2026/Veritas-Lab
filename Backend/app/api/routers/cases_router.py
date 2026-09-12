@@ -132,6 +132,32 @@ class error_response(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
   
+def validate_case_assignment_request(request: Request, assign_request: assign_case_request):
+    payload = verify_jwt(request)
+
+    role = payload.get("role")
+    user_id = payload.get("sub")
+    username = payload.get("username")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
+    if not assign_request.CaseID:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": CASE_ID_REQUIRED
+            }
+        )
+
+    return user_id, username
 
 def verify_not_user(user_role:str):
     if  user_role  not in NOT_USER: #This solves for it being blank and non sense roles.
@@ -2629,54 +2655,36 @@ async def assign_case(
     request: Request, 
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
-    role = payload.get("role")
-    user_id = payload.get("sub")
-
-    if role not in ["ADMIN", "INVESTIGATOR"]:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "status": "error",
-                "message": "User unauthorized"
-            }
-        )
-
-    username = payload.get("username")
-
-    if not assign_request.CaseID:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "status": "error",
-                "message": CASE_ID_REQUIRED
-            }
-        )
+    user_id, username = validate_case_assignment_request(
+        request,
+        assign_request
+    )
 
     try:
-        await set_audit_executor(connection, user_id)
-        row = await connection.fetchrow(
-            """
-            UPDATE "Cases_DB"."Cases"
-            SET caseassigned = $1
-            WHERE caseid = $2::uuid
-                AND caseassigned IS NULL
-                AND casestate = 'PUBLISHED'
-                AND casecreator != $1
-            RETURNING *;
-            """,
-            username,
-            assign_request.CaseID
-        )
-
-        if row is None:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "status": "error",
-                    "message": "Invalid assignment request"
-                }
+        async with connection.transaction():
+            await set_audit_executor(connection, user_id)
+            row = await connection.fetchrow(
+                """
+                UPDATE "Cases_DB"."Cases"
+                SET caseassigned = $1
+                WHERE caseid = $2::uuid
+                    AND caseassigned IS NULL
+                    AND casestate = 'PUBLISHED'
+                    AND casecreator != $1
+                RETURNING *;
+                """,
+                username,
+                assign_request.CaseID
             )
+
+            if row is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": "Invalid assignment request"
+                    }
+                )
 
         return {
             "status": "success",
@@ -2766,29 +2774,10 @@ async def unassign_case(
     request: Request, 
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
-    role = payload.get("role")
-    user_id = payload.get("sub")
-
-    if role not in ["ADMIN", "INVESTIGATOR"]:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "status": "error",
-                "message": "User unauthorized"
-            }
-        )
-
-    username = payload.get("username")
-
-    if not assign_request.CaseID:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "status": "error",
-                "message": CASE_ID_REQUIRED
-            }
-        )
+    user_id, username = validate_case_assignment_request(
+        request,
+        assign_request
+    )
 
     try:
         async with connection.transaction():
