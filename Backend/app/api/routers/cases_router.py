@@ -103,6 +103,9 @@ class create_case_request(BaseModel):
 class create_single_case_request(BaseModel):
     CaseID: str | None = None
 
+class assign_case_request(BaseModel):
+    CaseID: str | None = None
+
 class update_comment_request(BaseModel):
     comment: str
 
@@ -2483,3 +2486,144 @@ async def get_audited_cases(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+@router.patch(
+    "/assignCase",
+    status_code=200,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Assign the current investigator or admin to a case",
+    description=(
+        "Assigns the currently authenticated ADMIN or INVESTIGATOR to a case. "
+        "The case must be published, unassigned, and must not have been created "
+        "by the user making the request."
+    ),
+    responses={
+        200: {
+            "description": "Case assigned successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case assigned successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Bad Request - Invalid assignment request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing_case_id": {
+                            "summary": "Case ID missing",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+                        "invalid_assignment": {
+                            "summary": "Case cannot be assigned",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid assignment request"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: USER_UNAUTHORIZED_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def assign_case(
+    assign_request: assign_case_request, 
+    request: Request, 
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+    role = payload.get("role")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
+    username = payload.get("username")
+
+    if not assign_request.CaseID:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": CASE_ID_REQUIRED
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."Cases"
+            SET caseassigned = $1
+            WHERE caseid = $2
+                AND caseassigned IS NULL
+                AND casestate = 'PUBLISHED'
+                AND casecreator != $1
+            RETURNING *;
+            """,
+            username,
+            assign_request.CaseID
+        )
+
+        if row is None:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "error",
+                    "message": "Invalid assignment request"
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "Case assigned successfully"
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+    
+    
+
+    
+    
