@@ -2623,3 +2623,142 @@ async def assign_case(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+@router.patch(
+    "/unassignCase",
+    status_code=200,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Unassign the current investigator or admin from a case",
+    description=(
+        "Unassigns the currently authenticated ADMIN or INVESTIGATOR from a case. "
+        "The case must be published, must currently be assigned to the user making "
+        "the request, and must not have been created by that user."
+    ),
+    responses={
+        200: {
+            "description": "Case unassigned successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case unassigned successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Bad Request - Invalid unassignment request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing_case_id": {
+                            "summary": "Case ID missing",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+                        "invalid_unassignment": {
+                            "summary": "Case cannot be unassigned",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid unassignment request"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: USER_UNAUTHORIZED_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def unassign_case(
+    assign_request: assign_case_request, 
+    request: Request, 
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+    role = payload.get("role")
+    user_id = payload.get("sub")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
+    username = payload.get("username")
+
+    if not assign_request.CaseID:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": CASE_ID_REQUIRED
+            }
+        )
+
+    try:
+        async with connection.transaction():
+            await set_audit_executor(connection, user_id)
+
+            row = await connection.fetchrow(
+                """
+                UPDATE "Cases_DB"."Cases"
+                SET caseassigned = NULL
+                WHERE caseid = $2::uuid
+                    AND caseassigned = $1
+                    AND casestate = 'PUBLISHED'
+                    AND casecreator != $1
+                RETURNING *;
+                """,
+                username,
+                assign_request.CaseID
+            )
+
+            if row is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": "Invalid unassignment request"
+                    }
+                )
+
+        return {
+            "status": "success",
+            "message": "Case unassigned successfully"
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
