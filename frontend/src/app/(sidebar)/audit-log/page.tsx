@@ -11,7 +11,7 @@ export default function AuditLogPage() {
       if (userRole !== 'ADMIN') {
         router.replace('/dashboard');
       }  
-    })
+    }, [userRole, router]);
 
     return (
         <div className='mt-8 ml-8 mr-8'>

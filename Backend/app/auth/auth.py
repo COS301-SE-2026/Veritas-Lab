@@ -71,6 +71,7 @@ auth_settings = Auth_Settings()
 
 SECRET_KEY = auth_settings.JWT_SECRET
 ALGORITHM = auth_settings.HASH
+COOKIE_MAX_AGE = auth_settings.TOKEN_EXPIRE * 60
 
 router = APIRouter(
     prefix="/api",
@@ -425,7 +426,7 @@ async def login(
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=1800
+        max_age=COOKIE_MAX_AGE
     )
 
     return {
@@ -601,7 +602,7 @@ async def register(
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=1800
+        max_age=COOKIE_MAX_AGE
     )
 
     return {
@@ -1552,7 +1553,9 @@ async def refresh_token(
     current_time = datetime.now(timezone.utc).timestamp()
     seconds_until_expiry = expiry - current_time
 
-    if seconds_until_expiry > 60:
+    refresh_window = (auth_settings.TOKEN_EXPIRE * 60) / 2 # Refresh if less than half the token's lifespan remains. We could shorten it if needed
+    
+    if seconds_until_expiry > refresh_window:
         return {
             "status": "success",
             "message": "Token does not need refreshing"
@@ -1593,7 +1596,7 @@ async def refresh_token(
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=1800
+        max_age=COOKIE_MAX_AGE
     )
 
     return {

@@ -1,11 +1,11 @@
 import type { SaveAnnotationsPayload } from '@/types/workbench';
 import type { ApiError } from '@/types/api';
+import { apiFetch } from './client';
 
 export async function saveAnnotations({ evidenceId, annotations }: SaveAnnotationsPayload): Promise<void> {
     const reportId = evidenceId;
-    const res = await fetch(`/api/saveAnnotations`, {
+    const res = await apiFetch(`/api/saveAnnotations`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
