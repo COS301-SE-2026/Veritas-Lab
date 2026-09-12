@@ -14,6 +14,7 @@ from app.core.database import get_connection
 from fastapi.security import APIKeyCookie
 
 COOKIE_NAME = "JWT_token"
+SYSTEM_INIT_UUID = uuidlib.UUID("00000000-0000-0000-0000-000000000000")
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
@@ -150,6 +151,13 @@ def validate_uuid(value: str) -> bool:
         return True
     except ValueError:
         return False
+
+def is_system_init_user(user_id) -> bool:
+    try:
+        is_system_init = uuidlib.UUID(str(user_id)) == SYSTEM_INIT_UUID
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return is_system_init
 
 # Validates a password. 
 # Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
@@ -698,6 +706,8 @@ async def fetch_users(
         users = []
 
         for row in rows:
+            if is_system_init_user(row["userid"]):
+                continue
             users.append(
                 {
                     "id":str(row["userid"]),
@@ -931,6 +941,15 @@ async def change_user_role(
             }
         )
 
+    if is_system_init_user(user_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Invalid userId format."
+            }
+        )
+
     if new_role not in ["USER", "ADMIN", "INVESTIGATOR"]:
         raise HTTPException(
             status_code=400,
@@ -1136,6 +1155,15 @@ async def delete_user(
             }
         )
 
+    if is_system_init_user(user_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Invalid User ID format."
+            }
+        )
+
     #An admin cannot delete themselves
     caller_id = payload.get("sub")
     if caller_id == user_id:
@@ -1282,6 +1310,14 @@ async def change_password(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
+    if is_system_init_user(payload.get("sub")):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Invalid or missing new password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+            }
+        )
     current_password = change_password_request.currentPassword
     new_password = change_password_request.newPassword
     if not current_password or not new_password:
