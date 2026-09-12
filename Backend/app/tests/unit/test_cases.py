@@ -1859,3 +1859,114 @@ def test_get_comments_missing_jwt(monkeypatch):
 
     assert "Missing authorization header" in str(excinfo.value)
 
+def test_create_user_role_allowed(monkeypatch):
+    client.cookies.clear()
+
+    _mock_jwt_success(
+        monkeypatch,
+        sub="mock-user-id",
+        username="normal_user",
+        role="USER"
+    )
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+    
+    _mock_db_connect(monkeypatch,
+        fetchrow_return={
+            "caseid": fake_case_id,
+            "casecreationdate": datetime(2026, 5, 20, 16, 0, tzinfo=timezone.utc)
+        }
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Case opened by a user",
+            "description": "A USER may open their own case."
+        }
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "status": "success",
+        "CaseId": fake_case_id
+    }
+
+def test_create_user_role_allowed(monkeypatch):
+    client.cookies.clear()
+
+    _mock_jwt_success(monkeypatch)
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    _mock_db_connect(monkeypatch,
+        fetchrow_return={
+            "caseid": fake_case_id,
+            "casecreationdate": datetime(2026, 5, 20, 16, 0, tzinfo=timezone.utc)
+        }
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Case opened by an investigator",
+            "description": "An INVESTIGATOR may open their own case."
+        }
+    )
+
+    assert response.status_code == 201
+
+def test_create_case_admin_allowed(monkeypatch):
+    client.cookies.clear()
+
+    _mock_jwt_success(
+        monkeypatch,
+        sub="mock-admin-id",
+        username="admin_user",
+        role="ADMIN"
+    )
+
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    _mock_db_connect(monkeypatch,
+        fetchrow_return={
+            "caseid": fake_case_id,
+            "casecreationdate": datetime(2026, 5, 20, 16, 0, tzinfo=timezone.utc)
+        }
+    )
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Case opened by an admin",
+            "description": "An ADMIN may open their own case."
+        }
+    )
+
+    assert response.status_code == 201
+    
+def test_create_case_database_error(monkeypatch):
+    client.cookies.clear()
+
+    _mock_jwt_success(monkeypatch)
+
+    mock_connection, mock_connect = _mock_db_connect(monkeypatch)
+    mock_connection.fetchrow = AsyncMock(side_effect=asyncpg.PostgresError("boom"))
+
+    response = client.post(
+        "/api/createCase",
+        json={
+            "title": "Mayday Mayday DB down!!",
+            "description": "Should return a 500 error."
+        }
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": cases_router.DATABASE_ERROR_MESSAGE
+        }
+    }
+
+    mock_connection.close.assert_called_once()
