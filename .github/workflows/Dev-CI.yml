@@ -5,6 +5,7 @@ on:
     pull_request:
         branches-ignore:
             - main
+            - database/changes/how-evidence-is-put-on-a-case
     workflow_dispatch:
 jobs:
     docker-build:
