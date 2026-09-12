@@ -137,7 +137,7 @@ services:
             - app-network
 
     minio:
-        image: minio/minio:latest
+        image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
         ports:
             - "${MINIO_API_PORT}:${MINIO_API_PORT}" 
             - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}" 
@@ -157,7 +157,7 @@ services:
             retries: 5
 
     minio-init:
-        image: minio/mc:latest
+        image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
         entrypoint: >
             /bin/sh -c "
             /usr/bin/mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
