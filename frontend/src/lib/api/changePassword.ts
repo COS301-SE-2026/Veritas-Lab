@@ -1,9 +1,9 @@
 import type { ApiError, ChangePasswordResponse } from '@/types/api';
+import { apiFetch } from './client';
 //frontend call to backend
 export async function changePassword(currentPassword: string, newPassword: string): Promise<ChangePasswordResponse> {
-    const res = await fetch(`/api/changePassword`, {
+    const res = await apiFetch(`/api/changePassword`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },

@@ -179,45 +179,58 @@ def _row_to_case(row: dict) -> Case:
 
     return case
 
-def _format_case_evidence(row: dict, user : bool) -> dict:
+def _format_case_evidence(row: dict, include_report: bool) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
     media_name = row["mediatitle"]
 
-    
-            #Creation of presigned URL below
+    # Generate presigned URL
     target_filename = f"{media_id}{media_extension}"
-    if user: # so none user log in block
-        presign_client =  get_object(for_presign=True)
+    presign_client = get_object(for_presign=True)
 
-        file_url = presign_client.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket':media_bucket,
-                'Key': target_filename
-            },
-            ExpiresIn=3600 # An hour 
-        )
-    else:
-        # user block: It needs the  url to be empty to hide the actual image since it could be sensitive info.
-        file_url= ""
+    file_url = presign_client.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": media_bucket,
+            "Key": target_filename
+        },
+        ExpiresIn=3600
+    )
 
-    return {
-        "reportId": str(row["reportid"]),
+    evidence = {
         "mediaId": str(media_id),
         "mediaName": media_name,
         "mediaBucket": media_bucket,
         "mediaExtension": media_extension,
         "mediaTypeId": str(row["mediatypeid"]),
         "mediaUrl": file_url,
-        "annotations": json.loads(row["annotations"]) if isinstance(row["annotations"], str) else (row["annotations"] or []),
-        "reportArtifacts": json.loads(row["reportartifacts"]) if isinstance(row["reportartifacts"], str) else row["reportartifacts"],
-        "reportFindings": row["reportfindings"],
-        "reportComments": row["reportcomments"],
-        "reportCertainty": row["reportcertainty"],
-        "reportDateCreation": row["reportdatecreation"].isoformat() if row["reportdatecreation"] else None,
     }
+
+    if include_report:
+        evidence.update({
+            "annotations": (
+                json.loads(row["annotations"])
+                if isinstance(row["annotations"], str)
+                else (row["annotations"] or [])
+            ),
+            "reportId": str(row["reportid"]),
+            "reportArtifacts": (
+                json.loads(row["reportartifacts"])
+                if isinstance(row["reportartifacts"], str)
+                else row["reportartifacts"]
+            ),
+            "reportFindings": row["reportfindings"],
+            "reportComments": row["reportcomments"],
+            "reportCertainty": row["reportcertainty"],
+            "reportDateCreation": (
+                row["reportdatecreation"].isoformat()
+                if row["reportdatecreation"]
+                else None
+            ),
+        })
+
+    return evidence
 
 def row_to_audit_event(row: dict) -> dict:
     return {
@@ -321,14 +334,14 @@ async def create_case(
         "CaseId": case_id
     }
 
-@router.post(
+@router.get(
     "/getCases",
     dependencies=[Depends(COOKIE_SCHEME)],
     status_code=status.HTTP_200_OK,
     summary='List Cases',
     description=(
         "Returns cases visible to the caller. INVESTIGATOR and ADMIN see every case. "
-        "USER role sees only closed cases."
+        "USER sees only cases they created."
     ),
     responses={
         200: {
@@ -340,7 +353,8 @@ async def create_case(
                         "cases": [
                             {
                                 "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
-                                "caseName": "Reciepts sus",
+                                "caseName": "Receipts sus",
+                                "caseCreator": "normal_user",
                                 "caseDescription": "Sus receipts case",
                                 "caseState": "OPEN",
                                 "caseCreationDate": "2026-05-20T19:43:02+00:00",
@@ -406,20 +420,22 @@ async def create_case(
     }
 )
 async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
-  
     payload = verify_jwt(request)
 
-    try:
-        is_standard_user = payload.get("role") == "USER"
+    role = payload.get("role")
+    username = payload.get("username")
+    is_standard_user = role == "USER"
 
+    try:
         rows = await connection.fetch(
             """
             SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
             FROM "Cases_DB"."Cases"
-            WHERE $1::boolean IS FALSE OR casestate = 'CLOSED'
+            WHERE $1::boolean IS FALSE OR casecreator = $2
             ORDER BY casecreationdate DESC
             """,
-            is_standard_user
+            is_standard_user,
+            username
         )
 
         return {
@@ -436,34 +452,83 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
             }
         )
 
-    
-@router.post(
+@router.get(
     "/getSingleCase",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get a single case",
     description=(
         "Returns one case with its comments and evidence. INVESTIGATOR and ADMIN can "
-        "get any case and receive presigned media URLs. The USER role can only "
-        "get closed cases, and their evidence is returned with an empty mediaUrl."
+        "get any case and receive full report data and presigned media URLs. "
+        "USER can only get cases they created. USER can access the media for their "
+        "own case in any state, but annotations and report data are only returned "
+        "when the case is CLOSED."
     ),
     responses={
         200: {
             "description": "Case retrieved successfully.",
             "content": {
                 "application/json": {
-                    "example": {
-                        "status": "success",
-                        "case":{
-                            "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
-                            "caseName": "Flood in Westville",
-                            "caseCreator": "investigator_user",
-                            "caseDescription": "Flood investigation case",
-                            "caseState": "OPEN",
-                            "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                    "examples": {
+                        "Full case": {
+                            "summary": "ADMIN, INVESTIGATOR, or USER viewing a closed case",
+                            "value": {
+                                "status": "success",
+                                "case": {
+                                    "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                    "caseName": "Flood in Westville",
+                                    "caseCreator": "investigator_user",
+                                    "caseDescription": "Flood investigation case",
+                                    "caseState": "CLOSED",
+                                    "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                                },
+                                "comments": [],
+                                "evidence": [
+                                    {
+                                        "reportId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                                        "mediaId": "11111111-2222-3333-4444-555555555555",
+                                        "mediaName": "flood_image.jpg",
+                                        "mediaBucket": "images",
+                                        "mediaExtension": ".jpg",
+                                        "mediaTypeId": "99999999-8888-7777-6666-555555555555",
+                                        "mediaUrl": "https://example.com/presigned-url",
+                                        "annotations": [],
+                                        "reportArtifacts": {},
+                                        "reportFindings": "No manipulation detected.",
+                                        "reportComments": "Reviewed by investigator.",
+                                        "reportCertainty": 3,
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00"
+                                    }
+                                ]
+                            }
                         },
-                        "comments": [],
-                        "evidence": []
+
+                        "User open case": {
+                            "summary": "USER viewing their own open case",
+                            "value": {
+                                "status": "success",
+                                "case": {
+                                    "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                    "caseName": "Flood in Westville",
+                                    "caseCreator": "normal_user",
+                                    "caseDescription": "Flood investigation case",
+                                    "caseState": "OPEN",
+                                    "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                                },
+
+                                "comments": [],
+                                "evidence": [
+                                    {
+                                        "mediaId": "11111111-2222-3333-4444-555555555555",
+                                        "mediaName": "flood_image.jpg",
+                                        "mediaBucket": "images",
+                                        "mediaExtension": ".jpg",
+                                        "mediaTypeId": "99999999-8888-7777-6666-555555555555",
+                                        "mediaUrl": "https://example.com/presigned-url"
+                                    }
+                                ]
+                            }
+                        }
                     }
                 }
             }
@@ -499,7 +564,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         401: INVALID_TOKEN_401,
         404: {
             "model": error_response,
-            "description": "Not Found - Case does not exist or USER requested on open case.",
+            "description": "Not Found - Case does not exist or USER requested a case they did not create.",
             "content": {
                 "application/json": {
                     "example": {
@@ -541,18 +606,21 @@ async def get_single_case(case_request: create_single_case_request, request: Req
 
     case_id = Case(case_id=case_request.CaseID).case_id
 
-    try:
-        is_standard_user = payload.get("role") == "USER"
+    role = payload.get("role")
+    username = payload.get("username")
+    is_standard_user = role == "USER"
 
+    try:
         row = await connection.fetchrow(
             """
             SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
             FROM "Cases_DB"."Cases"
             WHERE caseid = $1
-                AND ($2::boolean IS FALSE OR casestate = 'CLOSED')
+                AND ($2::boolean IS FALSE OR casecreator = $3)
             """,
             case_id,
-            is_standard_user
+            is_standard_user,
+            username
         )
 
         if row is None:
@@ -591,12 +659,14 @@ async def get_single_case(case_request: create_single_case_request, request: Req
             case_id,
         )
 
+        can_view_report = not is_standard_user or row["casestate"] == "CLOSED"
+
         return jsonable_encoder({
             "status": "success",
             "case": case.to_json(),
             "comments": await case.get_comments(connection),
             "evidence": [
-                _format_case_evidence(evidence_row, not is_standard_user)
+                _format_case_evidence(evidence_row, include_report=can_view_report)
                 for evidence_row in evidence_rows
             ]
         })
@@ -609,8 +679,6 @@ async def get_single_case(case_request: create_single_case_request, request: Req
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-
- 
 
 @router.post(
     "/cases/evidence",

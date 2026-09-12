@@ -13,36 +13,90 @@ async def fake_get_cases_context(ensure_user_exists):
 
     try:
         user_id = str(uuid.uuid4())
-        await ensure_user_exists(conn, user_id, "TestInvestigator", "INVESTIGATOR")
+
+        await ensure_user_exists(
+            conn,
+            user_id,
+            "TestInvestigator",
+            "INVESTIGATOR"
+        )
 
         # Set the session variable required by the Postgres audit trigger
-        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
-
-        open_case_id = str(uuid.uuid4())
         await conn.execute(
-            """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
-                VALUES ($1, $2, $3, $4, $5::case_state_enum)
-                """,
+            "SELECT set_config('app.current_user_id', $1, false)",
+            user_id
+        )
+
+        # Investigator-owned OPEN case
+        open_case_id = str(uuid.uuid4())
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
+            """,
             uuid.UUID(open_case_id),
             "Integration Test - Open Case",
             "TestInvestigator",
             "This case is currently open",
             "OPEN"
         )
+
         created_ids["open_case_id"] = open_case_id
 
+        # Investigator-owned CLOSED case
         closed_case_id = str(uuid.uuid4())
+
         await conn.execute(
-            """INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
-                VALUES ($1, $2, $3, $4, $5::case_state_enum)
-                """,
+            """
+            INSERT INTO "Cases_DB"."Cases"
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
+            """,
             uuid.UUID(closed_case_id),
             "Integration Test - Closed Case",
             "TestInvestigator",
             "This case is currently closed",
             "CLOSED"
         )
+
         created_ids["closed_case_id"] = closed_case_id
+
+        user_open_case_id = str(uuid.uuid4())
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
+            """,
+            uuid.UUID(user_open_case_id),
+            "Integration Test - User Open Case",
+            "test_user",
+            "This open case belongs to the regular user",
+            "OPEN"
+        )
+
+        created_ids["user_open_case_id"] = user_open_case_id
+
+        # USER-owned CLOSED case
+        user_closed_case_id = str(uuid.uuid4())
+
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases"
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
+            """,
+            uuid.UUID(user_closed_case_id),
+            "Integration Test - User Closed Case",
+            "test_user",
+            "This closed case belongs to the regular user",
+            "CLOSED"
+        )
+
+        created_ids["user_closed_case_id"] = user_closed_case_id
 
         yield created_ids
 
@@ -52,11 +106,25 @@ async def fake_get_cases_context(ensure_user_exists):
                 'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                 uuid.UUID(created_ids["open_case_id"])
             )
+
         if "closed_case_id" in created_ids:
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
                 uuid.UUID(created_ids["closed_case_id"])
             )
+
+        if "user_open_case_id" in created_ids:
+            await conn.execute(
+                'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
+                uuid.UUID(created_ids["user_open_case_id"])
+            )
+
+        if "user_closed_case_id" in created_ids:
+            await conn.execute(
+                'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
+                uuid.UUID(created_ids["user_closed_case_id"])
+            )
+
         await conn.close()
 
 @pytest.mark.asyncio
@@ -69,7 +137,7 @@ async def test_integration_get_cases_investigator(client, fake_get_cases_context
 
     client.cookies.set(COOKIE_NAME, create_token(mock_investigator_user))
 
-    response = client.post("/api/getCases", json={})
+    response = client.request("GET", "/api/getCases", json={})
 
     assert response.status_code == 200
     data = response.json()
@@ -89,7 +157,7 @@ async def test_integration_get_cases_regular_user(client, fake_get_cases_context
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_regular_user))
 
-    response = client.post("/api/getCases", json={})
+    response = client.request("GET", "/api/getCases", json={})
 
     assert response.status_code == 200
     data = response.json()
@@ -97,14 +165,14 @@ async def test_integration_get_cases_regular_user(client, fake_get_cases_context
 
     returned_case_ids = [c["caseId"] for c in data["cases"]]
 
-    assert fake_get_cases_context["closed_case_id"] in returned_case_ids
-    assert fake_get_cases_context["open_case_id"] not in returned_case_ids
+    assert fake_get_cases_context["user_closed_case_id"] in returned_case_ids
+    assert fake_get_cases_context["user_open_case_id"] in returned_case_ids
 
 @pytest.mark.asyncio
 async def test_integration_get_cases_unauthorized(client):
     client.cookies.clear()
 
-    response = client.request("POST", "/api/getCases")
+    response = client.request("GET", "/api/getCases")
 
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"

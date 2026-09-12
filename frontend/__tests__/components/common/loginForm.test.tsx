@@ -4,11 +4,13 @@ import LoginForm from '../../../src/components/common/loginForm';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockRefresh = jest.fn();
 
 jest.mock('next/navigation', () => ({
 	useRouter: () => ({
 		push: mockPush,
 		replace: mockReplace,
+		refresh: mockRefresh,
 	}),
 }));
 
@@ -16,6 +18,7 @@ describe('LoginForm', () => {
 	beforeEach(() => {
 		mockPush.mockClear();
 		mockReplace.mockClear();
+		mockRefresh.mockClear();
 		(globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn();
 	});
 
