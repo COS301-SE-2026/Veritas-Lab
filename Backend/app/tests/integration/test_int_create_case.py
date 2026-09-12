@@ -177,7 +177,7 @@ async def test_integration_create_case_expired_jwt(client):
     }
 
 @pytest.mark.asyncio
-async def test_integration_create_case_user_unauthorized(client):
+async def test_integration_create_case_register_cookie_not_sent_over(client):
     email = "create_case_unauthorized@example.com"
 
     await delete_user_by_email(email)
@@ -278,3 +278,82 @@ async def test_integration_create_case_name_too_long(client):
             "message": "CaseName must be 255 characters or less"
         }
     }
+
+async def test_integration_create_case_user_role_can_create(client, enssure_user_exists):
+    user_id = str(uuidlib.uuid4())
+
+    username = f"case_user_{user_id[:8]}"
+
+    case_id = None
+
+    connection = await get_connection()
+
+    try:
+        await ensure_user_exists(connection, user_id, "case_user", "USER")
+    finally:
+        await connection.close()
+
+    try:
+        client.cookies.clear()
+        client.cookies.set(
+            COOKIE_NAME,
+            create_token({
+                "id": user_id,
+                "username": username,
+                "role": "USER"
+            })
+        )
+
+        response = client.post(
+            "/api/createCase",
+            json={
+                "title": "User Role Case",
+                "description": "This case is created by a user with USER role."
+            }
+        )
+
+        assert response.status_code == 201
+
+        response_data = response.json()
+
+        assert response_data["status"] == "success"
+        assert "CaseId" in response_data
+
+        case_id = response_data["CaseId"]
+
+        connection = await get_connection()
+
+        try:
+            created_case = await connection.fetchrow(
+                """
+                SELECT
+                    casecreator,
+                    casename,
+                    casestate
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                """,
+                uuidlib.UUID(case_id)
+            )
+        finally:
+            await connection.close()
+
+        assert created_case is not None
+        assert created_case["casecreator"] == username
+        assert created_case["casestate"] == "OPEN"
+    
+    finally:
+        if case_id is not None:
+            connection = await get_connection()
+
+            try:
+                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
+                await connection.execute(
+                    """
+                    DELETE from "Cases_DB"."Cases"
+                    WHERE caseid = $1
+                    """,
+                    uuidlib.UUID(case_id)
+                )
+            finally:
+                await connection.close()
