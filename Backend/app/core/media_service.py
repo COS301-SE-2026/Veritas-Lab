@@ -154,7 +154,7 @@ class MediaService(ABC):
             row = await connection.fetchrow(
                 """
                 SELECT ReportArtifacts AS "reportartifacts"
-                FROM "Cases_DB"."Reports"
+                FROM "Cases_DB"."Media"
                 WHERE MediaId = $1
                 AND ReportArtifacts IS NOT NULL
                 LIMIT 1
@@ -183,7 +183,7 @@ class MediaService(ABC):
         try:
             await connection.execute(
                 """
-                UPDATE "Cases_DB"."Reports"
+                UPDATE "Cases_DB"."Media"
                 SET ReportArtifacts = $1::jsonb
                 WHERE MediaId = $2
                 AND ReportArtifacts IS NULL
@@ -208,10 +208,11 @@ class MediaService(ABC):
         try:
             await connection.execute(
                 """
-                UPDATE "Cases_DB"."Reports"
+                UPDATE "Cases_DB"."Media"
                 SET
                     ReportFindings = $1,
-                    ReportCertainty = $2
+                    ReportCertainty = $2,
+                    ReportDateCreation = CURRENT_TIMESTAMP
                 WHERE MediaId = $3
                 """,
                 analysis.Findings,
