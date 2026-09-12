@@ -2563,6 +2563,7 @@ async def assign_case(
 ):
     payload = verify_jwt(request)
     role = payload.get("role")
+    user_id = payload.get("sub")
 
     if role not in ["ADMIN", "INVESTIGATOR"]:
         raise HTTPException(
@@ -2585,11 +2586,12 @@ async def assign_case(
         )
 
     try:
+        await set_audit_executor(connection, user_id)
         row = await connection.fetchrow(
             """
             UPDATE "Cases_DB"."Cases"
             SET caseassigned = $1
-            WHERE caseid = $2
+            WHERE caseid = $2::uuid
                 AND caseassigned IS NULL
                 AND casestate = 'PUBLISHED'
                 AND casecreator != $1
@@ -2621,9 +2623,3 @@ async def assign_case(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
-
-    
-    
-
-    
-    
