@@ -2,6 +2,7 @@ import Sidebar from '@/components/common/sidebar';
 import { SidebarWrapper } from '@/context/SidebarContext';
 import { getCookie } from '@/auth/cookie';
 import { UserRoleProvider } from '@/context/UserRoleContext';
+import { redirect } from 'next/dist/client/components/navigation';
 type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 type CurrentUser = { //added to ensure admin cant delete itself or role change
     id: string;
@@ -11,6 +12,11 @@ type CurrentUser = { //added to ensure admin cant delete itself or role change
 function decodeJwtPayload(segment: string): Record<string, unknown> {
     return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
 }
+
+function isExpired(payload: Record<string, unknown>): boolean {
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
+}
+
 function getUserFromToken(token: string): CurrentUser {
     if (!token) {
         return { id: '', username: '', role: 'USER' };
@@ -30,6 +36,13 @@ function getUserFromToken(token: string): CurrentUser {
 
 export default async function SidebarLayout({ children }: { children: React.ReactNode }) {
     const token = await getCookie();
+    if(!token) redirect('/login');
+    try {
+        const payload = decodeJwtPayload(token.split('.')[1]);
+        if (isExpired(payload)) redirect('/login');
+    } catch {
+        redirect('/login');
+    }
     const currentUser = getUserFromToken(token);
 
     return (
