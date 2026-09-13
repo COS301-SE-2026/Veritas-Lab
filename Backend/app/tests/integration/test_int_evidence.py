@@ -70,18 +70,18 @@ async def fake_evidence_context(ensure_user_exists):
         )
         created_ids["media_id"] = media_id
 
-        report_row = await conn.fetchrow(
+        await conn.execute(
             """
-            INSERT INTO "Cases_DB"."Reports" 
-            (CaseId, MediaId, ImageTitle)
-            VALUES ($1, $2, $3)
-            RETURNING ReportId
+            UPDATE "Cases_DB"."Cases"
+            SET evidence = ARRAY[
+                ROW($2, $3)::"Cases_DB".evidence_type
+            ]
+            WHERE CaseId = $1
             """,
             uuid.UUID(case_id),
             uuid.UUID(media_id),
-            "Fake Evidence Title"
+            "test evidence",
         )
-        created_ids["report_id"] = str(report_row["reportid"])
 
         file_key = f"{media_id}{media_extension}"
         s3_client.put_object(
@@ -150,12 +150,11 @@ async def assert_object_storage_not_deleted(
 
     conn = await get_connection()
     try:
-        report_row = await conn.fetchrow(
-            'SELECT * FROM "Cases_DB"."Reports" WHERE CaseId = $1 AND MediaId = $2',
+        evidence_row = await conn.fetchrow(
+            'SELECT evidence FROM "Cases_DB"."Cases" WHERE CaseId = $1',
             uuid.UUID(case_id),
-            uuid.UUID(media_id)
         )
-        assert report_row is not None
+        assert any(str(evidence[0]) == str(media_id) for evidence in evidence_row["evidence"])
     finally:
         await conn.close()
 
@@ -190,7 +189,7 @@ async def test_integration_delete_evidence_403_not_creator(client, fake_evidence
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] =="Unauthorized to delete this evidence or record not found."
+    assert response.json()["detail"]["message"] == "Unauthorized to delete this evidence or record not found."
     await assert_object_storage_not_deleted(media_id,case_id,fake_evidence_context)
     
 #403: USER deleting
@@ -210,7 +209,7 @@ async def test_integration_delete_evidence_403_user(client, fake_evidence_contex
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] =="User unauthorized"
+    assert response.json()["detail"]["message"] == "Unauthorized to delete this evidence or record not found."
     await assert_object_storage_not_deleted(media_id,case_id,fake_evidence_context)
 
 
