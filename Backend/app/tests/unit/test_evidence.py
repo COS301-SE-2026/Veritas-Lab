@@ -271,13 +271,13 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     )
     mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-123")
 
-    report_inserts = 0
+    evidence_updates = 0
 
     async def mock_execute(query, *args, **kwargs):
-        nonlocal report_inserts
-        if 'INSERT INTO "Cases_DB"."Reports"' in query:
-            report_inserts += 1
-            if report_inserts == 2:
+        nonlocal evidence_updates
+        if 'UPDATE "Cases_DB"."Cases"' in query and 'array_append' in query:
+            evidence_updates += 1
+            if evidence_updates == 2:
                 raise asyncpg.exceptions.UniqueViolationError("Duplicate key value violates unique constraint")
         return None
 
@@ -324,7 +324,7 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
 @patch("app.core.cases.get_object")
 async def test_delete_evidence_investigator_duplicate_entry(mockget_object, mockDbConnect):
     """
-An investigator deletes a duplicate. Only the report is deleted.
+An investigator deletes a duplicate evidence reference.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
@@ -356,7 +356,7 @@ An investigator deletes a duplicate. Only the report is deleted.
 @patch("app.core.cases.asyncio", create=True)
 async def test_delete_evidence_investigator_only_entry(mock_asyncio, mockget_object, mockDbConnect):
     """
-An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
+An investigator deletes the only entry for that evidence and the object storage file.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
@@ -396,7 +396,7 @@ An investigator deletes the only entry for that evidence.The report is deleted a
 @patch("app.core.cases.get_object")
 async def test_delete_evidence_admin_duplicate_entry(mockget_object, mockDbConnect):
     """
-An admin deletes a duplicate. Therefore only the report is deleted
+An admin deletes a duplicate evidence reference.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
@@ -425,7 +425,7 @@ An admin deletes a duplicate. Therefore only the report is deleted
 @patch("app.core.cases.asyncio", create=True)
 async def test_delete_evidence_admin_only_entry(mock_asyncio, mockget_object, mockDbConnect):
     """
-An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
+An admin deletes the only entry of that evidence and the object storage file.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()

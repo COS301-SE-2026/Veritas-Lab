@@ -715,8 +715,8 @@ async def get_single_case(case_request: create_single_case_request, request: Req
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Upload case evidence",
     description=(
-        "Uploads a media file as evidence against an open case. Only the "
-        "INVESTIGATOR or ADMIN who created the case may upload to it. The file is "
+        "Uploads a media file as evidence against an open case. Only the user "
+        "who owns the case may upload to it, regardless of role. The file is "
         "stored in object storage and queued for AI analysis."
     ),
     responses={
@@ -774,7 +774,6 @@ async def get_single_case(case_request: create_single_case_request, request: Req
             }
         },
         401: INVALID_TOKEN_401,
-        403: USER_UNAUTHORIZED_403,
         404: {
             "model": error_response,
             "description": "Not Found - no open case with that id created by this user.",
@@ -845,7 +844,8 @@ async def upload_evidence(
 ):
     payload = verify_jwt(request)
 
-    verify_not_user(payload.get("role"))
+    #verify_not_user(payload.get("role"))
+    #Now open to all roles
 
     case_creator = payload["username"]
     executor_id=payload.get("sub")
@@ -2799,6 +2799,145 @@ async def unassign_case(
             "message": "Case unassigned successfully"
         }
 
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.patch(
+    "/publishCase",
+    status_code=200,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Publish an open case",
+    description=(
+        "Publishes an OPEN case owned by the currently authenticated user. "
+        "The case must exist, must currently be in the OPEN state, and the "
+        "authenticated user must be the case creator."
+    ),
+    responses={
+        200: {
+            "description": "Case published successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Case published successfully"
+                    }
+                }
+            }
+        },
+
+
+        400: {
+            "description": "Bad Request - Invalid publish request",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing_case_id": {
+                            "summary": "Case ID missing",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": CASE_ID_REQUIRED
+                                }
+                            }
+                        },
+                        "invalid_publish": {
+                            "summary": "Case cannot be published",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Invalid publish request"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        403: USER_UNAUTHORIZED_403,
+
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def publish_case(
+    publish_request: assign_case_request,
+    request: Request, 
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+    user_id = payload.get("sub")
+    username = payload.get("username")
+    role = payload.get("role")
+
+    if role not in ["INVESTIGATOR", "ADMIN", "USER"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
+
+    if not publish_request.CaseID:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": CASE_ID_REQUIRED
+            }
+        )
+
+    try:
+        async with connection.transaction():
+            await set_audit_executor(connection, user_id)
+
+            row = await connection.fetchrow(
+                """
+                UPDATE "Cases_DB"."Cases"
+                SET casestate = 'PUBLISHED', casepublishdate = CURRENT_TIMESTAMP
+                WHERE caseid = $1::uuid
+                    AND casestate = 'OPEN'
+                    AND casecreator = $2
+                RETURNING *;
+                """,
+                publish_request.CaseID,
+                username
+            )
+
+            if row is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": "Invalid publish request"
+                    }
+                )
+
+        return {
+            "status": "success",
+            "message": "Case published successfully"
+        }
+                
     except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
