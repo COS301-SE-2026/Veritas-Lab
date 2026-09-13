@@ -908,7 +908,6 @@ async def upload_evidence(
 
 @router.patch(
     "/closeCase",
-    summary="Close a case",
     status_code=200,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Close an assigned published case",
