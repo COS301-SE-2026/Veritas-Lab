@@ -155,10 +155,11 @@ async def fake_upload_context(ensure_user_exists):
         await conn.execute("SELECT set_config('app.current_user_id', $1, false)", created_ids["creator_user_id"])
         for case_id in created_case_ids:
             rows = await conn.fetch(
-                'SELECT mediaid FROM "Cases_DB"."Reports" WHERE caseid = $1',
+                'SELECT evidence FROM "Cases_DB"."Cases" WHERE caseid = $1',
                 case_id,
             )
-            media_ids.extend(str(row["mediaid"]) for row in rows)
+            for row in rows:
+                media_ids.extend(str(evidence[0]) for evidence in (row["evidence"] or []))
 
             await conn.execute(
                 'DELETE FROM "Cases_DB"."Cases" WHERE caseid = $1',
@@ -227,15 +228,15 @@ async def test_integration_upload_evidence_success(client, fake_upload_context):
             'SELECT MediaId FROM "Cases_DB"."Media" WHERE MediaId = $1',
             uuid.UUID(media_id),
         )
-        report_row = await conn.fetchrow(
-            'SELECT ReportId FROM "Cases_DB"."Reports" WHERE MediaId = $1',
-            uuid.UUID(media_id),
+        evidence_row = await conn.fetchrow(
+            'SELECT evidence FROM "Cases_DB"."Cases" WHERE caseid = $1',
+            uuid.UUID(fake_upload_context["open_case_id"]),
         )
     finally:
         await conn.close()
 
     assert media_row is not None
-    assert report_row is not None
+    assert any(str(evidence[0]) == media_id for evidence in evidence_row["evidence"])
 
     storage_client = get_object()
     head = storage_client.head_object(
@@ -265,17 +266,19 @@ async def test_integration_upload_evidence_duplicate_returns_409(client, fake_up
 
 
 @pytest.mark.asyncio
-async def test_integration_upload_evidence_user_forbidden(client, fake_upload_context):
-    client.cookies.set(COOKIE_NAME, cookie_for("StandardUser", "USER"))
+async def test_integration_upload_evidence_owner_can_upload_regardless_of_role(client, fake_upload_context):
+    client.cookies.set(
+        COOKIE_NAME,
+        cookie_for(CASE_CREATOR, "USER", fake_upload_context["creator_user_id"]),
+    )
 
     response = upload(
         client,
         fake_upload_context["open_case_id"],
-        png_bytes("forbidden"),
+        png_bytes("standard-user-owner"),
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"]["message"] == "User unauthorized"
+    assert response.status_code == 201
 
 
 @pytest.mark.asyncio
