@@ -1,7 +1,7 @@
 from uuid import UUID
 import pytest
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 import asyncpg
 
@@ -24,9 +24,8 @@ def override_database_dependency():
 @pytest.fixture
 def valid_payload():
     return {
-        "caseId": "case_123",
-        "evidenceId": "ev_456",
-        "reportId": "19dccebd-302b-412a-b77e-3167f79837d1",
+        "caseId": "19dccebd-302b-412a-b77e-3167f79837d1",
+        "mediaId": "19dccebd-302b-412a-b77e-3167f79837d1",
         "annotations": [
             {"tag": "highlight", "cord": "15-35"},
             {"tag": "comment", "cord": "35-23"}
@@ -35,7 +34,11 @@ def valid_payload():
 
 @pytest.mark.asyncio
 async def test_save_annotations_success(valid_payload):
-    with patch.object(cases_router, "verify_jwt", return_value={"role": "admin"}), \
+    with patch.object(cases_router, "verify_jwt", return_value={
+             "role": "ADMIN",
+             "username": "assigned_investigator",
+             "sub": str(UUID("19dccebd-302b-412a-b77e-3167f79837d1")),
+         }), \
          patch.object(cases_router, "verify_not_user", return_value=True), \
          patch.object(cases_router, "transform_to_uuid", return_value=UUID("19dccebd-302b-412a-b77e-3167f79837d1")), \
          patch.object(cases_router, "_save_annotations", new_callable=AsyncMock) as mock_save:
@@ -73,4 +76,23 @@ async def test_save_annotations_invalid_payload():
         response = await ac.post("/api/saveAnnotations", json=invalid_payload)
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_save_annotations_requires_case_assignment():
+    connection = AsyncMock()
+    connection.transaction = MagicMock()
+    connection.fetchrow.return_value = None
+
+    with pytest.raises(HTTPException) as exc_info:
+        await cases_router._save_annotations(
+            connection=connection,
+            case_id=UUID("19dccebd-302b-412a-b77e-3167f79837d1"),
+            media_id=UUID("29dccebd-302b-412a-b77e-3167f79837d1"),
+            annotations="[]",
+            user_name="unassigned_investigator",
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail["message"] == cases_router.USER_UNAUTHORIZED
 
