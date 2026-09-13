@@ -1014,7 +1014,6 @@ async def close_case(
                 WHERE caseid = $1::uuid
                     AND casestate = 'PUBLISHED'
                     AND caseassigned = $2
-                    AND casecreator != $2
                 RETURNING *;
                 """ ,
                 case_request.CaseID,
