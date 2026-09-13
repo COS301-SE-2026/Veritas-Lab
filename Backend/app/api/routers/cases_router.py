@@ -1602,7 +1602,11 @@ async def retreive_comments(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Delete case evidence",
-    description="Deletes a specific evidence item/media attached to a case. Investigators can only delete evidence from cases they created, while Admins can delete any evidence.",
+    description=(
+        "Deletes a specific evidence item/media attached to a case. Only the case "
+        "owner may delete evidence from an OPEN case. ADMIN users may delete "
+        "evidence from any case state."
+    ),
     responses={
         200: {
             "description": "Evidence deleted successfully.",
@@ -1644,12 +1648,12 @@ async def retreive_comments(
         },
         401: INVALID_TOKEN_401,
         403: {
-            "description": "Forbidden - User lacks permission or is standard USER role.",
+            "description": "Forbidden - The caller does not own the case or the case is not OPEN.",
             "content": {
                 "application/json": {
                     "examples": {
-                        "Role Forbidden": {
-                            "summary": "Standard USER Role Blocked",
+                        "Not Case Owner": {
+                            "summary": "Caller does not own the case",
                             "value": {
                                 "detail": {
                                     "status": "error",
@@ -1657,12 +1661,12 @@ async def retreive_comments(
                                 }
                             }
                         },
-                        "Not Owner": {
-                            "summary": "Investigator is not the Case Creator or the case doesn't exist",
+                        "Case Not Open": {
+                            "summary": "Case is not open",
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Unauthorized to delete this evidence or record not found."
+                                    "message": "User unauthorized"
                                 }
                             }
                         }
@@ -1726,11 +1730,8 @@ async def delete_evidence(
     payload = verify_jwt(request)
     #Can raise the 401 errors
     
-
-    user_role=payload.get("role")
-
-    verify_not_user(user_role)
-    #can raise HTTPException 403
+    #verify_not_user(user_role)
+    #There is no limmit to who can delete now
 
     media_id = media_id_valid_uuid(media_id)
     # can raise HTTPException 400 
@@ -1739,12 +1740,13 @@ async def delete_evidence(
 
         case = Case(case_id=case_id)
         #raises 400 for bad case id format
-        username=payload.get("username") if user_role == "INVESTIGATOR" else None
+        username=payload.get("username")
         response=await case.delete_evidence(
             media_id=media_id,
             connection=connection,
             jwt_username=username,
-            jwt_user_id=payload.get("sub")
+            jwt_user_id=payload.get("sub"),
+            is_admin=payload.get("role") == "ADMIN"
         )
         #
         
