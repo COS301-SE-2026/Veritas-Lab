@@ -331,7 +331,8 @@ An investigator deletes a duplicate evidence reference.
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=None)
+    mockDbConnection.fetchrow = AsyncMock(return_value={"caseid": uuid.uuid4()})
+    mockDbConnection.fetchval = AsyncMock(return_value=1)
     mockDbConnection.close = AsyncMock()
 
     mock_s3_client = MagicMock()
@@ -344,7 +345,8 @@ An investigator deletes a duplicate evidence reference.
 
     result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user, connection=mockDbConnection)
 
-    mockDbConnection.execute.assert_called_once()
+    mockDbConnection.fetchrow.assert_called_once()
+    mockDbConnection.fetchval.assert_awaited_once()
     mock_s3_client.remove_object.assert_not_called()
     assert result["status"] == "success"
     assert result["deleted"] == test_media_id
@@ -369,7 +371,10 @@ An investigator deletes the only entry for that evidence and the object storage 
     }
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+    mockDbConnection.fetchrow = AsyncMock(
+        side_effect=[{"caseid": uuid.uuid4()}, mockMediaData]
+    )
+    mockDbConnection.fetchval = AsyncMock(return_value=0)
     mockDbConnection.close = AsyncMock()
     mock_asyncio.to_thread = AsyncMock()
 
@@ -403,7 +408,8 @@ An admin deletes a duplicate evidence reference.
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=None)
+    mockDbConnection.fetchrow = AsyncMock(return_value={"caseid": uuid.uuid4()})
+    mockDbConnection.fetchval = AsyncMock(return_value=1)
 
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
@@ -412,9 +418,14 @@ An admin deletes a duplicate evidence reference.
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
+    result = await case.delete_evidence(
+        media_id=test_media_id,
+        connection=mockDbConnection,
+        is_admin=True,
+    )
 
-    mockDbConnection.execute.assert_called_once()
+    mockDbConnection.fetchrow.assert_called_once()
+    mockDbConnection.fetchval.assert_awaited_once()
     mock_s3_client.remove_object.assert_not_called()
     assert result["status"] == "success"
 
@@ -438,7 +449,10 @@ An admin deletes the only entry of that evidence and the object storage file.
     }
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+    mockDbConnection.fetchrow = AsyncMock(
+        side_effect=[{"caseid": uuid.uuid4()}, mockMediaData]
+    )
+    mockDbConnection.fetchval = AsyncMock(return_value=0)
     mock_asyncio.to_thread = AsyncMock()
 
     mock_s3_client = MagicMock()
@@ -448,7 +462,11 @@ An admin deletes the only entry of that evidence and the object storage file.
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
+    result = await case.delete_evidence(
+        media_id=test_media_id,
+        connection=mockDbConnection,
+        is_admin=True,
+    )
 
     mock_asyncio.to_thread.assert_awaited_once_with(
         mock_s3_client.delete_object,
@@ -488,7 +506,7 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
     mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
-    mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
+    mockDbConnection.fetchrow = AsyncMock(return_value=None)
     
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     case.case_id = uuid.uuid4()
@@ -512,14 +530,18 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
-    mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
+    mockDbConnection.fetchrow = AsyncMock(return_value=None)
     
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
+        await case.delete_evidence(
+            media_id=test_media_id,
+            connection=mockDbConnection,
+            is_admin=True,
+        )
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {"status": "error", "message": "Media not found."}
@@ -747,6 +769,11 @@ def test_delete_evidence_invalid_media_id(monkeypatch):
 def test_delete_evidence_user_forbidden(monkeypatch):
     client.cookies.clear()
 
+    connection = AsyncMock()
+    connection.transaction = MagicMock()
+    connection.fetchrow = AsyncMock(return_value=None)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", lambda: connection)
+
     def mock_verify_jwt(request):
         return {
             "sub": "user-id",
@@ -768,7 +795,7 @@ def test_delete_evidence_user_forbidden(monkeypatch):
     assert response.json() == {
         "detail": {
             "status": "error",
-            "message": "User unauthorized"
+            "message": "Unauthorized to delete this evidence or record not found."
         }
     }
 
