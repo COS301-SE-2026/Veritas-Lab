@@ -715,8 +715,8 @@ async def get_single_case(case_request: create_single_case_request, request: Req
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Upload case evidence",
     description=(
-        "Uploads a media file as evidence against an open case. Only the "
-        "INVESTIGATOR or ADMIN who created the case may upload to it. The file is "
+        "Uploads a media file as evidence against an open case. Only the user "
+        "who owns the case may upload to it, regardless of role. The file is "
         "stored in object storage and queued for AI analysis."
     ),
     responses={
@@ -774,7 +774,6 @@ async def get_single_case(case_request: create_single_case_request, request: Req
             }
         },
         401: INVALID_TOKEN_401,
-        403: USER_UNAUTHORIZED_403,
         404: {
             "model": error_response,
             "description": "Not Found - no open case with that id created by this user.",
@@ -845,7 +844,8 @@ async def upload_evidence(
 ):
     payload = verify_jwt(request)
 
-    verify_not_user(payload.get("role"))
+    #verify_not_user(payload.get("role"))
+    #Now open to all roles
 
     case_creator = payload["username"]
     executor_id=payload.get("sub")

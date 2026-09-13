@@ -349,31 +349,19 @@ class Case:
 
                     await connection.execute(
                         """
-                        INSERT INTO "Cases_DB"."Reports" (
-                            CaseId, 
-                            MediaId, 
-                            ImageTitle, 
-                            ReportArtifacts, 
-                            ReportFindings, 
-                            ReportComments
+                        UPDATE "Cases_DB"."Cases"
+                        SET evidence = array_append(
+                            COALESCE(evidence, ARRAY[]::"Cases_DB".evidence_type[]),
+                            ROW($2, $3)::"Cases_DB".evidence_type
                         )
-                        SELECT 
-                            $1,
-                            $2,
-                            $3,
-                            ReportArtifacts, 
-                            ReportFindings, 
-                            ReportComments
-                        FROM "Cases_DB"."Reports"
-                        WHERE MediaId = $2
-                        LIMIT 1;
+                        WHERE CaseId = $1;
                         """,
                         case_id,
                         media_id,
                         filename
                     )
 
-                else: 
+                else: # The hash is not in the db already therefore we need to add it
                     new_media_uuid = uuid.uuid4()
 
                     media_id = await connection.fetchval(
@@ -401,15 +389,16 @@ class Case:
 
                     await connection.execute(
                         """
-                        INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle, ReportArtifacts, ReportFindings, ReportComments)
-                        VALUES ($1, $2, $3, $4, $5, $6)
+                        UPDATE "Cases_DB"."Cases"
+                        SET evidence = array_append(
+                            COALESCE(evidence, ARRAY[]::"Cases_DB".evidence_type[]),
+                            ROW($2, $3)::"Cases_DB".evidence_type
+                        )
+                        WHERE CaseId = $1;
                         """,
                         case_id,
                         media_id,
-                        filename,
-                        None,
-                        None,
-                        None
+                        filename
                     )
 
             # Creation of presigned URL below
@@ -439,6 +428,17 @@ class Case:
                     "message": MEDIA_ALREADY_ON_CASE
                 }
             )
+
+        except asyncpg.PostgresError as e:
+            if "Duplicate evidence error" in str(e):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "status": "error",
+                        "message": MEDIA_ALREADY_ON_CASE
+                    }
+                )
+            raise
         
         except HTTPException as e:
             raise e
