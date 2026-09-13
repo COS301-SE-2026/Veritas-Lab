@@ -4,9 +4,15 @@
   --background: #ffffff;
   --foreground: #171717;
   --color-primary: #231F20;
+  --color-primary-hover: #34302f;
   --color-secondary: #3DBF79;
+  --color-b-50: #eafaf1;
+  --color-b-600: #2e9e66;
   --color-background: #ffffff;
   --color-text: #231F20;
+  --color-text-strong: #231F20;
+  --color-text-muted: #656a72;
+  --color-text-subtle: #969ba3;
   --color-dark: #231F20;
   --color-light: #a1a1a1;
   --color-lightest: #F2F2F2;
@@ -29,6 +35,26 @@
     --background: #ffffff;
     --foreground: #ededed;
   }
+}
+
+@layer components {
+  .vl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 1000px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+
+  .vl-btn-primary {
+    background: var(--color-secondary);
+    color: var(--color-primary);
+    box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--color-b-600) 70%, transparent);
+  } 
 }
 
 body {
