@@ -42,23 +42,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html { scroll-behavior: smooth; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
-body {
-  background: var(--color-canvas);
-  color: #201d1e;
-  font-family: var(--font-afacad), "Segoe UI", Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-::selection { background: color-mix(in srgb, var(--color-secondary) 30%, transparent); }
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-line-strong) transparent;
-}
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -116,18 +100,91 @@ body {
     color: inherit;
     background: transparent;
   }
+
+  .vl-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s ease, border-color .2s ease, transform .2 ease;
+  }
+
+  .vl-card-interactive:hover {
+    box-shadow: var(--shadow-lg);
+    border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-surface));
+    transform: translateY(-2px);
+  }
+
+  .vl-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .vl-sunken {
+    background: var(--color-surface);
+    border: 1px solid var(--color-surface);
+    border-radius: var(--radius-lg);
+  }
+
+  .vl-input, .vl-textarea, .vl-select {
+    width: 100%;
+    border: 1px solid var(--color-line-strong);
+    background-color: var(--color-surface);
+    color: var(--color-text-strong);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+
+  .vl-input {
+    border-radius: 1000px;
+    padding: 0.5rem 1rem;
+    transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+  }
+
+  .vl-textarea {
+    border-radius: var(--radius-md);
+    padding: 0.7rem 1rem;
+    resize: none;
+  }
+  
+  .vl-select {
+    border-radius: 1000px;
+    padding: 0.6rem 2rem 0.6rem 1rem;
+    cursor: pointer;
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+  }
+
+  .vl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: 1000px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
 }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-afacad), Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: #201d1e;
+  font-family: var(--font-afacad), "Segoe UI", Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+::selection { background: color-mix(in srgb, var(--color-secondary) 30%, transparent); }
 
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
