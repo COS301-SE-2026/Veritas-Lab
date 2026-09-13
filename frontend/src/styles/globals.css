@@ -9,6 +9,7 @@
   --color-b-50: #eafaf1;
   --color-b-600: #2e9e66;
   --color-background: #ffffff;
+  --color-surface: #ffffff;
   --color-text: #231F20;
   --color-text-strong: #231F20;
   --color-text-muted: #656a72;
@@ -21,13 +22,42 @@
   --color-info: #2b6cb0;
   --color-success: #2a9a5e;
   --color-risk: #e0a92e;
+
+  --radius-sm: 12px;
+  --radius-md: 16pc;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --radius-2xl: 32px;
+
+  --shadow-xs: 0 1px 2px rgba(20,18,19,0.06);
+  --shadow-sm: 0 1px 3px rgba(20,18,19,0.09), 0 1px 2px rgba(20,18,19,0.05);
+  --shadow-md: 0 6px 16px -6px rgba(20,18,19,0.14), 0 2px 6px -2px rgba(20,18,19,0.07);
+  --shadow-lg: 0 16px 34px -10px rgba(20,18,19,0.18), 0 6px 14px -8px rgba(20,18,19,0.10);
+  --shadow-pop: 0 24px 60px -16px rgba(20,18,19,0.30);
+  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 42%, transparent);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-afacad);
   --font-mono: var(--font-geist-mono);
+}
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  background: var(--color-canvas);
+  color: #201d1e;
+  font-family: var(--font-afacad), "Segoe UI", Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: color-mix(in srgb, var(--color-secondary) 30%, transparent); }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -54,7 +84,38 @@
     background: var(--color-secondary);
     color: var(--color-primary);
     box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--color-b-600) 70%, transparent);
-  } 
+  }
+
+  .vl-btn-secondary {
+    background: var(--color-primary);
+    color: #ffffff;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .vl-btn-outline {
+    background: transparent;
+    color: var(--color-primary);
+    border-color: var(--color-line-strong);
+  }
+
+  .vl-btn-light {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border-color: var(--color-surface);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .vl-btn-ghost {
+    background: transparent;
+    color: var(--color-text-muted);
+  }
+
+  .vl-btn-icon {
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    color: inherit;
+    background: transparent;
+  }
 }
 
 body {
