@@ -120,7 +120,8 @@ class create_comment_request(BaseModel):
 
 class save_annotations_payload(BaseModel):
     #Mapping from CamelCase to SnakeCase for Sonar to be Happy
-    connector_id: str = Field(..., alias="reportId")
+    case_id: str = Field(..., alias="caseId")
+    media_id: str = Field(..., alias="mediaId")
     #since the format of the annotations was not specified by frontend we will be accepting any valid JSON
     annotations: List[Dict[str, Any]]
     model_config = ConfigDict(populate_by_name=True)
@@ -2078,33 +2079,46 @@ async def delete_case(
 
 async def _save_annotations(
     connection: asyncpg.Connection,
-    connector_id: UUID,
+    case_id: UUID,
+    media_id: UUID,
     annotations: str,
     user_name: str,
     executor_id: str | None = None
 ):
-    #This not in a class cases because it is faster to use the reportId in a query then to use the caseId and EvidenceId
-    #report_id was changed to connector_id to prepare for the database change since the reports need to be de a one-to-many relationship and not one-to-one
+        # Evidence is stored as a composite array on the case rather than in a join table.
     query = """
         UPDATE "Cases_DB"."Media" m
         SET MediaAnnotations = $1::jsonb
-        FROM "Cases_DB"."Reports" r 
-        INNER JOIN "Cases_DB"."Cases" c ON r.CaseId = c.CaseId
-        WHERE m.MediaId = r.MediaId
-          AND c.CaseCreator = $3 
-          AND r.ReportId = $2;
+        FROM "Cases_DB"."Cases" c
+        CROSS JOIN LATERAL unnest(c.evidence) AS evidence(evidence_id, case_perspective)
+        WHERE m.MediaId = evidence.evidence_id
+            AND c.CaseId = $2
+            AND m.MediaId = $3
+            AND c.CaseAssigned = $4
+            AND c.CaseState = 'PUBLISHED'
+        RETURNING m.MediaId;
     """
     try:
         async with connection.transaction():
             if executor_id:
                 await set_audit_executor(connection, executor_id)
 
-            await connection.execute(
+            updated_row = await connection.fetchrow(
                 query, 
                 annotations, 
-                connector_id, 
+                case_id,
+                media_id,
                 user_name
             )
+
+            if updated_row is None:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "status": "error",
+                        "message": USER_UNAUTHORIZED
+                    }
+                )
 
     except asyncpg.PostgresError:
         raise HTTPException(
@@ -2225,11 +2239,13 @@ async def save_annotations(
     executor_id=cookie.get("sub")
 
     try:
-        connector_id=transform_to_uuid(payload.connector_id)
+        case_id=transform_to_uuid(payload.case_id)
+        media_id=transform_to_uuid(payload.media_id)
         annotations_json_str = json.dumps(payload.annotations)
         await _save_annotations(
             connection,
-            connector_id,
+            case_id,
+            media_id,
             annotations_json_str,
             user_name,
             executor_id
