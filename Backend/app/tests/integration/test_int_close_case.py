@@ -1,334 +1,399 @@
+import uuid
+
 import pytest
-from fastapi.testclient import TestClient
-from app.api.main import app
-from app.core.env import User_Settings, Postgres_Settings, Auth_Settings
-import asyncpg
-from datetime import datetime, timedelta, timezone
-import uuid as uuidlib
-from app.auth.auth import create_token, COOKIE_NAME, INVALID_TOKEN, NOT_AUTH, EXPIRED_TOKEN
-import asyncio
-from jose import jwt
-from test_int_auth import delete_user_by_email
+import pytest_asyncio
+
+from app.auth.auth import COOKIE_NAME, create_token
 from app.tests.integration.conftest import get_connection
-from app.tests.integration.test_int_auth import load_admin_user # for sonar
-import app.tests.integration.test_int_auth as auth_tests # for sonar
-from app.api.routers.cases_router import CASE_ID_REQUIRED, INVALID_CASE_ID, CASE_NOT_FOUND_OR_UNAUTHORIZED
 
-USER_SETTINGS = User_Settings()
+INVESTIGATOR = "Close_Investigator"
+ADMIN = "Close_Admin"
+OTHER_INVESTIGATOR = "Close_Other_Investigator"
+CREATOR = "Close_Creator"
+USER = "Close_User"
 
-@pytest.mark.asyncio
-async def test_integration_close_case_success(client, load_admin_user):
-    case_id = None
-    executor_id = str(auth_tests.ADMIN_USER["userid"])
-    admin_user = {
-        "id": executor_id,
-        "username": auth_tests.ADMIN_USER["username"],
-        "role": "ADMIN"
-    }
+@pytest_asyncio.fixture
+async def close_context(ensure_user_exists):
+    conn = await get_connection()
 
-    admin_token = create_token(admin_user)
+    investigator_id = str(uuid.uuid4())
+    admin_id = str(uuid.uuid4())
+    other_investigator_id = str(uuid.uuid4())
+    creator_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
 
-    client.cookies.clear()
-    client.cookies.set(COOKIE_NAME, admin_token)
+    await ensure_user_exists(
+        conn,
+        investigator_id,
+        INVESTIGATOR,
+        "INVESTIGATOR"
+    )
+
+    await ensure_user_exists(
+        conn,
+        admin_id,
+        ADMIN,
+        "ADMIN"
+    )
+
+    await ensure_user_exists(
+        conn,
+        other_investigator_id,
+        OTHER_INVESTIGATOR,
+        "INVESTIGATOR"
+    )
+
+    await ensure_user_exists(
+        conn,
+        creator_id,
+        CREATOR,
+        "USER"
+    )
+
+    await ensure_user_exists(
+        conn,
+        user_id,
+        USER,
+        "USER"
+    )
+
+    created_case_ids = []
 
     try:
-        create_response = client.post(
-            "/api/createCase",
-            json={
-                "title": "Close Case Integration Test",
-                "description": "Case created for closeCase integration testing."
-            }
-        )
+        yield {
+            "conn": conn,
 
-        assert create_response.status_code == 201
+            "investigator_id": investigator_id,
+            "investigator_token": create_token(
+                {
+                    "id": investigator_id,
+                    "username": INVESTIGATOR,
+                    "role": "INVESTIGATOR"
+                }
+            ),
 
-        case_id = create_response.json()["CaseId"]
+            "admin_id": admin_id,
+            "admin_token": create_token(
+                {
+                    "id": admin_id,
+                    "username": ADMIN,
+                    "role": "ADMIN"
+                }
+            ),
 
-        response = client.post(
-            "/api/closeCase",
-            json={
-                "CaseID": case_id
-            }
-        )
+            "other_investigator_id": other_investigator_id,
 
-        assert response.status_code == 200
-        assert response.json() == {
-            "status": "success",
-            "message": "Case closed successfully."
+            "creator_id": creator_id,
+
+            "user_token": create_token(
+                {
+                    "id": user_id,
+                    "username": USER,
+                    "role": "USER"
+                }
+            ),
+
+            "cases": created_case_ids,
         }
 
-        connection = await get_connection()
+    finally:
+        await conn.execute(
+            "SELECT set_config('app.current_user_id', $1, false)",
+            investigator_id
+        )
 
-        try:
-            row = await connection.fetchrow(
+        for case_id in created_case_ids:
+            await conn.execute(
                 """
-                SELECT casestate
-                FROM "Cases_DB"."Cases"
+                DELETE FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
                 """,
-                uuidlib.UUID(case_id)
+                uuid.UUID(case_id)
             )
-        finally:
-            await connection.close()
 
-        assert row is not None
-        assert row["casestate"] == "CLOSED"
+        await conn.close()
 
-    finally:
-        if case_id is not None:
-            connection = await get_connection()
+async def seed_case(
+    ctx,
+    state="PUBLISHED",
+    creator=CREATOR
+):
+    conn = ctx["conn"]
+    case_id = uuid.uuid4()
 
-            try:
-                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
-                await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Cases"
-                    WHERE caseid = $1
-                    """,
-                    uuidlib.UUID(case_id)
-                )
-
-            finally:
-                await connection.close()
-
-@pytest.mark.asyncio
-async def test_integration_close_case_success_investigator(client):
-    case_id = None
-
-    connection = await get_connection()
-
-    try:
-        investigator = await connection.fetchrow(
-            """
-            SELECT userid, username
-            FROM "Users_DB"."Users"
-            WHERE useremail = $1
-            """,
-            USER_SETTINGS.E2E_INVESTIGATOR_EMAIL
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."Cases"
+        (
+            caseid,
+            casename,
+            casecreator,
+            casedescription,
+            casestate
         )
-    finally:
-        await connection.close()
-
-    assert investigator is not None
-
-    executor_id = str(investigator["userid"])
-    investigator_user = {
-        "id": executor_id ,
-        "username": investigator["username"],
-        "role": "INVESTIGATOR"
-    }
-
-    investigator_token = create_token(investigator_user)
-
-    client.cookies.clear()
-    client.cookies.set(
-        COOKIE_NAME,
-        investigator_token
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5::case_state_enum
+        )
+        """,
+        case_id,
+        "Close test case",
+        creator,
+        "Case used for close-case integration testing",
+        state
     )
 
-    try:
-        create_response = client.post(
-            "/api/createCase",
-            json={
-                "title": "Investigator Close Case Integration Test",
-                "description": "Case created by an investigator for closeCase integration testing."
-            }
-        )
+    ctx["cases"].append(str(case_id))
 
-        assert create_response.status_code == 201
+    return str(case_id)
 
-        case_id = create_response.json()["CaseId"]
-        response = client.post(
-            "/api/closeCase",
-            json={
-                "CaseID": case_id
-            }
-        )
-
-        assert response.status_code == 200
-
-        assert response.json() == {
-            "status": "success",
-            "message": "Case closed successfully."
-        }
-
-        connection = await get_connection()
-
-        try:
-            
-            row = await connection.fetchrow(
-                """
-                SELECT casestate
-                FROM "Cases_DB"."Cases"
-                WHERE caseid = $1
-                """,
-                uuidlib.UUID(case_id)
-            )
-        finally:
-            await connection.close()
-
-        assert row is not None
-        assert row["casestate"] == "CLOSED"
-
-    finally:
-        if case_id is not None:
-            connection = await get_connection()
-
-            try:
-                await connection.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
-                await connection.execute(
-                    """
-                    DELETE FROM "Cases_DB"."Cases"
-                    WHERE caseid = $1
-                    """,
-                    uuidlib.UUID(case_id)
-                )
-
-            finally:
-                await connection.close()
-
-@pytest.mark.asyncio
-async def test_integration_close_case_missing_case_id(client, load_admin_user):
-    admin_user = {
-        "id": str(auth_tests.ADMIN_USER["userid"]),
-        "username": auth_tests.ADMIN_USER["username"],
-        "role": "ADMIN"
-    }
-
-    client.cookies.clear()
-    client.cookies.set(
-        COOKIE_NAME,
-        create_token(admin_user)
+async def assign_case_to(ctx, case_id, username, executor_id):
+    await ctx["conn"].execute(
+        "SELECT set_config('app.current_user_id', $1, false)",
+        executor_id
     )
 
-    response = client.post(
+    await ctx["conn"].execute(
+        """
+        UPDATE "Cases_DB"."Cases"
+        SET caseassigned = $2
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id),
+        username
+    )
+
+@pytest.mark.asyncio
+async def test_investigator_can_close_assigned_published_case(client, close_context):
+    ctx = close_context
+    case_id = await seed_case(ctx)
+
+    await assign_case_to(
+        ctx,
+        case_id,
+        INVESTIGATOR,
+        ctx["investigator_id"]
+    )
+
+    client.cookies.set(COOKIE_NAME,ctx["investigator_token"])
+
+    response = client.patch(
         "/api/closeCase",
         json={
-            "CaseID": ""
+            "CaseID": case_id
         }
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 200, response.text
     assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": CASE_ID_REQUIRED
-        }
+        "status": "success",
+        "message": "Case closed successfully."
     }
 
+    row = await ctx["conn"].fetchrow(
+        """
+        SELECT casestate, caseclosedate
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id)
+    )
+
+    assert row["casestate"] == "CLOSED"
+    assert row["caseclosedate"] is not None
+
 @pytest.mark.asyncio
-async def test_integration_close_case_invalid_case_id(client, load_admin_user):
-    admin_user = {
-        "id": str(auth_tests.ADMIN_USER["userid"]),
-        "username": auth_tests.ADMIN_USER["username"],
-        "role": "ADMIN"
+async def test_admin_can_close_assigned_published_case(client, close_context):
+    ctx = close_context
+
+    case_id = await seed_case(ctx)
+
+    await assign_case_to(
+        ctx,
+        case_id,
+        ADMIN,
+        ctx["admin_id"]
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["admin_token"])
+
+    response = client.patch(
+        "/api/closeCase",
+        json={
+            "CaseID": case_id
+        }
+    )
+
+    assert response.status_code == 200, response.text
+
+    state = await ctx["conn"].fetchval(
+        """
+        SELECT casestate
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id)
+    )
+
+    assert state == "CLOSED"
+
+@pytest.mark.asyncio
+async def test_user_cannot_close_case(client, close_context):
+    ctx = close_context
+    case_id = await seed_case(ctx)
+
+    await assign_case_to(
+        ctx,
+        case_id,
+        INVESTIGATOR,
+        ctx["investigator_id"]
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["user_token"])
+
+    response = client.patch(
+        "/api/closeCase",
+        json={
+            "CaseID": case_id
+        }
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "User unauthorized"
     }
 
-    client.cookies.clear()
-    client.cookies.set(
-        COOKIE_NAME,
-        create_token(admin_user)
+    state = await ctx["conn"].fetchval(
+        """
+        SELECT casestate
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id)
     )
 
-    response = client.post(
-        "/api/closeCase",
-        json={
-            "CaseID": "not-a-valid-uuid"
-        }
-    )
-
-    assert response.status_code == 400
-    assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": INVALID_CASE_ID
-        }
-    }
+    assert state == "PUBLISHED"
 
 @pytest.mark.asyncio
-async def test_integration_close_case_missing_jwt(client):
-    client.cookies.clear()
+async def test_investigator_cannot_close_case_assigned_to_someone_else(client, close_context):
+    ctx = close_context
+    case_id = await seed_case(ctx)
 
-    response = client.post(
+    await assign_case_to(
+        ctx,
+        case_id,
+        OTHER_INVESTIGATOR,
+        ctx["other_investigator_id"]
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+
+    response = client.patch(
         "/api/closeCase",
         json={
-            "CaseID": str(uuidlib.uuid4())
-        }
-    )
-
-    assert response.status_code == 401
-
-@pytest.mark.asyncio
-async def test_integration_close_case_invalid_jwt(client):
-    client.cookies.clear()
-    client.cookies.set(
-        COOKIE_NAME,
-        "invalid-token"
-    )
-
-    response = client.post(
-        "/api/closeCase",
-        json={
-            "CaseID": str(uuidlib.uuid4())
-        }
-    )
-
-    assert response.status_code == 401
-
-@pytest.mark.asyncio
-async def test_integration_close_case_user_unauthorized(client):
-    email = "close_case_user@example.com"
-    await delete_user_by_email(email)
-
-    try: 
-        client.cookies.clear()
-        register_response = client.post(
-            "/api/register",
-            json={
-                "email": email,
-                "username": "close_case_user",
-                "password": USER_SETTINGS.ADMIN_PASSWORD
-            }
-        )
-
-        assert register_response.status_code == 201
-        response = client.post(
-            "/api/closeCase",
-            json={
-                "CaseID": str(uuidlib.uuid4())
-            }
-        )
-
-        assert response.status_code == 401
-
-    finally:
-        await delete_user_by_email(email)
-
-@pytest.mark.asyncio
-async def test_integration_close_case_not_found(client, load_admin_user):
-    admin_user = {
-        "id": str(auth_tests.ADMIN_USER["userid"]),
-        "username": auth_tests.ADMIN_USER["username"],
-        "role": "ADMIN"
-    }
-
-    client.cookies.clear()
-    client.cookies.set(
-        COOKIE_NAME,
-        create_token(admin_user)
-    )
-
-    response = client.post(
-        "/api/closeCase",
-        json={
-            "CaseID": str(uuidlib.uuid4())
+            "CaseID": case_id
         }
     )
 
     assert response.status_code == 404
-    assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+
+    state = await ctx["conn"].fetchval(
+        """
+        SELECT casestate
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id)
+    )
+
+    assert state == "PUBLISHED"
+
+@pytest.mark.asyncio
+async def test_cannot_close_open_case(client, close_context):
+    ctx = close_context
+    case_id = await seed_case(ctx, state="OPEN")
+
+    await assign_case_to(
+        ctx,
+        case_id,
+        INVESTIGATOR,
+        ctx["investigator_id"]
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+
+    response = client.patch(
+        "/api/closeCase",
+        json={
+            "CaseID": case_id
         }
+    )
+
+    assert response.status_code == 404
+
+    row = await ctx["conn"].fetchrow(
+        """
+        SELECT casestate, caseclosedate
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id)
+    )
+
+    assert row["casestate"] == "OPEN"
+    assert row["caseclosedate"] is None
+
+@pytest.mark.asyncio
+async def test_cannot_close_unassigned_case(client, close_context):
+    ctx = close_context
+    case_id = await seed_case(ctx)
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+
+    response = client.patch(
+        "/api/closeCase",
+        json={
+            "CaseID": case_id
+        }
+    )
+
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_close_case_requires_case_id(client, close_context):
+    ctx = close_context
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+
+    response = client.patch(
+        "/api/closeCase",
+        json={
+            "CaseID": None
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "CaseID required"
     }
+
+@pytest.mark.asyncio
+async def test_close_case_requires_authentication(client, close_context):
+    ctx = close_context
+
+    case_id = await seed_case(ctx)
+
+    client.cookies.clear()
+
+    response = client.patch(
+        "/api/closeCase",
+        json={
+            "CaseID": case_id
+        }
+    )
+
+    assert response.status_code == 401
