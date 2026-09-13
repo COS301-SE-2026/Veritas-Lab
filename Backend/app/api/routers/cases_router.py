@@ -906,12 +906,17 @@ async def upload_evidence(
             }
         )
 
-@router.post(
+@router.patch(
     "/closeCase",
     summary="Close a case",
     status_code=200,
     dependencies=[Depends(COOKIE_SCHEME)],
-    description="The creator of a case can close the case.",
+    summary="Close an assigned published case",
+    description=(
+        "Closes a PUBLISHED case assigned to the currently authenticated "
+        "ADMIN or INVESTIGATOR. The case must be assigned to the user making "
+        "the request and must not have been created by that same user."
+    ),
     responses={
         200: {
             "description": "Case closed successfully",
@@ -926,40 +931,23 @@ async def upload_evidence(
         },
 
         400: {
-            "description": "Bad Request - Invalid case ID",
+            "description": "Bad Request - Case ID missing",
             "content": {
                 "application/json": {
-                    "examples": {
-                        "MissingCaseID": {
-                            "summary": "Missing case ID",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": CASE_ID_REQUIRED
-                                }
-                            }
-                        },
-
-                        "InvalidCaseID": {
-                            "summary": "Invalid case ID",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": INVALID_CASE_ID
-                                }
-                            }
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_ID_REQUIRED
                         }
                     }
                 }
             }
         },
 
-        401: INVALID_TOKEN_401,
-
         403: USER_UNAUTHORIZED_403,
 
         404: {
-            "description": "Case not found or user unauthorized",
+            "description": "Case not found or user unauthorized to close it",
             "content": {
                 "application/json": {
                     "example": {
@@ -973,7 +961,8 @@ async def upload_evidence(
         },
 
         500: {
-            "description": "Database error",
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
             "content": {
                 "application/json": {
                     "example": {
@@ -993,9 +982,19 @@ async def close_case(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
+    role = payload.get("role")
 
-    verify_not_user(payload.get("role"))
-    executor_id = payload.get("sub")
+    if role not in ["INVESTIGATOR", "ADMIN"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": "User unauthorized"
+            }
+        )
+
+    user_id = payload.get("sub")
+    username = payload.get("username")
     
     if not case_request.CaseID:
         raise HTTPException(
@@ -1007,40 +1006,30 @@ async def close_case(
         )
     
     try:
-        case_uuid = UUID(case_request.CaseID)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, 
-            detail={
-                "status": "error", 
-                "message": INVALID_CASE_ID
-            }
-        )
-
-    try:
-        await set_audit_executor(connection, executor_id)
-        row = await connection.fetchrow(
-            """
+        async with connection.transaction():
+            await set_audit_executor(connection, user_id)
+            row = await connection.fetchrow(
+                """
                 UPDATE "Cases_DB"."Cases"
-                SET casestate = 'CLOSED'::case_state_enum,
-                    caseclosedate = CURRENT_TIMESTAMP
-                WHERE caseid = $1
-                AND ($2::text = 'ADMIN' OR casecreator = $3)
-                RETURNING caseid
-            """ ,
-            case_uuid,
-            payload.get("role"),
-            payload.get("username")
-        )
-
-        if row is None:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "status": "error",
-                    "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
-                }
+                SET casestate = 'CLOSED', caseclosedate = CURRENT_TIMESTAMP
+                WHERE caseid = $1::uuid
+                    AND casestate = 'PUBLISHED'
+                    AND caseassigned = $2
+                    AND casecreator != $2
+                RETURNING *;
+                """ ,
+                case_request.CaseID,
+                username
             )
+
+            if row is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "status": "error",
+                        "message": CASE_NOT_FOUND_OR_UNAUTHORIZED
+                    }
+                )
 
         return {
             "status": "success",
@@ -1055,6 +1044,7 @@ async def close_case(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
 @router.post(
     "/updateCase",
     status_code=status.HTTP_200_OK,
