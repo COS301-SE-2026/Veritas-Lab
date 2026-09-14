@@ -13,6 +13,7 @@ from app.core.cases import (
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
     INTERNAL_SERVER_ERROR_STORAGE,
+    DATABASE_ERROR_MESSAGE,
     set_audit_executor,
 )
 from app.auth.auth import verify_jwt, COOKIE_NAME, NOT_AUTH, EXPIRED_TOKEN, INVALID_TOKEN, INVALID_TOKEN_401
@@ -36,7 +37,6 @@ r2_settings = R2_Settings()
 minio_settings = Minio_Settings()
 
 NOT_USER= ["INVESTIGATOR", "ADMIN"]
-DATABASE_ERROR_MESSAGE="Database error"
 CASE_ID_REQUIRED = "CaseID required"
 INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
@@ -253,7 +253,8 @@ def _row_to_audited_case(row: dict) -> dict:
     summary="Create a Case",
     status_code=201,
     dependencies=[Depends(COOKIE_SCHEME)],
-    description="Creates a new case for an authenticated user. Those with the role 'USER' cannot use this endpoint.",
+    description="Creates a new case for an authenticated user. USER, INVESTIGATOR, and ADMIN roles may all create cases."
+                " The case is always created in the OPEN state and is owned by the creator.",
     responses={
         201: {
             "description": "Case created successfully",
@@ -297,16 +298,15 @@ def _row_to_audited_case(row: dict) -> dict:
 
         401: INVALID_TOKEN_401,
 
-        403: USER_UNAUTHORIZED_403,
-
-        409: {
-            "description": "Conflict - Case already exists",
+        500: {
+            "model": error_response,
+            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
             "content": {
                 "application/json": {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "This case already exists"
+                            "message": DATABASE_ERROR_MESSAGE
                         }
                     }
                 }
@@ -320,8 +320,6 @@ async def create_case(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = verify_jwt(request)
-    verify_not_user(payload.get("role"))
-
 
     case = Case(
         case_name=case_request.title, 

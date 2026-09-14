@@ -26,6 +26,7 @@ UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
 MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
 INTERNAL_SERVER_ERROR = "Internal server error"
 INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Please try again."
+DATABASE_ERROR_MESSAGE = "Database error"
 
 FILE_TOO_LARGE = "File exceeds the maximum allowed size of 50MB"
  
@@ -256,18 +257,27 @@ class Case:
                 }
             )
         await set_audit_executor(connection, user_id)
-        row = await connection.fetchrow(
-            """
-            INSERT INTO "Cases_DB"."Cases"
-            (casecreator, casename, casedescription, casestate)
-            VALUES ($1, $2, $3, $4::case_state_enum)
-            RETURNING caseid, casecreationdate
-            """,
-            self.case_creator,
-            self.case_name,
-            self.case_description,
-            self.case_state
-        )
+        try:
+            row = await connection.fetchrow(
+                """
+                INSERT INTO "Cases_DB"."Cases"
+                (casecreator, casename, casedescription, casestate)
+                VALUES ($1, $2, $3, $4::case_state_enum)
+                RETURNING caseid, casecreationdate
+                """,
+                self.case_creator,
+                self.case_name,
+                self.case_description,
+                self.case_state
+            )
+        except asyncpg.PostgresError:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "message": DATABASE_ERROR_MESSAGE
+                }
+            )
 
         self.case_id=row["caseid"]
         self.case_creation_date=row["casecreationdate"]
