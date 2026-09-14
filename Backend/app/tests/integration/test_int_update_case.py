@@ -38,7 +38,7 @@ def other_investigator_cookie():
 
 def user_cookie():
     return create_token({
-        "id": str(uuid.uuid4()),
+        "id": OWNER_USER_ID,
         "username": OWNER_USERNAME,
         "role": "USER"
     })
@@ -159,7 +159,7 @@ async def test_integration_update_case_both_fields(client, fake_update_case_cont
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_user_role_forbidden(client, fake_update_case_context):
+async def test_integration_update_case_user_role_can_update_own_case(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, user_cookie())
     case_id = fake_update_case_context["owned_case_id"]
 
@@ -167,16 +167,36 @@ async def test_integration_update_case_user_role_forbidden(client, fake_update_c
         "/api/updateCase",
         json={
             "CaseID": case_id,
-            "CaseName": "USER should not be able to do this"
+            "CaseName": "Renamed by the owning user"
         }
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"]["message"] == "User unauthorized"
+    assert response.status_code == 200
 
     row = await fetch_case(fake_update_case_context["connection"], case_id)
 
-    assert row["casename"] == f"{ORIGINAL_NAME} - owned"
+    assert row["casename"] == "Renamed by the owning user"
+    assert row["casedescription"] == ORIGINAL_DESCRIPTION
+
+@pytest.mark.asyncio
+async def test_integration_update_case_user_role_can_update_foreign_case(client, fake_update_case_context):
+    client.cookies.set(COOKIE_NAME, user_cookie())
+    case_id = fake_update_case_context["foreign_case_id"]
+
+    response = client.post(
+        "/api/updateCase",
+        json={
+            "CaseID": case_id,
+            "CaseName": "Stolen by a USER"
+        }
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["message"] == "Case not found or user unauthorized."
+
+    row = await fetch_case(fake_update_case_context["connection"], case_id)
+
+    assert row["casename"] == f"{ORIGINAL_NAME} - foreign"
 
 
 @pytest.mark.asyncio

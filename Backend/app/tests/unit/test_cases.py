@@ -838,21 +838,26 @@ def test_update_case_invalid_jwt(monkeypatch):
         }
     }
 
-def test_update_case_user_unauthorized(monkeypatch):
+def test_update_case_user_role_allowed(monkeypatch):
     client.cookies.clear()
     _mock_jwt_success(monkeypatch, sub="mock-user-id", username="normal_user", role="USER")
 
+    fake_case_id = "12345678-abcd-ef01-2345-6789abcdef01"
+
+    _mock_db_connect(monkeypatch, fetchrow_return={"caseid": fake_case_id})
+
     response = client.post(
         "/api/updateCase",
-        json={"CaseID": "12345678-abcd-ef01-2345-6789abcdef01"}
+        json={
+            "CaseID": fake_case_id,
+            "CaseName": "Some update by normal user",
+        }
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200
     assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": cases_router.USER_UNAUTHORIZED
-        }
+            "status": "success",
+            "message": cases_router.CASE_UPDATED_SUCCESS
     }
 
 def test_update_case_missing_case_id(monkeypatch):
