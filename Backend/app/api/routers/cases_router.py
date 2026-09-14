@@ -1050,7 +1050,7 @@ async def close_case(
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Update a Case",
     description=(
-        "Updates the name and/or the description of a case. Only INVESTIGATOR and "
+        "Updates the name and/or the description of a case. USER, INVESTIGATOR and "
         "ADMIN roles may call this endpoint, and a case can only be updated by the "
         "user who created it. Fields that are omitted are left unchanged, so either "
         "CaseName or CaseDescription must be supplied."
@@ -1126,8 +1126,6 @@ async def close_case(
 
         401: INVALID_TOKEN_401,
 
-        403: USER_UNAUTHORIZED_403,
-
         404: {
             "model": error_response,
             "description": "Not Found - Case does not exist or the caller is not its creator",
@@ -1166,8 +1164,6 @@ async def update_case(
 ):
     payload = verify_jwt(request)
 
-    verify_not_user(payload.get("role"))
-
     if not case_request.CaseID:
         raise HTTPException(
             status_code=400,
@@ -1191,16 +1187,7 @@ async def update_case(
     validated_name = None
 
     if case_request.CaseName is not None:
-        try:
-            validated_name = Case(case_name=case_request.CaseName).case_name
-        except ValueError as e:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "status": "error",
-                    "message": str(e)
-                }
-            )
+        validated_name = Case(case_name=case_request.CaseName).case_name
 
     try:
         await set_audit_executor(connection, payload.get("sub"))
