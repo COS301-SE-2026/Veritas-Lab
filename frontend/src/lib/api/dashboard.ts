@@ -3,19 +3,16 @@ import { apiFetch } from '@/lib/api/client';
 
 export async function fetchCases(): Promise<DashboardCase[]> {
 	const res = await apiFetch(`/api/getCases`, {
-		method: 'POST',
+		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({})
+		}
 	});
-	
 	const data = await res.json().catch(() => null);
 	if (!res.ok) {
-		const error = data as ApiError | null
+		const error = data as ApiError | null;
 		throw new Error(error?.detail?.message || 'Failed to fetch dashboard cases');
 	}
-
 	const serverCases = Array.isArray(data) ? data : data.cases ?? [];
 	return serverCases as DashboardCase[];
 }
