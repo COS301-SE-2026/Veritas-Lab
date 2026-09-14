@@ -235,3 +235,84 @@ function signalForEntry(key: string, value: string): MetadataSignal | null {
     }
     return null;
 }
+
+function buildInsights( kind: string, entries: [string, string][], signals: Record<string, MetadataSignal>,): MetadataInsight[] {
+    const insights: MetadataInsight[] = [];
+    const has = (pattern: RegExp) => entries.some(([key, value]) => pattern.test(key) && value !== '');
+    const aiKeys = Object.entries(signals).filter(([, s]) => s.severity === 'ai');
+    if (aiKeys.length > 0) {
+        insights.push({
+            severity: 'ai',
+            title: `${aiKeys.length} AI indicator${aiKeys.length === 1 ? '' : 's'}`,
+            detail: `Fields naming a generative tool or declaring synthetic origin: ${aiKeys
+                .slice(0, 4)
+                .map(([key]) => key)
+                .join(', ')}${aiKeys.length > 4 ? '…' : ''}`,
+        });
+    }
+
+    if (kind === 'image' || kind === 'video') {
+        if (!has(/(^|:)(Make|Model|LensModel|LensMake|CameraModelName|AndroidModel)$/i)) {
+            insights.push({
+                severity: 'tamper',
+                title: 'No capture device recorded',
+                detail: 'There is no camera make/model. Either the file never came from a camera or the EXIF block was stripped.',
+            });
+        }
+        if (!has(/(DateTimeOriginal|CreateDate|MediaCreateDate|TrackCreateDate)/i)) {
+            insights.push({
+                severity: 'tamper',
+                title: 'No original capture date',
+                detail: 'No DateTimeOriginal/CreateDate is present, so the capture time cannot be confirmed.',
+            });
+        }
+    }
+
+    const original = parseExifDate(firstValue(entries, /DateTimeOriginal/i));
+    const modified = parseExifDate(firstValue(entries, /(^|:)ModifyDate$/i));
+    if (original && modified && modified - original > 60_000) {
+        insights.push({
+            severity: 'tamper',
+            title: 'Modified after capture',
+            detail: 'ModifyDate is later than DateTimeOriginal so the file was rewritten after it was created.',
+        });
+    }
+
+    if (kind === 'pdf' && !has(/PDF:(Creator|Author|Title)/i)) {
+        insights.push({
+            severity: 'tamper',
+            title: 'PDF authoring fields empty',
+            detail: 'Creator/Author/Title are missing which is common for scripted or sanitised PDFs.',
+        });
+    }
+
+    if (entries.length > 0 && entries.every(([key]) => /^(File|Composite|SourceFile)/i.test(key))) {
+        insights.push({
+            severity: 'tamper',
+            title: 'Only filesystem metadata present',
+            detail: 'Every field comes from the filesystem layer. All embedded metadata appears to have been stripped.',
+        });
+    }
+    return insights;
+}
+
+export function analyseMetadata( metadata: Record<string, unknown>, kind: string,): MetadataAnalysis {
+    const entries: [string, string][] = Object.entries(metadata).map(([key, value]) => [
+        key,
+        formatMetadataValue(value),
+    ]);
+    const signals: Record<string, MetadataSignal> = {};
+    for (const [key, value] of entries) {
+        const signal = signalForEntry(key, value);
+        if (signal) signals[key] = keep(signals[key], signal);
+    }
+    const counts: Record<SignalSeverity, number> = { ai: 0, tamper: 0, provenance: 0 };
+    for (const signal of Object.values(signals)) counts[signal.severity] += 1;
+
+    return {
+        signals,
+        insights: buildInsights(kind, entries, signals),
+        counts,
+        flaggedCount: counts.ai + counts.tamper,
+    };
+}
