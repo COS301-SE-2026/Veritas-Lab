@@ -76,3 +76,162 @@ const EDITOR_WORDS = [
     'acrobat distiller', 'microsoft. word', 'quartz pdfcontext',
 ];
 const EDITOR_PATTERN = new RegExp(`(${EDITOR_WORDS.join('|')})`, 'i');
+
+//METADATA REGEX CHECKS TO FIND CERTAIN PATTERNS OR SIGNATURES:
+//check synthetic origin declaration
+const SYNTHETIC_SOURCE_PATTERN =
+    /(trainedAlgorithmicMedia|compositeWithTrainedAlgorithmicMedia|algorithmicMedia|syntheticMedia)/i;
+//signatures left by diffusion uis
+const DIFFUSION_PARAM_PATTERN =
+    /(Steps:\s*\d|Sampler:|CFG ?scale|Seed:\s*\d{4,}|Model hash|denoising_strength|"class_type"|KSampler|CheckpointLoader(Simple)?|VAEDecode|EmptyLatentImage|<lora:|sd_model|negative_prompt)/i;
+
+const C2PA_GENERATOR_KEY = /(SoftwareAgent|Claim_?Generator|ClaimGenerator|GeneratorInfo)/i;
+
+const DIGITAL_SOURCE_KEY = /DigitalSourceType/i;
+
+const EDIT_ACTION_PATTERN =
+    /c2pa\.(edited|color_adjustments|cropped|resized|filtered|redacted|drawing|orientation|converted|repackaged|transcoded)/i;
+
+const CREATE_ACTION_PATTERN = /c2pa\.(created|placed)/i;
+
+const HISTORY_KEY = /(History(Action|SoftwareAgent|When|Changed|Params|Parameters|InstanceID)|DerivedFrom)/i;
+
+const EDITOR_NAMESPACE_KEY = /^(Photoshop|XMP-photoshop|XMP-crs|Adobe):/i;
+
+const PROVENANCE_KEY =
+    /(JUMBF:(Signature|Alg|Hash|InstanceID|Name|JUMDLabel)|c2pa\.signature|CertificateIssuer|SignatureTime)/i;
+
+const ZERO_DATE_PATTERN = /^0{4}:0{2}:0{2}[ T]0{2}:0{2}:0{2}/;
+
+//helper to format 
+export function formatMetadataValue(value: unknown): string {
+    if (value === null || value === undefined || value === '') {
+        return '';
+    }
+    if (Array.isArray(value)) {
+        return value.map((item) => formatMetadataValue(item)).join(', ');
+    }
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    }
+    return String(value);
+}
+//exiftool formatting
+export function metadataNamespace(key: string): string {
+    const index = key.indexOf(':');
+    return index > 0 ? key.slice(0, index) : 'Other';
+}
+function keep(current: MetadataSignal | undefined, next: MetadataSignal): MetadataSignal {
+    if (!current) {
+        return next;
+    }
+    return SEVERITY_RANK[next.severity] > SEVERITY_RANK[current.severity] ? next : current;
+}
+function firstValue(entries: [string, string][], pattern: RegExp): string | null {
+    const hit = entries.find(([key, value]) => pattern.test(key) && value !== '');
+    return hit ? hit[1] : null;
+}
+function parseExifDate(value: string | null): number | null {
+    if (!value || ZERO_DATE_PATTERN.test(value)) {
+        return null;
+    }
+    // 2026:07:29 12:33:01+00:00 -> 2026-07-29T12:33:01+00:00
+    const normalised = value
+        .trim()
+        .replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
+        .replace(' ', 'T');
+    const time = Date.parse(normalised);
+    return Number.isNaN(time) ? null : time;
+}
+
+//analysis
+function signalForEntry(key: string, value: string): MetadataSignal | null {
+    if (value === '') {
+        return null;
+    }
+    //C2PA/JUMBF claim generator naming an ai tool
+    if (C2PA_GENERATOR_KEY.test(key) && AI_TOOL_PATTERN.test(value)) {
+        return {
+            severity: 'ai',
+            label: 'AI claim',
+            reason: 'The C2PA claim generator names a generative AI tool so the file declares itself as AI produced.',
+        };
+    }
+
+    //digital source type declaring synthetic media
+    if (DIGITAL_SOURCE_KEY.test(key) && SYNTHETIC_SOURCE_PATTERN.test(value)) {
+        return {
+            severity: 'ai',
+            label: 'Synthetic',
+            reason: 'The digital source type is declared as algorithmic/trained-algorithmic media (a code for AI generated content).',
+        };
+    }
+
+    //diffusion pipeline remainders
+    if (DIFFUSION_PARAM_PATTERN.test(value)) {
+        return {
+            severity: 'ai',
+            label: 'Diffusion params',
+            reason: 'This field contains diffusion generation parameters (prompt, sampler, seed or node graph) written by a local image generation UI.',
+        };
+    }
+
+    //any field naming a known generative model or service
+    if (AI_TOOL_PATTERN.test(value)) {
+        return {
+            severity: 'ai',
+            label: 'AI tool',
+            reason: 'The value names a known generative AI model or service.',
+        };
+    }
+
+    // 5. C2PA edit actions
+    if (EDIT_ACTION_PATTERN.test(value)) {
+        return {
+            severity: 'tamper',
+            label: 'Edit action',
+            reason: 'The C2PA action list records an editing operation applied after capture.',
+        };
+    }
+
+    //XMP edit history/editor-only namespaces
+    if (HISTORY_KEY.test(key) || EDITOR_NAMESPACE_KEY.test(key)) {
+        return {
+            severity: 'tamper',
+            label: 'Edit history',
+            reason: 'This key only exists once the file has been opened and written by an editor.',
+        };
+    }
+
+    //editing/re-encoding software
+    if (EDITOR_PATTERN.test(value)) {
+        return {
+            severity: 'tamper',
+            label: 'Re-encoded',
+            reason: 'The file was written by editing or re encoding software rather than straight from a capture device.',
+        };
+    }
+
+    //zeroed container timestamps
+    if (ZERO_DATE_PATTERN.test(value)) {
+        return {
+            severity: 'tamper',
+            label: 'Null date',
+            reason: 'The timestamp is zeroed, which is typical of scrubbed or synthetically generated containers.',
+        };
+    }
+
+    //neutral provenance material
+    if (PROVENANCE_KEY.test(key) || CREATE_ACTION_PATTERN.test(value)) {
+        return {
+            severity: 'provenance',
+            label: 'Provenance',
+            reason: 'Part of the embedded C2PA provenance manifest. Useful context but not suspicious on its own.',
+        };
+    }
+    return null;
+}
