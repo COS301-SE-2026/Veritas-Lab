@@ -9,7 +9,12 @@
   --color-b-50: #eafaf1;
   --color-b-600: #2e9e66;
   --color-background: #ffffff;
+  --color-canvas: #f4f5f7;
   --color-surface: #ffffff;
+  --color-surface-muted: #f7f8fa;
+  --color-surface-sunken: #eef1f4;
+  --color-line: #e6e9ed;
+  --color-line-strong: #d5d9df;
   --color-text: #231F20;
   --color-text-strong: #231F20;
   --color-text-muted: #656a72;
@@ -23,7 +28,11 @@
   --color-info: #2b6cb0;
   --color-success: #2a9a5e;
   --color-risk: #e0a92e;
-
+  --ok-soft: #e6f6ee;      --ok-fg: #1f7a4d;
+  --warn-soft: #fbeed8;    --warn-fg: #9a5b00;
+  --danger-soft: #fdeaea;  --color-danger: #c0292e;
+  --info-soft: #e8f0fb;    --info-fg: #235a97;
+  --risk-soft: #faf0d6;    --risk-fg: #856110;
   --radius-sm: 12px;
   --radius-md: 16pc;
   --radius-lg: 20px;
@@ -36,6 +45,18 @@
   --shadow-lg: 0 16px 34px -10px rgba(20,18,19,0.18), 0 6px 14px -8px rgba(20,18,19,0.10);
   --shadow-pop: 0 24px 60px -16px rgba(20,18,19,0.30);
   --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 42%, transparent);
+
+  --color-text: var(--color-text-strong);
+  --color-lightest: var(--color-surface-sunken);
+  --b-500: var(--color-secondary);
+  --b-600: var(--color-b-600);
+  --canvas: var(--color-canvas);
+  --surface: var(--color-surface);
+  --surface-muted: var(--color-surface-muted);
+  --line: var(--color-line);
+  --text-strong: var(--color-text-strong);
+  --text-muted: var(--color-text-muted);
+  --text-subtle: var(--color-text-subtle);
 }
 
 @theme inline {
@@ -64,6 +85,14 @@
     cursor: pointer;
     border: 1px solid transparent;
   }
+
+  .vl-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .vl-btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; transform: none; }
+  .vl-btn:not(:disabled):active { transform: translateY(1px); }
+
+  .vl-btn-sm { padding: 0.4rem 0.85rem; font-size: 0.875rem; }
+  .vl-btn-lg { padding: 0.85rem 1.75rem; font-size: 1.0625rem; }
+
 
   .vl-btn-primary {
     background: var(--color-secondary);
@@ -170,6 +199,17 @@
     border: 1px solid transparent;
     white-space: nowrap;
   }
+
+  .vl-badge-open     { background: var(--ok-soft);   color: var(--ok-fg);   border-color: color-mix(in srgb, var(--ok-fg) 20%, transparent); }
+  .vl-badge-progress { background: var(--info-soft); color: var(--info-fg); border-color: color-mix(in srgb, var(--info-fg) 20%, transparent); }
+  .vl-badge-closed   { background: var(--color-surface-sunken); color: var(--color-text-muted); border-color: var(--color-line-strong); }
+  .vl-badge-warn     { background: var(--warn-soft);   color: var(--warn-fg); }
+  .vl-badge-danger   { background: var(--danger-soft); color: var(--color-danger); }
+  .vl-badge-info     { background: var(--info-soft);   color: var(--info-fg); }
+  .vl-badge-risk     { background: var(--risk-soft);   color: var(--risk-fg); }
+  .vl-badge-neutral  { background: var(--color-surface-sunken); color: var(--color-text-muted); }
+
+  .vl-dot { width: 0.45rem; height: 0.45rem; border-radius: 999px; background: currentColor; }
 }
 
 html { scroll-behavior: smooth; }
