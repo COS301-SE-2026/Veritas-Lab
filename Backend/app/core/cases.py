@@ -27,6 +27,8 @@ MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
 INTERNAL_SERVER_ERROR = "Internal server error"
 INTERNAL_SERVER_ERROR_STORAGE = "Evidence storage is temporarily unavailable. Please try again."
 DATABASE_ERROR_MESSAGE = "Database error"
+CASE_DELETE_NOT_ALLOWED = "Only the creator of an open case or an admin can delete this case"
+STORAGE_DELETE_FAILED_PREFIX = "Failed to delete stored object "
 
 FILE_TOO_LARGE = "File exceeds the maximum allowed size of 50MB"
  
@@ -195,6 +197,82 @@ def pdf_script_helper(file_bytes):
             }
         )
                    
+
+async def collect_orphan_media(connection: asyncpg.Connection, evidence) -> list[dict]:
+    """
+    Deletes the Media rows for evidence no longer referenced by any case and returns
+    what was removed, so the stored objects can be cleaned up afterwards.
+    """
+    orphan_media = []
+
+    # Each element is the composite evidence_type(evidence_id, case_perspective),
+    # which asyncpg returns as a tuple, so the id is read positionally.
+    for evidence_item in evidence:
+        media_id = evidence_item[0]
+
+        remaining_media_references = await connection.fetchval(
+            """
+            SELECT COUNT(*)
+            FROM "Cases_DB"."Cases" other_case,
+                 unnest(COALESCE(other_case.evidence, ARRAY[]::"Cases_DB".evidence_type[])) AS elem
+            WHERE elem.evidence_id = $1
+            """,
+            media_id
+        )
+
+        # Still attached to another case, so it is not an orphan.
+        if remaining_media_references:
+            continue
+
+        deleted_media = await connection.fetchrow(
+            """
+            DELETE FROM "Cases_DB"."Media" media
+            USING "Cases_DB"."MediaType" media_type
+            WHERE media.MediaId = $1
+                AND media.MediaType = media_type.MediaTypeId
+            RETURNING
+                media.MediaId AS mediaid,
+                media_type.MediaBucket AS mediabucket,
+                media_type.MediaExtension AS mediaextension
+            """,
+            media_id
+        )
+
+        if deleted_media is not None:
+            orphan_media.append({
+                "mediaid": deleted_media["mediaid"],
+                "mediabucket": deleted_media["mediabucket"],
+                "mediaextension": deleted_media["mediaextension"]
+            })
+
+    return orphan_media
+
+
+async def delete_stored_objects(orphan_media: list[dict]):
+    """
+    Removes the orphaned objects from object storage. Runs after the database
+    transaction has committed.
+    """
+    storage_client = get_object()
+
+    for media in orphan_media:
+        object_name = f"{media['mediaid']}{media['mediaextension']}"
+
+        try:
+            await asyncio.to_thread(
+                storage_client.delete_object,
+                Bucket=media["mediabucket"],
+                Key=object_name
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "message": f"{STORAGE_DELETE_FAILED_PREFIX}{object_name}: {e}"
+                }
+            )
+
 
 # If the case_id is None then the case is not in the db. You may call create().
 # When the case_id is not None then we know the case exists in the db. Time and Id is adjusted after create() is called.
@@ -719,8 +797,8 @@ class Case:
 
     async def delete_case(
         self,
-        username: str, 
-        role: str,
+        username: str,
+        is_admin: bool,
         connection: asyncpg.Connection,
         executor_id: str | None = None,
     ):
@@ -731,128 +809,54 @@ class Case:
             )
 
         case_id=self.case_id
-        
-        orphan_media = []
 
         try:
-            
+
             async with connection.transaction():
                 if executor_id is not None:
                     await set_audit_executor(connection, executor_id)
 
-                case_row = await connection.fetchrow(
+                # An ADMIN may delete any case. Anyone else may only delete a case they created, and only while it is still OPEN.
+                deleted_case = await connection.fetchrow(
                     """
-                    SELECT casecreator
-                    FROM "Cases_DB"."Cases"
-                    WHERE caseid = $1
-                    """,
-                    case_id
-                )
-
-                if case_row is None:
-                    raise HTTPException(
-                        status_code=404,
-                        detail={
-                            "status": "error",
-                            "message": CASE_NOT_FOUND
-                        }
-                    )
-                
-                case_creator = case_row["casecreator"]
-
-                if role != "ADMIN" and username != case_creator:
-                    raise HTTPException(
-                        status_code=403,
-                        detail={
-                            "status": "error",
-                            "message": "Only the case creator or an admin can delete this case"
-                        }
-                    )
-
-                result = await connection.fetchrow(
-                    """
-                    WITH target_media AS (
-                        SELECT COALESCE(array_agg(DISTINCT MediaId), '{}') AS mediaids
-                        FROM "Cases_DB"."Reports"
-                        WHERE CaseId = $1
-                    ),
-                    deleted_case AS (
-                        DELETE FROM "Cases_DB"."Cases"
-                        WHERE CaseId = $1
-                        RETURNING CaseId AS caseid
-                    )
-                    SELECT d.caseid, m.mediaids
-                    FROM deleted_case d
-                    CROSS JOIN target_media m
-                    """,
-                    case_id
-                )
-
-                # returned caseid only serves for deleteion detection.
-                if result is None:
-                    raise HTTPException(
-                        status_code=404,
-                        detail={
-                            "status": "error",
-                            "message": CASE_NOT_FOUND
-                        }
-                    )
-                
-                media_rows = result["mediaids"]
-            
-                for media_id in media_rows:
-
-                    deleted_media = await connection.fetchrow(
-                        """
-                        DELETE FROM "Cases_DB"."Media" media
-                        USING "Cases_DB"."MediaType" mt
-                        WHERE media.MediaId = $1
-                        AND media.MediaType = mt.MediaTypeId
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM "Cases_DB"."Reports" r
-                            WHERE r.MediaId = media.MediaId
+                    DELETE FROM "Cases_DB"."Cases"
+                    WHERE CaseId = $1
+                        AND (
+                            $2::boolean IS TRUE
+                            OR (CaseCreator = $3 AND CaseState = 'OPEN')
                         )
-                        RETURNING 
-                            media.MediaId AS "mediaid",
-                            mt.MediaBucket AS "mediabucket",
-                            mt.MediaExtension AS "mediaextension"
-                        """,
-                        media_id
-                    )
+                    RETURNING COALESCE(
+                        evidence,
+                        ARRAY[]::"Cases_DB".evidence_type[]
+                    ) AS evidence
+                    """,
+                    case_id,
+                    is_admin,
+                    username
+                )
 
-                    if deleted_media is not None:
-                        orphan_media.append({
-                            "mediaid": deleted_media["mediaid"],
-                            "mediabucket": deleted_media["mediabucket"],
-                            "mediaextension": deleted_media["mediaextension"]
-                        })                 
-                
-            storage_client = get_object()
-
-            for media in orphan_media:
-                object_name = f"{media['mediaid']}{media['mediaextension']}"
-
-                try:
-                    #$414
-                    storage_client.delete_object(
-                        Bucket=media["mediabucket"], 
-                        Key=object_name
-                    )
-                except HTTPException:
-                    raise
-                except Exception:
+                if deleted_case is None:
                     raise HTTPException(
-                        status_code=500,
-                        detail="Object storage Error"
+                        status_code=404 if is_admin else 403,
+                        detail={
+                            "status": "error",
+                            "message": CASE_NOT_FOUND if is_admin else CASE_DELETE_NOT_ALLOWED
+                        }
                     )
+
+                orphan_media = await collect_orphan_media(
+                    connection,
+                    deleted_case["evidence"]
+                )
+
+            await delete_stored_objects(orphan_media)
 
         except asyncpg.PostgresError:
             raise HTTPException(
                 status_code=500,
                 detail={
                     "status": "error",
-                    "message": "Database error"
+                    "message": DATABASE_ERROR_MESSAGE
                 }
             )
 
