@@ -371,8 +371,12 @@ async def create_case(
     status_code=status.HTTP_200_OK,
     summary='List Cases',
     description=(
-        "Returns cases visible to the caller. INVESTIGATOR and ADMIN see every case. "
-        "USER sees only cases they created."
+        "Returns all cases visible to the authenticated user. "
+        "Any user can view cases they created, regardless of state. "
+        "ADMIN and INVESTIGATOR users can additionally view all PUBLISHED "
+        "and CLOSED cases. "
+        "ADMIN and INVESTIGATOR users cannot view another user's OPEN case. "
+        "USER accounts can only view cases they created."
     ),
     responses={
         200: {
@@ -452,21 +456,24 @@ async def create_case(
 )
 async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
     payload = verify_jwt(request)
-
     role = payload.get("role")
     username = payload.get("username")
-    is_standard_user = role == "USER"
 
     try:
         rows = await connection.fetch(
             """
             SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
             FROM "Cases_DB"."Cases"
-            WHERE $1::boolean IS FALSE OR casecreator = $2
+            WHERE 
+                casecreator = $1
+                OR (
+                    $2 = ANY(ARRAY['ADMIN', 'INVESTIGATOR'])
+                    AND casestate IN ('PUBLISHED', 'CLOSED')
+                )
             ORDER BY casecreationdate DESC
             """,
-            is_standard_user,
-            username
+            username,
+            role
         )
 
         return {
