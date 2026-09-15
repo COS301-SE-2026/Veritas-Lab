@@ -12,6 +12,7 @@ from app.core.cases import (
     PDF_SCRIPTS_NOT_ALLOWED,
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
+    CASE_DELETE_NOT_ALLOWED,
     INTERNAL_SERVER_ERROR_STORAGE,
     DATABASE_ERROR_MESSAGE,
     set_audit_executor,
@@ -1888,9 +1889,14 @@ async def create_comment(
           
 @router.delete(
     "/deleteCase",
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Deletes a case",
-    description="Deletes a specific case and all attached elements within reason",
+    description=(
+        "Deletes a case together with any evidence only it referenced. USER, "
+        "INVESTIGATOR and ADMIN may all delete a case they created, but only while it "
+        "is still OPEN. An Admin may delete any case in any state."
+    ),
     responses={
         200: {
             "description": "Deletion of the case was successful.",
@@ -1914,7 +1920,7 @@ async def create_comment(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Case id is missing"
+                                    "message": "CaseID required"
                                 }
                             }
                         },
@@ -1923,7 +1929,7 @@ async def create_comment(
                             "value": {
                                 "detail":{
                                     "status": "error",
-                                    "message": "fake-uuid is not a valid UUID format"
+                                    "message": "'fake-uuid' is not a valid UUID format"
                                 }
                             }
                         }
@@ -1933,27 +1939,13 @@ async def create_comment(
         },
         401: INVALID_TOKEN_401,
         403: {
-            "description": "Forbidden - User lacks sufficient permissions",
+            "description": "Forbidden - not the creator, or the case is no longer open",
             "content": {
                 "application/json": {
-                    "examples": {
-                        "Role Forbidden": {
-                            "summary": "Standard User Role Blocked",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": "User unauthorized"
-                                }
-                            }
-                        },
-                        "Not Owner or Admin": {
-                            "summary": "User is neither Case Creator nor Admin",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": "Only the case creator or an admin can delete this case"
-                                }
-                            }
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_DELETE_NOT_ALLOWED
                         }
                     }
                 }
@@ -1987,7 +1979,7 @@ async def create_comment(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Database query failed"
+                                    "message": DATABASE_ERROR_MESSAGE
                                 }
                             }
                         },
@@ -1996,7 +1988,7 @@ async def create_comment(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Object storage Error"
+                                    "message": "Failed to delete stored object 1234.png: connection refused"
                                 }
                             }
                         }
@@ -2014,8 +2006,6 @@ async def delete_case(
 
     payload = verify_jwt(request)
     
-    verify_not_user(payload.get("role"))
-    
     if not case_request.CaseID:
         raise HTTPException(
             status_code=400,
@@ -2031,19 +2021,15 @@ async def delete_case(
     try:
         await delete_case.delete_case(
             username=payload.get("username"),
-            role=payload.get("role"),
+            is_admin=payload.get("role") == "ADMIN",
             connection=connection,
             executor_id=payload.get("sub")
         )
 
-        
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Case deleted successfully"
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Case deleted successfully"
+        }
     
     except asyncpg.PostgresError:
         raise HTTPException(
