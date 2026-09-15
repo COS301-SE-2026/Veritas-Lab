@@ -62,7 +62,7 @@ type FaqProps = {
 
 export default function HelpMenuFAQ({ items, openIndex, onToggle }: Readonly<FaqProps>) {
   return (
-    <div className="divide-y divide-(--color-lightest) overflow-hidden rounded-2xl border border-(--color-lightest)">
+    <div className="divide-y divide-(--color-line) overflow-hidden rounded-[var(--radius-lg)] border border-(--color-line) bg-(--color-surface)">
       {items.map((f, i) => {
         const isOpen = openIndex === i;
         return (
@@ -71,16 +71,16 @@ export default function HelpMenuFAQ({ items, openIndex, onToggle }: Readonly<Faq
               type="button"
               onClick={() => onToggle(isOpen ? null : i)}
               aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-medium text-(--color-text) transition-colors hover:bg-(--color-lightest)"
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-medium text-(--color-text-strong) transition-colors hover:bg-(--color-surface-muted)"
             >
               <span>{f.question}</span>
               <ChevronDown
                 size={18}
-                className={`shrink-0 text-(--color-light) transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                className={`shrink-0 text-(--color-text-subtle) transition-transform ${isOpen ? 'rotate-180' : ''}`}
               />
             </button>
             {isOpen && (
-              <p className="px-5 pb-4 text-sm leading-relaxed text-(--color-light)">{f.answer}</p>
+              <p className="px-5 pb-4 text-sm leading-relaxed text-(--color-text-muted)">{f.answer}</p>
             )}
           </div>
         );

@@ -61,13 +61,13 @@ export default function HelpMenuGuide({ items }: Readonly<{ items: Guide[] }>) {
         return (
           <div
             key={g.title}
-            className="rounded-2xl bg-(--color-lightest) p-5 transition-shadow hover:shadow-md"
+            className="vl-card vl-card-interactive p-5"
           >
-            <span className="flex size-12 items-center justify-center rounded-xl bg-(--color-background)">
-              <Icon className="size-6 text-(--color-secondary)" />
+            <span className="flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-(--color-b-50) ring-1 ring-[color-mix(in_srgb,var(--b-500)_22%,transparent)]">
+              <Icon className="size-6 text-(--color-b-600)" />
             </span>
-            <h2 className="mt-4 text-lg font-bold text-(--color-text)">{g.title}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-(--color-text)">{g.body}</p>
+            <h2 className="mt-4 text-lg font-bold text-(--color-text-strong)">{g.title}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-(--color-text-muted)">{g.body}</p>
           </div>
         );
       })}
