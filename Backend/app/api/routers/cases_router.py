@@ -213,9 +213,7 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
-    media_name = row["mediatitle"]
-
-    # Generate presigned URL
+    media_name = row["medianame"]
     target_filename = f"{media_id}{media_extension}"
     presign_client = get_object(for_presign=True)
 
@@ -230,6 +228,7 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
 
     evidence = {
         "mediaId": str(media_id),
+        "casePerspective": row["caseperspective"],
         "mediaName": media_name,
         "mediaBucket": media_bucket,
         "mediaExtension": media_extension,
@@ -244,15 +243,17 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 if isinstance(row["annotations"], str)
                 else (row["annotations"] or [])
             ),
-            "reportId": str(row["reportid"]),
+
             "reportArtifacts": (
                 json.loads(row["reportartifacts"])
                 if isinstance(row["reportartifacts"], str)
                 else row["reportartifacts"]
             ),
+
             "reportFindings": row["reportfindings"],
             "reportComments": row["reportcomments"],
             "reportCertainty": row["reportcertainty"],
+            
             "reportDateCreation": (
                 row["reportdatecreation"].isoformat()
                 if row["reportdatecreation"]
@@ -483,16 +484,18 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         )
 
 @router.get(
-    "/getSingleCase",
+    "/getSingleCase/{CaseId}",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get a single case",
     description=(
-        "Returns one case with its comments and evidence. INVESTIGATOR and ADMIN can "
-        "get any case and receive full report data and presigned media URLs. "
-        "USER can only get cases they created. USER can access the media for their "
-        "own case in any state, but annotations and report data are only returned "
-        "when the case is CLOSED."
+        "Returns a single case with its comments and evidence. "
+        "Any authenticated user can view a case they created, regardless of its state. "
+        "ADMIN and INVESTIGATOR users can additionally view any PUBLISHED or CLOSED case. "
+        "ADMIN and INVESTIGATOR users receive evidence annotations and report-related "
+        "information whenever they can access the case. "
+        "USER accounts only receive annotations and report-related information when "
+        "the case is CLOSED."
     ),
     responses={
         200: {
@@ -500,23 +503,26 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
             "content": {
                 "application/json": {
                     "examples": {
-                        "Full case": {
-                            "summary": "ADMIN, INVESTIGATOR, or USER viewing a closed case",
+                        "Investigator or admin": {
+                            "summary": (
+                                "ADMIN or INVESTIGATOR viewing a PUBLISHED "
+                                "or CLOSED case"
+                            ),
                             "value": {
                                 "status": "success",
                                 "case": {
                                     "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
                                     "caseName": "Flood in Westville",
-                                    "caseCreator": "investigator_user",
+                                    "caseCreator": "normal_user",
                                     "caseDescription": "Flood investigation case",
-                                    "caseState": "CLOSED",
+                                    "caseState": "PUBLISHED",
                                     "caseCreationDate": "2026-05-20T19:43:02+00:00"
                                 },
                                 "comments": [],
                                 "evidence": [
                                     {
-                                        "reportId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
                                         "mediaId": "11111111-2222-3333-4444-555555555555",
+                                        "casePerspective": "Front view",
                                         "mediaName": "flood_image.jpg",
                                         "mediaBucket": "images",
                                         "mediaExtension": ".jpg",
@@ -533,8 +539,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                             }
                         },
 
-                        "User open case": {
-                            "summary": "USER viewing their own open case",
+                        "User viewing own case": {
+                            "summary": "USER viewing a case they created",
                             "value": {
                                 "status": "success",
                                 "case": {
@@ -545,11 +551,11 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                     "caseState": "OPEN",
                                     "caseCreationDate": "2026-05-20T19:43:02+00:00"
                                 },
-
                                 "comments": [],
                                 "evidence": [
                                     {
                                         "mediaId": "11111111-2222-3333-4444-555555555555",
+                                        "casePerspective": "Front view",
                                         "mediaName": "flood_image.jpg",
                                         "mediaBucket": "images",
                                         "mediaExtension": ".jpg",
@@ -563,38 +569,32 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 }
             }
         },
+
         400: {
             "model": error_response,
-            "description": "Bad Request - Missing or malformed CaseID",
+            "description": "Bad Request - CaseId is malformed",
             "content": {
                 "application/json": {
-                    "examples": {
-                        "Missing CaseID": {
-                            "summary": "No CaseID supplied",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": CASE_ID_REQUIRED
-                                }
-                            }
-                        },
-                        "Invalid CaseID": {
-                            "summary": "CaseID is not a valid UUID",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": "'not-a-valid-uuid' is not a valid UUID format"
-                                }
-                            }
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
                         }
                     }
                 }
             }
         },
+
         401: INVALID_TOKEN_401,
+
         404: {
             "model": error_response,
-            "description": "Not Found - Case does not exist or USER requested a case they did not create.",
+            "description": (
+                "Not Found - Case does not exist or the authenticated user "
+                "is not authorised to view it. USER accounts may only view "
+                "cases they created. ADMIN and INVESTIGATOR accounts may view "
+                "their own cases or any PUBLISHED or CLOSED case."
+            ),
             "content": {
                 "application/json": {
                     "example": {
@@ -606,9 +606,13 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 }
             }
         },
+
         500: {
             "model": error_response,
-            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "description": (
+                "Internal Server Error - "
+                + DATABASE_ERROR_MESSAGE
+            ),
             "content": {
                 "application/json": {
                     "example": {
@@ -622,35 +626,32 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         }
     }
 )
-async def get_single_case(case_request: create_single_case_request, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
+async def get_single_case(CaseId: str, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
     payload = verify_jwt(request)
-
-    if not case_request.CaseID:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "status": "error",
-                "message": CASE_ID_REQUIRED
-            }
-        )
-
-    case_id = Case(case_id=case_request.CaseID).case_id
+    case_id = Case(case_id=CaseId).case_id
 
     role = payload.get("role")
     username = payload.get("username")
-    is_standard_user = role == "USER"
 
     try:
         row = await connection.fetchrow(
             """
-            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
             FROM "Cases_DB"."Cases"
             WHERE caseid = $1
-                AND ($2::boolean IS FALSE OR casecreator = $3)
+                AND (
+                    casecreator = $2
+                    OR (
+                        $3 = ANY(ARRAY['ADMIN', 'INVESTIGATOR'])
+                        AND (
+                            casestate IN ('PUBLISHED', 'CLOSED')
+                        )
+                    )
+                )
             """,
             case_id,
-            is_standard_user,
-            username
+            username,
+            role
         )
 
         if row is None:
@@ -667,29 +668,40 @@ async def get_single_case(case_request: create_single_case_request, request: Req
         evidence_rows = await connection.fetch(
              """
             SELECT
-                r.ReportID AS "reportid",
-                r.CaseID AS "caseid",
-                r.MediaID AS "mediaid",
-                r.ReportArtifacts AS "reportartifacts",
-                r.imagetitle AS "mediatitle",
-                r.ReportFindings AS "reportfindings",
-                r.ReportComments AS "reportcomments",
-                r.ReportCertainty AS "reportcertainty",
-                r.ReportDateCreation AS "reportdatecreation",
-                m.MediatypeId AS "mediatypeid",
+                ev.evidence_id AS "mediaid",
+                ev.case_perspective AS "caseperspective",
+
+                media.MediaAnnotations AS "annotations",
+                media.ReportArtifacts AS "reportartifacts",
+                media.ReportFindings AS "reportfindings",
+                media.ReportComments AS "reportcomments",
+                media.ReportCertainty AS "reportcertainty",
+                media.ReportDateCreation AS "reportdatecreation",
+                media.MediaUploadDate AS "mediauploaddate",
+
+                m.MediaTypeId AS "mediatypeid",
+                m.MediaName AS "medianame",
                 m.MediaExtension AS "mediaextension",
-                m.MediaBucket AS "mediabucket",
-                media.MediaAnnotations AS "annotations"
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" media ON r.MediaID = media.MediaID
-            JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
-            WHERE r.CaseID = $1
-            ORDER BY r.ReportDateCreation DESC
+                m.MediaBucket AS "mediabucket"
+
+            FROM "Cases_DB"."Cases" c
+
+            CROSS JOIN LATERAL
+                unnest(c.evidence)
+                AS ev(evidence_id, case_perspective)
+
+            JOIN "Cases_DB"."Media" media
+                ON media.MediaId = ev.evidence_id
+
+            JOIN "Cases_DB"."MediaType" m
+                ON media.MediaType = m.MediaTypeId
+
+            WHERE c.CaseId = $1
             """,
             case_id,
         )
 
-        can_view_report = not is_standard_user or row["casestate"] == "CLOSED"
+        can_view_report = role in ["ADMIN", "INVESTIGATOR"] or row["casestate"] == "CLOSED"
 
         return jsonable_encoder({
             "status": "success",
