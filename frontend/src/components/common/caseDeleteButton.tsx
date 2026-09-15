@@ -36,28 +36,29 @@ export default function CaseDeleteButton({ caseId, caseTitle, onDeleted }: Reado
 
     return (
         <>
-            <Button
-                variant="sadSack"
-                size="small"
+            <button
+                type="button"
                 onClick={openModal}
-                className="flex h-6 w-6 !p-0 items-center justify-center rounded-full hover:bg-[var(--color-light)] cursor-pointer"
+                aria-label="Delete case"
+                className="flex size-7 items-center justify-center rounded-full bg-(--color-surface)/80 text-(--color-text-subtle) shadow-[var(--shadow-xs)] backdrop-blur transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--color-danger)] cursor-pointer"
             >
                 <X size={14} />
-            </Button>
+            </button>
             <Modal isOpen={isModalOpen} onClose={closeModal}>
-                <div className="p-2">
-                    <h2 className="text-lg font-bold text-[var(--color-text)]">Delete case?</h2>
-                    <p className="mt-2 text-sm text-(--color-light)">
+                <div>
+                    <h2 className="text-lg font-bold text-(--color-text-strong)">Delete case?</h2>
+                    <p className="mt-2 text-sm text-(--color-text-muted)">
                         This will permanently remove &ldquo;{caseTitle}&rdquo; and all attached evidence and comments. This action cannot be undone.
                     </p>
-                    {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
+                    {error ? <div className="mt-3"><Label text={error} htmlFor="error" variant="error" /></div> : null}
                     <div className="mt-6 flex justify-end gap-3">
-                        <Button variant="sadSack" text="Cancel" onClick={closeModal} disabled={isDeleting} />
+                        <Button variant="outline" text="Cancel" onClick={closeModal} disabled={isDeleting} />
                         <Button
                             variant="submit"
                             text={isDeleting ? 'Deleting' : 'Delete'}
                             onClick={handleConfirmDelete}
                             disabled={isDeleting}
+                            className={'bg-[var(--color-danger)] text-white border-transparent hover:bg-(--color-danger)'}
                         />
                     </div>
                 </div>
