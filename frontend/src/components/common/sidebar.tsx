@@ -9,7 +9,7 @@ import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-    ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle, Settings,
+    ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle, Settings, ScrollText,
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import ResetPasswordModal from '@/components/common/resetPasswordModal';
@@ -24,15 +24,17 @@ export default function Sidebar() {
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', icon: Home },
         ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
-        ...(userRole === 'ADMIN' ? [{ label: 'Audit Logs', href: '/audit-log', icon: UserStar }] : []),
+        ...(userRole === 'ADMIN' ? [{ label: 'Audit Logs', href: '/audit-log', icon: ScrollText }] : []),
         { label: 'Help', href: '/help', icon: HelpCircle },
     ];
 
+    const footerItemClasses = (collapsed: boolean) =>
+        `flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/[0.06] text-white/80 hover:bg-white/[0.14] hover:text-white -translate-x-1 hover:translate-x-0 transition-[transform,background-color,color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`;
+
     return (
         <div
-            className={`relative z-0 flex flex-col h-screen sticky top-0 bg-[var(--color-primary)] text-white transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`}
+            className={`relative z-0 flex flex-col h-screen sticky top-0 bg-gradient-to-b from-[#26221f] via-(--color-primary) to-[#1b1817] text-white transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`}
         >
-        <div />
             <header className="flex items-center justify-between px-4 py-5">
                 {!collapsed && (
                     <div className="flex items-center gap-2 ml-3">
@@ -43,51 +45,47 @@ export default function Sidebar() {
                 <Button onClick={toggle} variant="sidebar">
                     {collapsed
                         ? <Menu size={18} />
-                        : <ChevronLeft size={18} className="text-[var(--color-light)]" />}
+                        : <ChevronLeft size={18} className="text-white/70" />}
                 </Button>
             </header>
 
-            <nav className={`flex-1 py-4 space-y-3 ${collapsed ? 'pl-2 pr-0' : 'pl-7 pr-0'}`}>
+            <nav className={`flex-1 py-4 space-y-2.5 ${collapsed ? 'pl-2 pr-0' : 'pl-7 pr-0'}`}>
                 {navItems.map(({ label, href, icon: Icon }) => {
                     const isActive = pathname === href;
                     return (
                         <div key={href} className="relative">
                             <Link
                                 href={href}
+                                aria-current={isActive ? 'page' : undefined}
                                 className={`group relative flex items-center gap-3 text-sm rounded-l-full rounded-r-none transition-[transform,background-color,color] duration-200 ease-out
                                     ${collapsed
                                             ? 'justify-center py-3 pl-0 pr-4 -mr-3'
                                             : 'justify-start py-3 pl-4 pr-16 -mr-12'}
                                     ${isActive
-                                            ? 'bg-[var(--color-secondary)] text-[var(--color-text)] font-medium translate-x-0'
-                                            : 'bg-white/8 text-white/90 -translate-x-1 hover:translate-x-0 hover:bg-white/15'}
+                                            ? 'bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
+                                            : 'bg-white/[0.06] text-white/80 -translate-x-1 hover:translate-x-0 hover:bg-white/[0.14] hover:text-white'}
                                 `}
                             >
                                 <Icon size={18} className="shrink-0" />
                                 {!collapsed && <span className="truncate">{label}</span>}
                             </Link>
-
-                            <span
-                                className={`absolute right-0 top-1/2 -translate-y-1/2 h-6 w-px ${isActive ? 'bg-black/20' : 'bg-white/10'}`}
-                            />
                         </div>
                     );
                 })}
             </nav>
 
-            <footer className={`pb-6 ${collapsed ? 'pl-2' : 'pl-7'} space-y-4`}>
+            <footer className={`pb-6 ${collapsed ? 'pl-2' : 'pl-7'} space-y-3`}>
                 <button
                     onClick={() => setIsResetPasswordOpen(true)}
-                    className={`flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/8 text-white/90 hover:bg-white/15 -translate-x-1 hover:translate-x-0 transition-[transform,background-color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`}
+                    className={footerItemClasses(collapsed)}
                 >
-                    {/* used same styling as logout button */}
                     <Settings size={18} className="shrink-0" />
                     {!collapsed && <span>Settings</span>}
                 </button>
 
                 <button
                     onClick={logOut}
-                    className={`flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/8 text-white/90 hover:bg-white/15 -translate-x-1 hover:translate-x-0 transition-[transform,background-color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`}
+                    className={footerItemClasses(collapsed)}
                 >
                     <LogOut size={18} className="shrink-0" />
                     {!collapsed && <span>Log Out</span>}
