@@ -91,7 +91,7 @@ async def test_get_single_case_user_success_hides_report():
         mock_case_class.return_value.case_id = uuid.UUID(case_id)
 
         response = await get_single_case(
-            CaseId=case_id,
+            case_id=case_id,
             request=MagicMock(),
             connection=connection
         )
@@ -140,7 +140,7 @@ async def test_get_single_case_investigator_success_shows_report():
         mock_case_class.return_value.case_id = uuid.UUID(case_id)
 
         response = await get_single_case(
-            CaseId=case_id,
+            case_id=case_id,
             request=MagicMock(),
             connection=connection
         )
@@ -186,7 +186,7 @@ async def test_get_single_case_admin_success_shows_report():
         mock_case_class.return_value.case_id = uuid.UUID(case_id)
 
         response = await get_single_case(
-            CaseId=case_id,
+            case_id=case_id,
             request=MagicMock(),
             connection=connection
         )
@@ -215,7 +215,7 @@ async def test_get_single_case_not_found():
 
         with pytest.raises(HTTPException) as exc_info:
             await get_single_case(
-                CaseId=case_id,
+                case_id=case_id,
                 request=MagicMock(),
                 connection=connection
             )
@@ -247,7 +247,7 @@ async def test_get_single_case_database_error_fetching_case():
 
         with pytest.raises(HTTPException) as exc_info:
             await get_single_case(
-                CaseId=case_id,
+                case_id=case_id,
                 request=MagicMock(),
                 connection=connection
             )
@@ -290,7 +290,7 @@ async def test_get_single_case_database_error_fetching_evidence():
 
         with pytest.raises(HTTPException) as exc_info:
             await get_single_case(
-                CaseId=case_id,
+                case_id=case_id,
                 request=MagicMock(),
                 connection=connection
             )

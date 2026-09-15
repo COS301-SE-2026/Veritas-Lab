@@ -460,21 +460,38 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
     username = payload.get("username")
 
     try:
-        rows = await connection.fetch(
-            """
-            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
-            FROM "Cases_DB"."Cases"
-            WHERE 
-                casecreator = $1
-                OR (
-                    $2 = ANY(ARRAY['ADMIN', 'INVESTIGATOR'])
-                    AND casestate IN ('PUBLISHED', 'CLOSED')
-                )
-            ORDER BY casecreationdate DESC
-            """,
-            username,
-            role
-        )
+        if role == "USER":
+            rows = await connection.fetch(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                FROM "Cases_DB"."Cases"
+                WHERE casecreator = $1
+                ORDER BY casecreationdate DESC
+                """,
+                username
+            )
+
+        elif role in ["ADMIN", "INVESTIGATOR"]:
+            rows = await connection.fetch(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                FROM "Cases_DB"."Cases"
+                WHERE 
+                    casecreator = $1
+                    OR casestate IN ('PUBLISHED', 'CLOSED')
+                ORDER BY casecreationdate DESC
+                """,
+                username
+            )
+
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "User unauthorized"
+                }
+            )
 
         return {
             "status": "success",
@@ -491,7 +508,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         )
 
 @router.get(
-    "/getSingleCase/{CaseId}",
+    "/getSingleCase/{case_id}",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get a single case",
@@ -633,33 +650,48 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         }
     }
 )
-async def get_single_case(CaseId: str, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
+async def get_single_case(case_id: str, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
     payload = verify_jwt(request)
-    case_id = Case(case_id=CaseId).case_id
+    case_id = Case(case_id=case_id).case_id
 
     role = payload.get("role")
     username = payload.get("username")
 
     try:
-        row = await connection.fetchrow(
-            """
-            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
-            FROM "Cases_DB"."Cases"
-            WHERE caseid = $1
-                AND (
-                    casecreator = $2
-                    OR (
-                        $3 = ANY(ARRAY['ADMIN', 'INVESTIGATOR'])
-                        AND (
-                            casestate IN ('PUBLISHED', 'CLOSED')
-                        )
+        if role == "USER":
+            row = await connection.fetchrow(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1 AND casecreator = $2
+                """,
+                case_id,
+                username
+            )
+            
+        elif role in ["ADMIN", "INVESTIGATOR"]:
+            row = await connection.fetchrow(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                    AND (
+                        casecreator = $2
+                        OR casestate IN ('PUBLISHED', 'CLOSED')
                     )
-                )
-            """,
-            case_id,
-            username,
-            role
-        )
+                """,
+                case_id,
+                username
+            )
+
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "User unauthorized"
+                }
+            )
 
         if row is None:
             raise HTTPException(

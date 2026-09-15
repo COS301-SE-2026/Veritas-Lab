@@ -74,7 +74,6 @@ async def test_get_cases_user_success():
     args = connection.fetch.call_args.args
 
     assert args[1] == "test_user"
-    assert args[2] == "USER"
 
 @pytest.mark.asyncio
 async def test_get_cases_investigator_success():
@@ -132,7 +131,6 @@ async def test_get_cases_investigator_success():
     args = connection.fetch.call_args.args
 
     assert args[1] == "investigator1"
-    assert args[2] == "INVESTIGATOR"
 
 @pytest.mark.asyncio
 async def test_get_cases_admin_success():
@@ -174,7 +172,6 @@ async def test_get_cases_admin_success():
     args = connection.fetch.call_args.args
 
     assert args[1] == "admin1"
-    assert args[2] == "ADMIN"
 
 @pytest.mark.asyncio
 async def test_get_cases_empty_result():
