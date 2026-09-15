@@ -438,6 +438,8 @@ async def create_case(
             }
         },
 
+        403: USER_UNAUTHORIZED_403,
+
         500: {
             "model": error_response,
             "description": "Internal server error " + DATABASE_ERROR_MESSAGE,
@@ -478,7 +480,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 FROM "Cases_DB"."Cases"
                 WHERE 
                     casecreator = $1
-                    OR casestate IN ('PUBLISHED', 'CLOSED')
+                    OR casestate != 'OPEN'
                 ORDER BY casecreationdate DESC
                 """,
                 username
@@ -611,6 +613,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
 
         401: INVALID_TOKEN_401,
 
+        403: USER_UNAUTHORIZED_403,
+
         404: {
             "model": error_response,
             "description": (
@@ -668,7 +672,7 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 case_id,
                 username
             )
-            
+
         elif role in ["ADMIN", "INVESTIGATOR"]:
             row = await connection.fetchrow(
                 """
@@ -677,7 +681,7 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 WHERE caseid = $1
                     AND (
                         casecreator = $2
-                        OR casestate IN ('PUBLISHED', 'CLOSED')
+                        OR casestate != 'OPEN'
                     )
                 """,
                 case_id,
