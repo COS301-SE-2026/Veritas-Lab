@@ -27,11 +27,12 @@ async def audit_context(ensure_user_exists):
             "conn": conn,
             "investigator_id": investigator_id,
             "investigator_name": investigator_name,
+            "admin_name": admin_name,
             "investigator_token": create_token(
-                {"id": investigator_id, "username": INVESTIGATOR, "role": "INVESTIGATOR"}
+                {"id": investigator_id, "username": investigator_name, "role": "INVESTIGATOR"}
             ),
             "admin_token": create_token(
-                {"id": admin_id, "username": ADMIN, "role": "ADMIN"}
+                {"id": admin_id, "username": admin_name, "role": "ADMIN"}
             ),
             "cases": created_case_ids,
         }
@@ -41,7 +42,14 @@ async def audit_context(ensure_user_exists):
         )
         for case_id in created_case_ids:
             rows = await conn.fetch(
-                'SELECT mediaid FROM "Cases_DB"."Reports" WHERE caseid = $1',
+                """
+                SELECT elem.evidence_id AS mediaid
+                FROM "Cases_DB"."Cases" AS cases
+                CROSS JOIN LATERAL unnest(
+                    COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
+                ) AS elem
+                WHERE cases.caseid = $1
+                """,
                 uuid.UUID(case_id),
             )
             await conn.execute(
@@ -61,11 +69,11 @@ async def seed_case(ctx, closed=False):
     )
     await conn.execute(
         """
-        INSERT INTO "Cases_DB"."Cases" 
+        INSERT INTO "Cases_DB"."Cases"
         (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
         VALUES ($1, $2, $3, $4, $5::case_state_enum)
         """,
-        case_id, "Audit test case", ctx["investigator_id"], "This is a test case for auditing", "CLOSED" if closed else "OPEN"
+        case_id, "Audit test case", ctx["investigator_name"], "This is a test case for auditing", "CLOSED" if closed else "OPEN"
     )
     ctx["cases"].append(str(case_id))
     return str(case_id)
@@ -80,8 +88,15 @@ async def seed_evidence(ctx, case_id):
         'INSERT INTO "Cases_DB"."Media" (MediaId, MediaType, MediaHash) VALUES ($1, $2, $3)',
         media_id, media_type, uuid.uuid4().hex,
     )
+    # Evidence lives in a composite array on the case now. Append so a case can hold
+    # more than one piece of evidence.
     await conn.execute(
-        'INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle) VALUES ($1, $2, $3)',
+        """
+        UPDATE "Cases_DB"."Cases"
+        SET evidence = COALESCE(evidence, ARRAY[]::"Cases_DB".evidence_type[])
+            || ARRAY[ROW($2, $3)::"Cases_DB".evidence_type]
+        WHERE CaseId = $1
+        """,
         case_id, media_id, "Test Evidence",
     )
     return media_id
@@ -162,7 +177,16 @@ async def test_evidence_removal_is_not_recorded(client, audit_context):
     media_id = await seed_evidence(ctx, case_id)
 
     await ctx["conn"].execute(
-        'DELETE FROM "Cases_DB"."Reports" WHERE mediaid = $1', media_id
+        """
+        UPDATE "Cases_DB"."Cases"
+        SET evidence = ARRAY(
+            SELECT elem
+            FROM unnest(COALESCE(evidence, ARRAY[]::"Cases_DB".evidence_type[])) AS elem
+            WHERE elem.evidence_id != $2
+        )
+        WHERE CaseId = $1
+        """,
+        uuid.UUID(case_id), media_id
     )
 
     client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
@@ -172,8 +196,15 @@ async def test_evidence_removal_is_not_recorded(client, audit_context):
     assert "Evidence Added" not in result
 
 @pytest.mark.asyncio
-async def test_timeline_empty_for_unaudited_case(client, audit_context):
+async def test_timeline_unknown_case_is_forbidden_for_non_admin(client, audit_context):
     client.cookies.set(COOKIE_NAME, audit_context["investigator_token"])
+    response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
+
+    assert response.status_code == 403, response.text
+
+@pytest.mark.asyncio
+async def test_timeline_empty_for_unaudited_case(client, audit_context):
+    client.cookies.set(COOKIE_NAME, audit_context["admin_token"])
     response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
 
     assert response.status_code == 200, response.text
@@ -204,3 +235,146 @@ async def test_get_all_audited_cases(client, audit_context):
     assert set(body["cases"][0]) == {
         "caseId", "caseName", "eventCount", "lastEventTimestamp", "caseExists"
     }
+
+
+@pytest.mark.asyncio
+async def test_timeline_visible_to_case_creator_with_user_role(client, audit_context, ensure_user_exists):
+    # Issue #458: the creator reads their own case timeline, whatever their role.
+    ctx = audit_context
+    user_id = str(uuid.uuid4())
+    username = f"Audit_User_{user_id[:8]}"
+
+    await ensure_user_exists(ctx["conn"], user_id, "Audit_User", "USER")
+
+    case_id = uuid.uuid4()
+    await ctx["conn"].execute(
+        "SELECT set_config('app.current_user_id', $1, false)", user_id
+    )
+    await ctx["conn"].execute(
+        """
+        INSERT INTO "Cases_DB"."Cases"
+        (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+        VALUES ($1, $2, $3, $4, $5::case_state_enum)
+        """,
+        case_id, "User owned audit case", username, "Created by a USER", "OPEN"
+    )
+    ctx["cases"].append(str(case_id))
+
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token({"id": user_id, "username": username, "role": "USER"})
+    )
+    response = client.get(f"/api/getAudit/caseID/{case_id}")
+
+    assert response.status_code == 200, response.text
+    assert "Case Created" in actions(response)
+
+
+@pytest.mark.asyncio
+async def test_timeline_visible_to_assigned_investigator(client, audit_context):
+    ctx = audit_context
+    case_id = await seed_case(ctx)
+
+    await ctx["conn"].execute(
+        'UPDATE "Cases_DB"."Cases" SET casecreator = $2, caseassigned = $3 WHERE CaseId = $1',
+        uuid.UUID(case_id), "SomebodyElse", ctx["investigator_name"]
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    response = client.get(f"/api/getAudit/caseID/{case_id}")
+
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_timeline_forbidden_to_unrelated_investigator(client, audit_context):
+    # The access rule: an investigator who neither created nor is assigned the case
+    # can no longer read its history.
+    ctx = audit_context
+    case_id = await seed_case(ctx)
+
+    await ctx["conn"].execute(
+        'UPDATE "Cases_DB"."Cases" SET casecreator = $2 WHERE CaseId = $1',
+        uuid.UUID(case_id), "SomebodyElse"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    response = client.get(f"/api/getAudit/caseID/{case_id}")
+
+    assert response.status_code == 403, response.text
+
+
+@pytest.mark.asyncio
+async def test_timeline_visible_to_admin_for_any_case(client, audit_context):
+    ctx = audit_context
+    case_id = await seed_case(ctx)
+
+    await ctx["conn"].execute(
+        'UPDATE "Cases_DB"."Cases" SET casecreator = $2 WHERE CaseId = $1',
+        uuid.UUID(case_id), "SomebodyElse"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["admin_token"])
+    response = client.get(f"/api/getAudit/caseID/{case_id}")
+
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_timeline_readable_after_case_is_deleted(client, audit_context):
+    # The live row is gone, so ownership has to come from Audit_Cases.
+    ctx = audit_context
+    case_id = await seed_case(ctx)
+
+    await ctx["conn"].execute(
+        'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1', uuid.UUID(case_id)
+    )
+    ctx["cases"].remove(case_id)
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    response = client.get(f"/api/getAudit/caseID/{case_id}")
+
+    assert response.status_code == 200, response.text
+    assert actions(response) == ["Case Created", "Case Deleted"]
+
+
+@pytest.mark.asyncio
+async def test_timeline_records_publish_and_close(client, audit_context):
+    ctx = audit_context
+    case_id = await seed_case(ctx)
+
+    await ctx["conn"].execute(
+        "UPDATE \"Cases_DB\".\"Cases\" SET casestate = 'PUBLISHED'::case_state_enum WHERE CaseId = $1",
+        uuid.UUID(case_id)
+    )
+    await ctx["conn"].execute(
+        "UPDATE \"Cases_DB\".\"Cases\" SET casestate = 'CLOSED'::case_state_enum WHERE CaseId = $1",
+        uuid.UUID(case_id)
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    result = actions(client.get(f"/api/getAudit/caseID/{case_id}"))
+
+    assert "Case Published" in result
+    assert "Case Closed" in result
+
+
+@pytest.mark.asyncio
+async def test_timeline_records_assignment_and_unassignment(client, audit_context):
+    ctx = audit_context
+    case_id = await seed_case(ctx)
+
+    await ctx["conn"].execute(
+        'UPDATE "Cases_DB"."Cases" SET caseassigned = $2 WHERE CaseId = $1',
+        uuid.UUID(case_id), "SomeInvestigator"
+    )
+    await ctx["conn"].execute(
+        'UPDATE "Cases_DB"."Cases" SET caseassigned = NULL WHERE CaseId = $1',
+        uuid.UUID(case_id)
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    result = actions(client.get(f"/api/getAudit/caseID/{case_id}"))
+
+    assert "Case Assigned" in result
+    assert "Case Unassigned" in result
