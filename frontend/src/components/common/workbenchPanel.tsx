@@ -38,44 +38,41 @@ export default function WorkbenchPanel({
         }
     };
 
+    const toolButtonClasses = (isActive: boolean) =>
+        `flex items-center gap-2.5 rounded-[var(--radius-sm)] p-3 text-left text-sm font-semibold transition-colors ${isActive
+            ? 'bg-(--color-secondary) text-(--color-text) shadow-[0_4px_12px_-6px_color-mix(in_srgb,var(--b-600)_70%,transparent)]'
+            : 'text-(--color-text-strong) hover:bg-(--color-surface-sunken)'
+        }`;
+
     return (
-        <div className="flex w-72 shrink-0 flex-col gap-4 rounded-[21px] border border-(--color-light) p-4">
+        <div className="vl-panel flex w-full shrink-0 flex-col gap-4 p-5 lg:w-72">
             <div>
-                <h2 className="text-xl font-bold text-(--color-text)">Tools</h2>
-                <p className="mt-1 text-xs text-(--color-light)">Select a tool to work on this evidence.</p>
+                <h2 className="text-lg font-bold text-(--color-text-strong)">Tools</h2>
+                <p className="mt-1 text-xs text-(--color-text-muted)">Select a tool to work on this evidence.</p>
             </div>
 
-            {/* Tool list. currently: Annotations and the metadata Comparison view. */}
             <button
                 type="button"
                 onClick={() => onSelectWorkbenchTool(isAnnotationsActive ? null : 'Annotations')}
                 aria-pressed={isAnnotationsActive}
-                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${isAnnotationsActive
-                        ? 'bg-(--color-secondary) text-(--color-text)'
-                        : 'text-(--color-text) hover:bg-(--color-lightest)'
-                    }`}
+                className={toolButtonClasses(isAnnotationsActive)}
             >
                 <Pencil size={16} className="shrink-0" />
                 Annotations
             </button>
 
-            {/* Shows the metadata side by side view */}
             <button
                 type="button"
                 onClick={() => onSelectWorkbenchTool(isCompareActive ? null : 'Compare')}
                 aria-pressed={isCompareActive}
-                className={`flex items-center gap-2 rounded-xl p-3 text-left text-sm font-semibold transition-colors ${isCompareActive
-                        ? 'bg-(--color-secondary) text-(--color-text)'
-                        : 'text-(--color-text) hover:bg-(--color-lightest)'
-                    }`}
+                className={toolButtonClasses(isCompareActive)}
             >
                 <Columns2 size={16} className="shrink-0" />
                 View Metadata Comparison
             </button>
 
-            {/* Annotation controls only exist while the Annotations tool is active */}
             {isAnnotationsActive ? (
-                <div className="flex flex-col gap-4 border-t border-(--color-light) pt-4">
+                <div className="flex flex-col gap-4 border-t border-(--color-line) pt-4">
                     <SliderBar<AnnotationTool>
                         filters={ANNOTATION_TOOLS}
                         defaultFilter={activeTool}
@@ -95,7 +92,7 @@ export default function WorkbenchPanel({
                             variant="sadSack"
                             onClick={onClearAll}
                             disabled={annotations.length === 0}
-                            className="flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="gap-2"
                         >
                             <Trash2 size={16} />
                             <span className="text-sm font-medium">Clear</span>
@@ -104,7 +101,7 @@ export default function WorkbenchPanel({
                             variant="submit"
                             onClick={handleSave}
                             disabled={saveStatus === 'saving' || annotations.length === 0}
-                            className="ml-auto flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="ml-auto gap-2"
                         >
                             <Save size={16} />
                             <span className="text-sm">{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>

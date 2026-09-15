@@ -70,7 +70,7 @@ function extractMetadata(reportArtifacts: Record<string, unknown> | null | undef
 
 function MetadataList({ entries }: Readonly<{ entries: MetadataEntry[] }>) {
     if (entries.length === 0) {
-        return <p className="text-sm text-(--color-light)">No metadata available.</p>;
+        return <p className="text-sm text-(--color-text-subtle)">No metadata available.</p>;
     }
 
     return (
@@ -78,10 +78,10 @@ function MetadataList({ entries }: Readonly<{ entries: MetadataEntry[] }>) {
             {entries.map(([key, value]) => (
                 <div
                     key={key}
-                    className="flex flex-col gap-0.5 border-b border-(--color-light)/40 pb-2 last:border-none"
+                    className="flex flex-col gap-0.5 border-b border-(--color-line) pb-2 last:border-none"
                 >
-                    <dt className="font-mono text-xs text-(--color-text)">{key}</dt>
-                    <dd className="text-(--color-light) break-words">{value}</dd>
+                    <dt className="font-mono text-xs text-(--color-text-strong)">{key}</dt>
+                    <dd className="text-(--color-text-muted) break-words">{value}</dd>
                 </div>
             ))}
         </dl>
@@ -95,7 +95,7 @@ export default function MetadataComparison({
 }: Readonly<MetadataComparisonProps>) {
     if (mediaKind === 'unsupported') {
         return (
-            <div className="mt-4 rounded-2xl border border-(--color-light) p-4 text-sm text-(--color-light)">
+            <div className="vl-panel mt-4 p-4 text-sm text-(--color-text-muted)">
                 Metadata comparison isnt available for this file type.
             </div>
         );
@@ -105,24 +105,24 @@ export default function MetadataComparison({
     const exampleEntries = buildEntries(mediaKind, badExampleData[mediaKind]);
 
     return (
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-(--color-light) p-4">
+        <div className="vl-panel mt-4 flex flex-col gap-3 p-5">
             <div className="flex items-center gap-2">
-                <Columns2 size={16} className="shrink-0 text-(--color-light)" />
-                <h3 className="text-s font-semibold text-(--color-text)">
+                <Columns2 size={16} className="shrink-0 text-(--color-b-600)" />
+                <h3 className="text-sm font-semibold text-(--color-text-strong)">
                     Metadata comparison
                 </h3>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-(--color-light)">
+                <div className="flex flex-col gap-2 rounded-[var(--radius-md)] bg-(--color-surface-muted) p-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-(--color-text-subtle)">
                         {mediaName}
                     </h4>
                     <MetadataList entries={realEntries} />
                 </div>
 
-                <div className="flex flex-col gap-2 md:border-l md:border-(--color-light) md:pl-4">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-(--color-light)">
+                <div className="flex flex-col gap-2 rounded-[var(--radius-md)] bg-(--color-surface-muted) p-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-(--color-text-subtle)">
                         {exampleLabels[mediaKind]}
                     </h4>
                     <MetadataList entries={exampleEntries} />
