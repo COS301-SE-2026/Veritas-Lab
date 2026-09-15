@@ -358,7 +358,6 @@ export const referenceExamples: Record<ExampleMediaKind, ReferenceExample[]> = {
     video: VIDEO_EXAMPLES,
 };
 
-/** Back-compat: the first example of each kind is the historic "bad example". */
 export const badExampleData: Record<ExampleMediaKind, Record<string, unknown>> = {
     image: IMAGE_EXAMPLES[0].data,
     pdf: PDF_EXAMPLES[0].data,
