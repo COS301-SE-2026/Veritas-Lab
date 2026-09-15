@@ -41,7 +41,9 @@ async def single_case_context(case_assignment_context):
 async def seed_case(
     ctx,
     creator=None,
-    state="OPEN"
+    state="OPEN",
+    name="Integration test case",
+    description="Case used for integration testing"
 ):
     if creator is None:
         creator = ctx["creator_name"]
@@ -72,9 +74,9 @@ async def seed_case(
         )
         """,
         case_id,
-        "Get single case test",
+        name,
         creator,
-        "Case used for getSingleCase integration testing",
+        description,
         state
     )
 
