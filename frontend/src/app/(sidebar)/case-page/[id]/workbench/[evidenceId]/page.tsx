@@ -56,7 +56,7 @@ export default function WorkbenchPage() {
 
     useEffect(() => {
         let cancelled = false;
-        
+
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
@@ -86,30 +86,31 @@ export default function WorkbenchPage() {
     const handleSave = () => saveAnnotations({ evidenceId, annotations });
 
     return (
-        <div className="mt-8 ml-16 mr-16">
+        <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">
             <Link
                 href={`/case-page/${caseId}`}
-                className="inline-flex items-center gap-2 text-sm text-(--color-light) transition-colors hover:text-(--color-text)"
+                className="inline-flex items-center gap-2 text-sm font-medium text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
             >
                 <ArrowLeft size={16} />
                 Back to case
             </Link>
 
-            <div className="mt-4 flex items-start justify-between gap-4">
+            <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-(--color-text)">{mediaName}</h1>
-                    <p className="mt-1 text-sm text-(--color-light)">
+                    <h1 className="text-2xl font-bold text-(--color-text-strong)">{mediaName}</h1>
+                    <p className="mt-1 text-sm text-(--color-text-muted)">
                         Use the tools on the right to work on this evidence.
                     </p>
+                    {error ? <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p> : null}
                 </div>
-                <Button variant="submit" onClick={openReport} className="flex items-center gap-2">
+                <Button variant="submit" onClick={openReport} className="gap-2">
                     <FileText size={16} />
-                    <span className="text-sm">Show Report</span>
+                    <span>Show Report</span>
                 </Button>
             </div>
 
-            <div className="mt-6 flex gap-6">
-                <div className="flex-1">
+            <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+                <div className="min-w-0 flex-1">
                     <WorkbenchCanvas
                         video={video}
                         mediaUrl={mediaUrl}
