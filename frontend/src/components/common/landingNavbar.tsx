@@ -19,12 +19,12 @@ export default function LandingNavbar() {
 
     return (
         <header
-            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out bg-(--color-primary)
+            className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out
                 ${visible
                     ? 'translate-y-0 opacity-100'
                     : '-translate-y-full opacity-0 pointer-events-none'}`}
         >
-            <nav className="flex items-center justify-between gap-4 px-6 sm:px-10 py-3 backdrop-blur-xl border-b border-black/5 shadow-[0_8px_30px_-12px_var(--color-dark)]/10">
+            <nav className="flex items-center justify-between gap-4 border-b border-white/10 bg-[rgba(24,22,23,0.72)] px-6 sm:px-10 py-3 backdrop-blur-xl shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
                 <button
                     type="button"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -46,13 +46,13 @@ export default function LandingNavbar() {
                     <Button
                         text="Log In"
                         variant="light"
-                        className="px-5 sm:px-8 py-2 text-base font-semibold"
+                        className="px-5 sm:px-8 py-2"
                         onClick={() => router.push('/login')}
                     />
                     <Button
                         text="Sign Up"
                         variant="submit"
-                        className="px-5 sm:px-8 py-2 text-base font-semibold"
+                        className="px-5 sm:px-8 py-2"
                         onClick={() => router.push('/register')}
                     />
                 </div>
