@@ -43,6 +43,7 @@ INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
+AUDIT_NOT_ALLOWED = "Only the case creator, the assigned investigator or an admin can view this audit log"
 CASE_UPDATED_SUCCESS = "Case updated successfully."
 UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 COMMENT_UPDATED_SUCCESS = "Comment edit successfully."
@@ -2247,10 +2248,12 @@ async def save_annotations(
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get all aduit logs for a case",
     description=(
-        "Returns every audited event recorded against a case."
-        "Covers case creation, renaming, description edits, closing "
-        "and deletion, as along with evidence added to or annotated on the case. "
-        "A case with no audit logs will return an empty list."
+        "Returns every audited event recorded against a case. "
+        "Covers case creation, renaming, description edits, publishing, assignment, "
+        "closing and deletion, as along with evidence added to or annotated on the case. "
+        "The case creator may read their own case, an INVESTIGATOR may read a case "
+        "assigned to them, and an ADMIN may read any case. The timeline stays readable "
+        "after a case is deleted. A case with no audit logs will return an empty list."
     ),
     responses={
         200: {
@@ -2290,7 +2293,19 @@ async def save_annotations(
 
         401: INVALID_TOKEN_401,
 
-        403: USER_UNAUTHORIZED_403,
+        403: {
+            "description": "Forbidden - not the creator, the assigned investigator or an admin",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": AUDIT_NOT_ALLOWED
+                        }
+                    }
+                }
+            }
+        },
 
         500: {
             "model": error_response,
@@ -2315,11 +2330,41 @@ async def get_case_audit_events(
 ):
     payload = verify_jwt(request)
 
-    verify_not_user(payload.get("role"))
-
     validated_case_id = Case(case_id=case_id).case_id
 
+    username = payload.get("username")
+    is_admin = payload.get("role") == "ADMIN"
+
     try:
+        if not is_admin:
+            ownership = await connection.fetchrow(
+                """
+                SELECT
+                    COALESCE(cases.casecreator, audit.old_casecreator) AS casecreator,
+                    COALESCE(cases.caseassigned, audit.old_caseassigned) AS caseassigned
+                FROM (SELECT $1::uuid AS caseid) AS target
+                LEFT JOIN "Cases_DB"."Cases" AS cases
+                    ON cases.caseid = target.caseid
+                LEFT JOIN LATERAL (
+                    SELECT old_casecreator, old_caseassigned
+                    FROM "Cases_DB"."Audit_Cases"
+                    WHERE old_case_id = target.caseid
+                    ORDER BY audit_case_id DESC
+                    LIMIT 1
+                ) AS audit ON TRUE
+                """,
+                validated_case_id
+            )
+
+            if username not in (ownership["casecreator"], ownership["caseassigned"]):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "status": "error",
+                        "message": AUDIT_NOT_ALLOWED
+                    }
+                )
+
         rows = await connection.fetch(
             """
             WITH case_audit AS (
@@ -2330,7 +2375,8 @@ async def get_case_audit_events(
                     query_type::text AS query_type,
                     old_casename,
                     old_casedescription,
-                    old_casestate
+                    old_casestate,
+                    old_caseassigned
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
 
@@ -2344,7 +2390,8 @@ async def get_case_audit_events(
                 NULL::text,
                 cases.casename,
                 cases.casedescription,
-                cases.casestate
+                cases.casestate,
+                cases.caseassigned
             FROM "Cases_DB"."Cases" AS cases
             WHERE cases.caseid = $1::uuid
             ),
@@ -2356,10 +2403,12 @@ async def get_case_audit_events(
                     old_casename,
                     old_casedescription,
                     old_casestate,
+                    old_caseassigned,
                     LEAD(old_casename) OVER (ORDER BY ordinal) AS next_casename,
                     LEAD(old_casedescription) OVER (ORDER BY ordinal) AS next_casedescription,
-                    LEAD(old_casestate) OVER (ORDER BY ordinal) AS next_casestate
-                FROM case_audit 
+                    LEAD(old_casestate) OVER (ORDER BY ordinal) AS next_casestate,
+                    LEAD(old_caseassigned) OVER (ORDER BY ordinal) AS next_caseassigned
+                FROM case_audit
             ),
             audit_events AS (
                 SELECT
@@ -2368,15 +2417,23 @@ async def get_case_audit_events(
                     CASE
                         WHEN query_type = 'INSERT' THEN 'Case Created'
                         WHEN query_type = 'DELETE' THEN 'Case Deleted'
-                        WHEN old_casestate = 'OPEN' AND next_casestate = 'CLOSED'
-                            THEN 'Case Closed'
-                        WHEN old_casename IS DISTINCT FROM next_casename 
-                            THEN 'Case Renamed'
-                        WHEN old_casedescription IS DISTINCT FROM next_casedescription 
-                            THEN 'Case Description Updated'
-                        WHEN old_casename IS DISTINCT FROM next_casename 
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'PUBLISHED' THEN 'Case Published'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'CLOSED' THEN 'Case Closed'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'OPEN' THEN 'Case Reopened'
+                        WHEN old_caseassigned IS NULL
+                            AND next_caseassigned IS NOT NULL THEN 'Case Assigned'
+                        WHEN old_caseassigned IS NOT NULL
+                            AND next_caseassigned IS NULL THEN 'Case Unassigned'
+                        WHEN old_casename IS DISTINCT FROM next_casename
                             AND old_casedescription IS DISTINCT FROM next_casedescription
                             THEN 'Case Renamed and Description Updated'
+                        WHEN old_casename IS DISTINCT FROM next_casename
+                            THEN 'Case Renamed'
+                        WHEN old_casedescription IS DISTINCT FROM next_casedescription
+                            THEN 'Case Description Updated'
                         ELSE 'Case Updated'
                     END AS eventaction
                 FROM case_transitions
@@ -2392,9 +2449,12 @@ async def get_case_audit_events(
                         ELSE 'Evidence Annotated'
                     END AS eventaction
                     FROM "Cases_DB"."Audit_Media" AS audit_media
-                    INNER JOIN "Cases_DB"."Reports" AS reports
-                        ON reports.mediaid = audit_media.old_media_id
-                    WHERE reports.caseid = $1::uuid
+                    INNER JOIN "Cases_DB"."Cases" AS cases
+                        ON cases.caseid = $1::uuid
+                    CROSS JOIN LATERAL unnest(
+                        COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
+                    ) AS elem
+                    WHERE elem.evidence_id = audit_media.old_media_id
                         AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
             )
             SELECT
