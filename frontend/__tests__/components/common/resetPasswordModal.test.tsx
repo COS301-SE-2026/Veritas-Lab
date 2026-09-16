@@ -19,7 +19,7 @@ describe('ResetPasswordModal', () => {
  
 	it('renders heading and fields when open', () => {
 		render(<ResetPasswordModal isOpen={true} onClose={mockOnClose} />);
-		expect(screen.getByText('Change Password')).toBeInTheDocument();
+		expect(screen.getByText('Change password')).toBeInTheDocument();
 		expect(screen.getByLabelText('Current Password')).toBeInTheDocument();
 		expect(screen.getByLabelText('New Password')).toBeInTheDocument();
 		expect(screen.getByLabelText('Confirm New Password')).toBeInTheDocument();
