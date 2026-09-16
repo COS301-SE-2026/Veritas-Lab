@@ -51,7 +51,7 @@ export default function AdminUserCard({ user, isBusy = false, currentUserId, onR
                         type='button'
                         onClick={() => onDelete(user)}
                         disabled={isBusy}
-                        className='rounded-full px-3 py-1.5 text-sm font-semibold text-[var(--color-danger)] transition-colors hover:bg-[var(--danger-soft)] disabled:cursor-not-allowed disabled:opacity-50'
+                        className='rounded-full px-3 py-1.5 text-sm font-semibold text-white bg-(--color-danger) transition-colors hover:bg-[var(--danger-soft)] hover:text-(--color-primary) disabled:cursor-not-allowed disabled:opacity-50'
                     >
                         Delete
                     </Button>

@@ -34,7 +34,7 @@
   --info-soft: #e8f0fb;    --info-fg: #235a97;
   --risk-soft: #faf0d6;    --risk-fg: #856110;
   --radius-sm: 12px;
-  --radius-md: 16pc;
+  --radius-md: 16px;
   --radius-lg: 20px;
   --radius-xl: 26px;
   --radius-2xl: 32px;
@@ -64,15 +64,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #ffffff;
-    --foreground: #ededed;
-  }
-}
-
 @layer components {
   .vl-btn {
     display: inline-flex;
@@ -82,16 +73,21 @@
     padding: 0.6rem 1rem;
     border-radius: 1000px;
     font-weight: 600;
+    line-height: 1;
     cursor: pointer;
     border: 1px solid transparent;
+    transition: background-color .18s ease, color .18s ease,
+                border-color .18s ease, box-shadow .18s ease, transform .12s ease;
+    -webkit-user-select: none; user-select: none;
+    white-space: nowrap;
   }
 
   .vl-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
   .vl-btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; transform: none; }
   .vl-btn:not(:disabled):active { transform: translateY(1px); }
 
-  .vl-btn-sm { padding: 0.4rem 0.85rem; font-size: 0.875rem; }
-  .vl-btn-lg { padding: 0.85rem 1.75rem; font-size: 1.0625rem; }
+  .vl-btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+  .vl-btn-lg { padding: 0.8rem 2rem; font-size: 1rem; }
 
 
   .vl-btn-primary {
@@ -133,28 +129,28 @@
 
   .vl-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-surface);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
-    transition: box-shadow .2s ease, border-color .2s ease, transform .2 ease;
+    transition: box-shadow .2s ease, border-color .2s ease, transform .2s ease;
   }
 
   .vl-card-interactive:hover {
     box-shadow: var(--shadow-lg);
-    border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-surface));
+    border-color: color-mix(in srgb, var(--color-secondary) 45%, var(--color-line));
     transform: translateY(-2px);
   }
 
   .vl-panel {
     background: var(--color-surface);
-    border: 1px solid var(--color-surface);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
   }
 
   .vl-sunken {
-    background: var(--color-surface);
-    border: 1px solid var(--color-surface);
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-lg);
   }
 
@@ -199,6 +195,20 @@
     border: 1px solid transparent;
     white-space: nowrap;
   }
+
+  .vl-btn-primary:not(:disabled):hover { background: var(--color-b-600); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .vl-btn-primary:not(:disabled):hover { background: var(--color-b-600); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .vl-btn-outline:not(:disabled):hover { border-color: var(--color-primary); background: var(--color-surface-muted); }
+  .vl-btn-light:not(:disabled):hover { background: var(--color-surface-muted); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .vl-btn-ghost:not(:disabled):hover { background: var(--color-surface-sunken); color: var(--color-primary); }
+  .vl-btn-icon:not(:disabled):hover { background: rgba(255,255,255,0.12); }
+  .vl-input:hover, .vl-select:hover { border-color: var(--color-primary-hover); }
+  .vl-input:focus, .vl-textarea:focus, .vl-select:focus {
+    outline: none;
+    border-color: var(--color-secondary);
+    box-shadow: var(--shadow-focus);
+  }
+  .vl-input::placeholder, .vl-textarea::placeholder { color: var(--color-text-subtle); }
 
   .vl-badge-open     { background: var(--ok-soft);   color: var(--ok-fg);   border-color: color-mix(in srgb, var(--ok-fg) 20%, transparent); }
   .vl-badge-progress { background: var(--info-soft); color: var(--info-fg); border-color: color-mix(in srgb, var(--info-fg) 20%, transparent); }

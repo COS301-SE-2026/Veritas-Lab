@@ -30,7 +30,7 @@ export default function AdminDeleteModal({
                 <div className='flex justify-end gap-2'>
                     <Button variant='outline' onClick={onClose} disabled={isSubmitting} text='Cancel' />
                     <Button variant='submit' onClick={onConfirm} disabled={isSubmitting} 
-                        className='bg-[var(--color-danger)] text-white border-transparent hover:bg-[var(--color-danger)]'
+                        className='text-white bg-(--color-danger) transition-colors hover:bg-[var(--danger-soft)] hover:text-(--color-primary) text-white border-transparent '
                         text={isSubmitting ? 'Deleting' : 'Delete user'} />
                 </div>
             </div>
