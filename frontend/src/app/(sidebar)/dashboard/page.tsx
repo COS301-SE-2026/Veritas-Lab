@@ -34,7 +34,8 @@ export default function Dashboard() {
     const riskScores = useCaseRiskScores(allCases);
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
-
+    const canCreateCase = userRole === 'ADMIN' || userRole === 'INVESTIGATOR' || userRole === 'USER';
+    
     return (
         <>
         <div className="mx-auto max-w-7xl px-6 sm:px-8 pt-10 pb-16">
@@ -43,7 +44,7 @@ export default function Dashboard() {
                     <h1 className="text-[30px] sm:text-[34px] font-bold tracking-tight text-(--color-text-strong)">Dashboard</h1>
                     <p className="mt-1 text-[15px] text-(--color-text-muted)">Manage and track your cases</p>
                 </div>
-                {showDashboardCards && userRole !== 'USER' && (
+                { canCreateCase && (
                     <Button variant="submit" onClick={openModal} className="gap-2">
                         <Plus size={18} />
                         <span className="font-semibold">New Case</span>
@@ -99,7 +100,7 @@ export default function Dashboard() {
                 </div>
             </div>
         </div>
-        {showDashboardCards && userRole !== 'USER' && (
+        { canCreateCase && (
             <DashboardModal isOpen={isModalOpen} onClose={closeModal} onCreated={() => { closeModal(); void refreshCases(); }} />
         )}
         </>
