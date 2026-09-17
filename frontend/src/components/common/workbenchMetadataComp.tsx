@@ -249,8 +249,8 @@ export default function MetadataComparison({
 
     if (!supported) {
         return (
-            <div className="rounded-[21px] border border-(--color-light) p-4 text-sm text-(--color-light)">
-                Metadata comparison isn&apos;t available for this file type.
+            <div className="vl-panel mt-4 p-4 text-sm text-(--color-text-muted)">
+                Metadata comparison isnt available for this file type.
             </div>
         );
     }

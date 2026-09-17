@@ -122,6 +122,21 @@ async def test_admin_cannot_delete_themself(client, monkeypatch):
     assert response.json()["detail"]["message"] == "Admins cannot delete themselves."
     assert auth.COOKIE_NAME not in response.cookies
 
+@pytest.mark.asyncio
+async def test_system_init_cannot_be_deleted(client, monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "verify_jwt",
+        lambda request: admin_payload()
+    )
+
+    response = client.delete(
+        "/api/users/00000000-0000-0000-0000-000000000000"
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Invalid User ID format."
+
 #Testing nonexistent user with error code 404
 @pytest.mark.asyncio
 async def test_nonexistent_user_delete_404(client, monkeypatch):

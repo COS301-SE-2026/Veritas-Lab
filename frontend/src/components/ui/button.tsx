@@ -12,19 +12,19 @@ export default function Button({
 }: ButtonProps) {
 
     const sizeClasses = {
-        small: '',
+        small: 'vl-btn-sm',
         medium: '',
-        large: '',
+        large: 'vl-btn-lg',
     };
 
     const variantClasses = {
-        primary: '',
-        secondary: '',
-        outline: 'py-2 px-4 border-[var(--color-primary)] border-1 text-[var(--color-primary)] hover:bg-(--color-dark) rounded-full hover:text-white transition-colors',
-        sidebar: 'p-2 rounded-md hover:bg-(--color-dark) transition-colors ml-auto',
-        submit: 'bg-[var(--color-secondary)] text-(--color-text) font-medium py-2 px-4 rounded-full hover:bg-[#2E9E66] transition-colors font-semibold',
-        sadSack: 'py-2 px-4 text-[var(--color-text)] hover:text-[var(--color-primary)] rounded-full',
-        light: 'py-2 px-4 bg-[var(--color-background)] text-[var(--color-text)] hover:bg-[var(--color-light)] rounded-full',
+        primary: 'vl-btn vl-btn-primary',
+        secondary: 'vl-btn vl-btn-secondary',
+        outline: 'vl-btn vl-btn-outline',
+        sidebar: 'vl-btn vl-btn-icon ml-auto text-white/80',
+        submit: 'vl-btn vl-btn-primary',
+        sadSack: 'vl-btn vl-btn-ghost',
+        light: 'vl-btn vl-btn-light',
     };
 
     return (

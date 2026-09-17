@@ -6,6 +6,7 @@ FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped a
 
 class VideoService(MediaService):
     def __init__(self) -> None:
+        super().__init__()
         self.ai_detector = AIVideoDetector()
 
     async def ai_analysis(self, path: str | Path) -> dict:

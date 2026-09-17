@@ -86,6 +86,33 @@ async def test_fetch_users_success(monkeypatch):
     }
 
 @pytest.mark.asyncio
+async def test_fetch_users_excludes_system_init(monkeypatch):
+    client.cookies.clear()
+
+    class SystemInitConnection:
+        async def fetch(self, query):
+            return [{
+                "userid": "00000000-0000-0000-0000-000000000000",
+                "username": "SYSTEM_INIT",
+                "userrole": "ADMIN"
+            }]
+
+    async def mock_connect(*args, **kwargs):
+        return SystemInitConnection()
+
+    monkeypatch.setattr(auth, "verify_jwt", lambda request: {
+        "sub": "admin-id",
+        "username": "Admin User",
+        "role": "ADMIN"
+    })
+    monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
+
+    response = client.post("/api/fetchUsers", json={})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success", "users": []}
+
+@pytest.mark.asyncio
 async def test_fetch_users_not_admin(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):
@@ -243,6 +270,25 @@ async def test_change_user_role_success(monkeypatch):
         "status": "success",
         "message": "User role updated to INVESTIGATOR successfully"
     }
+
+@pytest.mark.asyncio
+async def test_change_user_role_rejects_system_init(monkeypatch):
+    monkeypatch.setattr(auth, "verify_jwt", lambda request: {
+        "sub": "admin-id",
+        "username": "Admin User",
+        "role": "ADMIN"
+    })
+
+    response = client.post(
+        "/api/changeUserRole",
+        json={
+            "userId": "00000000-0000-0000-0000-000000000000",
+            "NewRole": "USER"
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Invalid userId format."
 
 @pytest.mark.asyncio
 async def test_change_user_role_not_admin(monkeypatch):

@@ -15,7 +15,7 @@ describe('MediaUploadModal', () => {
 
     it('renders when open and handles file selection', () => {
         render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
-        const input = screen.getByLabelText('Upload Media') as HTMLInputElement;
+        const input = screen.getByLabelText('Upload media') as HTMLInputElement;
         const file = new File(['file-content'], 'report.pdf', { type: 'application/pdf' });
         fireEvent.change(input, { target: { files: [file] } });
         expect(screen.getByText('report.pdf')).toBeInTheDocument();

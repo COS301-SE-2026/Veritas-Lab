@@ -11,25 +11,25 @@ const highlights: Highlight[] = [
 
 export default function LandingHighlights() {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6">
             {highlights.map((item) => {
                 const Icon = item.icon;
                 return (
                     <Card
                         key={item.title}
-                        className="w-full min-h-[220px] sm:min-h-[280px] rounded-2xl bg-(--color-lightest) p-5"
+                        className="vl-card vl-card-interactive w-full min-h-[220px] sm:min-h-[260px] p-6"
                     >
                         <Card.Header>
                             <div
-                                className="size-[60px] rounded-xl bg-(--color-background) flex items-center justify-center"
+                                className="flex size-14 items-center justify-center rounded-2xl bg-(--color-b-50) ring-1 ring-[color-mix(in_srgb,var(--b-500)_25%,transparent)]"
                                 aria-hidden="true"
                             >
-                                <Icon className="size-[40px] text-(--color-secondary)" />
+                                <Icon className="size-7 text-(--color-b-600)" />
                             </div>
                         </Card.Header>
-                        <Card.Content className="mt-6 sm:mt-10">
-                            <h3 className="text-(--color-text) text-lg sm:text-xl font-bold">{item.title}</h3>
-                            <p className="text-(--color-text) text-base sm:text-lg mt-3 sm:mt-5">{item.description}</p>
+                        <Card.Content className="mt-6 sm:mt-8">
+                            <h3 className="text-(--color-text-strong) text-lg sm:text-xl font-bold">{item.title}</h3>
+                            <p className="text-(--color-text-muted) text-base mt-2.5 leading-relaxed">{item.description}</p>
                         </Card.Content>
                     </Card>
                 );

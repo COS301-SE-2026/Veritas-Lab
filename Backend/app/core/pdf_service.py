@@ -12,6 +12,7 @@ PDF_METADATA_CREATORTOOL="XMP:CreatorTool"
 
 class PDFService(MediaService):
     def __init__(self):
+        super().__init__()
         self.ai_detector = AIPDFDetector()
 
     def is_stripped(self,metadata:dict) -> bool:

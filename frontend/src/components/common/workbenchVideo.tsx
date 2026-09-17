@@ -14,9 +14,9 @@ type WorkbenchVideoProps = {
     onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
 };
 
-export default function WorkbenchVideo({ 
-    mediaUrl, 
-    mediaName, 
+export default function WorkbenchVideo({
+    mediaUrl,
+    mediaName,
     video,
     active,
     activeTool,
@@ -29,12 +29,12 @@ export default function WorkbenchVideo({
     const [paused, setPaused] = useState(true);
     const aspectRatio = 16 / 9;
     return (
-        <div className="relative w-full overflow-hidden rounded-2xl border border-(--color-light) bg-black/5" style={{ aspectRatio }}>
-            <video 
-                src={mediaUrl} 
+        <div className="relative w-full overflow-hidden rounded-[var(--radius-lg)] border border-(--color-line) bg-black" style={{ aspectRatio }}>
+            <video
+                src={mediaUrl}
                 ref={video}
-                title={mediaName}  
-                controls 
+                title={mediaName}
+                controls
                 className="size-full"
                 onPause={() => setPaused(true)}
                 onPlay={() => setPaused(false)}

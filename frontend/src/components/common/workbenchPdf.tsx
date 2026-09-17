@@ -33,15 +33,15 @@ export default function WorkbenchPdf({
     const [numPages, setNumPages] = useState(0);
 
     return (
-        <div className="flex max-h-[75vh] flex-col items-center gap-4 overflow-auto rounded-2xl border border-(--color-light) bg-black/5 p-4">
+        <div className="flex max-h-[75vh] flex-col items-center gap-4 overflow-auto rounded-[var(--radius-lg)] border border-(--color-line) bg-(--color-surface-sunken) p-4">
             <Document
                 file={url}
                 onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                loading={<p className="text-sm text-(--color-light)">Loading PDF…</p>}
-                error={<p className="text-sm text-(--color-error)">Couldn’t load PDF.</p>}
+                loading={<p className="text-sm text-(--color-text-subtle)">Loading PDF…</p>}
+                error={<p className="text-sm text-[var(--color-danger)]">Couldn’t load PDF.</p>}
             >
                 {Array.from({ length: numPages }, (_, index) => index + 1).map((pageNumber) => (
-                    <div key={pageNumber} className="relative w-fit shadow-md">
+                    <div key={pageNumber} className="relative w-fit overflow-hidden rounded-[var(--radius-sm)] shadow-[var(--shadow-md)]">
                         <Page pageNumber={pageNumber} width={PAGE_WIDTH} renderTextLayer={false} renderAnnotationLayer={false} />
                         <AnnotationLayer
                             page={pageNumber}

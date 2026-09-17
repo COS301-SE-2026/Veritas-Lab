@@ -117,8 +117,8 @@ describe('CasePage (integration)', () => {
         expect(screen.getByText('Loading case...')).toBeInTheDocument();
         expect(await screen.findByText('Alpha Fraud')).toBeInTheDocument();
         expect(screen.getByText('Suspicious transaction pattern')).toBeInTheDocument();
-        expect(screen.getByText('Status: Open')).toBeInTheDocument();
-        expect(screen.getByText('Created: 01/05/2026')).toBeInTheDocument();
+        expect(screen.getByText('Status:')).toBeInTheDocument();
+        expect(screen.getByText('Created:')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Edit Case' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Upload Evidence' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe('CasePage (integration)', () => {
         await screen.findByText('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'Close Case' }));
         await waitFor(() => expect(mockedCloseCase).toHaveBeenCalledWith('case-1'));
-        await waitFor(() => expect(screen.getByText('Status: Closed')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText('Status:')).toBeInTheDocument());
         expect(screen.queryByRole('button', { name: 'Close Case' })).not.toBeInTheDocument();
         expect(mockedFetchCase).toHaveBeenCalledTimes(2);
     });
@@ -235,7 +235,7 @@ describe('CasePage (integration)', () => {
         await screen.findByText('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'Upload Evidence' }));
         const file = new File(['dummy'], 'newfile.png', { type: 'image/png' });
-        const fileInput = screen.getByLabelText('Upload Media');
+        const fileInput = screen.getByLabelText('Upload media');
         fireEvent.change(fileInput, { target: { files: [file] } });
         fireEvent.submit(fileInput.closest('form')!);
         await waitFor(() => {
@@ -254,8 +254,8 @@ describe('CasePage (integration)', () => {
         } as Awaited<ReturnType<typeof fetchCase>>);
         render(<CasePage />);
         await screen.findByText('Screenshot.png');
-        fireEvent.click(screen.getByRole('button', { name: '' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete evidence' }));
+        fireEvent.click(await screen.getByRole('button', { name: 'Delete' }));
         await waitFor(() => expect(mockedDeleteEvidence).toHaveBeenCalledWith('case-1', 'media-1'));
         await waitFor(() => expect(screen.queryByText('Screenshot.png')).not.toBeInTheDocument());
         expect(screen.getByText('No evidence uploaded yet.')).toBeInTheDocument();

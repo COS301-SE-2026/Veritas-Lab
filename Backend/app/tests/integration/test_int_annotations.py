@@ -17,7 +17,7 @@ USER_SETTINGS = User_Settings()
 
 
 @pytest_asyncio.fixture
-async def fake_report_context(ensure_user_exists):
+async def fake_annotation_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
     user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
@@ -68,29 +68,30 @@ async def fake_report_context(ensure_user_exists):
                 VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
                 uuid.UUID(case_id), 
-                "Integration Test Investigation Case", 
-                "TestInvest", 
+                "Integration Test Investigation Case",
+                "CaseCreator",
                 "Integration test case description", 
-                "OPEN"
+                "OPEN",
             )
             created_ids["case_id"] = case_id
 
-            report_row = await conn.fetchrow(
+            await conn.execute(
                 """
-                INSERT INTO "Cases_DB"."Reports" 
-                (CaseId, MediaId, ImageTitle )
-                VALUES ($1, $2, $3)
-                RETURNING ReportId, CaseId, MediaId, ImageTitle
+                UPDATE "Cases_DB"."Cases"
+                SET CaseAssigned = $2,
+                    CaseState = 'PUBLISHED'::case_state_enum,
+                    evidence = ARRAY[
+                        ROW($3, $4)::"Cases_DB".evidence_type
+                    ]
+                WHERE CaseId = $1
                 """,
                 uuid.UUID(case_id),
+                "TestInvest",
                 uuid.UUID(media_id),
-                media_name
+                "annotation evidence"
             )
 
-            report_id = str(report_row["reportid"])
-            created_ids["report_id"] = report_id
-
-        yield report_id 
+        yield {"case_id": case_id, "media_id": media_id}
 
     finally:
         async with conn.transaction():
@@ -119,29 +120,25 @@ async def fake_report_context(ensure_user_exists):
 
         await conn.close()
 
-async def check_annotations(payload, report_id):
+async def check_annotations(media_id, expected_annotations=None):
     conn = await get_connection()
     try:
         row = await conn.fetchrow(
             """
-            SELECT m.MediaAnnotations 
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" m ON r.MediaId = m.MediaId
-            WHERE r.ReportId = $1
+            SELECT MediaAnnotations
+            FROM "Cases_DB"."Media"
+            WHERE MediaId = $1
             """,
-            uuid.UUID(report_id)
+            uuid.UUID(media_id)
         )
 
-        assert row is not None, f"Report {report_id} not found in database."
+        assert row is not None, f"Media {media_id} not found in database."
 
         db_annotations = row["mediaannotations"]
 
-        if db_annotations is not None:
-            if isinstance(db_annotations, str):
-                db_annotations = json.loads(db_annotations)
-            assert db_annotations != payload["annotations"]
-        else:
-            assert db_annotations is None
+        if isinstance(db_annotations, str):
+            db_annotations = json.loads(db_annotations)
+        assert db_annotations == expected_annotations
 
     finally:
         await conn.close()
@@ -149,8 +146,9 @@ async def check_annotations(payload, report_id):
 
 # Test for the 200
 @pytest.mark.asyncio
-async def test_integration_save_annotations_success(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_success(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
         "username": "TestInvest",
@@ -161,7 +159,8 @@ async def test_integration_save_annotations_success(client, fake_report_context)
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": report_id,
+        "caseId": case_id,
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "bounding_box", 
@@ -188,15 +187,14 @@ async def test_integration_save_annotations_success(client, fake_report_context)
     try:
         row = await conn.fetchrow(
             """
-            SELECT m.MediaAnnotations
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" m ON r.MediaId = m.MediaId
-            WHERE r.ReportId = $1
+            SELECT MediaAnnotations
+            FROM "Cases_DB"."Media"
+            WHERE MediaId = $1
             """,
-            uuid.UUID(report_id)
+            uuid.UUID(media_id)
         )
 
-        assert row is not None, f"Report {report_id} not found in database."
+        assert row is not None, f"Media {media_id} not found in database."
 
         db_annotations = row["mediaannotations"]
 
@@ -212,8 +210,9 @@ async def test_integration_save_annotations_success(client, fake_report_context)
 
 # Test 401, Invalid UUID
 @pytest.mark.asyncio
-async def test_integration_save_annotations_invalid_uuid(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_invalid_uuid(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
 
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
@@ -225,7 +224,8 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": "Invalid UUID",
+        "caseId": "Invalid UUID",
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "line", 
@@ -248,18 +248,20 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload, report_id)
+    await check_annotations(media_id)
 
 # Test 401, Invalid JWT
 @pytest.mark.asyncio
-async def test_integration_save_annotations_invalid_jwt(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_invalid_jwt(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
 
     test_token = ""
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": report_id,
+        "caseId": case_id,
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "line", 
@@ -282,12 +284,13 @@ async def test_integration_save_annotations_invalid_jwt(client, fake_report_cont
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload, report_id)
+    await check_annotations(media_id)
 
 # 403 - User doesn't have permission. Role is USER
 @pytest.mark.asyncio
-async def test_integration_save_annotations_user_unauthorized(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_user_unauthorized(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
 
     mock_invest = {
         "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
@@ -299,7 +302,8 @@ async def test_integration_save_annotations_user_unauthorized(client, fake_repor
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": "Invalid UUID",
+        "caseId": case_id,
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "line", 
@@ -322,7 +326,7 @@ async def test_integration_save_annotations_user_unauthorized(client, fake_repor
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload, report_id)
+    await check_annotations(media_id)
 
 @pytest_asyncio.fixture
 async def fake_comment_context(ensure_user_exists):

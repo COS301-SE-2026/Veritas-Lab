@@ -96,6 +96,6 @@ describe('AnnotationList', () => {
                 onRemove={jest.fn()}
             />,
         );
-        expect(screen.getByText('A note').closest('div')).toHaveClass('bg-(--color-secondary)/20');
+        expect(screen.getByText('A note').closest('div')).toHaveClass('bg-(--color-b-50)');
     });
 });

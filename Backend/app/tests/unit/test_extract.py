@@ -219,6 +219,9 @@ async def test_get_existing_metadata_found(monkeypatch):
     result = await service.get_existing_metadata("12345678-abcd-ef01-2345-6789abcdef01")
 
     assert result == {"File:FileType": "JPEG"}
+    query = connection.fetchrow.call_args.args[0]
+    assert 'FROM "Cases_DB"."Media"' in query
+    assert 'FROM "Cases_DB"."Reports"' not in query
     connection.close.assert_awaited_once()
 
 
@@ -242,10 +245,47 @@ async def test_save_metadata(monkeypatch):
 
     await service.save_metadata("12345678-abcd-ef01-2345-6789abcdef01", metadata)
 
-    connection.execute.assert_awaited_once()
-    args = connection.execute.call_args.args
+    assert connection.execute.await_count == 2
+    audit_args = connection.execute.await_args_list[0].args
+    assert audit_args == (
+        "SELECT set_config('app.current_user_id', $1, false)",
+        "00000000-0000-0000-0000-000000000000",
+    )
+    args = connection.execute.await_args_list[1].args
+    assert 'UPDATE "Cases_DB"."Media"' in args[0]
+    assert 'UPDATE "Cases_DB"."Reports"' not in args[0]
     assert args[1] == json.dumps(metadata)
     assert args[2] == "12345678-abcd-ef01-2345-6789abcdef01"
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_update_analysis(monkeypatch):
+    connection = mock_connection(monkeypatch)
+
+    service = ImageService()
+    analysis = AnalysisFindings(Certainty=2, Findings="Metadata indicates editing")
+
+    await service.update_analysis(
+        "12345678-abcd-ef01-2345-6789abcdef01",
+        analysis
+    )
+
+    assert connection.execute.await_count == 2
+    audit_args = connection.execute.await_args_list[0].args
+    assert audit_args == (
+        "SELECT set_config('app.current_user_id', $1, false)",
+        "00000000-0000-0000-0000-000000000000",
+    )
+    args = connection.execute.await_args_list[1].args
+    assert 'UPDATE "Cases_DB"."Media"' in args[0]
+    assert 'UPDATE "Cases_DB"."Reports"' not in args[0]
+    assert "ReportDateCreation = CURRENT_TIMESTAMP" in args[0]
+    assert args[1:4] == (
+        "Metadata indicates editing",
+        2,
+        "12345678-abcd-ef01-2345-6789abcdef01"
+    )
     connection.close.assert_awaited_once()
 
 

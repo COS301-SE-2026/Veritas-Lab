@@ -76,6 +76,25 @@ async def test_change_password_success(monkeypatch):
     }
 
 @pytest.mark.asyncio
+async def test_system_init_cannot_change_password(monkeypatch):
+    monkeypatch.setattr(auth, "verify_jwt", lambda request: {
+        "sub": "00000000-0000-0000-0000-000000000000",
+        "username": "SYSTEM_INIT",
+        "role": "ADMIN"
+    })
+
+    response = client.post(
+        "/api/changePassword",
+        json={
+            "currentPassword": CURRENT_PASSWORD,
+            "newPassword": NEW_PASSWORD
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Invalid or missing new password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+
+@pytest.mark.asyncio
 async def test_change_password_missing_current_password(monkeypatch):
     client.cookies.clear()
     def mock_verify_jwt(request):

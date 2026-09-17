@@ -271,13 +271,13 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     )
     mockDbConnection.fetchval = AsyncMock(return_value="mocked-evidence-uuid-123")
 
-    report_inserts = 0
+    evidence_updates = 0
 
     async def mock_execute(query, *args, **kwargs):
-        nonlocal report_inserts
-        if 'INSERT INTO "Cases_DB"."Reports"' in query:
-            report_inserts += 1
-            if report_inserts == 2:
+        nonlocal evidence_updates
+        if 'UPDATE "Cases_DB"."Cases"' in query and 'array_append' in query:
+            evidence_updates += 1
+            if evidence_updates == 2:
                 raise asyncpg.exceptions.UniqueViolationError("Duplicate key value violates unique constraint")
         return None
 
@@ -324,14 +324,15 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
 @patch("app.core.cases.get_object")
 async def test_delete_evidence_investigator_duplicate_entry(mockget_object, mockDbConnect):
     """
-An investigator deletes a duplicate. Only the report is deleted.
+An investigator deletes a duplicate evidence reference.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=None)
+    mockDbConnection.fetchrow = AsyncMock(return_value={"caseid": uuid.uuid4()})
+    mockDbConnection.fetchval = AsyncMock(return_value=1)
     mockDbConnection.close = AsyncMock()
 
     mock_s3_client = MagicMock()
@@ -344,7 +345,8 @@ An investigator deletes a duplicate. Only the report is deleted.
 
     result = await case.delete_evidence(media_id=test_media_id, jwt_username=test_user, connection=mockDbConnection)
 
-    mockDbConnection.execute.assert_called_once()
+    mockDbConnection.fetchrow.assert_called_once()
+    mockDbConnection.fetchval.assert_awaited_once()
     mock_s3_client.remove_object.assert_not_called()
     assert result["status"] == "success"
     assert result["deleted"] == test_media_id
@@ -356,7 +358,7 @@ An investigator deletes a duplicate. Only the report is deleted.
 @patch("app.core.cases.asyncio", create=True)
 async def test_delete_evidence_investigator_only_entry(mock_asyncio, mockget_object, mockDbConnect):
     """
-An investigator deletes the only entry for that evidence.The report is deleted and the same for the Minio.
+An investigator deletes the only entry for that evidence and the object storage file.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
@@ -369,7 +371,10 @@ An investigator deletes the only entry for that evidence.The report is deleted a
     }
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+    mockDbConnection.fetchrow = AsyncMock(
+        side_effect=[{"caseid": uuid.uuid4()}, mockMediaData]
+    )
+    mockDbConnection.fetchval = AsyncMock(return_value=0)
     mockDbConnection.close = AsyncMock()
     mock_asyncio.to_thread = AsyncMock()
 
@@ -396,14 +401,15 @@ An investigator deletes the only entry for that evidence.The report is deleted a
 @patch("app.core.cases.get_object")
 async def test_delete_evidence_admin_duplicate_entry(mockget_object, mockDbConnect):
     """
-An admin deletes a duplicate. Therefore only the report is deleted
+An admin deletes a duplicate evidence reference.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=None)
+    mockDbConnection.fetchrow = AsyncMock(return_value={"caseid": uuid.uuid4()})
+    mockDbConnection.fetchval = AsyncMock(return_value=1)
 
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
@@ -412,9 +418,14 @@ An admin deletes a duplicate. Therefore only the report is deleted
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
+    result = await case.delete_evidence(
+        media_id=test_media_id,
+        connection=mockDbConnection,
+        is_admin=True,
+    )
 
-    mockDbConnection.execute.assert_called_once()
+    mockDbConnection.fetchrow.assert_called_once()
+    mockDbConnection.fetchval.assert_awaited_once()
     mock_s3_client.remove_object.assert_not_called()
     assert result["status"] == "success"
 
@@ -425,7 +436,7 @@ An admin deletes a duplicate. Therefore only the report is deleted
 @patch("app.core.cases.asyncio", create=True)
 async def test_delete_evidence_admin_only_entry(mock_asyncio, mockget_object, mockDbConnect):
     """
-An admin deletes the only entry of that evidence. The Minio version is deleted and the report is also deleted
+An admin deletes the only entry of that evidence and the object storage file.
     """
     mockDbConnection = AsyncMock()
     mockDbConnection.transaction = MagicMock()
@@ -438,7 +449,10 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     }
 
     mockDbConnection.execute = AsyncMock(return_value="DELETE 1")
-    mockDbConnection.fetchrow = AsyncMock(return_value=mockMediaData)
+    mockDbConnection.fetchrow = AsyncMock(
+        side_effect=[{"caseid": uuid.uuid4()}, mockMediaData]
+    )
+    mockDbConnection.fetchval = AsyncMock(return_value=0)
     mock_asyncio.to_thread = AsyncMock()
 
     mock_s3_client = MagicMock()
@@ -448,7 +462,11 @@ An admin deletes the only entry of that evidence. The Minio version is deleted a
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
     
-    result = await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
+    result = await case.delete_evidence(
+        media_id=test_media_id,
+        connection=mockDbConnection,
+        is_admin=True,
+    )
 
     mock_asyncio.to_thread.assert_awaited_once_with(
         mock_s3_client.delete_object,
@@ -488,7 +506,7 @@ An investigator tries to delete evidence but it fails due to either CaseCreator 
     mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
-    mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
+    mockDbConnection.fetchrow = AsyncMock(return_value=None)
     
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     case.case_id = uuid.uuid4()
@@ -512,14 +530,18 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
     mockDbConnection.transaction = MagicMock()
     mockDbConnect.return_value = mockDbConnection
 
-    mockDbConnection.execute = AsyncMock(return_value="DELETE 0")
+    mockDbConnection.fetchrow = AsyncMock(return_value=None)
     
     case = Case(case_creator="New_Dev", case_name="The Jones v Smith")
     case.case_id = uuid.uuid4()
     test_media_id = uuid.uuid4()
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_evidence(media_id=test_media_id, connection=mockDbConnection)
+        await case.delete_evidence(
+            media_id=test_media_id,
+            connection=mockDbConnection,
+            is_admin=True,
+        )
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {"status": "error", "message": "Media not found."}
@@ -747,6 +769,11 @@ def test_delete_evidence_invalid_media_id(monkeypatch):
 def test_delete_evidence_user_forbidden(monkeypatch):
     client.cookies.clear()
 
+    connection = AsyncMock()
+    connection.transaction = MagicMock()
+    connection.fetchrow = AsyncMock(return_value=None)
+    monkeypatch.setattr(cases_router.asyncpg, "connect", lambda: connection)
+
     def mock_verify_jwt(request):
         return {
             "sub": "user-id",
@@ -768,7 +795,7 @@ def test_delete_evidence_user_forbidden(monkeypatch):
     assert response.json() == {
         "detail": {
             "status": "error",
-            "message": "User unauthorized"
+            "message": "Unauthorized to delete this evidence or record not found."
         }
     }
 

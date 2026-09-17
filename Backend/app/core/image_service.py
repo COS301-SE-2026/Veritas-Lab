@@ -8,6 +8,7 @@ FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped a
 class ImageService(MediaService):
 
     def __init__(self) -> None:
+        super().__init__()
         self.detector = AIImageDetector()
     
     def is_stripped(self, metadata: dict) -> bool:
