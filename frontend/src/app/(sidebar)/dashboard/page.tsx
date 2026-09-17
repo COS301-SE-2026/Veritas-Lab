@@ -73,7 +73,7 @@ export default function Dashboard() {
                         <div className="text-sm text-(--color-light)">No cases found.</div>
                     ) : (
                         visibleCases.map((item) => {
-                            const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' && item.caseCreator === currentUser?.username);
+                            const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' /* && item.caseCreator === currentUser?.username*/);
                             const risk = riskScores.find((score) => score.caseId === item.caseId);
                             return (
                                 <CaseCard
