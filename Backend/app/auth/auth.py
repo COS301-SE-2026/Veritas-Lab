@@ -124,6 +124,88 @@ def verify_jwt(request: Request) -> dict:
             }
         )
 
+async def update_verify_jwt(
+    request: Request,
+    connection: asyncpg.Connection = Depends(get_connection)
+) -> dict:
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": NOT_AUTH
+            }
+        )
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        user_id = payload.get("sub")
+        if not user_id or not validate_uuid(user_id):
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "status": "error",
+                    "message": INVALID_TOKEN
+                }
+            )
+
+        # Query database to check user existence and token issue time validation
+        row = await connection.fetchrow(
+            """
+            SELECT userid, username, userrole, userjwtissued
+            FROM "Users_DB"."Users"
+            WHERE userid = $1::uuid
+            """,
+            user_id
+        )
+
+        if not row:
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "status": "error",
+                    "message": INVALID_TOKEN
+                }
+            )
+
+        # Ensure token iat (issued at) claim is valid if stored in DB
+        iat = payload.get("iat")
+        if iat and row["userjwtissued"]:
+            jwt_issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+            if jwt_issued_at < row["userjwtissued"]:
+                raise HTTPException(
+                    status_code=401,
+                    detail={
+                        "status": "error",
+                        "message": EXPIRED_TOKEN
+                    }
+                )
+
+        return payload
+
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": EXPIRED_TOKEN
+            }
+        ) 
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
 # an "@", one or more valid post-@ pre. characters (0-9, a-z, A-z,.,-), a ".",
