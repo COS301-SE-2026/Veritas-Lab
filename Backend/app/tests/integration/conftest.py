@@ -5,6 +5,8 @@ import pytest_asyncio
 from app.core.env import Postgres_Settings
 from fastapi.testclient import TestClient
 from app.api.main import app
+from app.auth.auth import create_token
+
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
@@ -82,3 +84,116 @@ async def ensure_user_exists():
 def client():
     with TestClient(app) as test_client:
         yield test_client
+
+@pytest_asyncio.fixture
+async def case_assignment_context(ensure_user_exists):
+    conn = await get_connection()
+
+    investigator_id = str(uuid.uuid4())
+    admin_id = str(uuid.uuid4())
+    other_investigator_id = str(uuid.uuid4())
+    creator_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
+
+    investigator = f"Test_Investigator_{investigator_id[:8]}"
+    admin = f"Test_Admin_{admin_id[:8]}"
+    other_investigator = f"Other_Investigator_{other_investigator_id[:8]}"
+    creator = f"Test_Creator_{creator_id[:8]}"
+    user = f"Test_User_{user_id[:8]}"
+
+    await ensure_user_exists(
+        conn,
+        investigator_id,
+        investigator,
+        "INVESTIGATOR"
+    )
+
+    await ensure_user_exists(
+        conn,
+        admin_id,
+        admin,
+        "ADMIN"
+    )
+
+    await ensure_user_exists(
+        conn,
+        other_investigator_id,
+        other_investigator,
+        "INVESTIGATOR"
+    )
+
+    await ensure_user_exists(
+        conn,
+        creator_id,
+        creator,
+        "USER"
+    )
+
+    await ensure_user_exists(
+        conn,
+        user_id,
+        user,
+        "USER"
+    )
+
+    created_case_ids = []
+
+    try:
+        yield {
+            "conn": conn,
+
+            "investigator_id": investigator_id,
+            "investigator_name": investigator,
+            "investigator_token": create_token(
+                {
+                    "id": investigator_id,
+                    "username": investigator,
+                    "role": "INVESTIGATOR"
+                }
+            ),
+
+            "admin_id": admin_id,
+            "admin_name": admin,
+            "admin_token": create_token(
+                {
+                    "id": admin_id,
+                    "username": admin,
+                    "role": "ADMIN"
+                }
+            ),
+
+            "other_investigator_id": other_investigator_id,
+            "other_investigator_name": other_investigator,
+
+            "creator_id": creator_id,
+            "creator_name": creator,
+
+            "user_id": user_id,
+            "user_name": user,
+            "user_token": create_token(
+                {
+                    "id": user_id,
+                    "username": user,
+                    "role": "USER"
+                }
+            ),
+
+            "cases": created_case_ids,
+        }
+
+    finally:
+        await conn.execute(
+            "SELECT set_config('app.current_user_id', $1, false)",
+            investigator_id
+        )
+
+        for case_id in created_case_ids:
+            await conn.execute(
+                """
+                DELETE FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                """,
+                uuid.UUID(case_id)
+            )
+
+        await conn.close()

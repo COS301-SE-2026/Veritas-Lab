@@ -32,16 +32,14 @@ async def seed_case(
         )
         """,
         case_id,
-        "Close test case",
+        "Unassignment test case",
         creator,
-        "Case used for close-case integration testing",
+        "Case used for unassignment testing",
         state
     )
 
     ctx["cases"].append(str(case_id))
-
     return str(case_id)
-
 
 async def assign_case_to(
     ctx,
@@ -64,9 +62,8 @@ async def assign_case_to(
         username
     )
 
-
 @pytest.mark.asyncio
-async def test_investigator_can_close_assigned_published_case(client, case_assignment_context):
+async def test_investigator_can_unassign_themselves(client, case_assignment_context):
     ctx = case_assignment_context
     case_id = await seed_case(ctx)
 
@@ -77,10 +74,13 @@ async def test_investigator_can_close_assigned_published_case(client, case_assig
         ctx["investigator_id"]
     )
 
-    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    client.cookies.set(
+        COOKIE_NAME,
+        ctx["investigator_token"]
+    )
 
     response = client.patch(
-        "/api/closeCase",
+        "/api/unassignCase",
         json={
             "CaseID": case_id
         }
@@ -89,24 +89,22 @@ async def test_investigator_can_close_assigned_published_case(client, case_assig
     assert response.status_code == 200, response.text
     assert response.json() == {
         "status": "success",
-        "message": "Case closed successfully."
+        "message": "Case unassigned successfully"
     }
 
-    row = await ctx["conn"].fetchrow(
+    assigned = await ctx["conn"].fetchval(
         """
-        SELECT casestate, caseclosedate
+        SELECT caseassigned
         FROM "Cases_DB"."Cases"
         WHERE caseid = $1
         """,
         uuid.UUID(case_id)
     )
 
-    assert row["casestate"] == "CLOSED"
-    assert row["caseclosedate"] is not None
-
+    assert assigned is None
 
 @pytest.mark.asyncio
-async def test_admin_can_close_assigned_published_case(client, case_assignment_context):
+async def test_admin_can_unassign_themselves(client, case_assignment_context):
     ctx = case_assignment_context
     case_id = await seed_case(ctx)
 
@@ -120,7 +118,7 @@ async def test_admin_can_close_assigned_published_case(client, case_assignment_c
     client.cookies.set(COOKIE_NAME, ctx["admin_token"])
 
     response = client.patch(
-        "/api/closeCase",
+        "/api/unassignCase",
         json={
             "CaseID": case_id
         }
@@ -128,19 +126,19 @@ async def test_admin_can_close_assigned_published_case(client, case_assignment_c
 
     assert response.status_code == 200, response.text
 
-    state = await ctx["conn"].fetchval(
+    assigned = await ctx["conn"].fetchval(
         """
-        SELECT casestate
+        SELECT caseassigned
         FROM "Cases_DB"."Cases"
         WHERE caseid = $1
         """,
         uuid.UUID(case_id)
     )
 
-    assert state == "CLOSED"
+    assert assigned is None
 
 @pytest.mark.asyncio
-async def test_user_cannot_close_case(client, case_assignment_context):
+async def test_user_cannot_unassign_case(client, case_assignment_context):
     ctx = case_assignment_context
     case_id = await seed_case(ctx)
 
@@ -151,13 +149,10 @@ async def test_user_cannot_close_case(client, case_assignment_context):
         ctx["investigator_id"]
     )
 
-    client.cookies.set(
-        COOKIE_NAME,
-        ctx["user_token"]
-    )
+    client.cookies.set(COOKIE_NAME, ctx["user_token"])
 
     response = client.patch(
-        "/api/closeCase",
+        "/api/unassignCase",
         json={
             "CaseID": case_id
         }
@@ -170,19 +165,19 @@ async def test_user_cannot_close_case(client, case_assignment_context):
         "message": "User unauthorized"
     }
 
-    state = await ctx["conn"].fetchval(
+    assigned = await ctx["conn"].fetchval(
         """
-        SELECT casestate
+        SELECT caseassigned
         FROM "Cases_DB"."Cases"
         WHERE caseid = $1
         """,
         uuid.UUID(case_id)
     )
 
-    assert state == "PUBLISHED"
+    assert assigned == ctx["investigator_name"]
 
 @pytest.mark.asyncio
-async def test_investigator_cannot_close_case_assigned_to_someone_else(client, case_assignment_context):
+async def test_investigator_cannot_unassign_other_investigator(client, case_assignment_context):
     ctx = case_assignment_context
     case_id = await seed_case(ctx)
 
@@ -193,35 +188,64 @@ async def test_investigator_cannot_close_case_assigned_to_someone_else(client, c
         ctx["other_investigator_id"]
     )
 
-    client.cookies.set(
-        COOKIE_NAME,
-        ctx["investigator_token"]
-    )
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
 
     response = client.patch(
-        "/api/closeCase",
+        "/api/unassignCase",
         json={
             "CaseID": case_id
         }
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 400
 
-    state = await ctx["conn"].fetchval(
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "Invalid unassignment request"
+    }
+
+    assigned = await ctx["conn"].fetchval(
         """
-        SELECT casestate
+        SELECT caseassigned
         FROM "Cases_DB"."Cases"
         WHERE caseid = $1
         """,
         uuid.UUID(case_id)
     )
 
-    assert state == "PUBLISHED"
+    assert assigned == ctx["other_investigator_name"]
 
 @pytest.mark.asyncio
-async def test_cannot_close_open_case(client, case_assignment_context):
+async def test_cannot_unassign_unassigned_case(client, case_assignment_context):
     ctx = case_assignment_context
-    case_id = await seed_case(ctx, state="OPEN")
+    case_id = await seed_case(ctx)
+
+    client.cookies.set(
+        COOKIE_NAME,
+        ctx["investigator_token"]
+    )
+
+    response = client.patch(
+        "/api/unassignCase",
+        json={
+            "CaseID": case_id
+        }
+    )
+
+    assert response.status_code == 400
+
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "Invalid unassignment request"
+    }
+
+@pytest.mark.asyncio
+async def test_cannot_unassign_open_case(client, case_assignment_context):
+    ctx = case_assignment_context
+    case_id = await seed_case(
+        ctx,
+        state="OPEN"
+    )
 
     await assign_case_to(
         ctx,
@@ -230,85 +254,63 @@ async def test_cannot_close_open_case(client, case_assignment_context):
         ctx["investigator_id"]
     )
 
-    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
-
-    response = client.patch(
-        "/api/closeCase",
-        json={
-            "CaseID": case_id
-        }
-    )
-
-    assert response.status_code == 404
-
-    row = await ctx["conn"].fetchrow(
-        """
-        SELECT casestate, caseclosedate
-        FROM "Cases_DB"."Cases"
-        WHERE caseid = $1
-        """,
-        uuid.UUID(case_id)
-    )
-
-    assert row["casestate"] == "OPEN"
-    assert row["caseclosedate"] is None
-
-@pytest.mark.asyncio
-async def test_cannot_close_unassigned_case(client, case_assignment_context):
-    ctx = case_assignment_context
-    case_id = await seed_case(ctx)
-    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
-
-    response = client.patch(
-        "/api/closeCase",
-        json={
-            "CaseID": case_id
-        }
-    )
-
-    assert response.status_code == 404
-
-    state = await ctx["conn"].fetchval(
-        """
-        SELECT casestate
-        FROM "Cases_DB"."Cases"
-        WHERE caseid = $1
-        """,
-        uuid.UUID(case_id)
-    )
-
-    assert state == "PUBLISHED"
-
-@pytest.mark.asyncio
-async def test_close_case_requires_case_id(client, case_assignment_context):
-    ctx = case_assignment_context
     client.cookies.set(
         COOKIE_NAME,
         ctx["investigator_token"]
     )
 
     response = client.patch(
-        "/api/closeCase",
+        "/api/unassignCase",
+        json={
+            "CaseID": case_id
+        }
+    )
+
+    assert response.status_code == 400
+
+    assigned = await ctx["conn"].fetchval(
+        """
+        SELECT caseassigned
+        FROM "Cases_DB"."Cases"
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id)
+    )
+
+    assert assigned == ctx["investigator_name"]
+
+@pytest.mark.asyncio
+async def test_unassign_case_requires_case_id(client, case_assignment_context):
+    ctx = case_assignment_context
+
+    client.cookies.set(
+        COOKIE_NAME,
+        ctx["investigator_token"]
+    )
+
+    response = client.patch(
+        "/api/unassignCase",
         json={
             "CaseID": None
         }
     )
 
     assert response.status_code == 400
+
     assert response.json()["detail"] == {
         "status": "error",
         "message": "CaseID required"
     }
 
 @pytest.mark.asyncio
-async def test_close_case_requires_authentication(client, case_assignment_context):
+async def test_unassign_case_requires_authentication(client, case_assignment_context):
     ctx = case_assignment_context
     case_id = await seed_case(ctx)
 
     client.cookies.clear()
 
     response = client.patch(
-        "/api/closeCase",
+        "/api/unassignCase",
         json={
             "CaseID": case_id
         }

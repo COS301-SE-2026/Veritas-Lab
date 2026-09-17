@@ -70,18 +70,6 @@ async def create_test_media(executor_id: str, executor_username: str):
             media_type["mediatypeid"]
         )
 
-        await connection.execute(
-            """
-            INSERT INTO "Cases_DB"."Reports" (
-                MediaId,
-                CaseId
-            )
-            VALUES ($1, $2)
-            """,
-            media_id,
-            case_id
-        )
-
         return (
             media_id,
             case_id,
@@ -115,7 +103,7 @@ async def get_report(media_id):
                 ReportArtifacts,
                 ReportFindings,
                 ReportCertainty
-            FROM "Cases_DB"."Reports"
+            FROM "Cases_DB"."Media"
             WHERE MediaId = $1
             """,
             media_id
@@ -144,14 +132,6 @@ async def delete_test_data(
         await connection.execute(
             "SELECT set_config('app.current_user_id', $1, false)",
             executor_id
-        )
-
-        await connection.execute(
-            """
-            DELETE FROM "Cases_DB"."Reports"
-            WHERE MediaId = $1
-            """,
-            media_id
         )
 
         await connection.execute(
