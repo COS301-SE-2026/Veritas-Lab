@@ -105,36 +105,36 @@ export default function HelpMenuTutorial({ items, openIndex, onToggle }: Readonl
         return (
           <div
             key={t.title}
-            className="overflow-hidden rounded-2xl border border-(--color-lightest)"
+            className="overflow-hidden rounded-[var(--radius-lg)] border border-(--color-line) bg-(--color-surface) shadow-[var(--shadow-xs)]"
           >
             <button
               type="button"
               onClick={() => onToggle(isOpen ? null : i)}
               aria-expanded={isOpen}
-              className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-(--color-lightest)"
+              className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-(--color-surface-muted)"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--color-lightest)">
-                <Icon className="size-5 text-(--color-secondary)" />
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-(--color-b-50) ring-1 ring-[color-mix(in_srgb,var(--b-500)_22%,transparent)]">
+                <Icon className="size-5 text-(--color-b-600)" />
               </span>
               <span className="flex-1">
-                <span className="block font-semibold text-(--color-text)">{t.title}</span>
-                <span className="block text-sm text-(--color-light)">{t.summary}</span>
+                <span className="block font-semibold text-(--color-text-strong)">{t.title}</span>
+                <span className="block text-sm text-(--color-text-muted)">{t.summary}</span>
               </span>
               <ChevronDown
                 size={18}
-                className={`shrink-0 text-(--color-light) transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                className={`shrink-0 text-(--color-text-subtle) transition-transform ${isOpen ? 'rotate-180' : ''}`}
               />
             </button>
 
             {isOpen && (
-              <div className="border-t border-(--color-lightest) px-4 py-4 pl-20">
-                <ol className="list-decimal space-y-2 pl-4 text-sm text-(--color-text) marker:font-semibold marker:text-(--color-secondary)">
+              <div className="border-t border-(--color-line) px-4 py-4 pl-20">
+                <ol className="list-decimal space-y-2 pl-4 text-sm text-(--color-text-strong) marker:font-semibold marker:text-(--color-b-600)">
                   {t.steps.map((s) => (
                     <li key={s}>{s}</li>
                   ))}
                 </ol>
                 {t.note && (
-                  <p className="mt-4 rounded-xl bg-(--color-lightest) p-3 text-sm text-(--color-text)">
+                  <p className="mt-4 rounded-[var(--radius-md)] border border-(--color-line) bg-(--color-surface-muted) p-3 text-sm text-(--color-text-strong)">
                     <strong className="font-semibold">Note: </strong>
                     {t.note}
                   </p>

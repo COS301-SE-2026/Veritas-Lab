@@ -51,8 +51,8 @@ export default async function SidebarLayout({ children }: { children: React.Reac
                 <div className="flex min-h-screen bg-[var(--color-primary)]">
                     <Sidebar />
                     <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden
-                                    bg-[var(--color-lightest)] rounded-l-3xl
-                                    shadow-[-8px_0_24px_var(--color-dark)]/50">
+                                    bg-(--color-canvas) rounded-l-[28px]
+                                    shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.45)]">
                         {children}
                     </main>
                 </div>

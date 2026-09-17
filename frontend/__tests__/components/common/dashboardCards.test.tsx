@@ -36,14 +36,14 @@ describe('DashboardCards', () => {
 
         expect(screen.getByText('Total Cases')).toBeInTheDocument();
         expect(screen.getByText('3')).toBeInTheDocument();
-        expect(screen.getByText('All time')).toBeInTheDocument();
-
+        
         expect(screen.getByText('Open Cases')).toBeInTheDocument();
         expect(screen.getByText('2')).toBeInTheDocument();
-        expect(screen.getByText('Open')).toBeInTheDocument();
-
+        expect(screen.getByText('Currently active')).toBeInTheDocument();
+        
         expect(screen.getByText('Cases Closed')).toBeInTheDocument();
         expect(screen.getByText('1')).toBeInTheDocument();
-        expect(screen.getByText('Closed (all time)')).toBeInTheDocument();
+
+        expect(screen.getAllByText('All time')).toHaveLength(2);
     });
 });

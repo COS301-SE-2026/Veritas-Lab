@@ -5,9 +5,6 @@ type AuditTimelineProps = {
     caseId: string
 }
 export default function AuditTimeline({ caseId }: AuditTimelineProps) {
-    // Yeah this stuffs mocked for now until the backenders finish the api
-    // it conforms to the service contract so it should work unless they decide to be mean and change it <---- They broke it :(
-    
     const {
         error,
         timeline,
@@ -16,14 +13,14 @@ export default function AuditTimeline({ caseId }: AuditTimelineProps) {
 
     const ROW_SIZE = 5;
     const ACTION_ICON_MAP: Record<string, React.ReactNode> = {
-        "Case Created": <FolderPlus className="size-[28px] text-(--color-secondary)" />,
-        "Case Deleted": <Trash2 className="size-[28px] text-(--color-secondary)" />,
-        "Case Closed": <RouteOff className="size-[28px] text-(--color-secondary)" />,
-        "Case Renamed": <FolderPen className="size-[28px] text-(--color-secondary)" />,
-        "Case Description Updated": <FolderUp className="size-[28px] text-(--color-secondary)" />,
-        "Case Renamed and Description Updated": <FolderUp className="size-[28px] text-(--color-secondary)" />,
-        "Evidence Added": <LayersPlus className="size-[28px] text-(--color-secondary)" />,
-        "Evidence Annotated": <SquarePen className="size-[28px] text-(--color-secondary)" />,
+        "Case Created": <FolderPlus className="size-[26px] text-(--color-b-600)" />,
+        "Case Deleted": <Trash2 className="size-[26px] text-(--color-b-600)" />,
+        "Case Closed": <RouteOff className="size-[26px] text-(--color-b-600)" />,
+        "Case Renamed": <FolderPen className="size-[26px] text-(--color-b-600)" />,
+        "Case Description Updated": <FolderUp className="size-[26px] text-(--color-b-600)" />,
+        "Case Renamed and Description Updated": <FolderUp className="size-[26px] text-(--color-b-600)" />,
+        "Evidence Added": <LayersPlus className="size-[26px] text-(--color-b-600)" />,
+        "Evidence Annotated": <SquarePen className="size-[26px] text-(--color-b-600)" />,
     };
 
     if (error) {
@@ -77,17 +74,17 @@ export default function AuditTimeline({ caseId }: AuditTimelineProps) {
                                 <span className="hidden lg:block absolute top-[30px] left-[60px] w-[100px] h-[calc(100%+67px)] border border-l-0 rounded-r-full border-(--color-secondary)/35"/>
                             )
                         )}
-                        <div className="absolute left-0 top-0 lg:static size-[60px] rounded-full bg-(--color-background) border-2 border-(--color-secondary)/40 flex items-center justify-center">
-                            {ACTION_ICON_MAP[event.action] || <Info className="size-[28px] text-(--color-secondary)" />}
+                        <div className="absolute left-0 top-0 lg:static flex size-[60px] items-center justify-center rounded-full bg-(--color-surface) shadow-[var(--shadow-sm)] ring-2 ring-(--b-500)">
+                            {ACTION_ICON_MAP[event.action] || <Info className="size-[26px] text-(--color-b-600)" />}
                         </div>
                         <div>
-                            <p className="text-(--color-light) text-sm font-bold mt-1 lg:mt-6">
+                            <p className="text-(--color-text-subtle) text-sm font-bold mt-1 lg:mt-6">
                                 {new Date(event.timestamp).toLocaleString()}
                             </p>
-                            <h3 className="text-(--color-text) text-lg sm:text-xl font-bold mt-1">
+                            <h3 className="text-(--color-text-strong) text-lg sm:text-xl font-bold mt-1">
                                 {event.action}
                             </h3>
-                            <p className="text-(--color-light) text-sm font-bold mt-1">
+                            <p className="text-(--color-text-muted) text-sm font-bold mt-1">
                                 {event.user}
                             </p>
                         </div>

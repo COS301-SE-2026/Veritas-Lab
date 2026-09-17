@@ -41,38 +41,43 @@ export default function CaseEditButton({ caseId, initialName, initialDescription
 
     return (
         <>
-            <Button variant="submit" text="Edit Case" onClick={openModal} className={className} />
+            <Button variant="outline" text="Edit Case" onClick={openModal} className={className} />
             <Modal isOpen={isModalOpen} onClose={closeModal}>
                 <div>
-                    <div className="text-[24px] font-bold text-(--color-text) mb-4">Edit Case</div>
-                    <Label text="Case Title" htmlFor="editCaseTitle" className="mb-2 text-[16px] text-(--color-text)" />
-                    <Input
-                        id="editCaseTitle"
-                        type="text"
-                        value={caseName}
-                        onChange={(value) => setCaseName(value)}
-                        placeholder="Enter case title"
-                        className="border border-gray-300 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-(--color-light) mb-4 w-full text-[16px] text-(--color-text)"
-                        required
-                    />
-                    <Label text="Case Description" htmlFor="editCaseDescription" className="mb-2 text-[16px] text-(--color-text)" />
-                    <Input
-                        id="editCaseDescription"
-                        type="text"
-                        value={caseDescription}
-                        onChange={(value) => setCaseDescription(value)}
-                        placeholder="Enter case description"
-                        className="border border-(--color-light) rounded-lg py-10 px-4 focus:outline-none focus:ring-2 focus:ring-(--color-light) mb-4 w-full text-[16px] text-(--color-text)"
-                        required
-                    />
-                    {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
-                    <div className="flex justify-end">
-                        <Button variant="sadSack" onClick={closeModal} className="mr-2" disabled={isSaving}>
-                            <div className="text-[16px] font-bold">Cancel</div>
-                        </Button>
-                        <Button variant="submit" onClick={handleSave} disabled={isSaving}>
-                            <div className="text-[16px] font-bold">{isSaving ? 'Saving' : 'Save Changes'}</div>
-                        </Button>
+                    <div className="text-[22px] font-bold text-(--color-text-strong)">Edit case</div>
+                    <p className="mt-1 mb-5 text-sm text-(--color-text-muted)">Update the case title and description.</p>
+
+                    <div className="flex flex-col gap-1.5">
+                        <Label text="Case Title" htmlFor="editCaseTitle" className="font-medium text-(--color-text-strong)" />
+                        <Input
+                            id="editCaseTitle"
+                            type="text"
+                            value={caseName}
+                            onChange={(value) => setCaseName(value)}
+                            placeholder="Enter case title"
+                            className="vl-input"
+                            required
+                        />
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-1.5">
+                        <Label text="Case Description" htmlFor="editCaseDescription" className="font-medium text-(--color-text-strong)" />
+                        <textarea
+                            id="editCaseDescription"
+                            value={caseDescription}
+                            onChange={(event) => setCaseDescription(event.target.value)}
+                            placeholder="Enter case description"
+                            rows={4}
+                            className="vl-textarea"
+                            required
+                        />
+                    </div>
+
+                    {error ? <div className="mt-4"><Label text={error} htmlFor="error" variant="error" /></div> : null}
+
+                    <div className="mt-6 flex justify-end gap-2">
+                        <Button variant="sadSack" onClick={closeModal} disabled={isSaving} text="Cancel" />
+                        <Button variant="submit" onClick={handleSave} disabled={isSaving} text={isSaving ? 'Saving' : 'Save Changes'} />
                     </div>
                 </div>
             </Modal>

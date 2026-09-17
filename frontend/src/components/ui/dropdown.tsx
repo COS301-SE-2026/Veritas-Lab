@@ -13,7 +13,7 @@ export default function Dropdown({
 			onChange={onChange}
 			defaultValue={defaultValue}
 			disabled={disabled}
-			className={className}
+			className={`vl-select ${className ?? ''}`}
 		>
 			{options.map((option) => (
 				<option key={option.value} value={option.value} className={optionClassName}>
