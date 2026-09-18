@@ -87,6 +87,7 @@ type MetadataPaneProps = {
     totalCount: number;
     query: string;
     action?: React.ReactNode;
+    className?: string;
 };
 
 function MetadataPane({
@@ -96,12 +97,13 @@ function MetadataPane({
     totalCount,
     query,
     action,
+    className = '',
 }: Readonly<MetadataPaneProps>) {
     const [expanded, setExpanded] = useState(false);
     const visible = expanded ? entries : entries.slice(0, INITIAL_ROW_LIMIT);
 
     return (
-        <section className="flex min-h-0 flex-col gap-3">
+        <section className={`flex min-h-0 flex-col gap-3 ${className}`}>
             <header className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                     <h4 className="truncate text-sm font-semibold text-(--color-text)">{title}</h4>
@@ -118,7 +120,7 @@ function MetadataPane({
                     No fields match the current filters.
                 </p>
             ) : (
-                <dl className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+                <dl className="flex min-h-0 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1">
                     {visible.map(({ key, value, signal }) => (
                         <div
                             key={key}
@@ -263,9 +265,7 @@ export default function MetadataComparison({
     ];
 
     return (
-        <div
-            className={`flex min-h-0 flex-col gap-4 rounded-[21px] border border-(--color-light) bg-(--color-background) p-4 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] ${className}`}
-        >
+        <div className={`vl-panel flex min-h-0 flex-col gap-4 p-5 ${className}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                     <Columns2 size={18} className="shrink-0 text-(--color-text)" />
@@ -407,17 +407,17 @@ export default function MetadataComparison({
                     query={query}
                 />
 
-                <div className="min-h-0 md:border-l md:border-(--color-light)/60 md:pl-4">
-                    <MetadataPane
-                        title={example?.label ?? 'Reference'}
-                        subtitle={example?.description}
-                        entries={visibleExample}
-                        totalCount={exampleEntries.length}
-                        query={query}
-                        action={
-                            examples.length > 1 ? (
-                                <button
-                                    type="button"
+                <MetadataPane
+                    title={example?.label ?? 'Reference'}
+                    subtitle={example?.description}
+                    entries={visibleExample}
+                    totalCount={exampleEntries.length}
+                    query={query}
+                    className="md:border-l md:border-(--color-line) md:pl-4"
+                    action={
+                        examples.length > 1 ? (
+                            <button
+                                type="button"
                                     onClick={() => setExampleIndex((index) => (index + 1) % examples.length)}
                                     className="inline-flex shrink-0 items-center gap-2 rounded-full border border-(--color-light) px-3 py-1.5 text-sm font-semibold text-(--color-text) hover:bg-(--color-lightest)"
                                     title="Show a different reference example"
@@ -428,7 +428,6 @@ export default function MetadataComparison({
                             ) : null
                         }
                     />
-                </div>
             </div>
         </div>
     );
