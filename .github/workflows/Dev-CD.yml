@@ -17,6 +17,8 @@ jobs:
         timeout-minutes: 15
         steps:
             - uses: actions/checkout@v7
+              with: 
+                    lfs: true
             - uses: docker/login-action@v4
               with:
                     registry: ghcr.io
