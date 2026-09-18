@@ -33,14 +33,14 @@ describe('Dashboard page', () => {
         mockUseCaseDashboard.mockReturnValue({ ...baseHookState });
     });
     //the asserts match the visible case
-    it('renders search view for regular users', () => {
+    it('renders search view and the create button for regular users', () => {
         render(<Dashboard />);
         expect(screen.getByText('Dashboard')).toBeInTheDocument();
         expect(screen.getByPlaceholderText('Search cases...')).toBeInTheDocument();
         expect(screen.getByText('Alpha Fraud')).toBeInTheDocument();
         expect(screen.getByText('Created by investigator.adams')).toBeInTheDocument();
         expect(screen.queryByText('Total Cases')).not.toBeInTheDocument();
-        expect(screen.queryByText('New Case')).not.toBeInTheDocument();
+        expect(screen.getByText('New Case')).toBeInTheDocument();
     });
 
     //ensures that only the investigator can see the create button and their own dashboard cards.

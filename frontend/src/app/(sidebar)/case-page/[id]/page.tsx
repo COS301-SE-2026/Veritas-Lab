@@ -76,10 +76,10 @@ export default function CasePage() {
     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
-    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //creator
-    const canCloseCase = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //invest that is case owner or any admin
-    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //investigator that is owner or any admin
-    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //owner and not closed
+    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN' || userRole === 'USER') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //creator
+    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !caseDetails?.caseClosed; //need to add assigned can only close with admin
+    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'USER' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //user that is owner or any admin
+    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails /*&& caseDetails.caseCreator === currentUser?.username  change to assigned */&& !caseDetails?.caseClosed; //owner and not closed
 
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';

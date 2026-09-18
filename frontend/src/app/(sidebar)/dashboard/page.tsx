@@ -34,7 +34,8 @@ export default function Dashboard() {
     const riskScores = useCaseRiskScores(allCases);
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
-
+    const canCreateCase = userRole === 'ADMIN' || userRole === 'INVESTIGATOR' || userRole === 'USER';
+    
     return (
         <>
         <div className="mx-auto max-w-7xl px-6 sm:px-8 pt-10 pb-16">
@@ -43,7 +44,7 @@ export default function Dashboard() {
                     <h1 className="text-[30px] sm:text-[34px] font-bold tracking-tight text-(--color-text-strong)">Dashboard</h1>
                     <p className="mt-1 text-[15px] text-(--color-text-muted)">Manage and track your cases</p>
                 </div>
-                {showDashboardCards && userRole !== 'USER' && (
+                { canCreateCase && (
                     <Button variant="submit" onClick={openModal} className="gap-2">
                         <Plus size={18} />
                         <span className="font-semibold">New Case</span>
@@ -63,42 +64,43 @@ export default function Dashboard() {
                     onSortChange={setSortKey}
                 />
             </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-4">
-                {isLoading ? (
+            <div>
+                <div className="grid grid-cols-1 gap-4 mt-4">
+                    {isLoading ? (
                     <div className="flex items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) py-16 text-sm text-(--color-text-muted)">
                         Loading cases...
                     </div>
-                ) : error ? (
-                    <Label text={error} htmlFor="error" variant="error" />
-                ) : visibleCases.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) py-16 text-center">
-                        <FolderSearch size={32} className="text-(--color-text-subtle)" />
-                        <p className="text-sm text-(--color-text-muted)">No cases found.</p>
-                    </div>
-                ) : (
-                    visibleCases.map((item) => {
-                        const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' && item.caseCreator === currentUser?.username);
-                        const risk = riskScores.find((score) => score.caseId === item.caseId);
-                        return (
-                            <CaseCard
-                                key={item.caseId}
-                                caseTitle={item.caseName}
-                                caseDescription={`Created by ${item.caseCreator}`}
-                                caseStatus={item.caseClosed ? 'Closed' : 'Open'}
-                                href={`/case-page/${item.caseId}`}
-                                caseId={item.caseId}
-                                canDelete={canDeleteCase}
-                                onDeleted={refreshCases}
-                                riskScore={risk?.average}
-                                evidenceCount={risk?.count}
-                            />
-                        );
-                    })
-                )}
+                    ) : error ? (
+                        <Label text={error} htmlFor="error" variant="error" />
+                    ) : visibleCases.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) py-16 text-center">
+                            <FolderSearch size={32} className="text-(--color-text-subtle)" />
+                            <p className="text-sm text-(--color-text-muted)">No cases found.</p>
+                        </div>
+                    ) : (
+                        visibleCases.map((item) => {
+                            const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' /* && item.caseCreator === currentUser?.username*/);
+                            const risk = riskScores.find((score) => score.caseId === item.caseId);
+                            return (
+                                <CaseCard
+                                    key={item.caseId}
+                                    caseTitle={item.caseName}
+                                    caseDescription={`Created by ${item.caseCreator}`}
+                                    caseStatus={item.caseClosed ? 'Closed' : 'Open'}
+                                    href={`/case-page/${item.caseId}`}
+                                    caseId={item.caseId}
+                                    canDelete={canDeleteCase}
+                                    onDeleted={refreshCases}
+                                    riskScore={risk?.average}
+                                    evidenceCount={risk?.count}
+                                />
+                            );
+                        })
+                    )}
+                </div>
             </div>
         </div>
-        {showDashboardCards && userRole !== 'USER' && (
+        { canCreateCase && (
             <DashboardModal isOpen={isModalOpen} onClose={closeModal} onCreated={() => { closeModal(); void refreshCases(); }} />
         )}
         </>

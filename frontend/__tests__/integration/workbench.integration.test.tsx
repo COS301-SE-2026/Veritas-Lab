@@ -24,6 +24,11 @@ jest.mock('@/lib/media', () => ({
         if (extension && ['png', 'jpg', 'jpeg'].includes(extension)) return 'image';
         return 'unsupported';
     },
+    resolveMediaKind: ({ mediaExtension }: { mediaExtension?: string | null }) => {
+        if (mediaExtension === 'pdf') return 'pdf';
+        if (mediaExtension && ['png', 'jpg', 'jpeg'].includes(mediaExtension)) return 'image';
+        return 'unsupported';
+    },
 }));
 jest.mock('@/lib/report', () => ({
     getCertaintyMeta: (certainty: number | null) => {
