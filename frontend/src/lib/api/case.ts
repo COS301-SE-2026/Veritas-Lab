@@ -13,7 +13,7 @@ function normalizeComment(comment: Record<string, unknown>) {
 //conirfmed that all endpoints match the API service contract
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
     const res = await apiFetch(
-        `/api/getSingleCase?CaseID=${encodeURIComponent(caseID)}`,
+        `/api/getSingleCase/${encodeURIComponent(caseID)}`,
         {
             method: 'GET',
         }
