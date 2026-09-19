@@ -2,7 +2,8 @@ import Button from "@/components/ui/button";
 import { useState } from "react";
 import { CaseEvidence } from '@/types/api';
 import EvidenceCard from "@/components/common/evidenceCard";
-import { ReactFlow, Background, Controls, useNodesState, useEdgesState, Node, Edge} from '@xyflow/react';
+import { ReactFlow, Background, Controls, useNodesState, useEdgesState, Node, Edge, ReactFlowProvider, useReactFlow} from '@xyflow/react';
+import type { EvidenceNodeData } from "@/components/common/evidenceNode";
 import '@xyflow/react/dist/style.css';
 import CaseBoardCanvas from "@/components/common/CaseBoardCanvas";
 import { DragDropProvider } from "@dnd-kit/react";
@@ -10,10 +11,19 @@ type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
 };
+
 export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
+    return (
+        <ReactFlowProvider>
+            <CaseBoardInner caseId={caseId} evidenceList={evidenceList} />
+        </ReactFlowProvider>
+    )
+}
+export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
 
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+    const { screenToFlowPosition } = useReactFlow();
     return (
         // <div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
         //     <div>
@@ -33,20 +43,27 @@ export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
                     return;
                 }
 
-                const { mediaId, caseId, mediaName } = source.data as { mediaId: string; caseId: string; mediaName: string };
-
-                const { x, y } = position.current;
-                const newNode = {
-                    id: `node-${mediaId}`,
-                    type: 'default',
-                    position: { x, y },
-                    data: { label: mediaName },
+                const mediaId = (source.data as {mediaId?: string}).mediaId;
+                const evidence = evidenceList.find((e) => e.mediaId === mediaId);
+                if (!evidence) return;
+                const flowPosition = screenToFlowPosition(position.current);
+                const newNode: Node<EvidenceNodeData> = {
+                    id: `evidence-${mediaId}`,
+                    type: 'evidence',
+                    position: flowPosition,
+                    data: {
+                        mediaId: evidence.mediaId,
+                        caseId: caseId,
+                        mediaName: evidence.mediaName,
+                        mediaUrl: evidence.mediaUrl,
+                        mediaExtension: evidence.mediaExtension,
+                        reportCertainty: evidence.reportCertainty,
+                    }
                 };
                 setNodes((prevNodes) => [
                     ...prevNodes,
                     newNode,
                 ]);    
-                console.log(`Dropped media ${mediaName} (ID: ${mediaId}) from case ${caseId} at position (${x}, ${y})`);
             }}
         >
             
