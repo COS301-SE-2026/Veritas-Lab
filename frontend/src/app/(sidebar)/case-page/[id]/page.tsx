@@ -14,8 +14,9 @@ import CaseEditButton from "@/components/common/caseEditButton";
 import Label from "@/components/ui/label";
 import AuditTimeline from "@/components/common/auditTimeline";
 import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
+import CaseBoard from "@/components/common/CaseBoard";
 
-const TABS = ['Evidence', 'Comments', 'Audit Timeline'] as const;
+const TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -147,6 +148,7 @@ export default function CasePage() {
                                         caseId={id}
                                         canDelete={canDeleteEvidence}
                                         onDeleted={reloadCaseData}
+                                        variant="default"
                                     />
                                 )) : (
                                     <div className="w-full rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
@@ -162,13 +164,15 @@ export default function CasePage() {
                             />
                         ) : activeTab === 'Audit Timeline' ? (
                             <AuditTimeline caseId={id} />
+                        ) : activeTab === 'Case Board' ? (
+                            <CaseBoard caseId={id} evidenceList={evidenceList}/>
                         ) : (
                             <div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
                                 {activeTab} is not available yet.
                             </div>
                         )}
                     </div>
-
+                    {activeTab !== 'Case Board' ? (
                     <div className="w-full shrink-0 lg:w-72">
                         <div className="vl-panel p-5">
                             <h2 className="text-lg font-bold text-(--color-text-strong)">Case details</h2>
@@ -193,6 +197,7 @@ export default function CasePage() {
                             />
                         ) : null}
                     </div>
+                    ) : null}
                 </div>
             </div>
             {canUploadEvidence ? (

@@ -1,7 +1,8 @@
 import Button from "@/components/ui/button";
+import { useState } from "react";
 import { CaseEvidence } from '@/types/api';
 import EvidenceCard from "@/components/common/evidenceCard";
-import { ReactFlow, Background, Controls } from '@xyflow/react';
+import { ReactFlow, Background, Controls, useNodesState, useEdgesState, Node, Edge} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import CaseBoardCanvas from "@/components/common/CaseBoardCanvas";
 import { DragDropProvider } from "@dnd-kit/react";
@@ -10,6 +11,9 @@ type CaseBoardProps = {
     evidenceList: CaseEvidence[];
 };
 export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
+
+    const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     return (
         // <div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
         //     <div>
@@ -32,16 +36,29 @@ export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
                 const { mediaId, caseId, mediaName } = source.data as { mediaId: string; caseId: string; mediaName: string };
 
                 const { x, y } = position.current;
-
+                const newNode = {
+                    id: `node-${mediaId}`,
+                    type: 'default',
+                    position: { x, y },
+                    data: { label: mediaName },
+                };
+                setNodes((prevNodes) => [
+                    ...prevNodes,
+                    newNode,
+                ]);    
                 console.log(`Dropped media ${mediaName} (ID: ${mediaId}) from case ${caseId} at position (${x}, ${y})`);
             }}
         >
             
             <div className="flex flex-col gap-6 lg:flex-row">
                 <div className="flex-1">
-                    <CaseBoardCanvas id="droppable" >
-                        
-                    </CaseBoardCanvas>
+                    <CaseBoardCanvas 
+                        id="droppable"
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                    />
                 </div>
                     <div className="w-full shrink-0 lg:w-72">
                         <div className="vl-panel p-5">
