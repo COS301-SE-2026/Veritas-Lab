@@ -18,6 +18,28 @@ export type EvidenceNodeData = {
     reportCertainty: number | null;
     annotationCount: number;
 }
+const pinSize = 14
+function Pin({ color = '#c0392b' } : { color?: string}) {
+    return (
+        <Handle
+            type="source"
+            position={Position.Top}
+            style={{
+                top: 12,
+                width: pinSize,
+                height: pinSize,
+                border: 'none',
+                borderRadius: '50%',
+                background: `radial-gradient(circle at 35% 30%, #fff8 0 18%, ${color} 45%, color-mix(in srgb, ${color} 60%, black) 100%)`,
+                boxShadow: '1px 3px 3px rgba(0,0,0,.35)',
+                cursor: 'crosshair',
+            }}
+        
+        />
+    )
+}
+
+
 export default function EvidenceNode({ data, selected }: NodeProps<Node<EvidenceNodeData>>) {
     const certainty = getCertaintyMeta(data.reportCertainty);
     const mediaKind = getMediaKind(data.mediaExtension);
@@ -37,8 +59,8 @@ export default function EvidenceNode({ data, selected }: NodeProps<Node<Evidence
     return (
         <div className={`relative w-90 overflow-hidden rounded-[var(--radius-md)] border bg-(--color-surface) text-left shadow-(--shadow-xs)
             ${selected ? 'border-(--color-secondary) ring-2 ring-[color-mix(in_srgb,var(--color-secondary)_25%,transparent)]' : 'border-(--color-line)'}`}>
-            <Handle type="source" position={Position.Top} />
-            <div className="py-2.5 pr-3 pl-4">
+            <Pin />
+            <div className="pt-6 pb-2 pr-3 pl-4">
                 <p className="truncate text-[13px] font-semibold text-(--color-text-strong)" title={data.mediaName}>
                     {data.mediaName}
                 </p>

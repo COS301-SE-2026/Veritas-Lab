@@ -1,5 +1,5 @@
 'use client'
-import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton, ConnectionLineType } from '@xyflow/react';
 import {useDroppable} from '@dnd-kit/react';
 import { useState, useMemo } from 'react';
 import '@xyflow/react/dist/style.css';
@@ -39,6 +39,8 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
 			onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             connectionMode={ConnectionMode.Loose}
+            connectionLineType={ConnectionLineType.Straight}
+            connectionLineStyle={{ stroke: '#b3261e', strokeWidth: 2, strokeDasharray: '4 3' }}
     	>
         <Background />
         <Controls>

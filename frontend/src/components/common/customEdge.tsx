@@ -19,7 +19,7 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sel
                 path={path}
                 interactionWidth={14}
                 style={{
-                    stroke: '#ef4444',
+                    stroke: '#b3261e',
                     strokeWidth: selected ? 3 : 2,
                     strokeLinecap: 'round'
                 }}
