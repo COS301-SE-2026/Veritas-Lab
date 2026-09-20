@@ -528,22 +528,32 @@ def test_create_pdf_metrics_returns_correct_metrics():
     assert result["f1"] == 1.0
 
 def test_lexical_ai_probability_empty_text():
-    assert lexical.lexical_ai_probability("") == 0.5
-    assert lexical.lexical_ai_probability(None) == 0.5
+    assert lexical.lexical_ai_probability("") == {
+        "ai_probability": 0.5,
+        "suspicious_chunks": []
+    }
+
+    assert lexical.lexical_ai_probability(None) == {
+        "ai_probability": 0.5,
+        "suspicious_chunks": []
+    }
 
 def test_lexical_ai_probability_runs_in_batches(monkeypatch):
     class FakeTokeniser:
         def __call__(self, text, **kwargs):
             return {
                 "input_ids": torch.ones(
-                    (5,4),
+                    (5, 4),
                     dtype=torch.long
                 ),
                 "attention_mask": torch.ones(
-                    (5,4),
+                    (5, 4),
                     dtype=torch.long
                 )
             }
+
+        def decode(self, ids, skip_special_tokens=True):
+            return "decoded chunk"
 
     class FakeModel:
         def __init__(self):
@@ -551,14 +561,14 @@ def test_lexical_ai_probability_runs_in_batches(monkeypatch):
 
         def __call__(self, input_ids, attention_mask):
             self.calls += 1
-            
+
             batch_size = input_ids.shape[0]
-            
+
             logits = torch.tensor(
                 [[0.0, 2.0]] * batch_size,
                 dtype=torch.float32
             )
-            
+
             return SimpleNamespace(logits=logits)
 
     fake_model = FakeModel()
@@ -581,7 +591,7 @@ def test_lexical_ai_probability_runs_in_batches(monkeypatch):
         2
     )
 
-    probability = lexical.lexical_ai_probability(
+    result = lexical.lexical_ai_probability(
         "Some document text",
         max_chunks=3
     )
@@ -591,9 +601,15 @@ def test_lexical_ai_probability_runs_in_batches(monkeypatch):
         dim=-1
     )[1].item()
 
-    assert probability == pytest.approx(
+    assert result["ai_probability"] == pytest.approx(
         expected,
         rel=1e-5
+    )
+
+    assert len(result["suspicious_chunks"]) == 3
+    assert all(
+        chunk["text"] == "decoded chunk"
+        for chunk in result["suspicious_chunks"]
     )
 
     assert fake_model.calls == 2
@@ -603,12 +619,11 @@ def test_lexical_ai_probability_no_chunks(monkeypatch):
         def __call__(self, text, **kwargs):
             return {
                 "input_ids": torch.empty(
-                    (0,4),
+                    (0, 4),
                     dtype=torch.long
                 ),
-
                 "attention_mask": torch.empty(
-                    (0,4),
+                    (0, 4),
                     dtype=torch.long
                 )
             }
@@ -629,7 +644,10 @@ def test_lexical_ai_probability_no_chunks(monkeypatch):
         "Some text"
     )
 
-    assert result == 0.5
+    assert result == {
+        "ai_probability": 0.5,
+        "suspicious_chunks": []
+    }
 
 def test_test_model_pdf_level(monkeypatch, tmp_path):
     authentic = tmp_path / "0_authentic"

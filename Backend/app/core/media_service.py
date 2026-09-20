@@ -251,7 +251,11 @@ class MediaService(ABC):
                 )
 
                 ai_analysis = await self.ai_analysis(file_path)
-                automated_annotations = await self.automated_annotations(heatmap=ai_analysis["heatmap"])
+                heatmap = ai_analysis.get("heatmap") # this is done to keep PDF and Video Services safe.
+                if heatmap is not None:
+                    automated_annotations = await self.automated_annotations(heatmap=ai_analysis["heatmap"])
+                    #later, the saving annotations probably goes here
+                ai_analysis.pop("heatmap", None)
                 
             #This is to remove information about the system that does not 
             #affect the analysis
