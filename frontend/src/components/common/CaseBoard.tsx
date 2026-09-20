@@ -1,11 +1,11 @@
 import Button from "@/components/ui/button";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { CaseEvidence } from '@/types/api';
 import EvidenceCard from "@/components/common/evidenceCard";
-import { useNodesState, useEdgesState, Node, Edge, ReactFlowProvider, useReactFlow} from '@xyflow/react';
+import { useNodesState, useEdgesState, Node, Edge, ReactFlowProvider, useReactFlow, addEdge, Connection} from '@xyflow/react';
 import type { EvidenceNodeData } from "@/components/common/evidenceNode";
 import '@xyflow/react/dist/style.css';
-import CaseBoardCanvas from "@/components/common/CaseBoardCanvas";
+import CaseBoardCanvas from "@/components/common/caseBoardCanvas";
 import { DragDropProvider } from "@dnd-kit/react";
 import ReportPanel from '@/components/common/reportPanel';
 import { resolveMediaKind } from '@/lib/media';
@@ -31,6 +31,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
     const { screenToFlowPosition } = useReactFlow();
     const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
 
+    const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
     const selectedEvidence = useMemo(() => {
         const node = nodes.find((n) => n.selected && n.type === 'evidence');
         if(!node) return null;
@@ -94,6 +95,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
                     />
                 </div>
                     <div className="w-full shrink-0 lg:w-72">

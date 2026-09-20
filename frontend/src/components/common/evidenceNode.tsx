@@ -37,7 +37,7 @@ export default function EvidenceNode({ data, selected }: NodeProps<Node<Evidence
     return (
         <div className={`relative w-90 overflow-hidden rounded-[var(--radius-md)] border bg-(--color-surface) text-left shadow-(--shadow-xs)
             ${selected ? 'border-(--color-secondary) ring-2 ring-[color-mix(in_srgb,var(--color-secondary)_25%,transparent)]' : 'border-(--color-line)'}`}>
-            <Handle type="target" position={Position.Left} />
+            <Handle type="source" position={Position.Top} />
             <div className="py-2.5 pr-3 pl-4">
                 <p className="truncate text-[13px] font-semibold text-(--color-text-strong)" title={data.mediaName}>
                     {data.mediaName}
@@ -57,7 +57,6 @@ export default function EvidenceNode({ data, selected }: NodeProps<Node<Evidence
                     </div>
                 </div>
             </div>
-            <Handle type="source" position={Position.Right} />
         </div>
     );
 }

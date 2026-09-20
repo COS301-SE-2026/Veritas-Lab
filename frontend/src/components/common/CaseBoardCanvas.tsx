@@ -1,9 +1,9 @@
 'use client'
-import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode } from '@xyflow/react';
 import {useDroppable} from '@dnd-kit/react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
-
+import CustomEdge from '@/components/common/customEdge'
 
 type CaseBoardCanvasProps = {
     id: string;
@@ -11,11 +11,14 @@ type CaseBoardCanvasProps = {
     edges: Edge[];
     onNodesChange: OnNodesChange;
     onEdgesChange: OnEdgesChange;
+    onConnect: OnConnect
 };
 
 const nodeTypes = { evidence: EvidenceNode };
-
-export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange }: CaseBoardCanvasProps) {
+const edgeTypes = {
+  'custom-edge': CustomEdge,
+};
+export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect }: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
     return (
     <div 
@@ -25,8 +28,11 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
 			nodes={nodes}
 			edges={edges}
 			nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes} 
 			onNodesChange={onNodesChange}
 			onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            connectionMode={ConnectionMode.Loose}
 			fitView
     	>
         <Background />

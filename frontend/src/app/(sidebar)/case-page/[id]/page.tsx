@@ -14,7 +14,7 @@ import CaseEditButton from "@/components/common/caseEditButton";
 import Label from "@/components/ui/label";
 import AuditTimeline from "@/components/common/auditTimeline";
 import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
-import CaseBoard from "@/components/common/CaseBoard";
+import CaseBoard from "@/components/common/caseBoard";
 
 const TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
 export default function CasePage() {
