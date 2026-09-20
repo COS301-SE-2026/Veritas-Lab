@@ -2,6 +2,7 @@ from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIImageDetector
 from starlette.concurrency import run_in_threadpool
+from typing import Any
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
@@ -172,3 +173,8 @@ class ImageService(MediaService):
                     output += f" - {message}\n"
 
         return output
+
+    async def automated_annotations(self, **kwargs: Any):
+        heatmap = kwargs["heatmap"]
+        threshold = kwargs.get("threshold", 0.6)
+        return self.detector.heatmap_to_annotation(heatmap=heatmap, threshold=threshold)

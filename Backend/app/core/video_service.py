@@ -1,6 +1,7 @@
 from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIVideoDetector
+from typing import Any
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
@@ -245,3 +246,6 @@ class VideoService(MediaService):
                 output += f" - Audio weight: {audio_weight * 100:.0f}%\n"
 
         return output
+
+    async def automated_annotations(self, **kwargs: Any):
+        pass

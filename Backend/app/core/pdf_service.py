@@ -1,9 +1,8 @@
-import exiftool
 from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIPDFDetector
 import asyncio
-
+from typing import Any
 
 FRAUD_MESSAGE = "Lacks original authoring metadata; highly suspicious as it has been modified, re-rendered, or stripped by external software."
 PDF_METADATA_PRODUCER="PDF:Producer"
@@ -195,3 +194,6 @@ class PDFService(MediaService):
                     output += f" - {reason}\n"
 
         return output
+
+    async def automated_annotations(self, **kwargs: Any):
+        pass

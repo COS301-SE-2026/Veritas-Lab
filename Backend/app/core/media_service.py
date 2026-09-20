@@ -3,9 +3,8 @@ from uuid import UUID
 import asyncpg
 import exiftool
 from app.core.env import Minio_Settings, R2_Settings, Other_Settings, Postgres_Settings
-from minio import Minio
 import json
-from urllib.parse import urlparse
+from typing import Any
 from pathlib import Path
 import aiofiles.tempfile
 from starlette.concurrency import run_in_threadpool
@@ -252,6 +251,7 @@ class MediaService(ABC):
                 )
 
                 ai_analysis = await self.ai_analysis(file_path)
+                automated_annotations = await self.automated_annotations(heatmap=ai_analysis["heatmap"])
                 
             #This is to remove information about the system that does not 
             #affect the analysis
@@ -298,4 +298,8 @@ class MediaService(ABC):
 
     @abstractmethod
     def create_findings_string(self, input: dict) ->str:
+        pass
+
+    @abstractmethod
+    async def automated_annotations(self, **kwargs: Any):
         pass
