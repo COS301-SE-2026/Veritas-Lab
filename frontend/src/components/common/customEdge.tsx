@@ -1,15 +1,15 @@
 import { getStraightPath, BaseEdge, type EdgeProps, type Edge, useReactFlow, EdgeLabelRenderer } from '@xyflow/react';
 import { X } from 'lucide-react';
+import { PinSize } from '@/components/common/boardPin';
 type CustomEdge = Edge<Record<string, never>, 'custom'>;
 
 export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, selected }: EdgeProps<CustomEdge>) {
     const { deleteElements } = useReactFlow();
-    const pinSize = 14;
     const [path, labelX, labelY] = getStraightPath({ 
         sourceX, 
-        sourceY: sourceY + pinSize / 2, 
+        sourceY: sourceY + PinSize / 2, 
         targetX, 
-        targetY: targetY + pinSize / 2
+        targetY: targetY + PinSize / 2
     });
     
     return (

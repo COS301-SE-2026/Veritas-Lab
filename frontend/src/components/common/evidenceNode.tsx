@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { getMediaKind } from '@/lib/media';
 import { PenLine } from 'lucide-react';
 import Image from 'next/image';
+import Pin from '@/components/common/boardPin'
 const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
     ssr: false,
     loading: () => <span className="text-xs text-(--color-text-subtle)">Loading...</span>,
@@ -17,26 +18,6 @@ export type EvidenceNodeData = {
     mediaExtension: string;
     reportCertainty: number | null;
     annotationCount: number;
-}
-const pinSize = 14
-function Pin({ color = '#c0392b' } : { color?: string}) {
-    return (
-        <Handle
-            type="source"
-            position={Position.Top}
-            style={{
-                top: 12,
-                width: pinSize,
-                height: pinSize,
-                border: 'none',
-                borderRadius: '50%',
-                background: `radial-gradient(circle at 35% 30%, #fff8 0 18%, ${color} 45%, color-mix(in srgb, ${color} 60%, black) 100%)`,
-                boxShadow: '1px 3px 3px rgba(0,0,0,.35)',
-                cursor: 'crosshair',
-            }}
-        
-        />
-    )
 }
 
 
