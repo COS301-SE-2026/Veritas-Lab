@@ -58,6 +58,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         mediaUrl: evidence.mediaUrl,
                         mediaExtension: evidence.mediaExtension,
                         reportCertainty: evidence.reportCertainty,
+                        annotationCount: evidence.annotations?.length ?? 0,
                     }
                 };
                 setNodes((prevNodes) => [
