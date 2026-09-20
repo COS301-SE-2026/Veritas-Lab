@@ -20,7 +20,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                         <h2 className="text-xl font-bold text-(--color-text-strong)">Report</h2>
                         <p className="mt-1 text-xs text-(--color-text-muted)">{mediaName}</p>
                     </div>
-                    {onClose !== null && (
+                    {onClose && (
                         <button
                             type="button"
                             onClick={onClose}

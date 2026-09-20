@@ -107,3 +107,12 @@ export type ReportModalProps = {
     certainty: number | null;
     findings: string | null;
 };
+
+export type ReportPanelProps = {
+    mediaUrl?: string;
+    mediaKind?: MediaKind;
+    mediaName: string;
+    certainty: number | null;
+    findings: string | null;
+    onClose?: () => void;
+};
