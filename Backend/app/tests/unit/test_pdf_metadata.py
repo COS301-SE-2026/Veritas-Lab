@@ -149,14 +149,3 @@ async def test_analyse_metadata_detects_confirmed_editor():
 
     assert result.Certainty == 1
     assert "PDF:Producer (Confirmed Editor/Converter): pypdf" in result.Findings
-
-def test_create_findings_string_returns_fallback_for_missing_summary():
-    """
-    Verifies the fallback string when no summary is provided in the input dictionary.
-    """
-    service = PDFService()
-    
-    input_data = {}
-    
-    result = service.create_findings_string(input_data)
-    assert result == "No findings"

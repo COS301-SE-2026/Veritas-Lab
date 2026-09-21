@@ -337,7 +337,7 @@ class MediaService(ABC):
             print(json.dumps(combined_findings, indent=4))
 
             # use this when you want to upload to the database
-            final_findings = self.create_findings_string(combined_findings)
+            final_findings = json.dumps(combined_findings)
             final_analysis = AnalysisFindings(Certainty=final_risk_level, Findings=final_findings)
             await self.update_analysis(media_id=media_id, analysis=final_analysis)
 
@@ -352,10 +352,6 @@ class MediaService(ABC):
 
     @abstractmethod
     async def ai_analysis(self, path : str|Path) ->dict:
-        pass
-
-    @abstractmethod
-    def create_findings_string(self, input: dict) ->str:
         pass
 
     @abstractmethod

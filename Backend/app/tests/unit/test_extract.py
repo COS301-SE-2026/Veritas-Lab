@@ -316,12 +316,6 @@ async def test_analyse_uses_cached_metadata(monkeypatch):
             AsyncMock()
         )
 
-    monkeypatch.setattr(
-        service, 
-        "create_findings_string", 
-        MagicMock()
-    )
-
     result = await service.analyse("12345678-abcd-ef01-2345-6789abcdef01")
 
     assert result is None
@@ -332,7 +326,6 @@ async def test_analyse_uses_cached_metadata(monkeypatch):
     service.save_metadata.assert_not_called()
     service.analyse_metadata.assert_not_called()
     service.update_analysis.assert_not_called()
-    service.create_findings_string.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_analyse_full_path_strips_noise_keys(monkeypatch):
@@ -430,12 +423,6 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
         AsyncMock()
     )
 
-    monkeypatch.setattr(
-        service,
-        "create_findings_string",
-        MagicMock(return_value="combined findings string")
-    )
-
     result = await service.analyse(media_id)
 
     saved_metadata = service.save_metadata.call_args.args[1]
@@ -455,7 +442,14 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
     persisted_analysis = service.update_analysis.call_args.kwargs["analysis"]
 
     assert persisted_analysis.Certainty == 2
-    assert persisted_analysis.Findings == "combined findings string"
+
+    persisted_findings = json.loads(persisted_analysis.Findings)
+
+    assert persisted_findings["risk_level"] == 2
+    assert persisted_findings["ai_probability"] == 80
+    assert persisted_findings["classification"] == "AI-generated"
+    assert persisted_findings["findings"] == "Traces of editing software found"
+
     service.save_annotation.assert_awaited_once_with(
         media_id,
         []
