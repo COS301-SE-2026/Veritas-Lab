@@ -1,4 +1,3 @@
-import Button from "@/components/ui/button";
 import { useState, useMemo, useRef } from "react";
 import { CaseEvidence } from '@/types/api';
 import EvidenceCard from "@/components/common/evidenceCard";
@@ -58,16 +57,6 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
             mediaUrl: selectedEvidence?.mediaUrl,
         });
     return (
-        // <div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
-        //     <div>
-        //         Case Board is not available yet:
-        //     </div>
-        //     <Button
-        //         variant="secondary"
-        //         className="mt-4">
-        //         Generate Case Board
-        //     </Button>
-        // </div>
         <DragDropProvider
             onDragEnd={(event) => {
                 const { source, target, position } = event.operation;
@@ -127,7 +116,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                                 <div className="mt-4 flex flex-col gap-2">
                                     {evidenceList.map((evidence) => (
                                         <EvidenceCard
-                                            key={evidence.reportId}
+                                            key={evidence.mediaId}
                                             mediaName={evidence.mediaName}
                                             mediaUrl={evidence.mediaUrl}
                                             mediaExtension={evidence.mediaExtension}

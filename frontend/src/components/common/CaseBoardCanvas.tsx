@@ -7,6 +7,7 @@ import EvidenceNode from '@/components/common/evidenceNode';
 import CustomEdge from '@/components/common/customEdge'
 import { Layers, StickyNote } from 'lucide-react';
 import NoteNode from '@/components/common/noteNode'
+import Button from '@/components/ui/button'
 type CaseBoardCanvasProps = {
     id: string;
     nodes: Node[];
@@ -41,7 +42,7 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
     return (
     <div 
         ref={(el) => { ref(el); boxRef.current = el; }}
-        className={`h-[70vh] min-h-[480px] w-full overflow-hidden rounded-[var(--radius-xl)] border border-dashed bg-(--color-surface) ${isDropTarget ? 'border-(--color-secondary)' : 'border-(--color-line-strong)'}`}>
+        className={`relative h-[70vh] min-h-[480px] w-full overflow-hidden rounded-[var(--radius-xl)] border border-dashed bg-(--color-surface) ${isDropTarget ? 'border-(--color-secondary)' : 'border-(--color-line-strong)'}`}>
     	<ReactFlow
 			nodes={nodes}
 			edges={displayEdges}
@@ -69,6 +70,19 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
             </ControlButton>    
         </Controls>
     	</ReactFlow>
+
+        {nodes.length === 0 &&(
+            <div className='pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 p-6 text-center'>
+                <p className='max-w-sm text-sm text-(--color-text-muted)'>
+                    Drag evidence onto the board, or generate a timeline from the existing evidence.    
+                </p>
+                <Button 
+                    variant='secondary'
+                    className="pointer-events-auto"
+                    text='Generate Case Board'
+                />
+            </div>
+        )}
     </div>
   );
 }
