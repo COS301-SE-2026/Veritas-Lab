@@ -1,34 +1,46 @@
 'use client'
-import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton, ConnectionLineType } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton, ConnectionLineType, useReactFlow } from '@xyflow/react';
 import {useDroppable} from '@dnd-kit/react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
 import CustomEdge from '@/components/common/customEdge'
-import { Layers } from 'lucide-react';
+import { Layers, StickyNote } from 'lucide-react';
+import NoteNode from '@/components/common/noteNode'
 type CaseBoardCanvasProps = {
     id: string;
     nodes: Node[];
     edges: Edge[];
     onNodesChange: OnNodesChange;
     onEdgesChange: OnEdgesChange;
-    onConnect: OnConnect
+    onConnect: OnConnect;
+    onAddNote: (position: { x: number; y: number}) => void;
 };
 
-const nodeTypes = { evidence: EvidenceNode };
-const edgeTypes = {
-  'custom-edge': CustomEdge,
+const nodeTypes = { 
+    evidence: EvidenceNode,
+    note: NoteNode
 };
-export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect }: CaseBoardCanvasProps) {
+const edgeTypes = {
+'custom-edge': CustomEdge,
+};
+export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote }: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
+    const boxRef = useRef<HTMLDivElement | null>(null);
+    const { screenToFlowPosition } = useReactFlow();
     const [edgesOnTop, setEdgesOnTop] = useState(true);
 
+    const addNoteAtCenter = () => {
+        const box = boxRef.current?.getBoundingClientRect();
+        if(!box) return;
+        onAddNote(screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }));
+    }
     const displayEdges = useMemo(() => edges.map((e) => ({
         ...e, zIndex: edgesOnTop ? 1000 : 0
     })), [edges, edgesOnTop])
     return (
     <div 
-        ref={ref} 
+        ref={(el) => { ref(el); boxRef.current = el; }}
         className={`h-[70vh] min-h-[480px] w-full overflow-hidden rounded-[var(--radius-xl)] border border-dashed bg-(--color-surface) ${isDropTarget ? 'border-(--color-secondary)' : 'border-(--color-line-strong)'}`}>
     	<ReactFlow
 			nodes={nodes}
@@ -44,6 +56,9 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
     	>
         <Background />
         <Controls>
+            <ControlButton onClick={addNoteAtCenter} title='Add note'>
+                <StickyNote size={14}/>
+            </ControlButton>
             <ControlButton
                 onClick={() => setEdgesOnTop((e) => !e)}
                 title={edgesOnTop ? 'Show links behind evidence' : 'Show links above evidence'}

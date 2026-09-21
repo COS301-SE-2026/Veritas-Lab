@@ -1,5 +1,5 @@
 import Button from "@/components/ui/button";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useRef } from "react";
 import { CaseEvidence } from '@/types/api';
 import EvidenceCard from "@/components/common/evidenceCard";
 import { useNodesState, useEdgesState, Node, Edge, ReactFlowProvider, useReactFlow, addEdge, Connection} from '@xyflow/react';
@@ -10,12 +10,14 @@ import { DragDropProvider } from "@dnd-kit/react";
 import ReportPanel from '@/components/common/reportPanel';
 import { resolveMediaKind } from '@/lib/media';
 import SliderBar from '@/components/ui/sliderBar'
+import { NoteNodeData } from '@/components/common/noteNode';
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
 };
 
 const TABS = ['Evidence', 'Report'] as const;
+
 
 export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
     return (
@@ -30,8 +32,20 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const { screenToFlowPosition } = useReactFlow();
     const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
-
+    const noteCount = useRef(0);
     const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
+    const onAddNote = (position: { x: number; y: number }) => {
+        const newNode: Node<NoteNodeData> = {
+            id: `note-${Date.now()}-${noteCount.current++}`,
+            type: 'note',
+            position: { x: position.x - 112, y: position.y - 112 },
+            data: { text: '' }
+        }
+        setNodes((prevNodes) => [
+            ...prevNodes,
+            newNode,
+        ]);    
+    }
     const selectedEvidence = useMemo(() => {
         const node = nodes.find((n) => n.selected && n.type === 'evidence');
         if(!node) return null;
@@ -96,6 +110,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
+                        onAddNote={onAddNote}
                     />
                 </div>
                     <div className="w-full shrink-0 lg:w-72">
