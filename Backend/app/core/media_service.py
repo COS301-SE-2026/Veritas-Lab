@@ -12,6 +12,7 @@ from pydantic import BaseModel
 import boto3
 from botocore.client import Config
 from mypy_boto3_s3 import S3Client
+import io
 
 minio_settings = Minio_Settings()
 r2_settings = R2_Settings()
@@ -202,9 +203,54 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
-    async def save_annotation(self, automated_annotation):
-        #do later?
-        pass
+    def save_heatmap(
+        self,
+        media_id: UUID,
+        heatmap_bytes: bytes
+    ) -> None:
+        storage_client = get_object()
+
+        object_name = f"{media_id}.png"
+
+        file_stream = io.BytesIO(heatmap_bytes)
+
+        storage_client.put_object(
+            Bucket="heatmaps",
+            Key=object_name,
+            Body=file_stream,
+            ContentType="image/png"
+        )
+
+    async def save_annotation(self, media_id: UUID, automated_annotations: list[dict]):
+        connection = await asyncpg.connect(
+            user=postgres_settings.DB_USER,
+            password=postgres_settings.DB_PASSWORD,
+            database=postgres_settings.DB_NAME,
+            host=postgres_settings.DB_HOST,
+            port=postgres_settings.DB_PORT,
+            ssl="require" if postgres_settings.DB_SSL else None,
+        )
+
+        try:
+            await self.set_audit_executor(connection)
+
+            await connection.execute(
+                """
+                INSERT INTO "Cases_DB"."AutomatedAnnotations"
+                    (MediaId, MediaAnnotations)
+                VALUES
+                    ($1, $2::jsonb)
+                ON CONFLICT (MediaId)
+                DO UPDATE SET
+                    MediaAnnotations = EXCLUDED.MediaAnnotations,
+                    CreatedAt = CURRENT_TIMESTAMP
+                """,
+                media_id,
+                json.dumps(automated_annotations)
+            )
+
+        finally:
+            await connection.close()
 
     async def update_analysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
         connection = await asyncpg.connect(
@@ -251,9 +297,19 @@ class MediaService(ABC):
                 )
 
                 ai_analysis = await self.ai_analysis(file_path)
+                heatmap_path = ai_analysis.get("heatmap_path")
+
+                if heatmap_path is not None:
+                    heatmap_bytes = Path(heatmap_path).read_bytes()
+                    await run_in_threadpool(
+                        self.save_heatmap,
+                        media_id,
+                        heatmap_bytes
+                    )
+
                 automated_annotations = await self.automated_annotations(ai_analysis=ai_analysis)
                 ai_analysis.pop("heatmap", None)
-                await self.save_annotation(automated_annotations)
+                await self.save_annotation(media_id, automated_annotations)
                 
             #This is to remove information about the system that does not 
             #affect the analysis

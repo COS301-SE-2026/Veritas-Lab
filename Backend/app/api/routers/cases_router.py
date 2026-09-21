@@ -239,6 +239,18 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
     }
 
     if include_report:
+        heatmap_url = None
+
+        if media_extension.lower() in [".jpg", ".jpeg", ".png"]:
+            heatmap_url = presign_client.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": "heatmaps",
+                    "Key": f"{media_id}.png"
+                },
+                ExpiresIn=3600
+            )
+
         evidence.update({
             "annotations": (
                 json.loads(row["annotations"])
@@ -261,6 +273,8 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 if row["reportdatecreation"]
                 else None
             ),
+
+            "heatmapUrl": heatmap_url,
         })
 
     return evidence
@@ -561,7 +575,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                         "reportFindings": "No manipulation detected.",
                                         "reportComments": "Reviewed by investigator.",
                                         "reportCertainty": 3,
-                                        "reportDateCreation": "2026-05-21T10:15:00+00:00"
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": None,
                                     }
                                 ]
                             }
