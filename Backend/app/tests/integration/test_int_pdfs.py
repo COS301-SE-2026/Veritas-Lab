@@ -1,11 +1,13 @@
 from pathlib import Path
-from uuid import uuid4
+from uuid import uuid4, UUID
 import pytest
+import json
 
 from app.tests.integration.conftest import get_connection
 from app.core.env import Minio_Settings, Postgres_Settings, User_Settings
 from app.core.media_service import get_object
 from app.core.pdf_service import PDFService
+from app.tests.integration.conftest import get_automated_annotations
 
 TEST_PDF = Path(__file__).resolve().parent / "test.pdf"
 USER_SETTINGS = User_Settings()
@@ -218,6 +220,31 @@ async def test_pdf_full_integration(
         assert report["reportcertainty"] is not None
         assert "Metadata:" in report["reportfindings"]
         assert "AI Classifier:" in report["reportfindings"]
+
+        annotation_record = await get_automated_annotations(media_id)
+
+        assert annotation_record is not None
+        assert annotation_record["mediaid"] == media_id
+        assert annotation_record["mediaannotations"] is not None
+        assert annotation_record["createdat"] is not None
+
+        annotations = annotation_record["mediaannotations"]
+
+        if isinstance(annotations, str):
+            annotations = json.loads(annotations)
+
+        assert isinstance(annotations, list)
+
+        for annotation in annotations:
+            assert "id" in annotation
+            UUID(annotation["id"])
+
+            assert annotation["kind"] == "highlight"
+            assert annotation["source"] == "AI"
+
+            assert "text" in annotation
+            assert isinstance(annotation["text"], str)
+            assert annotation["text"].strip() != ""
 
     finally:
         if media_id is not None and case_id is not None and bucket is not None and object_name is not None:

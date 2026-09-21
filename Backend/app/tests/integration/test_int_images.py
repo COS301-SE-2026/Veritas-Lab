@@ -5,29 +5,9 @@ import pytest
 from app.tests.integration.conftest import get_connection
 from app.core.media_service import get_object
 from app.core.image_service import ImageService
+from app.tests.integration.conftest import get_automated_annotations
 
 TEST_IMAGE = Path(__file__).resolve().parent / "test.png"
-
-async def get_automated_annotations(media_id):
-    connection = await get_connection()
-
-    try:
-        return await connection.fetchrow(
-            """
-            SELECT
-                AnnotationId,
-                MediaId,
-                MediaAnnotations,
-                CreatedAt
-            FROM "Cases_DB"."AutomatedAnnotations"
-            WHERE MediaId = $1
-            """,
-            media_id
-        )
-
-    finally:
-        await connection.close()
-
 
 async def create_test_media(
     executor_id: str,

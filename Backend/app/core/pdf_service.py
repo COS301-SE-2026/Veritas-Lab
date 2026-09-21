@@ -3,6 +3,7 @@ from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIPDFDetector
 import asyncio
 from typing import Any
+from uuid import uuid4
 
 FRAUD_MESSAGE = "Lacks original authoring metadata; highly suspicious as it has been modified, re-rendered, or stripped by external software."
 PDF_METADATA_PRODUCER="PDF:Producer"
@@ -196,4 +197,26 @@ class PDFService(MediaService):
         return output
 
     async def automated_annotations(self, **kwargs: Any):
-        pass
+        ai_analysis = kwargs["ai_analysis"]
+
+        suspicious_chunks = ai_analysis.get(
+            "suspicious_chunks",
+            []
+        )
+
+        annotations = []
+
+        for chunk in suspicious_chunks:
+            text = chunk.get("text", "").strip()
+
+            if not text:
+                continue
+
+            annotations.append({
+                "id": str(uuid4()),
+                "kind": "highlight",
+                "source": "AI",
+                "text": text
+            })
+
+        return annotations
