@@ -691,3 +691,12 @@ FOR EACH ROW
 EXECUTE FUNCTION "Cases_DB".prevent_duplicate_evidence_in_array();
 
 DROP TABLE "Cases_DB"."Reports";
+
+-- New annotations table for ai only
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."AutomatedAnnotations" (
+    AnnotationId BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    MediaId UUID NOT NULL REFERENCES "Cases_DB"."Media"(MediaId) ON DELETE CASCADE ON UPDATE CASCADE,
+    MediaAnnotations JSONB NOT NULL,
+    CreatedAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
