@@ -5,6 +5,7 @@ from PIL import Image
 import torch
 from torchvision.models import EfficientNet_B0_Weights
 import numpy as np
+from uuid import uuid4
 
 from app.training.image.explanation import (
     GradCAM,
@@ -130,6 +131,7 @@ def heatmap_to_annotation(heatmap: np.ndarray, threshold: float = 0.6) -> dict |
     bottom = (y2 / height) * 100
 
     return {
+        "id": str(uuid4()),
         "kind": "shape",
         "source": "AI",
         "points": [

@@ -146,10 +146,6 @@ class MediaService(ABC):
 
         await run_in_threadpool(_download_from_s3)
 
-
-    
-    
-
     async def get_existing_metadata(self, media_id: UUID):
         connection = await asyncpg.connect(
             user=postgres_settings.DB_USER,
@@ -206,6 +202,10 @@ class MediaService(ABC):
         finally:
             await connection.close()
 
+    async def save_annotation(self, automated_annotation):
+        #do later?
+        pass
+
     async def update_analysis(self, media_id: UUID, analysis: AnalysisFindings) -> None:
         connection = await asyncpg.connect(
             user=postgres_settings.DB_USER,
@@ -251,11 +251,9 @@ class MediaService(ABC):
                 )
 
                 ai_analysis = await self.ai_analysis(file_path)
-                heatmap = ai_analysis.get("heatmap") # this is done to keep PDF and Video Services safe.
-                if heatmap is not None:
-                    automated_annotations = await self.automated_annotations(heatmap=ai_analysis["heatmap"])
-                    #later, the saving annotations probably goes here
+                automated_annotations = await self.automated_annotations(ai_analysis=ai_analysis)
                 ai_analysis.pop("heatmap", None)
+                await self.save_annotation(automated_annotations)
                 
             #This is to remove information about the system that does not 
             #affect the analysis
