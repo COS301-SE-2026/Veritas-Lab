@@ -408,6 +408,12 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
 
     monkeypatch.setattr(
         service,
+        "save_annotation",
+        AsyncMock()
+    )
+
+    monkeypatch.setattr(
+        service,
         "save_metadata",
         AsyncMock()
     )
@@ -450,6 +456,10 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
 
     assert persisted_analysis.Certainty == 2
     assert persisted_analysis.Findings == "combined findings string"
+    service.save_annotation.assert_awaited_once_with(
+        media_id,
+        []
+    )
 
 @pytest.mark.asyncio
 async def test_pdf_service_ai_analysis(monkeypatch):

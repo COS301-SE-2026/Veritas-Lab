@@ -57,7 +57,7 @@ class AIImageDetector:
         result["risk_level"] = risk_mapping[result["risk_level"]]
         return result
 
-    def heatmap_to_annotation(heatmap: np.ndarray, threshold: float = 0.6):
+    def heatmap_to_annotation(self, heatmap: np.ndarray, threshold: float = 0.6):
         return image_automated_annotation(heatmap=heatmap, threshold=threshold)
 
 class AIPDFDetector:

@@ -1,14 +1,12 @@
 from pathlib import Path
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 import json
 import pytest
-
 from app.tests.integration.conftest import get_connection
 from app.core.media_service import get_object
-from app.core.video_service import VideoService
+from app.core.image_service import ImageService
 
-
-TEST_VIDEO = Path(__file__).resolve().parent / "test.mp4"
+TEST_IMAGE = Path(__file__).resolve().parent / "test.png"
 
 async def get_automated_annotations(media_id):
     connection = await get_connection()
@@ -30,7 +28,11 @@ async def get_automated_annotations(media_id):
     finally:
         await connection.close()
 
-async def create_test_media(executor_id: str, executor_username: str):
+
+async def create_test_media(
+    executor_id: str,
+    executor_username: str
+):
     media_id = uuid4()
     case_id = uuid4()
 
@@ -49,13 +51,13 @@ async def create_test_media(executor_id: str, executor_username: str):
                 MediaBucket,
                 MediaExtension
             FROM "Cases_DB"."MediaType"
-            WHERE LOWER(MediaExtension) = '.mp4'
+            WHERE LOWER(MediaExtension) IN ('.jpg', '.jpeg')
             LIMIT 1
             """
         )
 
         if media_type is None:
-            pytest.fail("No MP4 MediaType exists")
+            pytest.fail("No JPG/JPEG MediaType exists")
 
         await connection.execute(
             """
@@ -68,9 +70,9 @@ async def create_test_media(executor_id: str, executor_username: str):
             VALUES ($1, $2, $3, $4)
             """,
             case_id,
-            "Video Integration Test",
+            "Image Integration Test",
             executor_username,
-            "Temporary case for video integration testing."
+            "Temporary case for image integration testing."
         )
 
         await connection.execute(
@@ -95,19 +97,28 @@ async def create_test_media(executor_id: str, executor_username: str):
     finally:
         await connection.close()
 
-def upload_test_video(media_id, bucket, extension):
+
+def upload_test_image(
+    media_id,
+    bucket,
+    extension
+):
     storage_client = get_object()
 
     object_name = f"{media_id}{extension}"
 
-    with open(TEST_VIDEO, "rb") as file_obj:
+    with open(TEST_IMAGE, "rb") as file_obj:
         storage_client.upload_fileobj(
             Fileobj=file_obj,
             Bucket=bucket,
-            Key=object_name
+            Key=object_name,
+            ExtraArgs={
+                "ContentType": "image/jpeg"
+            }
         )
 
     return object_name
+
 
 async def get_report(media_id):
     connection = await get_connection()
@@ -128,6 +139,22 @@ async def get_report(media_id):
     finally:
         await connection.close()
 
+
+def heatmap_exists(media_id):
+    storage_client = get_object()
+
+    try:
+        storage_client.head_object(
+            Bucket="heatmaps",
+            Key=f"{media_id}.png"
+        )
+
+        return True
+
+    except Exception:
+        return False
+
+
 async def delete_test_data(
     media_id,
     case_id,
@@ -136,7 +163,17 @@ async def delete_test_data(
     executor_id
 ):
     storage_client = get_object()
-    storage_client.delete_object(Bucket=bucket, Key=object_name)
+
+    storage_client.delete_object(
+        Bucket=bucket,
+        Key=object_name
+    )
+
+    storage_client.delete_object(
+        Bucket="heatmaps",
+        Key=f"{media_id}.png"
+    )
+
     connection = await get_connection()
 
     try:
@@ -164,14 +201,19 @@ async def delete_test_data(
     finally:
         await connection.close()
 
+
 @pytest.mark.asyncio
-async def test_video_full_integration(ensure_user_exists):
-    service = VideoService()
+async def test_image_full_integration(
+    ensure_user_exists
+):
+    service = ImageService()
 
     executor_id = str(uuid4())
-    base_username = "video_integration_user"
+    base_username = "image_integration_user"
 
-    executor_username = f"{base_username}_{executor_id[:8]}"
+    executor_username = (
+        f"{base_username}_{executor_id[:8]}"
+    )
 
     media_id = None
     case_id = None
@@ -186,6 +228,7 @@ async def test_video_full_integration(ensure_user_exists):
             executor_id,
             base_username
         )
+
     finally:
         await connection.close()
 
@@ -200,7 +243,7 @@ async def test_video_full_integration(ensure_user_exists):
             executor_username
         )
 
-        object_name = upload_test_video(
+        object_name = upload_test_image(
             media_id,
             bucket,
             extension
@@ -212,41 +255,10 @@ async def test_video_full_integration(ensure_user_exists):
 
         assert "risk_level" in result
         assert "ai_probability" in result
-        assert "prediction" in result
+        assert "classification" in result
         assert "findings" in result
 
-        assert 0.0 <= result["ai_probability"] <= 1.0
-
-        assert result["prediction"] in ("AI-generated", "Authentic")
-
         assert result["risk_level"] in (0, 1, 2, 3)
-        assert "visual" in result
-        assert "audio" in result
-        assert "fusion" in result
-
-        visual = result["visual"]
-
-        assert "prediction" in visual
-        assert "ai_probability" in visual
-        assert "authentic_probability" in visual
-        assert "frame_importance" in visual
-        assert 0.0 <= visual["ai_probability"] <= 1.0
-        assert visual["prediction"] in ("AI-generated", "Authentic")
-
-        audio = result["audio"]
-
-        assert "available" in audio
-
-        if audio["available"]:
-            assert "prediction" in audio
-            assert "ai_probability" in audio
-            assert 0.0 <= audio["ai_probability"] <= 1.0
-            assert audio["prediction"] in ("AI-generated", "Authentic")
-
-        fusion = result["fusion"]
-
-        assert "visual_weight" in fusion
-        assert "audio_weight" in fusion
 
         report = await get_report(media_id)
 
@@ -256,12 +268,14 @@ async def test_video_full_integration(ensure_user_exists):
         assert report["reportcertainty"] is not None
 
         assert "Metadata:" in report["reportfindings"]
-        assert "AI Video Classifier:" in report["reportfindings"]
-        assert "Visual Analysis:" in report["reportfindings"]
-        assert "Audio Analysis:" in report["reportfindings"]
-        assert "Combined Analysis:" in report["reportfindings"]
+        assert "Binary Classifier:" in report["reportfindings"]
 
-        annotation_record = await get_automated_annotations(media_id)
+        # Heatmap should have been persisted to MinIO.
+        assert heatmap_exists(media_id)
+
+        annotation_record = (
+            await get_automated_annotations(media_id)
+        )
 
         assert annotation_record is not None
         assert annotation_record["mediaid"] == media_id
@@ -274,9 +288,10 @@ async def test_video_full_integration(ensure_user_exists):
             annotations = json.loads(annotations)
 
         assert isinstance(annotations, list)
-        assert len(annotations) <= 8
-        if visual["prediction"] == "AI-generated":
-            assert len(annotations) > 0
+
+        # ImageService currently creates at most one
+        # heatmap-derived annotation.
+        assert len(annotations) <= 1
 
         for annotation in annotations:
             assert "id" in annotation
@@ -285,15 +300,14 @@ async def test_video_full_integration(ensure_user_exists):
             assert annotation["kind"] == "shape"
             assert annotation["source"] == "AI"
 
-            assert "timeStamp" in annotation
-            assert isinstance(annotation["timeStamp"], (int, float))
-            assert annotation["timeStamp"] >= 0
-
             assert "points" in annotation
             assert isinstance(annotation["points"], list)
             assert len(annotation["points"]) == 5
 
-            assert annotation["points"][0] == annotation["points"][-1]
+            assert (
+                annotation["points"][0]
+                == annotation["points"][-1]
+            )
 
             for point in annotation["points"]:
                 assert "x" in point
@@ -301,8 +315,17 @@ async def test_video_full_integration(ensure_user_exists):
 
                 assert 0 <= point["x"] <= 100
                 assert 0 <= point["y"] <= 100
+
+            # Images should not need video timestamps.
+            assert "timeStamp" not in annotation
+
     finally:
-        if media_id is not None and case_id is not None and bucket is not None and object_name is not None:
+        if (
+            media_id is not None
+            and case_id is not None
+            and bucket is not None
+            and object_name is not None
+        ):
             await delete_test_data(
                 media_id,
                 case_id,
