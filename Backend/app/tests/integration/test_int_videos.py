@@ -232,15 +232,21 @@ async def test_video_full_integration(ensure_user_exists):
         report = await get_report(media_id)
 
         assert report is not None
+
         assert report["reportartifacts"] is not None
         assert report["reportfindings"] is not None
         assert report["reportcertainty"] is not None
+        findings = json.loads(report["reportfindings"])
+        assert isinstance(findings, dict)
 
-        assert "Metadata:" in report["reportfindings"]
-        assert "AI Video Classifier:" in report["reportfindings"]
-        assert "Visual Analysis:" in report["reportfindings"]
-        assert "Audio Analysis:" in report["reportfindings"]
-        assert "Combined Analysis:" in report["reportfindings"]
+        assert findings["risk_level"] == result["risk_level"]
+        assert findings["ai_probability"] == result["ai_probability"]
+        assert findings["prediction"] == result["prediction"]
+        assert report["reportcertainty"] == result["risk_level"]
+        assert "visual" in findings
+        assert "audio" in findings
+        assert "fusion" in findings
+        assert "findings" in findings
 
         annotation_record = await get_automated_annotations(media_id)
 

@@ -9,10 +9,7 @@ from app.tests.integration.conftest import get_automated_annotations
 
 TEST_IMAGE = Path(__file__).resolve().parent / "test.png"
 
-async def create_test_media(
-    executor_id: str,
-    executor_username: str
-):
+async def create_test_media(executor_id: str, executor_username: str):
     media_id = uuid4()
     case_id = uuid4()
 
@@ -77,7 +74,6 @@ async def create_test_media(
     finally:
         await connection.close()
 
-
 def upload_test_image(
     media_id,
     bucket,
@@ -99,7 +95,6 @@ def upload_test_image(
 
     return object_name
 
-
 async def get_report(media_id):
     connection = await get_connection()
 
@@ -118,7 +113,6 @@ async def get_report(media_id):
 
     finally:
         await connection.close()
-
 
 def heatmap_exists(media_id):
     storage_client = get_object()
@@ -183,9 +177,7 @@ async def delete_test_data(
 
 
 @pytest.mark.asyncio
-async def test_image_full_integration(
-    ensure_user_exists
-):
+async def test_image_full_integration(ensure_user_exists):
     service = ImageService()
 
     executor_id = str(uuid4())
@@ -247,10 +239,18 @@ async def test_image_full_integration(
         assert report["reportfindings"] is not None
         assert report["reportcertainty"] is not None
 
-        assert "Metadata:" in report["reportfindings"]
-        assert "Binary Classifier:" in report["reportfindings"]
+        findings = json.loads(report["reportfindings"])
 
-        # Heatmap should have been persisted to MinIO.
+        assert isinstance(findings, dict)
+
+        assert findings["risk_level"] == result["risk_level"]
+        assert findings["ai_probability"] == result["ai_probability"]
+        assert findings["classification"] == result["classification"]
+        assert report["reportcertainty"] == result["risk_level"]
+        assert "confidence_percentage" in findings
+        assert "reasons" in findings
+        assert "findings" in findings
+
         assert heatmap_exists(media_id)
 
         annotation_record = (
@@ -269,8 +269,6 @@ async def test_image_full_integration(
 
         assert isinstance(annotations, list)
 
-        # ImageService currently creates at most one
-        # heatmap-derived annotation.
         assert len(annotations) <= 1
 
         for annotation in annotations:
@@ -296,7 +294,6 @@ async def test_image_full_integration(
                 assert 0 <= point["x"] <= 100
                 assert 0 <= point["y"] <= 100
 
-            # Images should not need video timestamps.
             assert "timeStamp" not in annotation
 
     finally:

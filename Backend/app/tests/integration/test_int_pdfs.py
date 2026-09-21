@@ -204,6 +204,8 @@ async def test_pdf_full_integration(
         result = await service.analyse(media_id)
 
         assert result is not None
+
+        
         assert "risk_level" in result
         assert "ai_probability" in result
         assert "classification" in result
@@ -218,8 +220,20 @@ async def test_pdf_full_integration(
         assert report["reportartifacts"] is not None
         assert report["reportfindings"] is not None
         assert report["reportcertainty"] is not None
-        assert "Metadata:" in report["reportfindings"]
-        assert "AI Classifier:" in report["reportfindings"]
+
+        findings = json.loads(report["reportfindings"])
+
+        assert isinstance(findings, dict)
+
+        assert findings["risk_level"] == result["risk_level"]
+        assert findings["ai_probability"] == result["ai_probability"]
+        assert findings["classification"] == result["classification"]
+
+        assert "findings" in findings
+        assert "reasons" in findings
+        assert "suspicious_chunks" in findings
+
+        assert isinstance(findings["suspicious_chunks"], list)
 
         annotation_record = await get_automated_annotations(media_id)
 
@@ -245,6 +259,19 @@ async def test_pdf_full_integration(
             assert "text" in annotation
             assert isinstance(annotation["text"], str)
             assert annotation["text"].strip() != ""
+
+        expected_texts = {
+            chunk["text"].strip()
+            for chunk in findings["suspicious_chunks"]
+            if chunk.get("text", "").strip()
+        }
+
+        annotation_texts = {
+            annotation["text"].strip()
+            for annotation in annotations
+        }
+
+        assert annotation_texts == expected_texts
 
     finally:
         if media_id is not None and case_id is not None and bucket is not None and object_name is not None:

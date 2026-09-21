@@ -144,6 +144,7 @@ class PDFService(MediaService):
             "lexical_ai_probability": (
                 result["lexical_ai_probability"]
             ),
+            "suspicious_chunks": result["suspicious_chunks"],
             "branch_contributions": (
                 result["branch_contributions"]
             )
