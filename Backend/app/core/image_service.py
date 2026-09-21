@@ -175,6 +175,18 @@ class ImageService(MediaService):
         return output
 
     async def automated_annotations(self, **kwargs: Any):
-        heatmap = kwargs["heatmap"]
+        ai_analysis = kwargs["ai_analysis"]
+
+        heatmap = ai_analysis.get("heatmap")
+
+        if heatmap is None:
+            return []
+
         threshold = kwargs.get("threshold", 0.6)
-        return self.detector.heatmap_to_annotation(heatmap=heatmap, threshold=threshold)
+
+        annotation = self.detector.heatmap_to_annotation(
+            heatmap=heatmap,
+            threshold=threshold
+        )
+
+        return [] if annotation is None else [annotation]

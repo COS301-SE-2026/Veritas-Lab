@@ -2,8 +2,29 @@ from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIVideoDetector
 from typing import Any
+from uuid import uuid4
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
+
+def zone_to_points(zone_index: int, zones_per_dim: int = 2):
+    row = zone_index // zones_per_dim
+    col = zone_index % zones_per_dim
+
+    zone_width = 100 / zones_per_dim
+    zone_height = 100 / zones_per_dim
+
+    left = col * zone_width
+    right = (col + 1) * zone_width
+    top = row * zone_height
+    bottom = (row + 1) * zone_height
+
+    return [
+        {"x": left, "y": top},
+        {"x": right, "y": top},
+        {"x": right, "y": bottom},
+        {"x": left, "y": bottom},
+        {"x": left, "y": top}
+    ]
 
 class VideoService(MediaService):
     def __init__(self) -> None:
@@ -248,4 +269,33 @@ class VideoService(MediaService):
         return output
 
     async def automated_annotations(self, **kwargs: Any):
-        pass
+        ai_analysis = kwargs["ai_analysis"]
+
+        frame_results = (
+            ai_analysis
+            .get("visual", {})
+            .get("frame_importance", [])
+        )
+
+        annotations = []
+
+        for frame in frame_results:
+            timestamp = frame.get("timestamp")
+            zone = frame.get("most_influential_zone")
+
+            if timestamp is None or zone is None:
+                continue
+
+            annotations.append({
+                "id": str(uuid4()),
+                "kind": "shape",
+                "source": "AI",
+                "timeStamp": timestamp,
+                "points": zone_to_points(
+                    zone,
+                    zones_per_dim=2
+                )
+            })
+
+        return annotations
+        
