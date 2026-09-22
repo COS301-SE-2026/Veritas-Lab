@@ -17,7 +17,7 @@ const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
 
 export default function EvidenceCard({
     mediaName, mediaUrl, mediaExtension, href, mediaId, caseId, canDelete, onDeleted, variant,
-    capturedAt, reportCertainty, annotationCount = 0, noteCount = 0, placed = false, selected = false,
+    capturedAt, reportCertainty, annotationCount = 0, placed = false, selected = false,
 }: Readonly<EvidenceCardProps>) {
     const isBoard = variant === 'case-board';
 
@@ -65,11 +65,6 @@ export default function EvidenceCard({
                         {annotationCount > 0 && (
                             <div className="flex items-center gap-1" title={`${annotationCount} annotation${annotationCount === 1 ? '' : 's'}`}>
                                 <PenLine size={11} /> {annotationCount}
-                            </div>
-                        )}
-                        {noteCount > 0 && (
-                            <div className="flex items-center gap-1" title={`${noteCount} note${noteCount === 1 ? '' : 's'}`}>
-                                <StickyNote size={11} /> {noteCount}
                             </div>
                         )}
                     </div>

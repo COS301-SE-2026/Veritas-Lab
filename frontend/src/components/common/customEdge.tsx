@@ -45,13 +45,9 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sel
                             type='button'
                             aria-label='Snip String'
                             onClick={() => deleteElements({ edges: [{id}] })}
-                            style={{
-                                transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-                                zIndex: 2000
-                            }}
                             className='flex h-5 w-5 items-center justify-center rounded-full border border-(--color-line) bg-(--color-surface) text-(--color-text-muted) shadow-(--shadow-xs) hover:text-[var(--color-danger)]'
                         >
-                            <X size={24} />
+                            <X size={12} />
                         </button>
                     </div>
                 </EdgeLabelRenderer>

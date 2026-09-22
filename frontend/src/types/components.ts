@@ -47,6 +47,7 @@ export type EvidenceCardProps = {
     caseId?: string;
     canDelete?: boolean;
     onDeleted?: () => void | Promise<void>;
+    variant: 'default' | 'case-board';
     capturedAt?: string | null;
     reportCertainty?: number | null;
     annotationCount?: number;
