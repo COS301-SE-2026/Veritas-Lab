@@ -272,7 +272,7 @@ async def test_create_case_cannot_be_called_twice():
 
 def test_get_cases_missing_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -299,7 +299,7 @@ def test_get_cases_missing_jwt(monkeypatch):
 
 def test_get_cases_invalid_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -326,7 +326,7 @@ def test_get_cases_invalid_jwt(monkeypatch):
 
 def test_get_cases_admin_returns_cases(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -403,7 +403,7 @@ def test_get_cases_admin_returns_cases(monkeypatch):
 def test_get_cases_investigator_returns_empty_list(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -441,7 +441,7 @@ def test_get_cases_investigator_returns_empty_list(monkeypatch):
 
 def test_get_single_case_missing_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -468,7 +468,7 @@ def test_get_single_case_missing_jwt(monkeypatch):
 
 def test_get_single_case_invalid_jwt(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -499,7 +499,7 @@ def test_get_single_case_invalid_jwt(monkeypatch):
 
 def test_get_single_case_missing_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -524,7 +524,7 @@ def test_get_single_case_missing_case_id(monkeypatch):
 
 def test_get_single_case_invalid_case_id(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -549,7 +549,7 @@ def test_get_single_case_invalid_case_id(monkeypatch):
 
 def test_get_single_case_not_found(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -592,7 +592,7 @@ def test_get_single_case_not_found(monkeypatch):
 def test_get_single_case_admin_returns_case(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -703,7 +703,7 @@ def test_get_single_case_admin_returns_case(monkeypatch):
 
 def test_get_single_case_success_for_a_normal_user(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt_(request):
+    async def mock_verify_jwt_(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "standard_user",
@@ -771,7 +771,7 @@ def test_get_single_case_success_for_a_normal_user(monkeypatch):
     assert data["evidence"][0]["mediaUrl"] != ""
 
 def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="investigator_user", role="INVESTIGATOR"):
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {"sub": sub, "username": username, "role": role}
     monkeypatch.setattr(
         cases_router, 
@@ -780,7 +780,7 @@ def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="inve
     )
 
 def _mock_jwt_failure(monkeypatch, message):
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -1149,7 +1149,7 @@ Raises an error due to the database going down
 def test_delete_case_success_creator(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "investigator_user",
@@ -1193,7 +1193,7 @@ def test_delete_case_success_creator(monkeypatch):
 def test_delete_case_success_admin(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-admin-id",
             "username": "admin_user",
@@ -1237,7 +1237,7 @@ def test_delete_case_success_admin(monkeypatch):
 def test_delete_case_missing_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise ValueError("Missing token")
     
     monkeypatch.setattr(
@@ -1258,7 +1258,7 @@ def test_delete_case_missing_jwt(monkeypatch):
 def test_delete_case_user_forbidden(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "normal_user",
@@ -1290,7 +1290,7 @@ def test_delete_case_user_forbidden(monkeypatch):
 def test_delete_case_missing_case_id(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -1320,7 +1320,7 @@ def test_delete_case_missing_case_id(monkeypatch):
 def test_delete_case_invalid_case_id(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -1352,7 +1352,7 @@ def test_delete_case_invalid_case_id(monkeypatch):
 def test_delete_case_not_found(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return{
             "sub": "mock-investigator-id",
             "username": "investigator_user",
@@ -1399,7 +1399,7 @@ def test_delete_case_not_found(monkeypatch):
 def test_delete_case_unauthorized_non_creator(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-investigator-id",
             "username": "other_investigator",
@@ -1579,7 +1579,7 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockget_object, moc
 def test_get_comments_missing_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise ValueError("Missing authorization header")
 
     monkeypatch.setattr(

@@ -9,84 +9,133 @@ from fastapi import HTTPException
 import pytest
 from datetime import datetime, timedelta, timezone
 from jose import jwt
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 TEST_SECRET_KEY = "test-secret"
 COOKIE_NAME = "JWT_token"
+USER_ID = "11111111-1111-1111-1111-111111111111"
 
 def make_request(token: str | None) -> MagicMock:
-    """Build a mock FastAPI Request with the JWT cookie set."""
     request = MagicMock()
     request.cookies = {COOKIE_NAME: token} if token else {}
     return request
 
+def make_connection(row: dict | None) -> MagicMock:
+    connection = MagicMock()
+    connection.fetchrow = AsyncMock(return_value=row)
+    return connection
 
-def make_token(payload_overrides: dict = {}, secret: str = TEST_SECRET_KEY) -> str:
+def make_token(payload_overrides: dict = {}, secret: str = TEST_SECRET_KEY, drop: tuple = ()) -> str:
+    now = datetime.now(timezone.utc)
     base_payload = {
-        "sub": "123",
+        "sub": USER_ID,
         "username": "byron",
         "role": "ADMIN",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
+        "iat": now,
+        "exp": now + timedelta(minutes=10),
     }
     payload = {**base_payload, **payload_overrides}
+    for claim in drop:
+        payload.pop(claim)
     return jwt.encode(payload, secret, algorithm=ALGORITHM)
 
+async def assert_rejected(request, connection, message):
+    with pytest.raises(HTTPException) as excinfo:
+        await verify_jwt(request, connection)
+
+    assert excinfo.value.status_code == 401
+    assert excinfo.value.detail["message"] == message
+
 class TestVerifyJWT:
-    def test_valid_token(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_valid_token(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+        connection = make_connection({"userjwtissued": datetime.now(timezone.utc)})
 
-        token = make_token()
-        request = make_request(token)
+        decoded = await verify_jwt(make_request(make_token()), connection)
 
-        decoded = verify_jwt(request)
-
-        assert decoded["sub"] == "123"
+        assert decoded["sub"] == USER_ID
         assert decoded["username"] == "byron"
         assert decoded["role"] == "ADMIN"
+        connection.fetchrow.assert_awaited_once()
 
-    def test_missing_cookie(self):
-        request = make_request(None)
-
-        with pytest.raises(HTTPException) as excinfo:
-            verify_jwt(request)
-
-        assert excinfo.value.status_code == 401
-        assert excinfo.value.detail["message"] == "Not authenticated"
-
-    def test_expired_token(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_valid_token_when_never_issued_in_db(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+        connection = make_connection({"userjwtissued": None})
 
+        decoded = await verify_jwt(make_request(make_token()), connection)
+
+        assert decoded["sub"] == USER_ID
+
+    @pytest.mark.asyncio
+    async def test_missing_cookie(self):
+        connection = make_connection(None)
+
+        await assert_rejected(make_request(None), connection, "Not authenticated")
+        connection.fetchrow.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_expired_token(self, monkeypatch):
+        monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
         token = make_token({"exp": datetime.now(timezone.utc) - timedelta(minutes=10)})
-        request = make_request(token)
 
-        with pytest.raises(HTTPException) as excinfo:
-            verify_jwt(request)
+        await assert_rejected(make_request(token), make_connection(None), "Token has expired")
 
-        assert excinfo.value.status_code == 401
-        assert excinfo.value.detail["message"] == "Token has expired"
-
-    def test_invalid_token(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_invalid_token(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
 
-        request = make_request("this.is.not.valid")
+        await assert_rejected(make_request("this.is.not.valid"), make_connection(None), "Invalid token")
 
-        with pytest.raises(HTTPException) as excinfo:
-            verify_jwt(request)
-
-        assert excinfo.value.status_code == 401
-        assert excinfo.value.detail["message"] == "Invalid token"
-
-    def test_wrong_secret(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_wrong_secret(self, monkeypatch):
         monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
-
         token = make_token(secret="wrong-secret")
-        request = make_request(token)
 
-        with pytest.raises(HTTPException) as excinfo:
-            verify_jwt(request)
+        await assert_rejected(make_request(token), make_connection(None), "Invalid token")
 
-        assert excinfo.value.status_code == 401
-        assert excinfo.value.detail["message"] == "Invalid token"
+    @pytest.mark.asyncio
+    async def test_token_without_iat_rejected(self, monkeypatch):
+        monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+        connection = make_connection({"userjwtissued": None})
+
+        await assert_rejected(make_request(make_token(drop=("iat",))), connection, "Invalid token")
+        connection.fetchrow.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_non_uuid_sub_rejected(self, monkeypatch):
+        monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+        connection = make_connection({"userjwtissued": None})
+
+        await assert_rejected(make_request(make_token({"sub": "123"})), connection, "Invalid token")
+        connection.fetchrow.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_deleted_user_rejected(self, monkeypatch):
+        monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+
+        await assert_rejected(make_request(make_token()), make_connection(None), "Invalid token")
+
+    @pytest.mark.asyncio
+    async def test_revoked_token_rejected(self, monkeypatch):
+        monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+        now = datetime.now(timezone.utc)
+        old_token = make_token({"iat": now - timedelta(minutes=5)})
+        connection = make_connection({"userjwtissued": now})
+
+        await assert_rejected(make_request(old_token), connection, "Invalid token")
+
+    @pytest.mark.asyncio
+    async def test_token_within_leeway_accepted(self, monkeypatch):
+        monkeypatch.setattr("app.auth.auth.SECRET_KEY", TEST_SECRET_KEY)
+        now = datetime.now(timezone.utc)
+        token = make_token({"iat": now - timedelta(seconds=1)})
+        connection = make_connection({"userjwtissued": now})
+
+        decoded = await verify_jwt(make_request(token), connection)
+
+        assert decoded["sub"] == USER_ID
 
 class TestValidateEmail:
     def test_valid_email(self):

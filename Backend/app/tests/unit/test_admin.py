@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
 
@@ -43,7 +44,7 @@ async def mock_connect(*args, **kwargs):
 @pytest.mark.asyncio
 async def test_fetch_users_success(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return{
             "sub": "admin-id",
             "username":"Admin user",
@@ -100,11 +101,11 @@ async def test_fetch_users_excludes_system_init(monkeypatch):
     async def mock_connect(*args, **kwargs):
         return SystemInitConnection()
 
-    monkeypatch.setattr(auth, "verify_jwt", lambda request: {
+    monkeypatch.setattr(auth, "verify_jwt", AsyncMock(return_value={
         "sub": "admin-id",
         "username": "Admin User",
         "role": "ADMIN"
-    })
+    }))
     monkeypatch.setattr(auth.asyncpg, "connect", mock_connect)
 
     response = client.post("/api/fetchUsers", json={})
@@ -115,7 +116,7 @@ async def test_fetch_users_excludes_system_init(monkeypatch):
 @pytest.mark.asyncio
 async def test_fetch_users_not_admin(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return{
             "sub": "normal-user-id",
             "username": "Normal User",
@@ -147,7 +148,7 @@ async def test_fetch_users_not_admin(monkeypatch):
 @pytest.mark.asyncio
 async def test_fetch_users_invalid_token(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -191,7 +192,7 @@ async def test_fetch_users_no_users(monkeypatch):
     async def empty_mock_connect(*args, **kwargs):
         return EmptyMockConnection()
     
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return{
             "sub":"admin-id",
             "username": "Admin User",
@@ -236,7 +237,7 @@ async def test_change_user_role_success(monkeypatch):
     async def mock_connect(*args, **kwargs):
         return MockConnection()
     
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "admin-id",
             "username": "Admin User",
@@ -273,11 +274,11 @@ async def test_change_user_role_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_change_user_role_rejects_system_init(monkeypatch):
-    monkeypatch.setattr(auth, "verify_jwt", lambda request: {
+    monkeypatch.setattr(auth, "verify_jwt", AsyncMock(return_value={
         "sub": "admin-id",
         "username": "Admin User",
         "role": "ADMIN"
-    })
+    }))
 
     response = client.post(
         "/api/changeUserRole",
@@ -293,7 +294,7 @@ async def test_change_user_role_rejects_system_init(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_user_role_not_admin(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return{
             "sub": "normal-user-id",
             "username": "Normal User",
@@ -335,7 +336,7 @@ async def test_change_user_role_no_user(monkeypatch):
     async def mock_connect(*args, **kwargs):
         return MockConnection()
     
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "admin-id",
             "username": "Admin User",
@@ -375,7 +376,7 @@ async def test_change_user_role_no_user(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_user_role_invalid_role(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "admin-id",
             "username": "Admin User",
@@ -423,7 +424,7 @@ async def test_admin_cannot_change_self(monkeypatch):
     
     admin_id = "11111111-1111-1111-1111-111111111111"
     
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": admin_id,
             "username": "Admin User",

@@ -2766,7 +2766,7 @@ async def unassign_case(
     request: Request, 
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    user_id, username = validate_case_assignment_request(
+    user_id, username = await validate_case_assignment_request(
         request,
         assign_request,
         connection

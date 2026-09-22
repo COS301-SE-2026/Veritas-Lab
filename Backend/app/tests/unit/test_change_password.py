@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
 from app.api.main import app
@@ -30,7 +31,7 @@ async def test_change_password_success(monkeypatch):
     async def mock_connect(*args, **kwargs):
         return MockConnection()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Test User",
@@ -77,11 +78,11 @@ async def test_change_password_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_system_init_cannot_change_password(monkeypatch):
-    monkeypatch.setattr(auth, "verify_jwt", lambda request: {
+    monkeypatch.setattr(auth, "verify_jwt", AsyncMock(return_value={
         "sub": "00000000-0000-0000-0000-000000000000",
         "username": "SYSTEM_INIT",
         "role": "ADMIN"
-    })
+    }))
 
     response = client.post(
         "/api/changePassword",
@@ -97,7 +98,7 @@ async def test_system_init_cannot_change_password(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_missing_current_password(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Test User",
@@ -126,7 +127,7 @@ async def test_change_password_missing_current_password(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_missing_new_password(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Test User",
@@ -155,7 +156,7 @@ async def test_change_password_missing_new_password(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_invalid_new_password(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Test User",
@@ -185,7 +186,7 @@ async def test_change_password_invalid_new_password(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_incorrect_current_password(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Test User",
@@ -228,7 +229,7 @@ async def test_change_password_incorrect_current_password(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_same_as_current(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Test User",
@@ -271,7 +272,7 @@ async def test_change_password_same_as_current(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_user_not_found(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "mock-user-id",
             "username": "Ghost User",
@@ -309,7 +310,7 @@ async def test_change_password_user_not_found(monkeypatch):
 @pytest.mark.asyncio
 async def test_change_password_invalid_token(monkeypatch):
     client.cookies.clear()
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
