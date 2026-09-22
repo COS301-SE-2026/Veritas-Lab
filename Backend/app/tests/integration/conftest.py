@@ -197,3 +197,23 @@ async def case_assignment_context(ensure_user_exists):
             )
 
         await conn.close()
+
+async def get_automated_annotations(media_id):
+    connection = await get_connection()
+
+    try:
+        return await connection.fetchrow(
+            """
+            SELECT
+                AnnotationId,
+                MediaId,
+                MediaAnnotations,
+                CreatedAt
+            FROM "Cases_DB"."AutomatedAnnotations"
+            WHERE MediaId = $1
+            """,
+            media_id
+        )
+
+    finally:
+        await connection.close()

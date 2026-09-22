@@ -376,11 +376,18 @@ def train_model():
 
     return trainer
 
-def lexical_ai_probability(text, max_chunks=None):
+def lexical_ai_probability(
+    text: str,
+    threshold: float = 0.7,
+    max_chunks=None
+) -> dict:
     text = (text or "").strip()
 
     if not text:
-        return 0.5
+        return {
+            "ai_probability": 0.5,
+            "suspicious_chunks": []
+        }
 
     model = get_inference_model()
     inference_tokeniser = get_inference_tokeniser()
@@ -397,18 +404,19 @@ def lexical_ai_probability(text, max_chunks=None):
     input_ids = encoded["input_ids"]
     attention_mask = encoded["attention_mask"]
 
-    ai_scores = []
-
     if max_chunks is not None:
         input_ids = input_ids[:max_chunks]
         attention_mask = attention_mask[:max_chunks]
 
+    ai_scores = []
+    suspicious_chunks = []
+
     with torch.no_grad():
         for start in range(0, len(input_ids), INFERENCE_BATCH_SIZE):
             end = start + INFERENCE_BATCH_SIZE
+
             batch_input_ids = input_ids[start:end]
             batch_attention_mask = attention_mask[start:end]
-
 
             outputs = model(
                 input_ids=batch_input_ids,
@@ -421,12 +429,33 @@ def lexical_ai_probability(text, max_chunks=None):
             )
 
             batch_ai_scores = probabilities[:, 1]
-            ai_scores.extend(batch_ai_scores.tolist())
+
+            for ids, score in zip(batch_input_ids, batch_ai_scores):
+                probability = float(score)
+                ai_scores.append(probability)
+
+                if probability >= threshold:
+                    chunk_text = inference_tokeniser.decode(
+                        ids,
+                        skip_special_tokens=True
+                    ).strip()
+
+                    if chunk_text:
+                        suspicious_chunks.append({
+                            "text": chunk_text,
+                            "ai_probability": probability
+                        })
 
     if not ai_scores:
-        return 0.5
-    
-    return float(np.mean(ai_scores))
+        return {
+            "ai_probability": 0.5,
+            "suspicious_chunks": []
+        }
+
+    return {
+        "ai_probability": float(np.mean(ai_scores)),
+        "suspicious_chunks": suspicious_chunks
+    }
 
 if __name__ == "__main__":
     test_model_pdf_level()

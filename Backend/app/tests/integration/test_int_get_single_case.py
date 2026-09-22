@@ -155,9 +155,43 @@ async def seed_media(ctx):
         json.dumps({
             "artifact": "test-artifact"
         }),
-        "No manipulation detected.",
+        json.dumps({
+            "risk_level": 3,
+            "ai_probability": 0.12,
+            "classification": "Authentic",
+            "findings": "No manipulation detected."
+        }),
         "Reviewed by investigator.",
         3
+    )
+
+    await ctx["conn"].execute(
+        """
+        INSERT INTO "Cases_DB"."AutomatedAnnotations"
+        (
+            MediaId,
+            MediaAnnotations
+        )
+        VALUES (
+            $1,
+            $2::jsonb
+        )
+        """,
+        media_id,
+        json.dumps([
+            {
+                "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "kind": "shape",
+                "source": "AI",
+                "points": [
+                    {"x": 10.0, "y": 10.0},
+                    {"x": 50.0, "y": 10.0},
+                    {"x": 50.0, "y": 50.0},
+                    {"x": 10.0, "y": 50.0},
+                    {"x": 10.0, "y": 10.0}
+                ]
+            }
+        ])
     )
 
     ctx["media_ids"].append(str(media_id))
@@ -328,6 +362,7 @@ async def test_user_open_case_hides_report_data(client, single_case_context):
     assert "reportComments" not in item
     assert "reportCertainty" not in item
     assert "reportDateCreation" not in item
+    assert "automatedAnnotations" not in item
 
 @pytest.mark.asyncio
 async def test_user_closed_case_can_view_report_data(client, single_case_context):
@@ -359,10 +394,41 @@ async def test_user_closed_case_can_view_report_data(client, single_case_context
     assert item["casePerspective"] == "Rear view"
     assert "annotations" in item
     assert "reportArtifacts" in item
-    assert item["reportFindings"] == "No manipulation detected."
+
+    assert item["reportFindings"] == {
+        "risk_level": 3,
+        "ai_probability": 0.12,
+        "classification": "Authentic",
+        "findings": "No manipulation detected."
+    }
+
     assert item["reportComments"] == "Reviewed by investigator."
     assert item["reportCertainty"] == 3
     assert item["reportDateCreation"] is not None
+
+    assert "automatedAnnotations" in item
+
+    assert item["annotations"] == [
+        {
+            "type": "test",
+            "value": "annotation"
+        }
+    ]
+
+    assert item["automatedAnnotations"] == [
+        {
+            "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "kind": "shape",
+            "source": "AI",
+            "points": [
+                {"x": 10.0, "y": 10.0},
+                {"x": 50.0, "y": 10.0},
+                {"x": 50.0, "y": 50.0},
+                {"x": 10.0, "y": 50.0},
+                {"x": 10.0, "y": 10.0}
+            ]
+        }
+    ]
 
 @pytest.mark.asyncio
 async def test_investigator_can_view_report_data(client, single_case_context):
@@ -383,9 +449,15 @@ async def test_investigator_can_view_report_data(client, single_case_context):
         "Side view"
     )
 
-    client.cookies.set(COOKIE_NAME,ctx["investigator_token"])
+    client.cookies.set(
+        COOKIE_NAME,
+        ctx["investigator_token"]
+    )
 
-    response = client.get(f"/api/getSingleCase/{case_id}")
+    response = client.get(
+        f"/api/getSingleCase/{case_id}"
+    )
+
     assert response.status_code == 200, response.text
     evidence = response.json()["evidence"]
     assert len(evidence) == 1
@@ -394,9 +466,38 @@ async def test_investigator_can_view_report_data(client, single_case_context):
     assert item["casePerspective"] == "Side view"
     assert "annotations" in item
     assert "reportArtifacts" in item
-    assert item["reportFindings"] == "No manipulation detected."
+    assert "automatedAnnotations" in item
+    assert item["reportFindings"] == {
+        "risk_level": 3,
+        "ai_probability": 0.12,
+        "classification": "Authentic",
+        "findings": "No manipulation detected."
+    }
+
     assert item["reportComments"] == "Reviewed by investigator."
     assert item["reportCertainty"] == 3
+
+    assert item["annotations"] == [
+        {
+            "type": "test",
+            "value": "annotation"
+        }
+    ]
+
+    assert item["automatedAnnotations"] == [
+        {
+            "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "kind": "shape",
+            "source": "AI",
+            "points": [
+                {"x": 10.0, "y": 10.0},
+                {"x": 50.0, "y": 10.0},
+                {"x": 50.0, "y": 50.0},
+                {"x": 10.0, "y": 50.0},
+                {"x": 10.0, "y": 10.0}
+            ]
+        }
+    ]
 
 @pytest.mark.asyncio
 async def test_get_single_case_not_found(client, single_case_context):

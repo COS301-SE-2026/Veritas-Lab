@@ -2,6 +2,7 @@ from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIImageDetector
 from starlette.concurrency import run_in_threadpool
+from typing import Any
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
@@ -135,40 +136,19 @@ class ImageService(MediaService):
             path
         )
 
-    def create_findings_string(self, input: dict) -> str:
-        if input is None or input == {}:
-            return "No findings"
+    async def automated_annotations(self, **kwargs: Any):
+        ai_analysis = kwargs["ai_analysis"]
 
-        output: str = "Metadata:\n"
+        heatmap = ai_analysis.get("heatmap")
 
-        if input.get("findings") is None or input.get("findings") == "":
-            output += "No metadata findings.\n"
-        else:
-            output += f"{input['findings']}\n"
+        if heatmap is None:
+            return []
 
-        output += "Binary Classifier:\n"
+        threshold = kwargs.get("threshold", 0.6)
 
-        ai_probability = input.get("ai_probability")
-        confidence = input.get("confidence_percentage")
-        classification = input.get("classification")
-        reasons = input.get("reasons", [])
+        annotation = self.detector.heatmap_to_annotation(
+            heatmap=heatmap,
+            threshold=threshold
+        )
 
-        if ai_probability is not None and confidence is not None:
-            output += (f"The binary classifier found an AI probability of {ai_probability}% with a confidence of {confidence}%.\n")
-        else:
-            output += "Binary classifier analysis unavailable.\n"
-            return output
-
-        if classification:
-            output += f"Classification: {classification}\n"
-
-        if reasons:
-            output += "Reasons:\n"
-
-            for reason in reasons:
-                message = reason.get("message")
-
-                if message:
-                    output += f" - {message}\n"
-
-        return output
+        return [] if annotation is None else [annotation]
