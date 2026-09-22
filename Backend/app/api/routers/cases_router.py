@@ -258,6 +258,12 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 else (row["annotations"] or [])
             ),
 
+            "automatedAnnotations": (
+                json.loads(row["automatedannotations"])
+                if isinstance(row["automatedannotations"], str)
+                else (row["automatedannotations"] or [])
+            ),
+
             "reportArtifacts": (
                 json.loads(row["reportartifacts"])
                 if isinstance(row["reportartifacts"], str)
@@ -570,8 +576,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                         "mediaExtension": ".jpg",
                                         "mediaTypeId": "99999999-8888-7777-6666-555555555555",
                                         "mediaUrl": "https://example.com/presigned-url",
-
-                                        "annotations": [
+                                        "annotations": [],
+                                        "automatedAnnotations": [
                                             {
                                                 "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
                                                 "kind": "shape",
@@ -635,8 +641,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                         "mediaExtension": ".pdf",
                                         "mediaTypeId": "88888888-7777-6666-5555-444444444444",
                                         "mediaUrl": "https://example.com/presigned-url",
-
-                                        "annotations": [
+                                        "annotations": [],
+                                        "automatedAnnotations": [
                                             {
                                                 "id": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
                                                 "kind": "highlight",
@@ -714,8 +720,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                         "mediaExtension": ".mp4",
                                         "mediaTypeId": "77777777-6666-5555-4444-333333333333",
                                         "mediaUrl": "https://example.com/presigned-url",
-
-                                        "annotations": [
+                                        "annotations": [],
+                                        "automatedAnnotations": [
                                             {
                                                 "id": "dddddddd-eeee-ffff-aaaa-bbbbbbbbbbbb",
                                                 "kind": "shape",
@@ -947,6 +953,8 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 ev.case_perspective AS "caseperspective",
 
                 media.MediaAnnotations AS "annotations",
+                auto.MediaAnnotations AS "automatedannotations",
+
                 media.ReportArtifacts AS "reportartifacts",
                 media.ReportFindings AS "reportfindings",
                 media.ReportComments AS "reportcomments",
@@ -970,6 +978,9 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
 
             JOIN "Cases_DB"."MediaType" m
                 ON media.MediaType = m.MediaTypeId
+            
+            LEFT JOIN "Cases_DB"."AutomatedAnnotations" auto
+                ON auto.MediaId = media.MediaId
 
             WHERE c.CaseId = $1
             """,
