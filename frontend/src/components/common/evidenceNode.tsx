@@ -1,4 +1,4 @@
-import { Node, NodeProps, Handle, Position } from '@xyflow/react'
+import { Node, NodeProps } from '@xyflow/react'
 import { getCertaintyMeta } from '@/lib/report';
 import dynamic from 'next/dynamic';
 import { getMediaKind } from '@/lib/media';
@@ -12,7 +12,6 @@ const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
 
 export type EvidenceNodeData = {
     mediaId: string;
-    caseId: string;
     mediaName: string;
     mediaUrl: string;
     mediaExtension: string;

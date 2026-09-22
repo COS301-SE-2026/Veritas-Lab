@@ -16,6 +16,8 @@ type CaseBoardCanvasProps = {
     onEdgesChange: OnEdgesChange;
     onConnect: OnConnect;
     onAddNote: (position: { x: number; y: number}) => void;
+    onGenerate: () => void;
+    canGenerate: boolean
 };
 
 const nodeTypes = { 
@@ -25,7 +27,7 @@ const nodeTypes = {
 const edgeTypes = {
 'custom-edge': CustomEdge,
 };
-export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote }: CaseBoardCanvasProps) {
+export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote, onGenerate, canGenerate }: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
     const boxRef = useRef<HTMLDivElement | null>(null);
     const { screenToFlowPosition } = useReactFlow();
@@ -54,6 +56,7 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
             connectionMode={ConnectionMode.Loose}
             connectionLineType={ConnectionLineType.Straight}
             connectionLineStyle={{ stroke: '#b3261e', strokeWidth: 2, strokeDasharray: '4 3' }}
+            minZoom={0.1}
     	>
         <Background />
         <Controls>
@@ -80,7 +83,12 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
                     variant='secondary'
                     className="pointer-events-auto"
                     text='Generate Case Board'
+                    onClick={onGenerate}
+                    disabled={!canGenerate}
                 />
+                {!canGenerate && (
+                    <p className='text-xs text-(--color-text-subtle)'>No evidence in this case has a captured timestamp</p>
+                )}
             </div>
         )}
     </div>
