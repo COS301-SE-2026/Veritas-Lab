@@ -36,7 +36,7 @@ export function generateBoard(evidenceList: CaseEvidence[], capturedAt: (number 
         source: evidenceNodeId(dated[i].evidence.mediaId),
         target: evidenceNodeId(evidence.mediaId),
         type: 'custom-edge',
-        data: { variant: 'timeline', label: `+${formatDistanceStrict(dated[i].time, time).}` },
+        data: { variant: 'timeline', label: `+${formatDistanceStrict(dated[i].time, time)}` },
     }))
 
     return { nodes, edges }
