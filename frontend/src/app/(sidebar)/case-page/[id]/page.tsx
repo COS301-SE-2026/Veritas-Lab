@@ -139,11 +139,11 @@ export default function CasePage() {
                             <div className="flex flex-wrap gap-4">
                                 {evidenceList.length > 0 ? evidenceList.map((evidence) => (
                                     <EvidenceCard
-                                        key={evidence.reportId}
+                                        key={evidence.mediaId}
                                         mediaName={evidence.mediaName}
                                         mediaUrl={evidence.mediaUrl}
                                         mediaExtension={evidence.mediaExtension}
-                                        href={`/case-page/${id}/workbench/${evidence.reportId}`}
+                                        href={`/case-page/${id}/workbench/${evidence.mediaId}`}
                                         mediaId={evidence.mediaId}
                                         caseId={id}
                                         canDelete={canDeleteEvidence}

@@ -47,6 +47,11 @@ export type EvidenceCardProps = {
     caseId?: string;
     canDelete?: boolean;
     onDeleted?: () => void | Promise<void>;
+    capturedAt?: string | null;
+    reportCertainty?: number | null;
+    annotationCount?: number;
+    placed?: boolean;
+    selected?: boolean;
 };
 //case evidence delete
 export type EvidenceDeleteButtonProps = {

@@ -85,7 +85,8 @@ export type WorkbenchPanelProps = {
 };
 
 export type SaveAnnotationsPayload = {
-    evidenceId: string;
+    caseId: string
+    mediaId: string;
     annotations: Annotation[];
 };
 

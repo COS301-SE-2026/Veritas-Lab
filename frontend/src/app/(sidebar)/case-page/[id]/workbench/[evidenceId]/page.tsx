@@ -60,7 +60,7 @@ export default function WorkbenchPage() {
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
-                const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
+                const match = data.evidence.find((item) => item.mediaId === evidenceId) ?? null;
                 setEvidence(match);
             })
             .catch((error) => {
@@ -88,7 +88,7 @@ export default function WorkbenchPage() {
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
-    const handleSave = () => saveAnnotations({ evidenceId, annotations });
+    const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
 
     return (
         <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">
