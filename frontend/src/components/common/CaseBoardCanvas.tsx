@@ -1,11 +1,11 @@
 'use client'
 import { ReactFlow, Background, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ConnectionLineType, useReactFlow, useViewport, Panel } from '@xyflow/react';
 import {useDroppable} from '@dnd-kit/react';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
 import CustomEdge from '@/components/common/customEdge'
-import { Layers, StickyNote, Minus, Maximize, Plus } from 'lucide-react';
+import { Layers, StickyNote, Minus, Maximize, Minimize2, Maximize2, Plus } from 'lucide-react';
 import NoteNode from '@/components/common/noteNode'
 import Button from '@/components/ui/button'
 type CaseBoardCanvasProps = {
@@ -17,7 +17,9 @@ type CaseBoardCanvasProps = {
     onConnect: OnConnect;
     onAddNote: (position: { x: number; y: number}) => void;
     onGenerate: () => void;
-    canGenerate: boolean
+    canGenerate: boolean;
+    fullscreen?: boolean
+    onToggleFullscreen?: () => void;
 };
 
 const nodeTypes = { 
@@ -28,7 +30,14 @@ const edgeTypes = {
 'custom-edge': CustomEdge,
 };
 
-function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges } : Readonly<{ onAddNote: () => void; edgesOnTop: boolean; onToggleEdges: () => void }>) {
+// A better toolbar than the defualt one 
+function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, onToggleFullscreen } : Readonly<{ 
+    onAddNote: () => void; 
+    edgesOnTop: boolean; 
+    onToggleEdges: () => void; 
+    fullscreen?: boolean; 
+    onToggleFullscreen?: () => void 
+}>) {
     const { zoom } = useViewport();
     const { zoomIn, zoomOut, fitView } = useReactFlow();
 
@@ -74,15 +83,36 @@ function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges } : Readonly<
             <button type="button" onClick={() => fitView({ padding: 0.2 })} className="vl-float-btn">
                 <Maximize size={15} /> Fit
             </button>
+
+            {onToggleFullscreen && (
+                <>
+                    <div className='vl-float-divider'/>
+
+                    <button
+                        type='button'
+                        onClick={onToggleFullscreen}
+                        title={fullscreen ? 'Exit full screen (Esc)' : 'Full screen'}
+                        className='vl-float-btn'
+                    >
+                        {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        {fullscreen ? 'Exit' : 'Full screen'}
+                    </button>
+                </>
+            )}
         </div>
     )
 }
 
-export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote, onGenerate, canGenerate }: CaseBoardCanvasProps) {
+export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote, onGenerate, canGenerate, fullscreen = false, onToggleFullscreen  }: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
     const boxRef = useRef<HTMLDivElement | null>(null);
-    const { screenToFlowPosition } = useReactFlow();
+    const { screenToFlowPosition, fitView } = useReactFlow();
     const [edgesOnTop, setEdgesOnTop] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 120);
+        return () => clearTimeout(timer);
+    }, [fullscreen, fitView]);
 
     const addNoteAtCenter = () => {
         const box = boxRef.current?.getBoundingClientRect();
@@ -114,7 +144,9 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
             <CustomBoardToolbar 
                 onAddNote={addNoteAtCenter}
                 edgesOnTop={edgesOnTop}
-                onToggleEdges={() => setEdgesOnTop((event) => !event)}    
+                onToggleEdges={() => setEdgesOnTop((event) => !event)}
+                fullscreen={fullscreen}
+                onToggleFullscreen={onToggleFullscreen} 
             />
         </Panel>
     	</ReactFlow>
