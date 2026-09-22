@@ -258,10 +258,14 @@ async def test_ai_analysis_maps_detector_result(service):
                 "message": "Suspicious structure"
             }
         ],
-
         "summary": "Likely AI-generated PDF.",
         "lexical_ai_probability": 0.82,
-
+        "suspicious_chunks": [
+            {
+                "text": "This section appears suspicious.",
+                "ai_probability": 0.88
+            }
+        ],
         "branch_contributions": {
             "lexical": 0.4,
             "structural": 0.6
@@ -274,16 +278,19 @@ async def test_ai_analysis_maps_detector_result(service):
         "risk_level": 3,
         "ai_probability": 0.91,
         "classification": "AI-generated",
-
         "reasons": [
             {
                 "message": "Suspicious structure"
             }
         ],
-
         "summary": "Likely AI-generated PDF.",
         "lexical_ai_probability": 0.82,
-
+        "suspicious_chunks": [
+            {
+                "text": "This section appears suspicious.",
+                "ai_probability": 0.88
+            }
+        ],
         "branch_contributions": {
             "lexical": 0.4,
             "structural": 0.6

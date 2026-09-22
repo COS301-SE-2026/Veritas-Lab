@@ -471,6 +471,12 @@ async def test_pdf_service_ai_analysis(monkeypatch):
             ],
             "summary": "The document was classified as AI-generated.",
             "lexical_ai_probability": 0.65,
+            "suspicious_chunks": [
+                {
+                    "text": "This is suspicious text.",
+                    "ai_probability": 0.82
+                }
+            ],
             "branch_contributions": {
                 "lexical": 0.08
             }
@@ -488,6 +494,12 @@ async def test_pdf_service_ai_analysis(monkeypatch):
         ],
         "summary": "The document was classified as AI-generated.",
         "lexical_ai_probability": 0.65,
+            "suspicious_chunks": [
+                {
+                    "text": "This is suspicious text.",
+                    "ai_probability": 0.82
+                }
+            ],
         "branch_contributions": {
             "lexical": 0.08
         }
