@@ -3,8 +3,10 @@ import type { CaseEvidence } from '@/types/api';
 import type { EvidenceNodeData } from '@/components/common/evidenceNode';
 import { formatDistanceStrict } from 'date-fns';
 
+export const evidenceNodeId = (mediaId: string) => `evidence-${mediaId}`;
+
 export const toEvidenceNode = (evidence: CaseEvidence, position: { x: number; y: number}) : Node<EvidenceNodeData> => ({
-    id: `evidence-${evidence.mediaId}`,
+    id: evidenceNodeId(evidence.mediaId),
     type: 'evidence',
     position,
     data: {
@@ -21,7 +23,7 @@ const colWidth = 440
 const rowHeight = 400
 const perRow = 6
 //make the nodes and edges of the timestamped evidence
-export default function generateBoard(evidenceList: CaseEvidence[], capturedAt: (number | null)[]) {
+export function generateBoard(evidenceList: CaseEvidence[], capturedAt: (number | null)[]) {
     const dated = evidenceList
         .map((evidence, i) => ({ evidence, time: capturedAt[i] }))
         .filter((date): date is { evidence: CaseEvidence; time: number } => date.time != null)
@@ -31,8 +33,8 @@ export default function generateBoard(evidenceList: CaseEvidence[], capturedAt: 
 
     const edges: Edge[] = dated.slice(1).map(({ evidence, time }, i) => ({
         id: `timeline:${dated[i].evidence.mediaId}:${evidence.mediaId}`,
-        source: `evidence-${dated[i].evidence.mediaId}`,
-        target: `evidence-${evidence.mediaId}`,
+        source: evidenceNodeId(dated[i].evidence.mediaId),
+        target: evidenceNodeId(evidence.mediaId),
         type: 'custom-edge',
         data: { variant: 'timeline', label: `+${formatDistanceStrict(dated[i].time, time).}` },
     }))

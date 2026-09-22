@@ -10,6 +10,8 @@ import ReportPanel from '@/components/common/reportPanel';
 import { resolveMediaKind } from '@/lib/media';
 import SliderBar from '@/components/ui/sliderBar'
 import { NoteNodeData } from '@/components/common/noteNode';
+import { getCapturedAt } from '@/lib/data/captureTime';
+import { generateBoard, toEvidenceNode, evidenceNodeId  } from '@/lib/data/boardGenerator';
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
@@ -29,7 +31,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
 
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-    const { screenToFlowPosition } = useReactFlow();
+    const { screenToFlowPosition, fitView } = useReactFlow();
     const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
     const noteCount = useRef(0);
     const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
@@ -45,17 +47,27 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
             newNode,
         ]);    
     }
+
+    const capturedAt = useMemo(() => 
+        evidenceList.map((e) => 
+            getCapturedAt(e.reportArtifacts)
+    ), [evidenceList]);
+
+    const generate = () => {
+        const board = generateBoard(evidenceList, capturedAt);
+        setNodes(board.nodes);
+        setEdges(board.edges);
+        setTimeout(() => fitView({ padding: 0.1, duration: 500 }), 50);
+    }
+
     const selectedEvidence = useMemo(() => {
         const node = nodes.find((n) => n.selected && n.type === 'evidence');
         if(!node) return null;
         const { mediaId } = node.data as EvidenceNodeData;
         return evidenceList.find((e) => e.mediaId === mediaId) ?? null;
     }, [nodes, evidenceList]);
-    const selectedEvidenceMediaKind = resolveMediaKind({
-            mediaExtension: selectedEvidence?.mediaExtension,
-            mediaName: selectedEvidence?.mediaName,
-            mediaUrl: selectedEvidence?.mediaUrl,
-        });
+    const selectedEvidenceMediaKind = resolveMediaKind(selectedEvidence ?? {});
+
     return (
         <DragDropProvider
             onDragEnd={(event) => {
@@ -68,24 +80,12 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                 const mediaId = (source.data as {mediaId?: string}).mediaId;
                 const evidence = evidenceList.find((e) => e.mediaId === mediaId);
                 if (!evidence) return;
-                const flowPosition = screenToFlowPosition(position.current);
-                const newNode: Node<EvidenceNodeData> = {
-                    id: `evidence-${mediaId}`,
-                    type: 'evidence',
-                    position: flowPosition,
-                    data: {
-                        mediaId: evidence.mediaId,
-                        caseId: caseId,
-                        mediaName: evidence.mediaName,
-                        mediaUrl: evidence.mediaUrl,
-                        mediaExtension: evidence.mediaExtension,
-                        reportCertainty: evidence.reportCertainty,
-                        annotationCount: evidence.annotations?.length ?? 0,
-                    }
-                };
+                if (nodes.some((no) => no.id === evidenceNodeId(evidence.mediaId))) {
+                    return;
+                }
                 setNodes((prevNodes) => [
                     ...prevNodes,
-                    newNode,
+                    toEvidenceNode(evidence, screenToFlowPosition(position.current)),
                 ]);    
             }}
         >
@@ -100,6 +100,8 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         onAddNote={onAddNote}
+                        onGenerate={generate}
+                        canGenerate={capturedAt.some((time) => time != null)}
                     />
                 </div>
                     <div className="w-full shrink-0 lg:w-72">
@@ -114,20 +116,24 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                             <div className="mt-3">
                                 <h2 className="text-xl font-bold text-(--color-text-strong)">Evidence</h2>
                                 <div className="mt-4 flex flex-col gap-2">
-                                    {evidenceList.map((evidence) => (
-                                        <EvidenceCard
-                                            key={evidence.mediaId}
-                                            mediaName={evidence.mediaName}
-                                            mediaUrl={evidence.mediaUrl}
-                                            mediaExtension={evidence.mediaExtension}
-                                            mediaId={evidence.mediaId}
-                                            caseId={caseId}
-                                            variant="case-board"
-                                            reportCertainty={evidence.reportCertainty}
-                                            annotationCount={evidence.annotations?.length ?? 0}
-                                            capturedAt={null}
-                                        />
-                                    ))}
+                                    {evidenceList.map((evidence, i) => {
+                                        const captured = capturedAt[i];
+                                        return (
+                                            <EvidenceCard
+                                                key={evidence.mediaId}
+                                                mediaName={evidence.mediaName}
+                                                mediaUrl={evidence.mediaUrl}
+                                                mediaExtension={evidence.mediaExtension}
+                                                mediaId={evidence.mediaId}
+                                                caseId={caseId}
+                                                variant="case-board"
+                                                reportCertainty={evidence.reportCertainty}
+                                                annotationCount={evidence.annotations?.length ?? 0}
+                                                capturedAt={captured != null ? new Date(captured).toISOString() : null}
+                                                placed={nodes.some((n) => n.id === evidenceNodeId(evidence.mediaId))}
+                                            />
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
