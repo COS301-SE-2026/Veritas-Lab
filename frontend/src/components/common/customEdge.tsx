@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { PinSize } from '@/components/common/boardPin';
 
 export type CaseEdgeData = {
-    varient?: 'timeline';
+    variant?: 'timeline';
     label?: string;
 }
 
@@ -25,7 +25,7 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sel
                 path={path}
                 interactionWidth={14}
                 style={{
-                    stroke: data?.varient === 'timeline' ? '#2e9e66' : '#b3261e',
+                    stroke: data?.variant === 'timeline' ? '#2e9e66' : '#b3261e',
                     strokeWidth: selected ? 3 : 2,
                     strokeLinecap: 'round'
                 }}
