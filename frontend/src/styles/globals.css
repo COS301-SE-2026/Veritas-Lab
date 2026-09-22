@@ -231,7 +231,6 @@
   .vl-float-btn:hover { background: rgba(255,255,255,0.1); }
   .vl-float-toolbar-light .vl-float-btn:hover { background: var(--color-surface-sunken); }
   .vl-float-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
-  .vl-float-btn[aria-pressed="true"] { background: var(--color-secondary); color: var(--color-primary); font-weight: 600; }
   .vl-float-toolbar-light .vl-float-btn[aria-pressed="true"] { background: var(--color-primary); color: #fff; }
   .vl-float-divider { width: 1px; height: 1.3rem; margin: 0 0.25rem; background: rgba(255,255,255,0.18); }
   .vl-float-toolbar-light .vl-float-divider { background: var(--color-line-strong); }

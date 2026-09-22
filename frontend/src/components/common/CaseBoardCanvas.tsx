@@ -1,11 +1,11 @@
 'use client'
-import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton, ConnectionLineType, useReactFlow, useViewport, Panel } from '@xyflow/react';
+import { ReactFlow, Background, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ConnectionLineType, useReactFlow, useViewport, Panel } from '@xyflow/react';
 import {useDroppable} from '@dnd-kit/react';
 import { useState, useMemo, useRef } from 'react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
 import CustomEdge from '@/components/common/customEdge'
-import { Layers, StickyNote, Minus, Maximize } from 'lucide-react';
+import { Layers, StickyNote, Minus, Maximize, Plus } from 'lucide-react';
 import NoteNode from '@/components/common/noteNode'
 import Button from '@/components/ui/button'
 type CaseBoardCanvasProps = {
@@ -62,6 +62,14 @@ function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges } : Readonly<
             <div className='w-11 text-center font-mono text-xs text-white/75' >
                 {Math.round(zoom * 100)}%
             </div>
+
+            <button 
+                type='button'
+                onClick={() => zoomIn()}
+                className='vl-float-btn px-0'
+            >
+                <Plus size={16} />
+            </button>
             
             <button type="button" onClick={() => fitView({ padding: 0.2 })} className="vl-float-btn">
                 <Maximize size={15} /> Fit
