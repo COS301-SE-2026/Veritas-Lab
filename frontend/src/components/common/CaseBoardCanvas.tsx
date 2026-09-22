@@ -1,11 +1,11 @@
 'use client'
-import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton, ConnectionLineType, useReactFlow } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, ConnectionMode, ControlButton, ConnectionLineType, useReactFlow, useViewport, Panel } from '@xyflow/react';
 import {useDroppable} from '@dnd-kit/react';
 import { useState, useMemo, useRef } from 'react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
 import CustomEdge from '@/components/common/customEdge'
-import { Layers, StickyNote } from 'lucide-react';
+import { Layers, StickyNote, Minus, Maximize } from 'lucide-react';
 import NoteNode from '@/components/common/noteNode'
 import Button from '@/components/ui/button'
 type CaseBoardCanvasProps = {
@@ -27,6 +27,49 @@ const nodeTypes = {
 const edgeTypes = {
 'custom-edge': CustomEdge,
 };
+
+function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges } : Readonly<{ onAddNote: () => void; edgesOnTop: boolean; onToggleEdges: () => void }>) {
+    const { zoom } = useViewport();
+    const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+    return (
+        <div role="toolbar" className='vl-float-toolbar'>
+            <button type='button' onClick={onAddNote} className='vl-float-btn bg-(--color-secondary) font-semibold text-(--color-primary) hover:!bg-(--color-b-600)'>
+                <StickyNote size={16}/>
+                Note
+            </button>
+
+            <button 
+                type='button' 
+                onClick={onToggleEdges} 
+                title={edgesOnTop ? 'Show links behind evidence' : 'Show links above evidence'} 
+                className="vl-float-btn aria-pressed:bg-white/15"
+            >
+                <Layers size={16} />
+                Links on top
+            </button>
+
+            <div className='vl-float-divider'/>
+
+            <button 
+                type='button'
+                onClick={() => zoomOut()}
+                className='vl-float-btn px-0'
+            >
+                <Minus size={16} />
+            </button>
+
+            <div className='w-11 text-center font-mono text-xs text-white/75' >
+                {Math.round(zoom * 100)}%
+            </div>
+            
+            <button type="button" onClick={() => fitView({ padding: 0.2 })} className="vl-float-btn">
+                <Maximize size={15} /> Fit
+            </button>
+        </div>
+    )
+}
+
 export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote, onGenerate, canGenerate }: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
     const boxRef = useRef<HTMLDivElement | null>(null);
@@ -59,19 +102,13 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
             minZoom={0.1}
     	>
         <Background />
-        <Controls>
-            <ControlButton onClick={addNoteAtCenter} title='Add note'>
-                <StickyNote size={14}/>
-            </ControlButton>
-            <ControlButton
-                onClick={() => setEdgesOnTop((e) => !e)}
-                title={edgesOnTop ? 'Show links behind evidence' : 'Show links above evidence'}
-                aria-pressed={edgesOnTop}
-                className={edgesOnTop ? '!bg-(--color-surface-sunken)' : ''}
-            >
-                <Layers size={14} />
-            </ControlButton>    
-        </Controls>
+        <Panel position='bottom-center' className='!mb-10'>
+            <CustomBoardToolbar 
+                onAddNote={addNoteAtCenter}
+                edgesOnTop={edgesOnTop}
+                onToggleEdges={() => setEdgesOnTop((event) => !event)}    
+            />
+        </Panel>
     	</ReactFlow>
 
         {nodes.length === 0 &&(

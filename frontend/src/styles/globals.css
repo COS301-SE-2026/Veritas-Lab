@@ -196,6 +196,46 @@
     white-space: nowrap;
   }
 
+  .vl-float-toolbar {
+    display: flex;
+    width: max-content;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.3rem;
+    border-radius: 1000px;
+    background: var(--color-primary);
+    color: rgba(255,255,255,0.85);
+    box-shadow: 0 12px 28px -12px rgba(20,18,19,0.6);
+  }
+  .vl-float-toolbar-light {
+    background: var(--color-surface);
+    color: var(--color-text-strong);
+  }
+  .vl-float-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 2rem;
+    min-width: 2rem;
+    justify-content: center;
+    padding: 0 1rem;
+    border-radius: 1000px;
+    font-size: 1rem;
+    color: inherit;
+    background: transparent;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease;
+  }
+  .vl-float-btn svg { flex-shrink: 0; }
+  .vl-float-btn:hover { background: rgba(255,255,255,0.1); }
+  .vl-float-toolbar-light .vl-float-btn:hover { background: var(--color-surface-sunken); }
+  .vl-float-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .vl-float-btn[aria-pressed="true"] { background: var(--color-secondary); color: var(--color-primary); font-weight: 600; }
+  .vl-float-toolbar-light .vl-float-btn[aria-pressed="true"] { background: var(--color-primary); color: #fff; }
+  .vl-float-divider { width: 1px; height: 1.3rem; margin: 0 0.25rem; background: rgba(255,255,255,0.18); }
+  .vl-float-toolbar-light .vl-float-divider { background: var(--color-line-strong); }
+
   .vl-btn-primary:not(:disabled):hover { background: var(--color-b-600); box-shadow: var(--shadow-md); transform: translateY(-1px); }
   .vl-btn-primary:not(:disabled):hover { background: var(--color-b-600); box-shadow: var(--shadow-md); transform: translateY(-1px); }
   .vl-btn-outline:not(:disabled):hover { border-color: var(--color-primary); background: var(--color-surface-muted); }
