@@ -221,7 +221,7 @@ async def test_integration_update_case_not_the_creator(client, fake_update_case_
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_unknown_case(client):
+async def test_integration_update_case_unknown_case(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, owner_cookie())
 
     response = client.post(
@@ -237,7 +237,7 @@ async def test_integration_update_case_unknown_case(client):
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_malformed_case_id(client):
+async def test_integration_update_case_malformed_case_id(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, owner_cookie())
 
     response = client.post(
@@ -253,7 +253,7 @@ async def test_integration_update_case_malformed_case_id(client):
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_missing_case_id(client):
+async def test_integration_update_case_missing_case_id(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, owner_cookie())
 
     response = client.post(

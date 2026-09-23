@@ -314,10 +314,10 @@ async def test_integration_upload_evidence_closed_case(client, fake_upload_conte
 
 
 @pytest.mark.asyncio
-async def test_integration_upload_evidence_malformed_case_id(client):
+async def test_integration_upload_evidence_malformed_case_id(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", str(uuid.uuid4())),
+        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     response = upload(client, "not-a-valid-uuid", png_bytes("malformed"))

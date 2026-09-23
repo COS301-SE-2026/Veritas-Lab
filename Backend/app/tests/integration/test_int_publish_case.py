@@ -397,13 +397,13 @@ async def test_publish_case_rejects_invalid_role(client, publish_context, ensure
     conn = await get_connection()
 
     try:
-        await ensure_user_exists(conn, invalid_role_id, "Invalid_Role_User", "INVALID_ROLE")
+        await ensure_user_exists(conn, invalid_role_id, "Invalid_Role_User", "USER")
     finally:
         await conn.close()
 
     invalid_token = create_token(
         {
-            "id": sinvalid_role_id,
+            "id": invalid_role_id,
             "username": "Invalid_Role_User",
             "role": "INVALID_ROLE"
         }
