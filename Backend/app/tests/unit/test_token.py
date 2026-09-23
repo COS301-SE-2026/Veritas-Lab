@@ -54,6 +54,8 @@ def test_refresh_token_invalid_jwt(monkeypatch):
     assert auth.COOKIE_NAME not in response.cookies
 
 def test_refresh_token_does_not_need_refreshing(monkeypatch):
+    unexpired_minutes = auth.auth_settings.TOKEN_EXPIRE
+
     def mock_jwt_decode(
         token, 
         secret_key, 
@@ -64,7 +66,7 @@ def test_refresh_token_does_not_need_refreshing(monkeypatch):
             "sub": "mock-user-id",
             "username": "test_user",
             "role": "INVESTIGATOR",
-            "exp": (datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp()
+            "exp": (datetime.now(timezone.utc) + timedelta(minutes=unexpired_minutes)).timestamp()
         }
     
     monkeypatch.setattr(
