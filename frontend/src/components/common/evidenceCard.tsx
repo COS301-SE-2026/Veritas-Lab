@@ -53,7 +53,7 @@ export default function EvidenceCard({
         } else {
             thumby = (
                 <div className="font-mono text-[10px] font-semibold uppercase text-(--color-text-subtle)">
-                    {mediaExtension.replace('.', '') || '—'}
+                    {mediaExtension.replace('.', '')}
                 </div>
             );
         }

@@ -2,8 +2,12 @@ import type { ApiError } from "@/types/api";
 import type { CaseBoard } from "@/types/components";
 import { apiFetch } from "./client";
 
+export type CaseBoardResponse = {
+    caseBoard: CaseBoard;
+};
+
 export async function getCaseBoard(caseId: string): Promise<CaseBoard | null> {
-    const res = await apiFetch(`/api/getCaseBoard/${caseId}`, {
+    const res = await apiFetch(`/api/CaseBoard/${caseId}`, {
         method: 'GET',
     });
 
@@ -13,7 +17,7 @@ export async function getCaseBoard(caseId: string): Promise<CaseBoard | null> {
         throw new Error(error?.detail?.message || 'Failed to load case board');
     }
 
-    return data as CaseBoard | null;
+    return (data as CaseBoardResponse | null)?.caseBoard ?? null;
 }
 
 export async function saveCaseBoard(caseId: string, caseBoard: CaseBoard, options?: { keepalive?: boolean }): Promise<void> {
@@ -22,7 +26,7 @@ export async function saveCaseBoard(caseId: string, caseBoard: CaseBoard, option
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(caseBoard),
+        body: JSON.stringify({ caseId, caseBoard }),
         keepalive: options?.keepalive
     });
 
