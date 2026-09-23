@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -5,12 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 import asyncpg
 
-
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
 from app.core.database import get_connection
 from app.tests.unit.database_override import unit_get_connection
-
 
 @pytest.fixture(autouse=True)
 def override_database_dependency():
@@ -20,13 +19,35 @@ def override_database_dependency():
     finally:
         app.dependency_overrides.pop(get_connection, None)
 
-
 @pytest.fixture
 def valid_payload():
     return {
         "caseId": "19dccebd-302b-412a-b77e-3167f79837d1",
         "caseBoard": {
-            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                }
+            ],
+            "edges": []
+        }
+    }
+
+@pytest.fixture
+def expected_response_payload():
+    return {
+        "status": "success",
+        "caseId": "19dccebd-302b-412a-b77e-3167f79837d1",
+        "caseBoard": {
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                }
+            ],
             "edges": []
         }
     }
@@ -93,3 +114,106 @@ async def test_save_case_board_requires_case_assignment():
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail["message"] == cases_router.USER_UNAUTHORIZED
+
+@pytest.mark.asyncio
+async def test_get_case_board_success(expected_response_payload):
+    case_id_str = expected_response_payload["caseId"]
+    db_case_board_json = json.dumps(expected_response_payload["caseBoard"])
+    
+    with patch.object(cases_router, "verify_jwt", return_value={"role": "INVESTIGATOR"}), \
+         patch.object(cases_router, "verify_not_user", return_value=True):
+        
+        mock_connection = AsyncMock()
+        mock_connection.fetchrow.side_effect = [
+            {"casestate": "CLOSED"},
+            {"caseboard": db_case_board_json}
+        ]
+        
+        async def override_get_connection():
+            yield mock_connection
+            
+        app.dependency_overrides[get_connection] = override_get_connection
+
+        try:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="https://test"
+            ) as ac:
+                response = await ac.get(f"/api/getCaseBoard/{case_id_str}")
+
+            assert response.status_code == 200
+            assert response.json() == expected_response_payload
+        finally:
+            app.dependency_overrides[get_connection] = unit_get_connection
+
+@pytest.mark.asyncio
+async def test_get_case_board_invalid_uuid():
+    with patch.object(cases_router, "verify_jwt", return_value={"role": "ADMIN"}), \
+         patch.object(cases_router, "verify_not_user", return_value=True), \
+         patch.object(cases_router, "transform_to_uuid", side_effect=HTTPException(status_code=400)):
+         
+        mock_connection = AsyncMock()
+        
+        async def override_get_connection():
+            yield mock_connection
+            
+        app.dependency_overrides[get_connection] = override_get_connection
+
+        try:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="https://test"
+            ) as ac:
+                response = await ac.get("/api/getCaseBoard/invalid-uuid-string")
+
+            assert response.status_code == 400
+        finally:
+            app.dependency_overrides[get_connection] = unit_get_connection
+
+@pytest.mark.asyncio
+async def test_get_case_board_not_found():
+    valid_uuid = "19dccebd-302b-412a-b77e-3167f79837d1"
+    
+    with patch.object(cases_router, "verify_jwt", return_value={"role": "INVESTIGATOR"}), \
+         patch.object(cases_router, "verify_not_user", return_value=True):
+         
+        mock_connection = AsyncMock()
+        mock_connection.fetchrow.return_value = None
+        
+        async def override_get_connection():
+            yield mock_connection
+            
+        app.dependency_overrides[get_connection] = override_get_connection
+
+        try:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="https://test"
+            ) as ac:
+                response = await ac.get(f"/api/getCaseBoard/{valid_uuid}")
+
+            assert response.status_code == 404
+        finally:
+            app.dependency_overrides[get_connection] = unit_get_connection
+
+@pytest.mark.asyncio
+async def test_get_case_board_open_case_forbidden():
+    valid_uuid = "19dccebd-302b-412a-b77e-3167f79837d1"
+    
+    with patch.object(cases_router, "verify_jwt", return_value={"role": "INVESTIGATOR"}), \
+         patch.object(cases_router, "verify_not_user", return_value=True):
+         
+        mock_connection = AsyncMock()
+        mock_connection.fetchrow.return_value = {"casestate": "OPEN"}
+        
+        async def override_get_connection():
+            yield mock_connection
+            
+        app.dependency_overrides[get_connection] = override_get_connection
+
+        try:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="https://test"
+            ) as ac:
+                response = await ac.get(f"/api/getCaseBoard/{valid_uuid}")
+
+            assert response.status_code == 403
+        finally:
+            app.dependency_overrides[get_connection] = unit_get_connection

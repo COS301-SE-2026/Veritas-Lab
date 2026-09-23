@@ -139,7 +139,26 @@ class success_response(BaseModel):
 class error_response(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
-  
+
+class case_board_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+    caseId: str = Field(..., examples=["19dccebd-302b-412a-b77e-3167f79837d1"])
+    caseBoard: Any = Field(
+        ...,
+        examples=[
+            {
+                "nodes": [
+                    {
+                        "id": "1", 
+                        "type": "note", 
+                        "text": "Suspect vehicle"
+                    }
+                ], 
+                "edges": []
+            }
+        ]
+    )
+
 def validate_case_assignment_request(request: Request, assign_request: assign_case_request):
     payload = verify_jwt(request)
 
