@@ -128,6 +128,11 @@ class save_annotations_payload(BaseModel):
     annotations: List[Dict[str, Any]]
     model_config = ConfigDict(populate_by_name=True)
 
+class save_case_board_payload(BaseModel):
+    case_id: str = Field(..., alias="caseId")
+    case_board: Any = Field(..., alias="caseBoard")
+    model_config = ConfigDict(populate_by_name=True)
+
 class success_response(BaseModel):
     status: str = Field(..., examples=["success"])
 
@@ -2295,6 +2300,110 @@ async def save_annotations(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+async def save_case_board_helper(
+    connection: asyncpg.Connection,
+    case_id: UUID,
+    case_board: str,
+    user_name: str
+):
+    try:
+        async with connection.transaction():
+            # Only the investigator/admin currently assigned to an OPEN case may save its board.
+            authorized_case = await connection.fetchrow(
+                """
+                SELECT CaseId
+                FROM "Cases_DB"."Cases"
+                WHERE CaseId = $1
+                    AND CaseAssigned = $2
+                    AND CaseState = 'PUBLISHED'
+                """,
+                case_id,
+                user_name
+            )
+ 
+            if authorized_case is None:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "status": "error",
+                        "message": USER_UNAUTHORIZED
+                    }
+                )
+
+            await connection.fetchrow(
+                """
+                INSERT INTO "Cases_DB"."CaseBoard" (CaseId, CaseBoard)
+                VALUES ($2, $1::jsonb)
+                ON CONFLICT (CaseId) DO UPDATE
+                    SET CaseBoard = EXCLUDED.CaseBoard
+                RETURNING CaseBoardId;
+                """,
+                case_board,
+                case_id
+            )
+ 
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+ 
+@router.post("/saveCaseBoard",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    
+)
+async def save_case_board(
+    payload: save_case_board_payload,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    cookie = verify_jwt(request)
+    user_role = cookie.get("role")
+    # Checking authorization
+    verify_not_user(user_role)
+    user_name = cookie.get("username")
+ 
+    try:
+        case_id = transform_to_uuid(payload.case_id)
+        case_board_json_str = json.dumps(payload.case_board)
+        await save_case_board_helper(
+            connection,
+            case_id,
+            case_board_json_str,
+            user_name
+        )
+ 
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success"
+            }
+        )
+ 
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
 
 @router.get(
     "/getAudit/caseID/{case_id}",
