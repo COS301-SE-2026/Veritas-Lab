@@ -1,16 +1,11 @@
 import '@testing-library/jest-dom'
 
-class MockObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-    takeRecords() { return []; }
+class ResizeObserverMock implements ResizeObserver {
+    observe = jest.fn();
+    unobserve = jest.fn();
+    disconnect = jest.fn();
 }
 
-if (!global.ResizeObserver) {
-    global.ResizeObserver = MockObserver as unknown as typeof ResizeObserver;
-}
-
-if (!global.IntersectionObserver) {
-    global.IntersectionObserver = MockObserver as unknown as typeof IntersectionObserver;
+if (!('ResizeObserver' in globalThis)) {
+    globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 }
