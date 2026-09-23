@@ -3254,3 +3254,101 @@ async def publish_case(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+
+@router.get(
+    "/getCaseBoard/{case_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    tags=["caseboard"],
+    summary="Get Case Board",
+    description=(
+        "Returns the JSONB case board for a case. USER accounts may never view "
+        "a case board. INVESTIGATOR and ADMIN accounts may view the board of "
+        "any case that is not in the OPEN state; OPEN cases are rejected the "
+        "same way an unauthorized role is."
+    ),
+    response_model=case_board_response,
+    responses={
+        200: {
+            "description": "Case board successfully retrieved.",
+            "model": case_board_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "caseId": "19dccebd-302b-412a-b77e-3167f79837d1",
+                        "caseBoard": {
+                            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+                            "edges": []
+                        }
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Bad Request - CaseId is malformed",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
+                        }
+                    }
+                }
+            },
+        },
+        401: INVALID_TOKEN_401,
+        403: USER_UNAUTHORIZED_403,
+        404: {
+            "description": "Not Found - Case does not exist.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND
+                        }
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error - Database failure or unhandled exception.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Database error"
+                                }
+                            }
+                        },
+                        "Server Exception": {
+                            "summary": "Unexpected Error",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "An unexpected error occurred"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        },
+    }
+)
+async def get_case_board(
+    case_id: str,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    pass
