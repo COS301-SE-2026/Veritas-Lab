@@ -79,6 +79,23 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
             getCapturedAt(e.reportArtifacts)
     ), [evidenceList]);
 
+    const groupedEvidence = useMemo(() => {
+        const placedIds = new Set (nodes.filter((node) => node.type === 'evidence').map((node) => node.id))
+        const onBoard: { evidence: CaseEvidence; captured: number | null }[] = [];
+        const available: { evidence: CaseEvidence; captured: number | null }[] = [];
+
+        evidenceList.forEach((evidence, i) => {
+            const item = { evidence, captured: capturedAt[i] };
+            if (placedIds.has(evidenceNodeId(evidence.mediaId))) {
+                onBoard.push(item);
+            } else {
+                available.push(item);
+            }
+        });
+
+        return { onBoard, available }
+    }, [evidenceList, capturedAt, nodes])
+
     // Generates the case board automatically
     const generate = () => {
         const board = generateBoard(evidenceList, capturedAt);
@@ -149,44 +166,65 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         {activeTab === 'Evidence' && (
                             <div className="mt-3">
                                 <h2 className="text-xl font-bold text-(--color-text-strong)">Evidence</h2>
-                                <div className="mt-4 flex flex-col gap-2">
-                                    {evidenceList.map((evidence, i) => {
-                                        const captured = capturedAt[i];
-                                        return (
-                                            <EvidenceCard
-                                                key={evidence.mediaId}
-                                                mediaName={evidence.mediaName}
-                                                mediaUrl={evidence.mediaUrl}
-                                                mediaExtension={evidence.mediaExtension}
-                                                mediaId={evidence.mediaId}
-                                                caseId={caseId}
-                                                variant="case-board"
-                                                reportCertainty={evidence.reportCertainty}
-                                                annotationCount={evidence.annotations?.length ?? 0}
-                                                capturedAt={captured != null ? new Date(captured).toISOString() : null}
-                                                placed={nodes.some((n) => n.id === evidenceNodeId(evidence.mediaId))}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'Report' && (
-                            <div className="mt-3">
-                                {selectedEvidence && (
-                                    <ReportPanel
-                                        mediaUrl={selectedEvidence.mediaUrl}
-                                        mediaKind={selectedEvidenceMediaKind}
-                                        mediaName={selectedEvidence.mediaName}
-                                        certainty={selectedEvidence.reportCertainty}
-                                        findings={selectedEvidence.reportFindings}
-                                    />
-                                )}
-                                {!selectedEvidence && (
-                                    <div className="flex h-20 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-(--color-line) bg-(--color-surface-muted)">
-                                        <p className="text-sm text-(--color-text-subtle)">Select an evidence to view its findings.</p>
+                                    <div className="mt-4 flex flex-col gap-5">
+                                        <div>
+                                            <h3 className="flex items-center justify-between text-[11px] font-semibold text-(--color-text-subtle)">
+                                                Not on board
+                                                <div className="text-[11px]">{groupedEvidence.available.length}</div>
+                                            </h3>
+                                            <div className="mt-2 flex flex-col gap-2">
+                                                {groupedEvidence.available.map(({ evidence, captured }) => (
+                                                    <EvidenceCard
+                                                        key={evidence.mediaId}
+                                                        mediaName={evidence.mediaName}
+                                                        mediaUrl={evidence.mediaUrl}
+                                                        mediaExtension={evidence.mediaExtension}
+                                                        mediaId={evidence.mediaId}
+                                                        caseId={caseId}
+                                                        variant="case-board"
+                                                        reportCertainty={evidence.reportCertainty}
+                                                        annotationCount={evidence.annotations?.length ?? 0}
+                                                        capturedAt={captured != null ? new Date(captured).toISOString() : null}
+                                                        placed={false}
+                                                    />
+                                                ))}
+                                                {groupedEvidence.available.length === 0 && (
+                                                    <p className="rounded-[var(--radius-md)] border border-dashed border-(--color-line) px-3 py-2 text-xs text-(--color-text-subtle)">
+                                                        All evidence is on the board.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <h3 className="flex items-center justify-between text-[11px] font-semibold text-(--color-text-subtle)">
+                                                On board
+                                                <span className="text-[11px]">{groupedEvidence.onBoard.length}</span>
+                                            </h3>
+                                            <div className="mt-2 flex flex-col gap-2">
+                                                {groupedEvidence.onBoard.map(({ evidence, captured }) => (
+                                                    <EvidenceCard
+                                                        key={evidence.mediaId}
+                                                        mediaName={evidence.mediaName}
+                                                        mediaUrl={evidence.mediaUrl}
+                                                        mediaExtension={evidence.mediaExtension}
+                                                        mediaId={evidence.mediaId}
+                                                        caseId={caseId}
+                                                        variant="case-board"
+                                                        reportCertainty={evidence.reportCertainty}
+                                                        annotationCount={evidence.annotations?.length ?? 0}
+                                                        capturedAt={captured != null ? new Date(captured).toISOString() : null}
+                                                        placed={true}
+                                                    />
+                                                ))}
+                                                {groupedEvidence.onBoard.length === 0 && (
+                                                    <p className="rounded-[var(--radius-md)] border border-dashed border-(--color-line) px-3 py-2 text-xs text-(--color-text-subtle)">
+                                                        Drag evidence onto the board to start.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
                             </div>
                         )}
                         </div>

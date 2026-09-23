@@ -1,8 +1,8 @@
-import { Node, NodeProps } from '@xyflow/react'
+import { Node, NodeProps, useReactFlow } from '@xyflow/react'
 import { getCertaintyMeta } from '@/lib/report';
 import dynamic from 'next/dynamic';
 import { getMediaKind } from '@/lib/media';
-import { PenLine } from 'lucide-react';
+import { PenLine, X } from 'lucide-react';
 import Image from 'next/image';
 import Pin from '@/components/common/boardPin'
 const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
@@ -20,9 +20,10 @@ export type EvidenceNodeData = {
 }
 
 
-export default function EvidenceNode({ data, selected }: NodeProps<Node<EvidenceNodeData>>) {
+export default function EvidenceNode({ id, data, selected }: NodeProps<Node<EvidenceNodeData>>) {
     const certainty = getCertaintyMeta(data.reportCertainty);
     const mediaKind = getMediaKind(data.mediaExtension);
+    const { deleteElements } = useReactFlow();
 
     let thumby;
     if (data.mediaUrl && mediaKind === 'pdf') {
@@ -41,7 +42,7 @@ export default function EvidenceNode({ data, selected }: NodeProps<Node<Evidence
             ${selected ? 'border-(--color-secondary) ring-2 ring-[color-mix(in_srgb,var(--color-secondary)_25%,transparent)]' : 'border-(--color-line)'}`}>
             <Pin />
             <div className="pt-6 pb-2 pr-3 pl-4">
-                <p className="truncate text-[13px] font-semibold text-(--color-text-strong)" title={data.mediaName}>
+                <p className="truncate pr-6 text-[13px] font-semibold text-(--color-text-strong)" title={data.mediaName}>
                     {data.mediaName}
                 </p>
                 <div className="mt-2 flex aspect-video w-full items-center justify-center overflow-hidden rounded-[10px] border border-(--color-line) bg-(--color-surface-sunken)">
@@ -59,6 +60,16 @@ export default function EvidenceNode({ data, selected }: NodeProps<Node<Evidence
                     </div>
                 </div>
             </div>
+            {selected && (
+                <button
+                    type="button"
+                    aria-label="Remove note"
+                    onClick={() => deleteElements({ nodes: [{ id }] })}
+                    className="nodrag nopan absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-(--color-line) bg-(--color-surface) text-(--color-text-muted) shadow-(--shadow-xs) hover:text-[var(--color-danger)]"
+                >
+                    <X size={12} />
+                </button>
+            )}
         </div>
     );
 }
