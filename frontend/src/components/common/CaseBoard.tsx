@@ -12,6 +12,8 @@ import SliderBar from '@/components/ui/sliderBar'
 import { NoteNodeData } from '@/components/common/noteNode';
 import { getCapturedAt } from '@/lib/data/captureTime';
 import { generateBoard, toEvidenceNode, evidenceNodeId  } from '@/lib/data/boardGenerator';
+import type { CaseBoard, SavedEdge } from '@/types/components';
+import { CaseEdgeData } from "./customEdge";
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
@@ -19,6 +21,45 @@ type CaseBoardProps = {
 
 const TABS = ['Evidence', 'Report'] as const;
 
+function formatBoard(nodes: Node[], edges: Edge[]): CaseBoard {
+    const evidenceNodes = nodes
+        .filter((node) => node.type === 'evidence')
+        .map((node) => ({
+            mediaId: (node.data as EvidenceNodeData).mediaId,
+            position: { x: node.position.x, y: node.position.y }
+        }));
+
+    const noteNodes = nodes
+        .filter((node) => node.type === 'note')
+        .map((node) => ({
+            id: node.id,
+            position: { x: node.position.x, y: node.position.y },
+            text: (node.data as NoteNodeData).text ?? ''
+        }));
+    
+    const savedEdges: SavedEdge[] = edges.map((edge) => {
+        const data = edge.data as CaseEdgeData | undefined;
+        const dataVariant = data?.variant ? { variant: data.variant } : {};
+        const label = data?.label ? { label: data.label } : {};
+        return {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle ?? null,
+            targetHandle: edge.targetHandle ?? null,
+            ...label,
+            ...dataVariant
+        }
+    })
+    const out: CaseBoard = {
+        nodes: {
+            evidenceNodes,
+            noteNodes
+        },
+        edges: savedEdges
+    }
+    return out;
+}
 
 export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
     return (

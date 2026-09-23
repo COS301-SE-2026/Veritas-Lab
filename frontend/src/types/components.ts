@@ -185,3 +185,37 @@ export type Audience = {
     description: string;
     icon: LucideIcon;
 };
+
+export type BoardPosition = {
+    x: number;
+    y: number;
+}
+
+export type SavedEvidenceNode = {
+    mediaId: string;
+    position: BoardPosition;
+}
+
+export type SavedNoteNode = {
+    id: string;
+    position: BoardPosition;
+    text: string;
+}
+
+export type SavedEdge = {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    variant?: 'timeline';
+}
+
+export type CaseBoard = {
+    nodes: {
+        evidenceNodes: SavedEvidenceNode[];
+        noteNodes: SavedNoteNode[];
+    };
+    edges: SavedEdge[];
+}
