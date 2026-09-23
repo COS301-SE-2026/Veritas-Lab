@@ -115,11 +115,22 @@ async def test_integration_save_case_board_success(client, fake_case_board_conte
         "caseId": case_id,
         "caseBoard": {
             "nodes": [
-                {"id": "1", "type": "note", "text": "Suspect vehicle"},
-                {"id": "2", "type": "evidence", "text": "Fingerprint match"}
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                },
+                {
+                    "id": "2", 
+                    "type": "evidence", 
+                    "text": "Fingerprint match"
+                }
             ],
             "edges": [
-                {"from": "1", "to": "2"}
+                {
+                    "from": "1", 
+                    "to": "2"
+                }
             ]
         }
     }
@@ -149,11 +160,29 @@ async def test_integration_save_case_board_overwrites_existing(client, fake_case
 
     first_payload = {
         "caseId": case_id,
-        "caseBoard": {"nodes": [{"id": "1", "type": "note", "text": "First draft"}], "edges": []}
+        "caseBoard": {
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "First draft"
+                }
+            ], 
+            "edges": []
+        }
     }
     second_payload = {
         "caseId": case_id,
-        "caseBoard": {"nodes": [{"id": "1", "type": "note", "text": "Updated draft"}], "edges": []}
+        "caseBoard": {
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Updated draft"
+                }
+            ], 
+            "edges": []
+        }
     }
 
     response = client.post("/api/saveCaseBoard", json=first_payload)
@@ -181,7 +210,13 @@ async def test_integration_save_case_board_invalid_uuid(client, fake_case_board_
     payload = {
         "caseId": "Invalid UUID",
         "caseBoard": {
-            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                }
+            ],
             "edges": []
         }
     }
@@ -207,7 +242,13 @@ async def test_integration_save_case_board_invalid_jwt(client, fake_case_board_c
     payload = {
         "caseId": case_id,
         "caseBoard": {
-            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                }
+            ],
             "edges": []
         }
     }
@@ -239,7 +280,13 @@ async def test_integration_save_case_board_user_unauthorized(client, fake_case_b
     payload = {
         "caseId": case_id,
         "caseBoard": {
-            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                }
+            ],
             "edges": []
         }
     }
@@ -278,7 +325,13 @@ async def test_integration_save_case_board_unassigned_investigator_forbidden(cli
     payload = {
         "caseId": case_id,
         "caseBoard": {
-            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+            "nodes": [
+                {
+                    "id": "1", 
+                    "type": "note", 
+                    "text": "Suspect vehicle"
+                }
+            ],
             "edges": []
         }
     }

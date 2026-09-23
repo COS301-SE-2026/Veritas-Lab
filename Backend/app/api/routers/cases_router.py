@@ -2309,7 +2309,6 @@ async def save_case_board_helper(
 ):
     try:
         async with connection.transaction():
-            # Only the investigator/admin currently assigned to an OPEN case may save its board.
             authorized_case = await connection.fetchrow(
                 """
                 SELECT CaseId
@@ -3279,7 +3278,13 @@ async def publish_case(
                         "status": "success",
                         "caseId": "19dccebd-302b-412a-b77e-3167f79837d1",
                         "caseBoard": {
-                            "nodes": [{"id": "1", "type": "note", "text": "Suspect vehicle"}],
+                            "nodes": [
+                                {
+                                    "id": "1", 
+                                    "type": "note", 
+                                    "text": "Suspect vehicle"
+                                }
+                            ],
                             "edges": []
                         }
                     }
@@ -3351,4 +3356,77 @@ async def get_case_board(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    pass
+    payload = verify_jwt(request)
+    user_role = payload.get("role")
+    verify_not_user(user_role)
+ 
+    validated_case_id = Case(case_id=case_id).case_id
+ 
+    try:
+        case_row = await connection.fetchrow(
+            """
+            SELECT CaseState
+            FROM "Cases_DB"."Cases"
+            WHERE CaseId = $1
+            """,
+            validated_case_id
+        )
+ 
+        if case_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "status": "error",
+                    "message": CASE_NOT_FOUND
+                }
+            )
+ 
+        if case_row["casestate"] == "OPEN":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+ 
+        board_row = await connection.fetchrow(
+            """
+            SELECT CaseBoard
+            FROM "Cases_DB"."CaseBoard"
+            WHERE CaseId = $1
+            """,
+            validated_case_id
+        )
+ 
+        case_board = board_row["caseboard"] if board_row is not None else None
+        if isinstance(case_board, str):
+            case_board = json.loads(case_board)
+ 
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "caseId": str(validated_case_id),
+                "caseBoard": case_board
+            }
+        )
+ 
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
