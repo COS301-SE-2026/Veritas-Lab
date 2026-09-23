@@ -61,6 +61,42 @@ function formatBoard(nodes: Node[], edges: Edge[]): CaseBoard {
     return out;
 }
 
+function extractBoard(board: CaseBoard, evidenceList: CaseEvidence[]): { nodes: Node[], edges: Edge[] } {
+    if (!board) return { nodes: [], edges: [] };
+
+    const evidenceNodes: Node[] = [];
+    for (const saved of board.nodes.evidenceNodes) {
+        const evidence = evidenceList.find((evidence) => evidence.mediaId === saved.mediaId);
+        if (!evidence) continue;
+        evidenceNodes.push(toEvidenceNode(evidence, saved.position));
+    }
+
+    const noteNodes: Node[] = board.nodes.noteNodes.map((saved) => ({
+        id: saved.id,
+        type: 'note',
+        position: saved.position,
+        data: { text: saved.text }
+    }));
+
+    const nodes = [...evidenceNodes, ...noteNodes];
+
+    const edges: Edge[] = board.edges
+        .filter((edge) => 
+            nodes.some((node) => node.id === edge.source) && 
+            nodes.some((node) => node.id === edge.target)
+        )
+        .map((edge) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            type: 'custom-edge',
+            data: { variant: edge.variant, label: edge.label }
+        }));
+    return { nodes, edges };
+}
+
 export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
     return (
         <ReactFlowProvider>
