@@ -176,7 +176,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                                                 {groupedEvidence.available.map(({ evidence, captured }) => (
                                                     <EvidenceCard
                                                         key={evidence.mediaId}
-                                                        mediaName={evidence.mediaName}
+                                                        mediaName={evidence.casePerspective}
                                                         mediaUrl={evidence.mediaUrl}
                                                         mediaExtension={evidence.mediaExtension}
                                                         mediaId={evidence.mediaId}
@@ -205,7 +205,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                                                 {groupedEvidence.onBoard.map(({ evidence, captured }) => (
                                                     <EvidenceCard
                                                         key={evidence.mediaId}
-                                                        mediaName={evidence.mediaName}
+                                                        mediaName={evidence.casePerspective}
                                                         mediaUrl={evidence.mediaUrl}
                                                         mediaExtension={evidence.mediaExtension}
                                                         mediaId={evidence.mediaId}
@@ -225,6 +225,24 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                                             </div>
                                         </div>
                                     </div>
+                            </div>
+                        )}
+                        {activeTab === 'Report' && (
+                            <div className="mt-3">
+                                {selectedEvidence && (
+                                    <ReportPanel
+                                        mediaUrl={selectedEvidence.mediaUrl}
+                                        mediaKind={selectedEvidenceMediaKind}
+                                        mediaName={selectedEvidence.casePerspective}
+                                        certainty={selectedEvidence.reportCertainty}
+                                        findings={selectedEvidence.reportFindings}
+                                    />
+                                )}
+                                {!selectedEvidence && (
+                                    <div className="flex h-20 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-(--color-line) bg-(--color-surface-muted)">
+                                        <p className="text-sm text-(--color-text-subtle)">Select an evidence to view its findings.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                         </div>

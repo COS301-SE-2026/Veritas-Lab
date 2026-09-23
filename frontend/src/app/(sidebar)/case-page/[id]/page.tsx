@@ -140,7 +140,7 @@ export default function CasePage() {
                                 {evidenceList.length > 0 ? evidenceList.map((evidence) => (
                                     <EvidenceCard
                                         key={evidence.mediaId}
-                                        mediaName={evidence.mediaName}
+                                        mediaName={evidence.casePerspective}
                                         mediaUrl={evidence.mediaUrl}
                                         mediaExtension={evidence.mediaExtension}
                                         href={`/case-page/${id}/workbench/${evidence.mediaId}`}

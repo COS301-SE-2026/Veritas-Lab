@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useDraggable } from '@dnd-kit/react';
-import { GripVertical, PenLine, StickyNote } from "lucide-react";
+import { GripVertical, PenLine, Clock, ClockAlert } from "lucide-react";
 import { getMediaKind } from "@/lib/media";
 import { getCertaintyMeta } from "@/lib/report";
 import type { EvidenceCardProps } from "@/types/components";
@@ -15,11 +15,21 @@ const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
     loading: () => <span className="text-xs text-(--color-text-subtle)">Loading…</span>,
 });
 
+function formatCapturedAt(value: string): string | null {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat('en-ZA', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(date);
+}
+
 export default function EvidenceCard({
     mediaName, mediaUrl, mediaExtension, href, mediaId, caseId, canDelete, onDeleted, variant,
     capturedAt, reportCertainty, annotationCount = 0, placed = false, selected = false,
 }: Readonly<EvidenceCardProps>) {
     const isBoard = variant === 'case-board';
+    const formattedTime = capturedAt ? formatCapturedAt(capturedAt) : null;
 
     const { ref, handleRef, isDragging } = useDraggable({
         id: `evidence-${mediaId ?? mediaName}`,
@@ -32,6 +42,21 @@ export default function EvidenceCard({
     if (isBoard) {
         const certainty = getCertaintyMeta(reportCertainty);
 
+        let thumby: ReactNode;
+        if (mediaUrl && mediaKind === 'pdf') {
+            thumby = <PdfThumbnail url={mediaUrl} width={52} />;
+        } else if (mediaUrl && mediaKind === 'image') {
+            thumby = (
+                <Image src={mediaUrl} alt={mediaName} width={52} height={52} unoptimized
+                       className="h-full w-full object-cover" />
+            );
+        } else {
+            thumby = (
+                <div className="font-mono text-[10px] font-semibold uppercase text-(--color-text-subtle)">
+                    {mediaExtension.replace('.', '') || '—'}
+                </div>
+            );
+        }
         const stateClasses = isDragging
             ? "border-(--color-secondary) shadow-(--shadow-pop) ring-2 ring-[color-mix(in_srgb,var(--color-secondary)_35%,transparent)] scale-[1.02]"
             : selected
@@ -54,6 +79,36 @@ export default function EvidenceCard({
                         <GripVertical size={14} />
                     </button>
 
+                    <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-(--color-line) bg-(--color-surface-sunken)">
+                        {thumby}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                            <p className="truncate text-[14px] leading-tight font-semibold text-(--color-text-strong)" title={mediaName}>
+                                {mediaName}
+                            </p>
+                            <div className="shrink-0 rounded-full bg-(--color-surface-sunken) px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase leading-none text-(--color-text-muted)">
+                                {mediaExtension.replace('.', '')}
+                            </div>
+                        </div>
+
+                        {formattedTime && (
+                            <time
+                                dateTime={capturedAt ?? undefined}
+                                suppressHydrationWarning
+                                className="mt-1 flex items-center gap-1 font-mono text-[11px] text-(--color-text-muted)"
+                            >
+                                <Clock size={11} className="shrink-0" />
+                                {formattedTime}
+                            </time>
+                        )}
+                        {!formattedTime && (
+                            <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-(--warn-fg)">
+                                <ClockAlert size={11} className="shrink-0" />
+                                No timestamp
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3 border-t border-(--color-line) bg-(--color-surface-muted) py-1.5 pr-3 pl-4 text-[11px] text-(--color-text-muted)">

@@ -11,7 +11,7 @@ export const toEvidenceNode = (evidence: CaseEvidence, position: { x: number; y:
     position,
     data: {
         mediaId: evidence.mediaId,
-        mediaName: evidence.mediaName,
+        mediaName: evidence.casePerspective,
         mediaUrl: evidence.mediaUrl,
         mediaExtension: evidence.mediaExtension,
         reportCertainty: evidence.reportCertainty,
