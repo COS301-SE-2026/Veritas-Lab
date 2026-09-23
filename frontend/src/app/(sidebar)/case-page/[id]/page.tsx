@@ -194,6 +194,21 @@ export default function CasePage() {
                                 </div>
                             </dl>
                         </div>
+                        {canPublishCase ? (
+                            <CasePublishButton
+                                caseId={id}
+                                caseTitle={caseDetails?.caseName ?? 'this case'}
+                                onPublished={reloadCaseData}
+                                className="mt-4"
+                            />
+                        ) : null}
+                        {canCloseCase ? (
+                            <CaseCloseButton
+                                caseId={id}
+                                onClosed={reloadCaseData}
+                                className="mt-4"
+                            />
+                        ) : null}
                         {canCloseCase ? (
                             <CaseCloseButton
                                 caseId={id}
