@@ -2355,7 +2355,103 @@ async def save_case_board_helper(
 @router.post("/saveCaseBoard",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
-    
+    summary="Save Case Board",
+    description=(
+        "Creates or updates the JSONB case board for a case. Only the investigator "
+        "or admin currently assigned to the case may save its board, and the case "
+        "must be in the Published state."
+    ),
+    response_model=success_response,
+    responses={
+        200: {
+            "description": "Case board successfully saved.",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success"
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "status": "error",
+                                "message": "Signature has expired."
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "status": "error",
+                                "message": "Not authenticated"
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "status": "error",
+                                "message": "Invalid token"
+                            }
+                        },
+                        "Invalid UUID": {
+                            "summary": "Invalid Case UUID",
+                            "value": {
+                                "status": "error",
+                                "message": "badly formed hexadecimal UUID string"
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden - User is not the investigator/admin currently assigned to the case, or the case is not Puublished.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": "User unauthorized"
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error - Database failure or unhandled exception.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Database error"
+                                }
+                            }
+                        },
+                        "Server Exception": {
+                            "summary": "Unexpected Error",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "An unexpected error occurred"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        },
+    }
 )
 async def save_case_board(
     payload: save_case_board_payload,
@@ -2364,7 +2460,6 @@ async def save_case_board(
 ):
     cookie = verify_jwt(request)
     user_role = cookie.get("role")
-    # Checking authorization
     verify_not_user(user_role)
     user_name = cookie.get("username")
  
