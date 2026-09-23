@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from "react";
 //import { getCookie } from '@/auth/cookie';
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
@@ -24,9 +24,15 @@ export default function CasePage() {
     const [error, setError] = useState<string | null>(null);
     const userRole = useUserRole();
     const currentUser = useCurrentUser();
+    const router = useRouter();
     const params = useParams<{ id: string }>();
     const id = params.id;
-    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
+    const searchParams = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    const initialTab = TABS.includes(tabParam as typeof TABS[number])
+        ? (tabParam as typeof TABS[number])
+        : 'Evidence';
+    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(initialTab);
 
     useEffect(() => {
         let isActive = true;
@@ -128,7 +134,7 @@ export default function CasePage() {
                     <SliderBar //changed sliderbar to fetch TABS and actively change page layout
                         filters={TABS}
                         defaultFilter={activeTab}
-                        onChange={(tab) => setActiveTab(tab)}
+                        onChange={(tab) => {setActiveTab(tab); router.replace(`/case-page/${id}?tab=${encodeURIComponent(tab)}`, { scroll: false })}}
                         className='w-full max-w-xl'
                     />
                 </div>

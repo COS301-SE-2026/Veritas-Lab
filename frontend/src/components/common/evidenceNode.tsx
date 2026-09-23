@@ -1,5 +1,6 @@
 import { Node, NodeProps, useReactFlow } from '@xyflow/react'
 import { getCertaintyMeta } from '@/lib/report';
+import { useRouter, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { getMediaKind } from '@/lib/media';
 import { PenLine, X } from 'lucide-react';
@@ -24,7 +25,16 @@ export default function EvidenceNode({ id, data, selected }: NodeProps<Node<Evid
     const certainty = getCertaintyMeta(data.reportCertainty);
     const mediaKind = getMediaKind(data.mediaExtension);
     const { deleteElements } = useReactFlow();
+    const router = useRouter();
+    const param = useParams<{ id: string }>();
 
+    const openWorkbench = (event: React.MouseEvent) => {
+        if (selected) {
+            event.stopPropagation();
+                    router.push(`/case-page/${param.id}/workbench/${data.mediaId}?from=board`);
+        }
+        return
+    }
     let thumby;
     if (data.mediaUrl && mediaKind === 'pdf') {
             thumby = <PdfThumbnail url={data.mediaUrl} width={294} />;
@@ -41,7 +51,10 @@ export default function EvidenceNode({ id, data, selected }: NodeProps<Node<Evid
         <div className={`relative w-90 overflow-hidden rounded-[var(--radius-md)] border bg-(--color-surface) text-left shadow-(--shadow-xs)
             ${selected ? 'border-(--color-secondary) ring-2 ring-[color-mix(in_srgb,var(--color-secondary)_25%,transparent)]' : 'border-(--color-line)'}`}>
             <Pin />
-            <div className="pt-6 pb-2 pr-3 pl-4">
+            <div 
+                onDoubleClick={openWorkbench}
+                className="pt-6 pb-2 pr-3 pl-4"
+            >
                 <p className="truncate pr-6 text-[13px] font-semibold text-(--color-text-strong)" title={data.mediaName}>
                     {data.mediaName}
                 </p>
