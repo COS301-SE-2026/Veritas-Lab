@@ -1,4 +1,4 @@
-import { fetchCase, addEvidence as submitEvidence, closeCase as closeCaseRequest, deleteEvidence as deleteEvidenceRequest, editComment as editCommentRequest, deleteComment as deleteCommentRequest, updateCase as updateCaseRequest} from '@/lib/api/case';
+import { fetchCase, addEvidence as submitEvidence, closeCase as closeCaseRequest, deleteEvidence as deleteEvidenceRequest, editComment as editCommentRequest, deleteComment as deleteCommentRequest, updateCase as updateCaseRequest, publishCase as publishCaseRequest } from '@/lib/api/case';
 
 export default function useCase() {
     return {
@@ -10,5 +10,6 @@ export default function useCase() {
         editComment: editCommentRequest,
         deleteComment: deleteCommentRequest,
         updateCase: updateCaseRequest,
+        publishCase: publishCaseRequest,
     };
 }
