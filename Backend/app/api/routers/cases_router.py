@@ -65,7 +65,7 @@ USER_UNAUTHORIZED_403 = {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "User unauthorized"
+                            "message": USER_UNAUTHORIZED
                         }
                     }
                 }
@@ -152,7 +152,7 @@ def validate_case_assignment_request(request: Request, assign_request: assign_ca
             status_code=403,
             detail={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
@@ -498,7 +498,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 status_code=403,
                 detail={
                     "status": "error",
-                    "message": "User unauthorized"
+                    "message": USER_UNAUTHORIZED
                 }
             )
 
@@ -700,7 +700,7 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 status_code=403,
                 detail={
                     "status": "error",
-                    "message": "User unauthorized"
+                    "message": USER_UNAUTHORIZED
                 }
             )
 
@@ -1051,7 +1051,7 @@ async def close_case(
             status_code=403,
             detail={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
@@ -1568,7 +1568,7 @@ async def delete_comment(
                     "example": {
                         "detail":{
                             "status": "error",
-                            "message": "User unauthorized"
+                            "message": USER_UNAUTHORIZED
                         }
                     }
                 }
@@ -1694,7 +1694,7 @@ async def retreive_comments(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "User unauthorized"
+                                    "message": USER_UNAUTHORIZED
                                 }
                             }
                         },
@@ -1703,7 +1703,7 @@ async def retreive_comments(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "User unauthorized"
+                                    "message": USER_UNAUTHORIZED
                                 }
                             }
                         }
@@ -2215,7 +2215,7 @@ async def _save_annotations(
                 "application/json": {
                     "example": {
                         "status": "error", 
-                        "message": "User unauthorized"
+                        "message": USER_UNAUTHORIZED
                     }
                 }
             },
@@ -2418,7 +2418,7 @@ async def save_case_board_helper(
                 "application/json": {
                     "example": {
                         "status": "error",
-                        "message": "User unauthorized"
+                        "message": USER_UNAUTHORIZED
                     }
                 }
             },
@@ -3201,7 +3201,7 @@ async def publish_case(
             status_code=403,
             detail={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
