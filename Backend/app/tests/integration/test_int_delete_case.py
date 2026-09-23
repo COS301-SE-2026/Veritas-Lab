@@ -120,17 +120,19 @@ async def fake_delete_case_context(ensure_user_exists):
         )
         created_ids["media_id"] = media_id
 
-        report_row = await conn.fetchrow(
+        # Evidence now lives in a composite array on the case, the Reports table is gone.
+        await conn.execute(
             """
-            INSERT INTO "Cases_DB"."Reports" (CaseId, MediaId, ImageTitle)
-            VALUES ($1, $2, $3)
-            RETURNING ReportId
+            UPDATE "Cases_DB"."Cases"
+            SET evidence = ARRAY[
+                ROW($2, $3)::"Cases_DB".evidence_type
+            ]
+            WHERE CaseId = $1
             """,
             uuid.UUID(case_id),
             uuid.UUID(media_id),
             "Test Image"
         )
-        created_ids["report_id"] = str(report_row["reportid"])
 
         file_key = f"{media_id}{extension}"
         storage.put_object(
@@ -177,14 +179,20 @@ async def fake_delete_case_context(ensure_user_exists):
 
 #404
 @pytest.mark.asyncio
-async def test_integration_delete_case_not_found_case(client, fake_delete_case_context):
+async def test_integration_delete_case_not_found_case(client, fake_delete_case_context, ensure_user_exists):
     case_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
-    creator = fake_delete_case_context["case_creator"]
+
+    admin_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, admin_id, "DeleteCaseAdmin", "ADMIN")
+    finally:
+        await conn.close()
 
     mock_invest = {
-        "id": fake_delete_case_context["executor_id"],
-        "username": creator,
-        "role": "INVESTIGATOR"
+        "id": admin_id,
+        "username": f"DeleteCaseAdmin_{admin_id[:8]}",
+        "role": "ADMIN"
     }
 
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
@@ -201,7 +209,7 @@ async def test_integration_delete_case_not_found_case(client, fake_delete_case_c
 
 #403
 @pytest.mark.asyncio
-async def test_integration_delete_case_user_perms(client, fake_delete_case_context, ensure_user_exists):
+async def test_integration_delete_case_non_creator_user_forbidden(client, fake_delete_case_context, ensure_user_exists):
     case_id = fake_delete_case_context["case_id"]
     creator = fake_delete_case_context["case_creator"]
 
@@ -228,7 +236,7 @@ async def test_integration_delete_case_user_perms(client, fake_delete_case_conte
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "User unauthorized"
+    assert response.json()["detail"]["message"] == "Only the creator of an open case or an admin can delete this case"
 
 
 @pytest.mark.asyncio
@@ -259,7 +267,7 @@ async def test_integration_delete_case_not_admin_id(client, fake_delete_case_con
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "Only the case creator or an admin can delete this case"
+    assert response.json()["detail"]["message"] == "Only the creator of an open case or an admin can delete this case"
 
 #400
 @pytest.mark.asyncio
@@ -338,3 +346,182 @@ async def test_integration_delete_case_success(client, fake_delete_case_context,
         assert case_row is None
     finally:
         await conn.close()
+
+async def set_case_state(case_id: str, executor_id: str, state: str):
+    conn = await get_connection()
+    try:
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
+        await conn.execute(
+            'UPDATE "Cases_DB"."Cases" SET CaseState = $2::case_state_enum WHERE CaseId = $1',
+            uuid.UUID(case_id),
+            state
+        )
+    finally:
+        await conn.close()
+
+
+async def fetch_case_row(case_id: str):
+    conn = await get_connection()
+    try:
+        return await conn.fetchrow(
+            'SELECT CaseId FROM "Cases_DB"."Cases" WHERE CaseId = $1',
+            uuid.UUID(case_id)
+        )
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_integration_delete_case_user_role_can_delete_own_open_case(client, ensure_user_exists):
+    # Issue #457: a USER may delete a case they created while it is still OPEN.
+    user_id = str(uuid.uuid4())
+    username = f"DeleteCaseUser_{user_id[:8]}"
+    case_id = str(uuid.uuid4())
+
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, user_id, "DeleteCaseUser", "USER")
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", user_id)
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
+            """,
+            uuid.UUID(case_id),
+            "Integration Test - user owned case",
+            username,
+            "Created by a USER for the delete test",
+            "OPEN"
+        )
+    finally:
+        await conn.close()
+
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token({"id": user_id, "username": username, "role": "USER"})
+    )
+
+    response = client.request("DELETE", "/api/deleteCase", json={"CaseID": case_id})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert await fetch_case_row(case_id) is None
+
+
+@pytest.mark.asyncio
+async def test_integration_delete_case_creator_cannot_delete_published_case(client, fake_delete_case_context):
+    case_id = fake_delete_case_context["case_id"]
+    creator = fake_delete_case_context["case_creator"]
+    executor_id = fake_delete_case_context["executor_id"]
+
+    await set_case_state(case_id, executor_id, "PUBLISHED")
+
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token({"id": executor_id, "username": creator, "role": "INVESTIGATOR"})
+    )
+
+    response = client.request("DELETE", "/api/deleteCase", json={"CaseID": case_id})
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["message"] == "Only the creator of an open case or an admin can delete this case"
+    assert await fetch_case_row(case_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_integration_delete_case_admin_can_delete_published_case(client, fake_delete_case_context, ensure_user_exists):
+    # An ADMIN is not restricted by ownership or by state.
+    case_id = fake_delete_case_context["case_id"]
+    executor_id = fake_delete_case_context["executor_id"]
+
+    await set_case_state(case_id, executor_id, "PUBLISHED")
+
+    admin_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, admin_id, "DeleteCaseAdmin", "ADMIN")
+    finally:
+        await conn.close()
+
+    client.cookies.set(
+        COOKIE_NAME,
+        create_token({
+            "id": admin_id,
+            "username": f"DeleteCaseAdmin_{admin_id[:8]}",
+            "role": "ADMIN"
+        })
+    )
+
+    response = client.request("DELETE", "/api/deleteCase", json={"CaseID": case_id})
+
+    assert response.status_code == 200
+    assert await fetch_case_row(case_id) is None
+
+
+@pytest.mark.asyncio
+async def test_integration_delete_case_shared_media_is_kept(client, fake_delete_case_context, ensure_user_exists):
+    # Guards collect_orphan_media: media still referenced by another case must survive.
+    case_id = fake_delete_case_context["case_id"]
+    creator = fake_delete_case_context["case_creator"]
+    executor_id = fake_delete_case_context["executor_id"]
+    media_id = fake_delete_case_context["media_id"]
+
+    other_case_id = str(uuid.uuid4())
+
+    conn = await get_connection()
+    try:
+        await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
+        await conn.execute(
+            """
+            INSERT INTO "Cases_DB"."Cases" (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
+            """,
+            uuid.UUID(other_case_id),
+            "Integration Test - shares the same media",
+            creator,
+            "Second case referencing the same evidence",
+            "OPEN"
+        )
+        await conn.execute(
+            """
+            UPDATE "Cases_DB"."Cases"
+            SET evidence = ARRAY[ROW($2, $3)::"Cases_DB".evidence_type]
+            WHERE CaseId = $1
+            """,
+            uuid.UUID(other_case_id),
+            uuid.UUID(media_id),
+            "Test Image"
+        )
+    finally:
+        await conn.close()
+
+    try:
+        client.cookies.set(
+            COOKIE_NAME,
+            create_token({"id": executor_id, "username": creator, "role": "INVESTIGATOR"})
+        )
+
+        response = client.request("DELETE", "/api/deleteCase", json={"CaseID": case_id})
+
+        assert response.status_code == 200
+
+        conn = await get_connection()
+        try:
+            media_row = await conn.fetchrow(
+                'SELECT MediaId FROM "Cases_DB"."Media" WHERE MediaId = $1',
+                uuid.UUID(media_id)
+            )
+            assert media_row is not None, "Media still referenced by another case must not be deleted"
+        finally:
+            await conn.close()
+
+    finally:
+        conn = await get_connection()
+        try:
+            await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
+            await conn.execute(
+                'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
+                uuid.UUID(other_case_id)
+            )
+        finally:
+            await conn.close()

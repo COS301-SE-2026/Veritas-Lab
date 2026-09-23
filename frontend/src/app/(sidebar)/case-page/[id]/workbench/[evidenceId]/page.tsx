@@ -12,7 +12,7 @@ import useAnnotations from '@/lib/hooks/useAnnotations';
 import useReportModal from '@/lib/hooks/useEvidenceReport';
 import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
-import { getMediaKind } from '@/lib/media';
+import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 
@@ -48,7 +48,7 @@ export default function WorkbenchPage() {
         if (id === null) return;
 
         const chosen = annotations.find((annotation) => annotation.id === id);
-        if(video.current && (chosen?.timeStamp !== undefined)) {
+        if (video.current && (chosen?.timeStamp !== undefined)) {
             video.current.pause();
             video.current.currentTime = chosen.timeStamp;
         }
@@ -56,7 +56,7 @@ export default function WorkbenchPage() {
 
     useEffect(() => {
         let cancelled = false;
-        
+
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
@@ -72,63 +72,74 @@ export default function WorkbenchPage() {
         };
     }, [caseId, evidenceId]);
 
-    if(evidence !== seededForm) {
+    if (evidence !== seededForm) {
         setSeededForm(evidence);
         loadAnnotations(evidence?.annotations ?? []);
     }
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
-    const mediaKind = getMediaKind(evidence?.mediaExtension);
-    const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind === 'video' ? 'unsupported' : mediaKind;
+    const mediaKind = resolveMediaKind({
+        mediaExtension: evidence?.mediaExtension,
+        mediaName: evidence?.mediaName,
+        mediaUrl: evidence?.mediaUrl,
+    });
+    //changed video metadata to be supported, used to be unsupported which is why it wasnt rendering (sorry i forgot to change that)
+    const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
     const handleSave = () => saveAnnotations({ evidenceId, annotations });
 
     return (
-        <div className="mt-8 ml-16 mr-16">
+        <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">
             <Link
                 href={`/case-page/${caseId}`}
-                className="inline-flex items-center gap-2 text-sm text-(--color-light) transition-colors hover:text-(--color-text)"
+                className="inline-flex items-center gap-2 text-sm font-medium text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
             >
                 <ArrowLeft size={16} />
                 Back to case
             </Link>
 
-            <div className="mt-4 flex items-start justify-between gap-4">
+            <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-(--color-text)">{mediaName}</h1>
-                    <p className="mt-1 text-sm text-(--color-light)">
-                        Use the tools on the right to work on this evidence.
+                    <h1 className="text-2xl font-bold text-(--color-text-strong)">{mediaName}</h1>
+                    <p className="mt-1 text-sm text-(--color-text-muted)">
+                        {comparisonActive
+                            ? 'Showing extracted metadata in place of the preview. Close the tool to return to the media.'
+                            : 'Use the tools on the right to work on this evidence.'}
                     </p>
+                    {error ? <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p> : null}
                 </div>
-                <Button variant="submit" onClick={openReport} className="flex items-center gap-2">
+                <Button variant="submit" onClick={openReport} className="gap-2">
                     <FileText size={16} />
-                    <span className="text-sm">Show Report</span>
+                    <span>Show Report</span>
                 </Button>
             </div>
 
-            <div className="mt-6 flex gap-6">
-                <div className="flex-1">
-                    <WorkbenchCanvas
-                        video={video}
-                        mediaUrl={mediaUrl}
-                        mediaKind={mediaKind}
-                        mediaName={mediaName}
-                        active={annotationsActive}
-                        activeTool={activeTool}
-                        annotations={annotations}
-                        selectedId={selectedId}
-                        onSelectAnnotation={pickSelectedAnnotation}
-                        onAddShape={addShape}
-                        onAddNote={addNote}
-                    />
+            <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+                <div className="min-w-0 flex-1">
+                    <div className={comparisonActive ? 'hidden' : 'block'} aria-hidden={comparisonActive}>
+                        <WorkbenchCanvas
+                            video={video}
+                            mediaUrl={mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            active={annotationsActive}
+                            activeTool={activeTool}
+                            annotations={annotations}
+                            selectedId={selectedId}
+                            onSelectAnnotation={pickSelectedAnnotation}
+                            onAddShape={addShape}
+                            onAddNote={addNote}
+                        />
+                    </div>
 
                     {comparisonActive ? (
                         <MetadataComparison
                             mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
+                            className="h-[min(75vh,900px)]"
                         />
                     ) : null}
                 </div>

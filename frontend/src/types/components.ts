@@ -89,15 +89,6 @@ export type CaseCloseButtonProps = {
     className?: string;
 };
 
-export type CheckBoxProps = {
-    label: string;
-    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-    checked?: boolean;
-    defaultChecked?: boolean;
-    disabled?: boolean;
-    className?: string;
-};
-
 export type DropdownOption = {
     label: string;
     value: string;
@@ -110,11 +101,6 @@ export type DropdownProps = {
     disabled?: boolean;
     className?: string;
     optionClassName?: string;
-};
-
-export type ContainerProps = {
-    children: ReactNode;
-    className?: string;
 };
 
 export type ButtonProps = {
@@ -142,10 +128,6 @@ export type CardProps = {
 export type CardSectionProps = {
     children: ReactNode;
     className?: string;
-};
-
-export type HeadingProps = {
-    text: string;
 };
 
 export type InputProps = {
@@ -176,11 +158,6 @@ export type SliderBarProps<T extends string = string> = {
     filters: ReadonlyArray<T>;
     defaultFilter?: T;
     onChange?: (filter: T) => void;
-    className?: string;
-};
-
-export type TextProps = {
-    text: string;
     className?: string;
 };
 

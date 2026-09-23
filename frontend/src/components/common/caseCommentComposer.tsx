@@ -1,4 +1,5 @@
 'use client';
+import { SendHorizontal } from 'lucide-react';
 import Button from '@/components/ui/button';
 
 type CaseCommentComposerProps = {
@@ -9,7 +10,7 @@ type CaseCommentComposerProps = {
 };
 export default function CaseCommentComposer({ draft, isSubmitting, onDraftChange, onSubmit }: CaseCommentComposerProps) {
     return (
-        <div className="mt-4 rounded-[24px] border border-[var(--color-light)]/30 bg-white p-4 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)]">
+        <div className="mt-4 rounded-[var(--radius-lg)] border border-(--color-line) bg-(--color-surface) p-4 shadow-[var(--shadow-sm)]">
             <label htmlFor="case-comment-message" className="sr-only">
                 Add a comment
             </label>
@@ -19,16 +20,18 @@ export default function CaseCommentComposer({ draft, isSubmitting, onDraftChange
                 onChange={(event) => onDraftChange(event.target.value)}
                 placeholder="Write your comment here"
                 rows={3}
-                className="w-full resize-none rounded-2xl border border-[var(--color-light)]/30 bg-[var(--color-background)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-light)] focus:border-[var(--color-primary)]"
+                className="vl-textarea bg-(--color-surface-muted) text-sm"
             />
             <div className="mt-3 flex justify-end">
                 <Button
                     variant="submit"
                     onClick={onSubmit}
                     disabled={isSubmitting || draft.trim().length === 0}
-                    className="px-6 py-3"
-                    text={isSubmitting ? 'Sending' : 'Send Comment'}
-                />
+                    className="gap-2"
+                >
+                    <SendHorizontal size={16} />
+                    {isSubmitting ? 'Sending' : 'Send Comment'}
+                </Button>
             </div>
         </div>
     );

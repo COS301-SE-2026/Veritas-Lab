@@ -12,21 +12,24 @@ function normalizeComment(comment: Record<string, unknown>) {
 }
 //conirfmed that all endpoints match the API service contract
 export async function fetchCase(caseID: string): Promise<CaseResponse> {
-    const res = await apiFetch(`/api/getSingleCase`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ CaseID: caseID })
-    });
+    const res = await apiFetch(
+        `/api/getSingleCase/${encodeURIComponent(caseID)}`,
+        {
+            method: 'GET',
+        }
+    );
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-        const error = data as ApiError | null
-        throw new Error(error?.detail?.message ||`Failed to fetch case`);
+        const error = data as ApiError | null;
+        throw new Error(
+            error?.detail?.message || 'Failed to fetch case'
+        );
     }
     return {
         ...data,
-        comments: Array.isArray(data.comments) ? data.comments.map(normalizeComment) : [],
+        comments: Array.isArray(data.comments)
+            ? data.comments.map(normalizeComment)
+            : [],
     };
 }
 

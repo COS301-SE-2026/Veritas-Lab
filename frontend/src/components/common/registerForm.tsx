@@ -16,16 +16,16 @@ export default function RegisterForm() {
 
     return (
         <div className="flex flex-col">
-            <h2 className="text-4xl font-bold tracking-tight text-[var(--color-text)] sm:text-5xl">
+            <h2 className="text-4xl font-bold tracking-tight text-(--color-text-strong) sm:text-5xl">
                 Create your account
             </h2>
-            <p className="mt-2 text-base text-[var(--color-light)]">
+            <p className="mt-3 text-base text-(--color-text-muted)">
                 Get started with Veritas Lab.
             </p>
 
             <form className="mt-8 flex w-full flex-col gap-5" onSubmit={handleSubmit} noValidate>
                 <div className="flex flex-col gap-1.5">
-                    <Label text="Username" htmlFor="username" className="font-medium text-[var(--color-text)]" />
+                    <Label text="Username" htmlFor="username" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="username"
                         type="text"
@@ -37,7 +37,7 @@ export default function RegisterForm() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <Label text="Work Email" htmlFor="email" className="font-medium text-[var(--color-text)]" />
+                    <Label text="Work Email" htmlFor="email" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="email"
                         type="email"
@@ -49,7 +49,7 @@ export default function RegisterForm() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <Label text="Password" htmlFor="password" className="font-medium text-[var(--color-text)]" />
+                    <Label text="Password" htmlFor="password" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="password"
                         type="password"
@@ -61,7 +61,7 @@ export default function RegisterForm() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <Label text="Confirm Password" htmlFor="confirmPassword" className="font-medium text-[var(--color-text)]" />
+                    <Label text="Confirm Password" htmlFor="confirmPassword" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="confirmPassword"
                         type="password"
@@ -81,7 +81,7 @@ export default function RegisterForm() {
                     {status.error && (
                         <p
                             role="alert"
-                            className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-3 py-2 text-sm text-[var(--color-error)]"
+                            className="rounded-xl border border-[color-mix(in_srgb,var(--color-danger)_25%,transparent)] bg-[var(--danger-soft)] px-3 py-2 text-sm font-medium text-[var(--color-danger)]"
                         >
                             {status.error}
                         </p>
@@ -89,7 +89,7 @@ export default function RegisterForm() {
                     {status.success && (
                         <p
                             role="status"
-                            className="rounded-lg border border-[var(--color-secondary)]/30 bg-[var(--color-secondary)]/10 px-3 py-2 text-sm text-[#2E9E66]"
+                            className="rounded-xl border border-[color-mix(in_srgb,var(--ok-fg)_25%,transparent)] bg-[var(--ok-soft)] px-3 py-2 text-sm font-medium text-[var(--ok-fg)]"
                         >
                             {status.success}
                         </p>
@@ -105,9 +105,9 @@ export default function RegisterForm() {
                 />
 
                 <div className="flex items-center gap-3">
-                    <span className="h-px flex-1 bg-[var(--color-lightest)]" />
-                    <span className="text-sm text-[var(--color-light)]">or</span>
-                    <span className="h-px flex-1 bg-[var(--color-lightest)]" />
+                    <span className="h-px flex-1 bg-(--color-line)" />
+                    <span className="text-sm text-(--color-text-subtle)">or</span>
+                    <span className="h-px flex-1 bg-(--color-line)" />
                 </div>
 
                 <Button

@@ -12,6 +12,7 @@ from app.core.cases import (
     PDF_SCRIPTS_NOT_ALLOWED,
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
+    CASE_DELETE_NOT_ALLOWED,
     INTERNAL_SERVER_ERROR_STORAGE,
     DATABASE_ERROR_MESSAGE,
     set_audit_executor,
@@ -42,6 +43,7 @@ INVALID_CASE_ID = "Invalid CaseID"
 CASE_NOT_FOUND_OR_UNAUTHORIZED = "Case not found or user unauthorized."
 COOKIE_SCHEME=APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 USER_UNAUTHORIZED = "User unauthorized"
+AUDIT_NOT_ALLOWED = "Only the case creator, the assigned investigator or an admin can view this audit log"
 CASE_UPDATED_SUCCESS = "Case updated successfully."
 UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 COMMENT_UPDATED_SUCCESS = "Comment edit successfully."
@@ -213,9 +215,7 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
-    media_name = row["mediatitle"]
-
-    # Generate presigned URL
+    media_name = row["medianame"]
     target_filename = f"{media_id}{media_extension}"
     presign_client = get_object(for_presign=True)
 
@@ -230,6 +230,7 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
 
     evidence = {
         "mediaId": str(media_id),
+        "casePerspective": row["caseperspective"],
         "mediaName": media_name,
         "mediaBucket": media_bucket,
         "mediaExtension": media_extension,
@@ -244,15 +245,17 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 if isinstance(row["annotations"], str)
                 else (row["annotations"] or [])
             ),
-            "reportId": str(row["reportid"]),
+
             "reportArtifacts": (
                 json.loads(row["reportartifacts"])
                 if isinstance(row["reportartifacts"], str)
                 else row["reportartifacts"]
             ),
+
             "reportFindings": row["reportfindings"],
             "reportComments": row["reportcomments"],
             "reportCertainty": row["reportcertainty"],
+            
             "reportDateCreation": (
                 row["reportdatecreation"].isoformat()
                 if row["reportdatecreation"]
@@ -370,8 +373,12 @@ async def create_case(
     status_code=status.HTTP_200_OK,
     summary='List Cases',
     description=(
-        "Returns cases visible to the caller. INVESTIGATOR and ADMIN see every case. "
-        "USER sees only cases they created."
+        "Returns all cases visible to the authenticated user. "
+        "Any user can view cases they created, regardless of state. "
+        "ADMIN and INVESTIGATOR users can additionally view all PUBLISHED "
+        "and CLOSED cases. "
+        "ADMIN and INVESTIGATOR users cannot view another user's OPEN case. "
+        "USER accounts can only view cases they created."
     ),
     responses={
         200: {
@@ -433,6 +440,8 @@ async def create_case(
             }
         },
 
+        403: USER_UNAUTHORIZED_403,
+
         500: {
             "model": error_response,
             "description": "Internal server error " + DATABASE_ERROR_MESSAGE,
@@ -454,19 +463,40 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
 
     role = payload.get("role")
     username = payload.get("username")
-    is_standard_user = role == "USER"
 
     try:
-        rows = await connection.fetch(
-            """
-            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
-            FROM "Cases_DB"."Cases"
-            WHERE $1::boolean IS FALSE OR casecreator = $2
-            ORDER BY casecreationdate DESC
-            """,
-            is_standard_user,
-            username
-        )
+        if role == "USER":
+            rows = await connection.fetch(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                FROM "Cases_DB"."Cases"
+                WHERE casecreator = $1
+                ORDER BY casecreationdate DESC
+                """,
+                username
+            )
+
+        elif role in ["ADMIN", "INVESTIGATOR"]:
+            rows = await connection.fetch(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                FROM "Cases_DB"."Cases"
+                WHERE 
+                    casecreator = $1
+                    OR casestate != 'OPEN'
+                ORDER BY casecreationdate DESC
+                """,
+                username
+            )
+
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "User unauthorized"
+                }
+            )
 
         return {
             "status": "success",
@@ -483,16 +513,18 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         )
 
 @router.get(
-    "/getSingleCase",
+    "/getSingleCase/{case_id}",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get a single case",
     description=(
-        "Returns one case with its comments and evidence. INVESTIGATOR and ADMIN can "
-        "get any case and receive full report data and presigned media URLs. "
-        "USER can only get cases they created. USER can access the media for their "
-        "own case in any state, but annotations and report data are only returned "
-        "when the case is CLOSED."
+        "Returns a single case with its comments and evidence. "
+        "Any authenticated user can view a case they created, regardless of its state. "
+        "ADMIN and INVESTIGATOR users can additionally view any PUBLISHED or CLOSED case. "
+        "ADMIN and INVESTIGATOR users receive evidence annotations and report-related "
+        "information whenever they can access the case. "
+        "USER accounts only receive annotations and report-related information when "
+        "the case is CLOSED."
     ),
     responses={
         200: {
@@ -500,23 +532,26 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
             "content": {
                 "application/json": {
                     "examples": {
-                        "Full case": {
-                            "summary": "ADMIN, INVESTIGATOR, or USER viewing a closed case",
+                        "Investigator or admin": {
+                            "summary": (
+                                "ADMIN or INVESTIGATOR viewing a PUBLISHED "
+                                "or CLOSED case"
+                            ),
                             "value": {
                                 "status": "success",
                                 "case": {
                                     "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
                                     "caseName": "Flood in Westville",
-                                    "caseCreator": "investigator_user",
+                                    "caseCreator": "normal_user",
                                     "caseDescription": "Flood investigation case",
-                                    "caseState": "CLOSED",
+                                    "caseState": "PUBLISHED",
                                     "caseCreationDate": "2026-05-20T19:43:02+00:00"
                                 },
                                 "comments": [],
                                 "evidence": [
                                     {
-                                        "reportId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
                                         "mediaId": "11111111-2222-3333-4444-555555555555",
+                                        "casePerspective": "Front view",
                                         "mediaName": "flood_image.jpg",
                                         "mediaBucket": "images",
                                         "mediaExtension": ".jpg",
@@ -533,8 +568,8 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                             }
                         },
 
-                        "User open case": {
-                            "summary": "USER viewing their own open case",
+                        "User viewing own case": {
+                            "summary": "USER viewing a case they created",
                             "value": {
                                 "status": "success",
                                 "case": {
@@ -545,11 +580,11 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                     "caseState": "OPEN",
                                     "caseCreationDate": "2026-05-20T19:43:02+00:00"
                                 },
-
                                 "comments": [],
                                 "evidence": [
                                     {
                                         "mediaId": "11111111-2222-3333-4444-555555555555",
+                                        "casePerspective": "Front view",
                                         "mediaName": "flood_image.jpg",
                                         "mediaBucket": "images",
                                         "mediaExtension": ".jpg",
@@ -563,38 +598,34 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 }
             }
         },
+
         400: {
             "model": error_response,
-            "description": "Bad Request - Missing or malformed CaseID",
+            "description": "Bad Request - CaseId is malformed",
             "content": {
                 "application/json": {
-                    "examples": {
-                        "Missing CaseID": {
-                            "summary": "No CaseID supplied",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": CASE_ID_REQUIRED
-                                }
-                            }
-                        },
-                        "Invalid CaseID": {
-                            "summary": "CaseID is not a valid UUID",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": "'not-a-valid-uuid' is not a valid UUID format"
-                                }
-                            }
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
                         }
                     }
                 }
             }
         },
+
         401: INVALID_TOKEN_401,
+
+        403: USER_UNAUTHORIZED_403,
+
         404: {
             "model": error_response,
-            "description": "Not Found - Case does not exist or USER requested a case they did not create.",
+            "description": (
+                "Not Found - Case does not exist or the authenticated user "
+                "is not authorised to view it. USER accounts may only view "
+                "cases they created. ADMIN and INVESTIGATOR accounts may view "
+                "their own cases or any PUBLISHED or CLOSED case."
+            ),
             "content": {
                 "application/json": {
                     "example": {
@@ -606,9 +637,13 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 }
             }
         },
+
         500: {
             "model": error_response,
-            "description": "Internal Server Error - " + DATABASE_ERROR_MESSAGE,
+            "description": (
+                "Internal Server Error - "
+                + DATABASE_ERROR_MESSAGE
+            ),
             "content": {
                 "application/json": {
                     "example": {
@@ -638,20 +673,42 @@ async def get_single_case(case_request: create_single_case_request, request: Req
 
     role = payload.get("role")
     username = payload.get("username")
-    is_standard_user = role == "USER"
 
     try:
-        row = await connection.fetchrow(
-            """
-            SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
-            FROM "Cases_DB"."Cases"
-            WHERE caseid = $1
-                AND ($2::boolean IS FALSE OR casecreator = $3)
-            """,
-            case_id,
-            is_standard_user,
-            username
-        )
+        if role == "USER":
+            row = await connection.fetchrow(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1 AND casecreator = $2
+                """,
+                case_id,
+                username
+            )
+
+        elif role in ["ADMIN", "INVESTIGATOR"]:
+            row = await connection.fetchrow(
+                """
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
+                FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                    AND (
+                        casecreator = $2
+                        OR casestate != 'OPEN'
+                    )
+                """,
+                case_id,
+                username
+            )
+
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "User unauthorized"
+                }
+            )
 
         if row is None:
             raise HTTPException(
@@ -667,29 +724,40 @@ async def get_single_case(case_request: create_single_case_request, request: Req
         evidence_rows = await connection.fetch(
              """
             SELECT
-                r.ReportID AS "reportid",
-                r.CaseID AS "caseid",
-                r.MediaID AS "mediaid",
-                r.ReportArtifacts AS "reportartifacts",
-                r.imagetitle AS "mediatitle",
-                r.ReportFindings AS "reportfindings",
-                r.ReportComments AS "reportcomments",
-                r.ReportCertainty AS "reportcertainty",
-                r.ReportDateCreation AS "reportdatecreation",
-                m.MediatypeId AS "mediatypeid",
+                ev.evidence_id AS "mediaid",
+                ev.case_perspective AS "caseperspective",
+
+                media.MediaAnnotations AS "annotations",
+                media.ReportArtifacts AS "reportartifacts",
+                media.ReportFindings AS "reportfindings",
+                media.ReportComments AS "reportcomments",
+                media.ReportCertainty AS "reportcertainty",
+                media.ReportDateCreation AS "reportdatecreation",
+                media.MediaUploadDate AS "mediauploaddate",
+
+                m.MediaTypeId AS "mediatypeid",
+                m.MediaName AS "medianame",
                 m.MediaExtension AS "mediaextension",
-                m.MediaBucket AS "mediabucket",
-                media.MediaAnnotations AS "annotations"
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" media ON r.MediaID = media.MediaID
-            JOIN "Cases_DB"."MediaType" m ON media.MediaType = m.MediaTypeId
-            WHERE r.CaseID = $1
-            ORDER BY r.ReportDateCreation DESC
+                m.MediaBucket AS "mediabucket"
+
+            FROM "Cases_DB"."Cases" c
+
+            CROSS JOIN LATERAL
+                unnest(c.evidence)
+                AS ev(evidence_id, case_perspective)
+
+            JOIN "Cases_DB"."Media" media
+                ON media.MediaId = ev.evidence_id
+
+            JOIN "Cases_DB"."MediaType" m
+                ON media.MediaType = m.MediaTypeId
+
+            WHERE c.CaseId = $1
             """,
             case_id,
         )
 
-        can_view_report = not is_standard_user or row["casestate"] == "CLOSED"
+        can_view_report = role in ["ADMIN", "INVESTIGATOR"] or row["casestate"] == "CLOSED"
 
         return jsonable_encoder({
             "status": "success",
@@ -1888,9 +1956,14 @@ async def create_comment(
           
 @router.delete(
     "/deleteCase",
+    status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Deletes a case",
-    description="Deletes a specific case and all attached elements within reason",
+    description=(
+        "Deletes a case together with any evidence only it referenced. USER, "
+        "INVESTIGATOR and ADMIN may all delete a case they created, but only while it "
+        "is still OPEN. An Admin may delete any case in any state."
+    ),
     responses={
         200: {
             "description": "Deletion of the case was successful.",
@@ -1914,7 +1987,7 @@ async def create_comment(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Case id is missing"
+                                    "message": "CaseID required"
                                 }
                             }
                         },
@@ -1923,7 +1996,7 @@ async def create_comment(
                             "value": {
                                 "detail":{
                                     "status": "error",
-                                    "message": "fake-uuid is not a valid UUID format"
+                                    "message": "'fake-uuid' is not a valid UUID format"
                                 }
                             }
                         }
@@ -1933,27 +2006,13 @@ async def create_comment(
         },
         401: INVALID_TOKEN_401,
         403: {
-            "description": "Forbidden - User lacks sufficient permissions",
+            "description": "Forbidden - not the creator, or the case is no longer open",
             "content": {
                 "application/json": {
-                    "examples": {
-                        "Role Forbidden": {
-                            "summary": "Standard User Role Blocked",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": "User unauthorized"
-                                }
-                            }
-                        },
-                        "Not Owner or Admin": {
-                            "summary": "User is neither Case Creator nor Admin",
-                            "value": {
-                                "detail": {
-                                    "status": "error",
-                                    "message": "Only the case creator or an admin can delete this case"
-                                }
-                            }
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_DELETE_NOT_ALLOWED
                         }
                     }
                 }
@@ -1987,7 +2046,7 @@ async def create_comment(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Database query failed"
+                                    "message": DATABASE_ERROR_MESSAGE
                                 }
                             }
                         },
@@ -1996,7 +2055,7 @@ async def create_comment(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "Object storage Error"
+                                    "message": "Failed to delete stored object 1234.png: connection refused"
                                 }
                             }
                         }
@@ -2031,19 +2090,15 @@ async def delete_case(
     try:
         await delete_case.delete_case(
             username=payload.get("username"),
-            role=payload.get("role"),
+            is_admin=payload.get("role") == "ADMIN",
             connection=connection,
             executor_id=payload.get("sub")
         )
 
-        
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Case deleted successfully"
-            }
-        )
+        return {
+            "status": "success",
+            "message": "Case deleted successfully"
+        }
     
     except asyncpg.PostgresError:
         raise HTTPException(
@@ -2261,10 +2316,12 @@ async def save_annotations(
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get all aduit logs for a case",
     description=(
-        "Returns every audited event recorded against a case."
-        "Covers case creation, renaming, description edits, closing "
-        "and deletion, as along with evidence added to or annotated on the case. "
-        "A case with no audit logs will return an empty list."
+        "Returns every audited event recorded against a case. "
+        "Covers case creation, renaming, description edits, publishing, assignment, "
+        "closing and deletion, as along with evidence added to or annotated on the case. "
+        "The case creator may read their own case, an INVESTIGATOR may read a case "
+        "assigned to them, and an ADMIN may read any case. The timeline stays readable "
+        "after a case is deleted. A case with no audit logs will return an empty list."
     ),
     responses={
         200: {
@@ -2304,7 +2361,19 @@ async def save_annotations(
 
         401: INVALID_TOKEN_401,
 
-        403: USER_UNAUTHORIZED_403,
+        403: {
+            "description": "Forbidden - not the creator, the assigned investigator or an admin",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": AUDIT_NOT_ALLOWED
+                        }
+                    }
+                }
+            }
+        },
 
         500: {
             "model": error_response,
@@ -2333,7 +2402,39 @@ async def get_case_audit_events(
 
     validated_case_id = Case(case_id=case_id).case_id
 
+    username = payload.get("username")
+    is_admin = payload.get("role") == "ADMIN"
+
     try:
+        if not is_admin:
+            ownership = await connection.fetchrow(
+                """
+                SELECT
+                    COALESCE(cases.casecreator, audit.old_casecreator) AS casecreator,
+                    COALESCE(cases.caseassigned, audit.old_caseassigned) AS caseassigned
+                FROM (SELECT $1::uuid AS caseid) AS target
+                LEFT JOIN "Cases_DB"."Cases" AS cases
+                    ON cases.caseid = target.caseid
+                LEFT JOIN LATERAL (
+                    SELECT old_casecreator, old_caseassigned
+                    FROM "Cases_DB"."Audit_Cases"
+                    WHERE old_case_id = target.caseid
+                    ORDER BY audit_case_id DESC
+                    LIMIT 1
+                ) AS audit ON TRUE
+                """,
+                validated_case_id
+            )
+
+            if username not in (ownership["casecreator"], ownership["caseassigned"]):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "status": "error",
+                        "message": AUDIT_NOT_ALLOWED
+                    }
+                )
+
         rows = await connection.fetch(
             """
             WITH case_audit AS (
@@ -2344,7 +2445,8 @@ async def get_case_audit_events(
                     query_type::text AS query_type,
                     old_casename,
                     old_casedescription,
-                    old_casestate
+                    old_casestate,
+                    old_caseassigned
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
 
@@ -2358,7 +2460,8 @@ async def get_case_audit_events(
                 NULL::text,
                 cases.casename,
                 cases.casedescription,
-                cases.casestate
+                cases.casestate,
+                cases.caseassigned
             FROM "Cases_DB"."Cases" AS cases
             WHERE cases.caseid = $1::uuid
             ),
@@ -2370,10 +2473,12 @@ async def get_case_audit_events(
                     old_casename,
                     old_casedescription,
                     old_casestate,
+                    old_caseassigned,
                     LEAD(old_casename) OVER (ORDER BY ordinal) AS next_casename,
                     LEAD(old_casedescription) OVER (ORDER BY ordinal) AS next_casedescription,
-                    LEAD(old_casestate) OVER (ORDER BY ordinal) AS next_casestate
-                FROM case_audit 
+                    LEAD(old_casestate) OVER (ORDER BY ordinal) AS next_casestate,
+                    LEAD(old_caseassigned) OVER (ORDER BY ordinal) AS next_caseassigned
+                FROM case_audit
             ),
             audit_events AS (
                 SELECT
@@ -2382,15 +2487,23 @@ async def get_case_audit_events(
                     CASE
                         WHEN query_type = 'INSERT' THEN 'Case Created'
                         WHEN query_type = 'DELETE' THEN 'Case Deleted'
-                        WHEN old_casestate = 'OPEN' AND next_casestate = 'CLOSED'
-                            THEN 'Case Closed'
-                        WHEN old_casename IS DISTINCT FROM next_casename 
-                            THEN 'Case Renamed'
-                        WHEN old_casedescription IS DISTINCT FROM next_casedescription 
-                            THEN 'Case Description Updated'
-                        WHEN old_casename IS DISTINCT FROM next_casename 
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'PUBLISHED' THEN 'Case Published'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'CLOSED' THEN 'Case Closed'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'OPEN' THEN 'Case Reopened'
+                        WHEN old_caseassigned IS NULL
+                            AND next_caseassigned IS NOT NULL THEN 'Case Assigned'
+                        WHEN old_caseassigned IS NOT NULL
+                            AND next_caseassigned IS NULL THEN 'Case Unassigned'
+                        WHEN old_casename IS DISTINCT FROM next_casename
                             AND old_casedescription IS DISTINCT FROM next_casedescription
                             THEN 'Case Renamed and Description Updated'
+                        WHEN old_casename IS DISTINCT FROM next_casename
+                            THEN 'Case Renamed'
+                        WHEN old_casedescription IS DISTINCT FROM next_casedescription
+                            THEN 'Case Description Updated'
                         ELSE 'Case Updated'
                     END AS eventaction
                 FROM case_transitions
@@ -2406,9 +2519,12 @@ async def get_case_audit_events(
                         ELSE 'Evidence Annotated'
                     END AS eventaction
                     FROM "Cases_DB"."Audit_Media" AS audit_media
-                    INNER JOIN "Cases_DB"."Reports" AS reports
-                        ON reports.mediaid = audit_media.old_media_id
-                    WHERE reports.caseid = $1::uuid
+                    INNER JOIN "Cases_DB"."Cases" AS cases
+                        ON cases.caseid = $1::uuid
+                    CROSS JOIN LATERAL unnest(
+                        COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
+                    ) AS elem
+                    WHERE elem.evidence_id = audit_media.old_media_id
                         AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
             )
             SELECT

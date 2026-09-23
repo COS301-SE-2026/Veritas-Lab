@@ -895,7 +895,6 @@ def test_update_case_invalid_case_id(monkeypatch):
     }
 
 def test_update_case_no_fields_provided(monkeypatch):
-    #Here we are testing for errors when CaseName and CaseDescription are None
     client.cookies.clear()
     _mock_jwt_success(monkeypatch)
 
@@ -1156,11 +1155,11 @@ def test_delete_case_success_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
+    async def mock_delete_case(self, username: str, is_admin: bool, connection, executor_id: str | None = None):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "investigator_user"
-        assert role == "INVESTIGATOR"
+        assert is_admin is False
         assert executor_id == "mock-user-id"
     
         return None
@@ -1200,11 +1199,11 @@ def test_delete_case_success_admin(monkeypatch):
             "role": "ADMIN"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
+    async def mock_delete_case(self, username: str, is_admin: bool, connection, executor_id: str | None = None):
         assert isinstance(self.case_id, str)
         assert self.case_id == "12345678-abcd-ef01-2345-6789abcdef01"
         assert username == "admin_user"
-        assert role == "ADMIN"
+        assert is_admin is True
         assert executor_id == "mock-admin-id"
 
         return None
@@ -1255,7 +1254,7 @@ def test_delete_case_missing_jwt(monkeypatch):
             }
         )
 
-def test_delete_case_user_forbidden(monkeypatch):
+def test_delete_case_user_role_allowed(monkeypatch):
     client.cookies.clear()
 
     async def mock_verify_jwt(request, connection):
@@ -1264,13 +1263,25 @@ def test_delete_case_user_forbidden(monkeypatch):
             "username": "normal_user",
             "role": "USER"
         }
-    
+
+    async def mock_delete_case(self, username: str, is_admin: bool, connection, executor_id: str | None = None):
+        assert username == "normal_user"
+        assert is_admin is False
+        assert executor_id == "mock-user-id"
+
+        return None
+
     monkeypatch.setattr(
-        cases_router, 
-        "verify_jwt", 
+        cases_router,
+        "verify_jwt",
         mock_verify_jwt
     )
-    
+    monkeypatch.setattr(
+        cases_router.Case,
+        "delete_case",
+        mock_delete_case
+    )
+
     response = client.request(
         "DELETE",
         "/api/deleteCase",
@@ -1279,12 +1290,10 @@ def test_delete_case_user_forbidden(monkeypatch):
         }
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200
     assert response.json() == {
-        "detail": {
-            "status": "error",
-            "message": "User unauthorized"
-        }
+        "status": "success",
+        "message": "Case deleted successfully"
     }
 
 def test_delete_case_missing_case_id(monkeypatch):
@@ -1359,7 +1368,7 @@ def test_delete_case_not_found(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
+    async def mock_delete_case(self, username: str, is_admin: bool, connection, executor_id: str | None = None):
         assert executor_id == "mock-investigator-id"
         raise HTTPException(
             status_code=404,
@@ -1406,16 +1415,16 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
             "role": "INVESTIGATOR"
         }
     
-    async def mock_delete_case(self, username: str, role: str, connection, executor_id: str | None = None):
+    async def mock_delete_case(self, username: str, is_admin: bool, connection, executor_id: str | None = None):
         assert username == "other_investigator"
-        assert role == "INVESTIGATOR"
+        assert is_admin is False
         assert executor_id == "mock-investigator-id"
         
         raise HTTPException(
             status_code=403,
             detail={
                 "status": "error",
-                "message": "Only the case creator or an admin can delete this case"
+                "message": "Only the creator of an open case or an admin can delete this case"
             }
         )
     
@@ -1442,7 +1451,7 @@ def test_delete_case_unauthorized_non_creator(monkeypatch):
     assert response.json() == {
         "detail": {
             "status": "error",
-            "message": "Only the case creator or an admin can delete this case"
+            "message": "Only the creator of an open case or an admin can delete this case"
         }
     }
 
@@ -1512,7 +1521,7 @@ def make_mock_connection_with_transaction():
 
 @pytest.mark.asyncio
 @patch("asyncpg.connect")
-async def test_delete_case_not_found(mockDbConnect):
+async def test_delete_case_not_found_post_refactor(mockDbConnect):
     connection = make_mock_connection_with_transaction()
     mockDbConnect.return_value = connection
 
@@ -1521,7 +1530,7 @@ async def test_delete_case_not_found(mockDbConnect):
     case = Case(case_id=str(uuid4()))
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_case("someone", "USER", connection)
+        await case.delete_case("someone", True, connection)
 
     assert excInfo.value.status_code == 404
     assert excInfo.value.detail == {
@@ -1535,17 +1544,17 @@ async def test_delete_case_unauthorized(mockDbConnect):
     connection = make_mock_connection_with_transaction()
     mockDbConnect.return_value = connection
 
-    connection.fetchrow = AsyncMock(return_value={"casecreator": "tha_real_creator"})
+    connection.fetchrow = AsyncMock(return_value=None)
 
     case = Case(case_id=str(uuid4()))
 
     with pytest.raises(HTTPException) as excInfo:
-        await case.delete_case("someone_eklse", "USER", connection)
+        await case.delete_case("someone_eklse", False, connection)
 
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == {
         "status": "error",
-        "message": "Only the case creator or an admin can delete this case"
+        "message": "Only the creator of an open case or an admin can delete this case"
     }
 
 @pytest.mark.asyncio
@@ -1558,23 +1567,47 @@ async def test_delete_case_success_with_orphan_media_cleanup(mockget_object, moc
     case_id = uuid4()
 
     connection.fetchrow = AsyncMock(side_effect=[
-        {"casecreator": "tha_real_creator"},
-        {"caseid": case_id, "mediaids": ["media-1"]},
-        {"mediaid": "media-1", "mediabucket": "evidence-bucket", "mediaextension": ".jpg" },
+        {"evidence": [("media-1", "Test Image")]},
+        {"mediaid": "media-1", "mediabucket": "evidence-bucket", "mediaextension": ".jpg"},
         ])
+
+    connection.fetchval = AsyncMock(return_value=0)
 
     mock_s3_client = MagicMock()
     mockget_object.return_value = mock_s3_client
 
     case = Case(case_id=str(case_id))
 
-    result = await case.delete_case("tha_real_creator", "USER", connection)
+    result = await case.delete_case("tha_real_creator", False, connection)
 
     assert result is None
     mock_s3_client.delete_object.assert_called_once_with(
         Bucket="evidence-bucket",
         Key="media-1.jpg"
     )
+
+@pytest.mark.asyncio
+@patch("asyncpg.connect")
+@patch("app.core.cases.get_object")
+async def test_delete_case_keeps_media_referenced_by_another_case(mockget_object, mockDbConnect):
+    connection = make_mock_connection_with_transaction()
+    mockDbConnect.return_value = connection
+
+    case_id = uuid4()
+
+    connection.fetchrow = AsyncMock(side_effect=[
+        {"evidence": [("media-1", "Test Image")]},
+        ])
+    connection.fetchval = AsyncMock(return_value=1)
+
+    mock_s3_client = MagicMock()
+    mockget_object.return_value = mock_s3_client
+
+    case = Case(case_id=str(case_id))
+
+    await case.delete_case("tha_real_creator", False, connection)
+
+    mock_s3_client.delete_object.assert_not_called()
 
 def test_get_comments_missing_jwt(monkeypatch):
     client.cookies.clear()

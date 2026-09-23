@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import useCase from '@/lib/hooks/useCase';
 import type { CaseCloseButtonProps } from '@/types/components';
@@ -26,13 +27,15 @@ export default function CaseCloseButton({ caseId, onClosed, className = '' }: Ca
     return (
         <div className={className}>
             <Button
-                variant="submit"
+                variant="outline"
                 onClick={handleClose}
                 disabled={isClosing}
-                className="w-full py-3"
-                text={isClosing ? 'Closing' : 'Close Case'}
-            />
-            {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
+                className="w-full gap-2 py-3"
+            >
+                <CheckCircle2 size={18} />
+                {isClosing ? 'Closing' : 'Close Case'}
+            </Button>
+            {error ? <div className="mt-2"><Label text={error} htmlFor="error" variant="error" /></div> : null}
         </div>
     );
 }

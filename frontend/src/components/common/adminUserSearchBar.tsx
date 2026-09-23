@@ -1,4 +1,5 @@
 'use client';
+import { Search } from 'lucide-react';
 import Input from '../ui/input';
 import Dropdown from '../ui/dropdown';
 import SliderBar from '../ui/sliderBar';
@@ -32,32 +33,27 @@ export default function AdminUserSearchBar({
     onSortChange,
 }: AdminUserSearchBarProps) {
     return (
-        <div className='grid gap-4 rounded-full font-semibold text-[var(--color-text)] p-4 mt-4 md:grid-cols-3'>
-            <div>
+        <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
+            <div className="relative">
+                <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-(--color-text-subtle)" />
                 <Input
                     placeholder={searchPlaceholder}
-                    className='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] pl-5 w-full py-2.5 rounded-full'
+                    className='vl-input pl-11'
                     value={searchValue}
                     onChange={onSearchChange}
                 />
             </div>
-            <div>
-                <SliderBar
-                    filters={filters}
-                    className='w-full'
-                    defaultFilter={roleFilter}
-                    onChange={onRoleChange}
-                />
-            </div>
-            <div>
-                <Dropdown
-                    options={sortOptions}
-                    className='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] pl-5 w-full py-3.5 rounded-full'
-                    optionClassName='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-full'
-                    defaultValue={sortValue}
-                    onChange={(event) => onSortChange?.(event.target.value)}
-                />
-            </div>
+            <SliderBar
+                filters={filters}
+                className='w-full'
+                defaultFilter={roleFilter}
+                onChange={onRoleChange}
+            />
+            <Dropdown
+                options={sortOptions}
+                defaultValue={sortValue}
+                onChange={(event) => onSortChange?.(event.target.value)}
+            />
         </div>
     );
 }

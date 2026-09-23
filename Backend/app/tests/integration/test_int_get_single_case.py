@@ -1,312 +1,430 @@
+import json
+import uuid
 import pytest
 import pytest_asyncio
-import uuid
-import asyncpg
-from fastapi.testclient import TestClient
-from app.tests.integration.conftest import get_connection
-from app.api.main import app
-from app.core.env import Postgres_Settings
-from app.auth.auth import create_token, COOKIE_NAME 
-
-POSTGRES_SETTINGS = Postgres_Settings()
-
-INVESTIGATOR_ID = str(uuid.uuid4())
-USER_ID = str(uuid.uuid4())
-
-def investigator_cookie():
-    return create_token({
-        "id": INVESTIGATOR_ID,
-        "username": "Testinvestigator",
-        "role": "INVESTIGATOR"
-    })
-
-def user_cookie():
-    return create_token({
-        "id": USER_ID,
-        "username": "Testuser",
-        "role": "USER"
-    })
-
-@pytest_asyncio.fixture(autouse=True)
-async def cookie_users_exists(ensure_user_exists):
-    conn = await get_connection()
-
-    try:
-        await ensure_user_exists(conn, INVESTIGATOR_ID, "Testinvestigator", role="INVESTIGATOR")
-        await ensure_user_exists(conn, USER_ID, "Testuser", role="USER")
-        yield
-    finally:
-        await conn.close()
+from app.auth.auth import COOKIE_NAME
 
 @pytest_asyncio.fixture
-async def fake_get_single_case_context(ensure_user_exists):
-    conn = await get_connection()
-    created_ids = {}
+async def single_case_context(case_assignment_context):
+    ctx = case_assignment_context
+
+    ctx["media_ids"] = []
+    ctx["media_type_ids"] = []
 
     try:
-        admin_id = str(uuid.uuid4())
-        await ensure_user_exists(conn, admin_id, "admin_user", role="ADMIN")
-        created_ids["admin_id"] = admin_id
-
-        await conn.execute(
-            "SELECT set_config('app.current_user_id', $1, false)",
-            admin_id
-        )
-
-        media_type_id = str(uuid.uuid4())
-        unique_suffix = uuid.uuid4().hex[:6]
-
-        await conn.execute(
-            """
-            INSERT INTO "Cases_DB"."MediaType"
-            (MediaTypeId, MediaName, MediaBucket, MediaExtension)
-            VALUES ($1, $2, $3, $4)
-            """,
-            uuid.UUID(media_type_id),
-            f"SINGLE_CASE_{unique_suffix}",
-            "test-bucket",
-            f".{unique_suffix}"
-        )
-
-        created_ids["media_type_id"] = media_type_id
-
-        # Investigator-owned OPEN and CLOSED cases
-        for label, closed in (("open", False), ("closed", True)):
-            media_id = str(uuid.uuid4())
-
-            await conn.execute(
-                """
-                INSERT INTO "Cases_DB"."Media"
-                (MediaId, MediaType, MediaHash)
-                VALUES ($1, $2, $3)
-                """,
-                uuid.UUID(media_id),
-                uuid.UUID(media_type_id),
-                uuid.uuid4().hex
-            )
-
-            created_ids[f"{label}_media_id"] = media_id
-
-            case_id = str(uuid.uuid4())
-
-            await conn.execute(
-                """
-                INSERT INTO "Cases_DB"."Cases"
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
-                VALUES ($1, $2, $3, $4, $5::case_state_enum)
-                """,
-                uuid.UUID(case_id),
-                f"Integration Test - {label} case",
-                "TestInvestigator",
-                f"This case is currently {label}",
-                "CLOSED" if closed else "OPEN"
-            )
-
-            created_ids[f"{label}_case_id"] = case_id
-
-            await conn.execute(
-                """
-                INSERT INTO "Cases_DB"."Reports"
-                (CaseId, MediaId, ImageTitle)
-                VALUES ($1, $2, $3)
-                """,
-                uuid.UUID(case_id),
-                uuid.UUID(media_id),
-                f"{label}-evidence"
-            )
-
-        # USER-owned OPEN and CLOSED cases
-        for label, closed in (("user_open", False), ("user_closed", True)):
-            media_id = str(uuid.uuid4())
-
-            await conn.execute(
-                """
-                INSERT INTO "Cases_DB"."Media"
-                (MediaId, MediaType, MediaHash)
-                VALUES ($1, $2, $3)
-                """,
-                uuid.UUID(media_id),
-                uuid.UUID(media_type_id),
-                uuid.uuid4().hex
-            )
-
-            created_ids[f"{label}_media_id"] = media_id
-
-            case_id = str(uuid.uuid4())
-
-            await conn.execute(
-                """
-                INSERT INTO "Cases_DB"."Cases"
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
-                VALUES ($1, $2, $3, $4, $5::case_state_enum)
-                """,
-                uuid.UUID(case_id),
-                f"Integration Test - {label} case",
-                "Testuser",
-                f"This case belongs to Testuser and is {label}",
-                "CLOSED" if closed else "OPEN"
-            )
-
-            created_ids[f"{label}_case_id"] = case_id
-
-            await conn.execute(
-                """
-                INSERT INTO "Cases_DB"."Reports"
-                (CaseId, MediaId, ImageTitle)
-                VALUES ($1, $2, $3)
-                """,
-                uuid.UUID(case_id),
-                uuid.UUID(media_id),
-                f"{label}-evidence"
-            )
-
-        yield created_ids
+        yield ctx
 
     finally:
-        for label in (
-            "open",
-            "closed",
-            "user_open",
-            "user_closed",
-        ):
-            if f"{label}_case_id" in created_ids:
-                await conn.execute(
-                    'DELETE FROM "Cases_DB"."Cases" WHERE CaseId = $1',
-                    uuid.UUID(created_ids[f"{label}_case_id"])
-                )
+        await ctx["conn"].execute(
+            "SELECT set_config('app.current_user_id', $1, false)",
+            ctx["investigator_id"]
+        )
 
-            if f"{label}_media_id" in created_ids:
-                await conn.execute(
-                    'DELETE FROM "Cases_DB"."Media" WHERE MediaId = $1',
-                    uuid.UUID(created_ids[f"{label}_media_id"])
-                )
-
-        if "media_type_id" in created_ids:
-            await conn.execute(
-                'DELETE FROM "Cases_DB"."MediaType" WHERE MediaTypeId = $1',
-                uuid.UUID(created_ids["media_type_id"])
+        for media_id in ctx["media_ids"]:
+            await ctx["conn"].execute(
+                """
+                DELETE FROM "Cases_DB"."Media"
+                WHERE mediaid = $1
+                """,
+                uuid.UUID(media_id)
             )
 
-        await conn.close()
+        for media_type_id in ctx["media_type_ids"]:
+            await ctx["conn"].execute(
+                """
+                DELETE FROM "Cases_DB"."MediaType"
+                WHERE mediatypeid = $1
+                """,
+                uuid.UUID(media_type_id)
+            )
 
-@pytest.mark.asyncio
-async def test_integration_get_single_case_investigator_open_case(client, fake_get_single_case_context):
-    client.cookies.set(COOKIE_NAME, investigator_cookie())
+async def seed_case(
+    ctx,
+    creator=None,
+    state="OPEN",
+    name="Integration test case",
+    description="Case used for integration testing"
+):
+    if creator is None:
+        creator = ctx["creator_name"]
 
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={"CaseID": fake_get_single_case_context["open_case_id"]}
+    case_id = uuid.uuid4()
+
+    await ctx["conn"].execute(
+        "SELECT set_config('app.current_user_id', $1, false)",
+        ctx["creator_id"]
     )
 
-    assert response.status_code == 200
-    data = response.json()
-
-    assert data["status"] == "success"
-    assert data["case"]["caseId"] == fake_get_single_case_context["open_case_id"]
-    assert data["case"]["caseState"] == "OPEN"
-
-    assert len(data["evidence"]) == 1
-    assert data["evidence"][0]["mediaUrl"] != ""
-
-@pytest.mark.asyncio
-async def test_integration_get_single_case_user_closed_case(client, fake_get_single_case_context):
-    client.cookies.set(COOKIE_NAME, user_cookie())
-
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={"CaseID": fake_get_single_case_context["user_closed_case_id"]}
+    await ctx["conn"].execute(
+        """
+        INSERT INTO "Cases_DB"."Cases"
+        (
+            caseid,
+            casename,
+            casecreator,
+            casedescription,
+            casestate
+        )
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5::case_state_enum
+        )
+        """,
+        case_id,
+        name,
+        creator,
+        description,
+        state
     )
 
-    assert response.status_code == 200
-    data = response.json()
+    ctx["cases"].append(str(case_id))
 
-    assert data["status"] == "success"
-    assert data["case"]["caseId"] == fake_get_single_case_context["user_closed_case_id"]
-    assert data["case"]["caseState"] == "CLOSED"
+    return str(case_id)
 
-    assert len(data["evidence"]) == 1
-    assert data["evidence"][0]["mediaUrl"] != ""
+async def seed_media(ctx):
+    media_type_id = uuid.uuid4()
+    media_id = uuid.uuid4()
 
-@pytest.mark.asyncio
-async def test_integration_get_single_case_user_can_see_open_case_without_report(client, fake_get_single_case_context):
-    client.cookies.set(COOKIE_NAME, user_cookie())
+    suffix = uuid.uuid4().hex[:6]
 
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={"CaseID": fake_get_single_case_context["user_open_case_id"]}
+    await ctx["conn"].execute(
+        "SELECT set_config('app.current_user_id', $1, false)",
+        ctx["investigator_id"]
     )
 
-    assert response.status_code == 200
+    await ctx["conn"].execute(
+        """
+        INSERT INTO "Cases_DB"."MediaType"
+        (
+            mediatypeid,
+            medianame,
+            mediabucket,
+            mediaextension
+        )
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4
+        )
+        """,
+        media_type_id,
+        f"Test Image {suffix}",
+        "test-bucket",
+        f".{suffix}"
+    )
 
-    data = response.json()
+    await ctx["conn"].execute(
+        """
+        INSERT INTO "Cases_DB"."Media"
+        (
+            mediaid,
+            mediatype,
+            mediahash,
+            mediaannotations,
+            reportartifacts,
+            reportfindings,
+            reportcomments,
+            reportcertainty,
+            reportdatecreation
+        )
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4::jsonb,
+            $5::jsonb,
+            $6,
+            $7,
+            $8,
+            CURRENT_TIMESTAMP
+        )
+        """,
+        media_id,
+        media_type_id,
+        f"hash-{uuid.uuid4()}",
+        json.dumps([
+            {
+                "type": "test",
+                "value": "annotation"
+            }
+        ]),
+        json.dumps({
+            "artifact": "test-artifact"
+        }),
+        "No manipulation detected.",
+        "Reviewed by investigator.",
+        3
+    )
 
-    assert data["status"] == "success"
-    assert data["case"]["caseId"] == fake_get_single_case_context["user_open_case_id"]
-    assert data["case"]["caseState"] == "OPEN"
+    ctx["media_ids"].append(str(media_id))
+    ctx["media_type_ids"].append(str(media_type_id))
 
-    assert len(data["evidence"]) == 1
+    return str(media_id)
 
-    evidence = data["evidence"][0]
+async def attach_evidence(
+    ctx,
+    case_id,
+    media_id,
+    perspective="Front view"
+):
+    await ctx["conn"].execute(
+        "SELECT set_config('app.current_user_id', $1, false)",
+        ctx["creator_id"]
+    )
 
-    assert evidence["mediaUrl"] != ""
-
-    assert "annotations" not in evidence
-    assert "reportId" not in evidence
-    assert "reportArtifacts" not in evidence
-    assert "reportFindings" not in evidence
-    assert "reportComments" not in evidence
-    assert "reportCertainty" not in evidence
-    assert "reportDateCreation" not in evidence
+    await ctx["conn"].execute(
+        """
+        UPDATE "Cases_DB"."Cases"
+        SET evidence = ARRAY[
+            ROW(
+                $2::uuid,
+                $3::text
+            )::"Cases_DB".evidence_type
+        ]
+        WHERE caseid = $1
+        """,
+        uuid.UUID(case_id),
+        uuid.UUID(media_id),
+        perspective
+    )
 
 @pytest.mark.asyncio
-async def test_integration_get_single_case_unknown_case(client):
-    client.cookies.set(COOKIE_NAME, investigator_cookie())
+async def test_user_can_view_own_open_case(client, single_case_context):
+    ctx = single_case_context
 
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={"CaseID": str(uuid.uuid4())}
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["user_name"],
+        state="OPEN"
     )
+
+    client.cookies.set(COOKIE_NAME, ctx["user_token"])
+    response = client.get(f"/api/getSingleCase/{case_id}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["case"]["caseId"] == case_id
+    assert body["case"]["caseState"] == "OPEN"
+
+@pytest.mark.asyncio
+async def test_user_cannot_view_another_users_case(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["creator_name"],
+        state="PUBLISHED"
+    )
+
+    client.cookies.set(COOKIE_NAME,ctx["user_token"])
+
+    response = client.get(f"/api/getSingleCase/{case_id}")
+    assert response.status_code == 404
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "Case not found"
+    }
+
+@pytest.mark.asyncio
+async def test_investigator_can_view_published_case(client, single_case_context):
+    ctx = single_case_context
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["creator_name"],
+        state="PUBLISHED"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    response = client.get(f"/api/getSingleCase/{case_id}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["case"]["caseState"] == "PUBLISHED"
+
+@pytest.mark.asyncio
+async def test_investigator_can_view_closed_case(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["creator_name"],
+        state="CLOSED"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+
+    response = client.get(f"/api/getSingleCase/{case_id}")
+    assert response.status_code == 200, response.text
+    assert response.json()["case"]["caseState"] == "CLOSED"
+
+@pytest.mark.asyncio
+async def test_investigator_cannot_view_another_users_open_case(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["creator_name"],
+        state="OPEN"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
+    response = client.get(f"/api/getSingleCase/{case_id}")
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_admin_can_view_published_case(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["creator_name"],
+        state="PUBLISHED"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["admin_token"])
+
+    response = client.get(f"/api/getSingleCase/{case_id}")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["case"]["caseState"] == "PUBLISHED"
+
+@pytest.mark.asyncio
+async def test_user_open_case_hides_report_data(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["user_name"],
+        state="OPEN"
+    )
+
+    media_id = await seed_media(ctx)
+
+    await attach_evidence(
+        ctx,
+        case_id,
+        media_id,
+        "Front view"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["user_token"])
+
+    response = client.get(f"/api/getSingleCase/{case_id}")
+
+    assert response.status_code == 200, response.text
+    evidence = response.json()["evidence"]
+    assert len(evidence) == 1
+    item = evidence[0]
+    assert item["mediaId"] == media_id
+    assert item["casePerspective"] == "Front view"
+    assert "annotations" not in item
+    assert "reportArtifacts" not in item
+    assert "reportFindings" not in item
+    assert "reportComments" not in item
+    assert "reportCertainty" not in item
+    assert "reportDateCreation" not in item
+
+@pytest.mark.asyncio
+async def test_user_closed_case_can_view_report_data(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["user_name"],
+        state="CLOSED"
+    )
+
+    media_id = await seed_media(ctx)
+
+    await attach_evidence(
+        ctx,
+        case_id,
+        media_id,
+        "Rear view"
+    )
+
+    client.cookies.set(COOKIE_NAME, ctx["user_token"])
+
+    response = client.get(f"/api/getSingleCase/{case_id}")
+    assert response.status_code == 200, response.text
+    evidence = response.json()["evidence"]
+    assert len(evidence) == 1
+    item = evidence[0]
+    assert item["mediaId"] == media_id
+    assert item["casePerspective"] == "Rear view"
+    assert "annotations" in item
+    assert "reportArtifacts" in item
+    assert item["reportFindings"] == "No manipulation detected."
+    assert item["reportComments"] == "Reviewed by investigator."
+    assert item["reportCertainty"] == 3
+    assert item["reportDateCreation"] is not None
+
+@pytest.mark.asyncio
+async def test_investigator_can_view_report_data(client, single_case_context):
+    ctx = single_case_context
+
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["creator_name"],
+        state="PUBLISHED"
+    )
+
+    media_id = await seed_media(ctx)
+
+    await attach_evidence(
+        ctx,
+        case_id,
+        media_id,
+        "Side view"
+    )
+
+    client.cookies.set(COOKIE_NAME,ctx["investigator_token"])
+
+    response = client.get(f"/api/getSingleCase/{case_id}")
+    assert response.status_code == 200, response.text
+    evidence = response.json()["evidence"]
+    assert len(evidence) == 1
+    item = evidence[0]
+    assert item["mediaId"] == media_id
+    assert item["casePerspective"] == "Side view"
+    assert "annotations" in item
+    assert "reportArtifacts" in item
+    assert item["reportFindings"] == "No manipulation detected."
+    assert item["reportComments"] == "Reviewed by investigator."
+    assert item["reportCertainty"] == 3
+
+@pytest.mark.asyncio
+async def test_get_single_case_not_found(client, single_case_context):
+    ctx = single_case_context
+    missing_case_id = str(uuid.uuid4())
+    client.cookies.set(
+        COOKIE_NAME,
+        ctx["investigator_token"]
+    )
+
+    response = client.get(f"/api/getSingleCase/{missing_case_id}")
 
     assert response.status_code == 404
-    assert response.json()["detail"]["status"] == "error"
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "Case not found"
+    }
 
 @pytest.mark.asyncio
-async def test_integration_get_single_case_malformed_case_id(client):
-    client.cookies.set(COOKIE_NAME, investigator_cookie())
+async def test_get_single_case_requires_authentication(client, single_case_context):
+    ctx = single_case_context
 
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={"CaseID": "not-a-valid-uuid"}
+    case_id = await seed_case(
+        ctx,
+        creator=ctx["user_name"],
+        state="OPEN"
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"]["status"] == "error"
-
-@pytest.mark.asyncio
-async def test_integration_get_single_case_missing_case_id(client):
-    client.cookies.set(COOKIE_NAME, investigator_cookie())
-
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={}
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"]["message"] == "CaseID required"
-
-@pytest.mark.asyncio
-async def test_integration_get_single_case_unauthorized(client):
-    response = client.request(
-        "GET",
-        "/api/getSingleCase",
-        json={"CaseID": str(uuid.uuid4())}
-    )
-
+    client.cookies.clear()
+    response = client.get(f"/api/getSingleCase/{case_id}")
     assert response.status_code == 401
-    assert response.json()["detail"]["status"] == "error"

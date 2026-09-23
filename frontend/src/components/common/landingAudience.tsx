@@ -11,26 +11,26 @@ const audiences: Audience[] = [
 export default function LandingAudience() {
     return (
         <section className="bg-white">
-            <div className="flex flex-col w-full px-6 sm:px-10 py-10 sm:py-14">
-                <p className="text-base sm:text-lg lg:text-xl text-(--color-light) tracking-wide">
-                    WHO IT&apos;S FOR
+            <div className="flex flex-col w-full px-6 sm:px-10 py-12 sm:py-16">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] text-(--color-text-subtle)">
+                    Who it&apos;s for
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6">
                     {audiences.map((item) => {
                         const Icon = item.icon;
                         return (
-                            <div key={item.title} className="rounded-2xl bg-(--color-lightest) p-5">
+                            <div key={item.title} className="vl-card vl-card-interactive p-6">
                                 <div
-                                    className="size-[60px] rounded-xl bg-(--color-background) flex items-center justify-center"
+                                    className="flex size-14 items-center justify-center rounded-2xl bg-(--color-b-50) ring-1 ring-[color-mix(in_srgb,var(--b-500)_25%,transparent)]"
                                     aria-hidden="true"
                                 >
-                                    <Icon className="size-[40px] text-(--color-secondary)" />
+                                    <Icon className="size-7 text-(--color-b-600)" />
                                 </div>
-                                <h3 className="text-(--color-text) text-lg sm:text-xl font-bold mt-6">
+                                <h3 className="text-(--color-text-strong) text-lg sm:text-xl font-bold mt-6">
                                     {item.title}
                                 </h3>
-                                <p className="text-(--color-text) text-base sm:text-lg mt-3">
+                                <p className="text-(--color-text-muted) text-base mt-2.5 leading-relaxed">
                                     {item.description}
                                 </p>
                             </div>
