@@ -3275,7 +3275,7 @@ async def publish_case(
 
 
 @router.get(
-    "/getCaseBoard/{case_id}",
+    "/CaseBoard/{case_id}",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     tags=["caseboard"],

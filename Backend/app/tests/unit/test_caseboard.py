@@ -138,7 +138,7 @@ async def test_get_case_board_success(expected_response_payload):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="https://test"
             ) as ac:
-                response = await ac.get(f"/api/getCaseBoard/{case_id_str}")
+                response = await ac.get(f"/api/CaseBoard/{case_id_str}")
 
             assert response.status_code == 200
             assert response.json() == expected_response_payload
@@ -162,7 +162,7 @@ async def test_get_case_board_invalid_uuid():
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="https://test"
             ) as ac:
-                response = await ac.get("/api/getCaseBoard/invalid-uuid-string")
+                response = await ac.get("/api/CaseBoard/invalid-uuid-string")
 
             assert response.status_code == 400
         finally:
@@ -187,7 +187,7 @@ async def test_get_case_board_not_found():
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="https://test"
             ) as ac:
-                response = await ac.get(f"/api/getCaseBoard/{valid_uuid}")
+                response = await ac.get(f"/api/CaseBoard/{valid_uuid}")
 
             assert response.status_code == 404
         finally:
@@ -212,7 +212,7 @@ async def test_get_case_board_open_case_forbidden():
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="https://test"
             ) as ac:
-                response = await ac.get(f"/api/getCaseBoard/{valid_uuid}")
+                response = await ac.get(f"/api/CaseBoard/{valid_uuid}")
 
             assert response.status_code == 403
         finally:

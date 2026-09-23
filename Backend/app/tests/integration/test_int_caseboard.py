@@ -388,10 +388,86 @@ async def test_integration_get_case_board_success(client, seeded_case_board):
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
 
-    response = client.get(f"/api/getCaseBoard/{case_id}")
+    response = client.get(f"/api/CaseBoard/{case_id}")
 
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
     assert data["caseId"] == case_id
     assert data["caseBoard"] == seeded_case_board["board_data"]
+
+@pytest.mark.asyncio
+async def test_integration_get_case_board_none_returns_null(client, fake_case_board_context):
+    case_id = fake_case_board_context["case_id"]
+
+    mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": "TestInvest",
+        "role": "INVESTIGATOR",
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+
+    response = client.get(f"/api/CaseBoard/{case_id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["caseId"] == case_id
+    assert data["caseBoard"] is None
+
+@pytest.mark.asyncio
+async def test_integration_get_case_board_invalid_uuid(client):
+    mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": "TestInvest",
+        "role": "INVESTIGATOR",
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+
+    response = client.get("/api/CaseBoard/invalid-uuid-string")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["status"] == "error"
+
+@pytest.mark.asyncio
+async def test_integration_get_case_board_invalid_jwt(client, seeded_case_board):
+    case_id = seeded_case_board["case_id"]
+
+    client.cookies.set(COOKIE_NAME, "")
+
+    response = client.get(f"/api/CaseBoard/{case_id}")
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["status"] == "error"
+    
+@pytest.mark.asyncio
+async def test_integration_get_case_board_user_unauthorized(client, seeded_case_board):
+    case_id = seeded_case_board["case_id"]
+
+    mock_user = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": "TestUser",
+        "role": "USER",
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_user))
+
+    response = client.get(f"/api/CaseBoard/{case_id}")
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["status"] == "error"
+
+@pytest.mark.asyncio
+async def test_integration_get_case_board_not_found(client):
+    non_existent_case_id = str(uuid.uuid4())
+
+    mock_invest = {
+        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "username": "TestInvest",
+        "role": "INVESTIGATOR",
+    }
+    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
+
+    response = client.get(f"/api/CaseBoard/{non_existent_case_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["status"] == "error"
