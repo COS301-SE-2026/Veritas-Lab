@@ -657,19 +657,10 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         }
     }
 )
-async def get_single_case(case_request: create_single_case_request, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
+async def get_single_case(case_id: str, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
     payload = await verify_jwt(request, connection)
 
-    if not case_request.CaseID:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "status": "error",
-                "message": CASE_ID_REQUIRED
-            }
-        )
-
-    case_id = Case(case_id=case_request.CaseID).case_id
+    case_id = Case(case_id=case_id).case_id
 
     role = payload.get("role")
     username = payload.get("username")
@@ -2073,8 +2064,6 @@ async def delete_case(
 
     payload = await verify_jwt(request, connection)
     
-    verify_not_user(payload.get("role"))
-    
     if not case_request.CaseID:
         raise HTTPException(
             status_code=400,
@@ -2397,8 +2386,6 @@ async def get_case_audit_events(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     payload = await verify_jwt(request, connection)
-
-    verify_not_user(payload.get("role"))
 
     validated_case_id = Case(case_id=case_id).case_id
 
