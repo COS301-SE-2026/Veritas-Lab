@@ -7,6 +7,7 @@ import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
 import CaseCloseButton from "@/components/common/caseCloseButton";
+import CasePublishButton from "@/components/common/casePublishButton";
 import useCase from "@/lib/hooks/useCase";
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
@@ -73,14 +74,20 @@ export default function CasePage() {
         }
     };
     //permissions reviewed and updated
-    const caseDetails = caseData?.case;
+     const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
-    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN' || userRole === 'USER') && !!caseDetails && caseDetails.caseCreator === currentUser?.username && !caseDetails?.caseClosed; //creator
-    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !caseDetails?.caseClosed; //need to add assigned can only close with admin
-    const canDeleteEvidence = (userRole === 'INVESTIGATOR' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'USER' && !!caseDetails && caseDetails.caseCreator === currentUser?.username || userRole === 'ADMIN') && !caseDetails?.caseClosed; //user that is owner or any admin
-    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails /*&& caseDetails.caseCreator === currentUser?.username  change to assigned */&& !caseDetails?.caseClosed; //owner and not closed
-
+    const caseState = caseDetails?.caseState ?? 'OPEN';
+    const isCaseClosed = caseState === 'CLOSED';
+    const isCaseOpen = caseState === 'OPEN';
+    //might need to still re review the permissions
+    const isOwner = !!caseDetails && caseDetails.caseCreator === currentUser?.username;
+    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN' || userRole === 'USER') && isOwner && isCaseOpen; //creator, before publishing
+    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !isCaseClosed; //need to add assigned can only close with admin
+    const canDeleteEvidence = ((userRole === 'INVESTIGATOR' && isOwner) || (userRole === 'USER' && isOwner) || userRole === 'ADMIN') && !isCaseClosed; //user that is owner or any admin
+    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails /*&& caseDetails.caseCreator === currentUser?.username  change to assigned */&& !isCaseClosed; //owner and not closed
+    const canPublishCase = isOwner && isCaseOpen; //any role, own case, still open
+    
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
         const date = new Date(dateValue);
@@ -176,7 +183,9 @@ export default function CasePage() {
                                 <div className="flex items-center gap-2 text-(--color-text-muted)">
                                     <FileStack size={16} className="shrink-0 text-(--color-text-subtle)" />
                                     <span>Status:</span>
-                                    <span className="font-semibold text-(--color-text-strong)">{caseDetails?.caseClosed ? 'Closed' : 'Open'}</span>
+                                    <span className="font-semibold text-(--color-text-strong)">
+                                        {caseState === 'CLOSED' ? 'Closed' : caseState === 'PUBLISHED' ? 'Published' : 'Open'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-2 text-(--color-text-muted)">
                                     <CalendarDays size={16} className="shrink-0 text-(--color-text-subtle)" />
