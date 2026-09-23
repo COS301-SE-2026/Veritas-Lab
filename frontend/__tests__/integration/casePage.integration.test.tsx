@@ -62,6 +62,7 @@ const baseCase = {
         caseName: 'Alpha Fraud',
         caseDescription: 'Suspicious transaction pattern',
         caseCreator: 'investigator.one',
+        caseReviews: null,
         caseClosed: false,
         caseCreationDate: '2026-05-01T09:00:00.000Z',
     },

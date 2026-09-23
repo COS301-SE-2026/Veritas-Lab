@@ -22,6 +22,9 @@ describe('CaseEvidenceDeleteButton', () => {
             addEvidence: jest.fn(),
             closeCase: jest.fn(),
             deleteEvidence,
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+            updateCase: jest.fn(),
         });
     });
     //test rendering of modal and its behaviour

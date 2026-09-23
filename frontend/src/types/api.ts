@@ -1,3 +1,5 @@
+import { Annotation } from "./workbench";
+
 export type ApiError = {
     detail: {
         status?: 'error';
@@ -48,7 +50,7 @@ export type CaseEvidence = {
     mediaExtension: string;
     mediaTypeId: string;
     mediaUrl: string;
-    annotations: [] | null;
+    annotations: Annotation[] | null;
     reportArtifacts: Record<string, unknown> | null;
     reportFindings: string | null;
     reportCertainty: number | null;

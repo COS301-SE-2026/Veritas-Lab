@@ -52,8 +52,8 @@ jest.mock('next/dynamic', () => () => {
     return DynamicComponent;
 });
 const evidenceFixture: CaseEvidence = {
-    reportId: 'report-1',
     mediaId: 'media-1',
+    casePerspective: 'Suspicious Screenshot.png',
     mediaName: 'Suspicious Screenshot.png',
     mediaBucket: 'bucket-1',
     mediaExtension: 'png',

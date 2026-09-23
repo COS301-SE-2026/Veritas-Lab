@@ -25,7 +25,7 @@ function formatCapturedAt(value: string): string | null {
 }
 
 export default function EvidenceCard({
-    mediaName, mediaUrl, mediaExtension, href, mediaId, caseId, canDelete, onDeleted, variant,
+    mediaName, mediaUrl, mediaExtension, href, mediaId, caseId, canDelete, onDeleted, variant = 'default',
     capturedAt, reportCertainty, annotationCount = 0, placed = false, selected = false,
 }: Readonly<EvidenceCardProps>) {
     const isBoard = variant === 'case-board';
