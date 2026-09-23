@@ -388,14 +388,22 @@ async def test_publish_case_requires_authentication(client, publish_context):
     assert response.status_code == 401
 
 @pytest.mark.asyncio
-async def test_publish_case_rejects_invalid_role(client, publish_context):
+async def test_publish_case_rejects_invalid_role(client, publish_context, ensure_user_exists):
     ctx = publish_context
 
     case_id = await seed_case(ctx)
 
+    invalid_role_id = str(uuid.uuid4())
+    conn = await get_connection()
+
+    try:
+        await ensure_user_exists(conn, invalid_role_id, "Invalid_Role_User", "INVALID_ROLE")
+    finally:
+        await conn.close()
+
     invalid_token = create_token(
         {
-            "id": str(uuid.uuid4()),
+            "id": sinvalid_role_id,
             "username": "Invalid_Role_User",
             "role": "INVALID_ROLE"
         }

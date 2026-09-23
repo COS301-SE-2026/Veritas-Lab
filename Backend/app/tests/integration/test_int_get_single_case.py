@@ -10,20 +10,33 @@ from app.auth.auth import create_token, COOKIE_NAME
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
+INVESTIGATOR_ID = str(uuid.uuid4())
+USER_ID = str(uuid.uuid4())
 
 def investigator_cookie():
     return create_token({
-        "id": str(uuid.uuid4()),
+        "id": INVESTIGATOR_ID,
         "username": "Testinvestigator",
         "role": "INVESTIGATOR"
     })
 
 def user_cookie():
     return create_token({
-        "id": str(uuid.uuid4()),
+        "id": USER_ID,
         "username": "Testuser",
         "role": "USER"
     })
+
+@pytest_asyncio.fixture(autouse=True)
+async def cookie_users_exists(ensure_user_exists):
+    conn = await get_connection()
+
+    try:
+        await ensure_user_exists(conn, INVESTIGATOR_ID, "Testinvestigator", role="INVESTIGATOR")
+        await ensure_user_exists(conn, USER_ID, "Testuser", role="USER")
+        yield
+    finally:
+        await conn.close()
 
 @pytest_asyncio.fixture
 async def fake_get_single_case_context(ensure_user_exists):

@@ -128,9 +128,17 @@ async def fake_get_cases_context(ensure_user_exists):
         await conn.close()
 
 @pytest.mark.asyncio
-async def test_integration_get_cases_investigator(client, fake_get_cases_context):
+async def test_integration_get_cases_investigator(client, fake_get_cases_context, ensure_user_exists):
+    investigator_id = str(uuid.uuid4())
+    conn = await get_connection()
+
+    try:
+        await ensure_user_exists(conn, investigator_id, "test_investigator", "INVESTIGATOR")
+    finally:
+        await conn.close()
+
     mock_investigator_user = {
-        "id": str(uuid.uuid4()),
+        "id": investigator_id,
         "username": "test_investigator",
         "role": "INVESTIGATOR"
     }
@@ -149,7 +157,14 @@ async def test_integration_get_cases_investigator(client, fake_get_cases_context
     assert fake_get_cases_context["closed_case_id"] in returned_case_ids
 
 @pytest.mark.asyncio
-async def test_integration_get_cases_regular_user(client, fake_get_cases_context):
+async def test_integration_get_cases_regular_user(client, fake_get_cases_context, ensure_user_exists):
+    regular_user_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, regular_user_id, "test_user", "USER")
+    finally:
+        await conn.close()
+        
     mock_regular_user = {
         "id": str(uuid.uuid4()),
         "username": "test_user",

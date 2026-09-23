@@ -182,7 +182,7 @@ async def test_integration_delete_case_not_found_case(client, fake_delete_case_c
     creator = fake_delete_case_context["case_creator"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": fake_delete_case_context["executor_id"],
         "username": creator,
         "role": "INVESTIGATOR"
     }
@@ -268,7 +268,7 @@ async def test_integration_delete_case_missing_case_id(client, fake_delete_case_
     creator = fake_delete_case_context["case_creator"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": fake_delete_case_context["executor_id"],
         "username": creator,
         "role": "INVESTIGATOR"
     }

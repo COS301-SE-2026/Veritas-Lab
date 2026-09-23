@@ -174,12 +174,19 @@ async def assert_media_audit_row_exists(media_id: str):
 
 #403: Not the owner deleting
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_403_not_creator(client, fake_evidence_context):
+async def test_integration_delete_evidence_403_not_creator(client, fake_evidence_context, ensure_user_exists):
     case_id = fake_evidence_context["case_id"]
     media_id = fake_evidence_context["media_id"]
 
+    unauthorized_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, unauthorized_id, "UnauthorizedUser", "INVESTIGATOR")
+    finally:
+        await conn.close()
+
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": unauthorized_id,
         "username": "UnauthorizedUser",
         "role": "INVESTIGATOR"
     }
@@ -194,12 +201,19 @@ async def test_integration_delete_evidence_403_not_creator(client, fake_evidence
     
 #403: USER deleting
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_403_user(client, fake_evidence_context):
+async def test_integration_delete_evidence_403_user(client, fake_evidence_context, ensure_user_exists):
     case_id = fake_evidence_context["case_id"]
     media_id = fake_evidence_context["media_id"]
 
+    unauthorized_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, unauthorized_id, "UnauthorizedUser", "USER")
+    finally:
+        await conn.close()
+
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": unauthorized_id,
         "username": "UnauthorizedUser",
         "role": "USER"
     }
@@ -215,12 +229,19 @@ async def test_integration_delete_evidence_403_user(client, fake_evidence_contex
 
 #400: invalid Case Id
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_400_case_id(client, fake_evidence_context):
+async def test_integration_delete_evidence_400_case_id(client, fake_evidence_context, ensure_user_exists):
     case_id = "invalid case id"
     media_id = fake_evidence_context["media_id"]
 
+    unauthorized_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, unauthorized_id, "UnauthorizedUser", "INVESTIGATOR")
+    finally:
+        await conn.close()
+
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": unauthorized_id,
         "username": "UnauthorizedUser",
         "role": "INVESTIGATOR"
     }
@@ -307,13 +328,20 @@ async def test_integration_delete_evidence_admin_success(
 
 #404: No media
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_404_no_media(client, fake_evidence_context):
+async def test_integration_delete_evidence_404_no_media(client, fake_evidence_context, ensure_user_exists):
     case_id = fake_evidence_context["case_id"]
     media_id = str(uuid.uuid4())
     creator = fake_evidence_context["creator"]
 
+    admin_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, admin_id, "NoMediaAdmin", "ADMIN")
+    finally:
+        await conn.close()
+
     mock_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": admin_id,
         "username": creator,
         "role": "ADMIN"
     }
@@ -328,13 +356,20 @@ async def test_integration_delete_evidence_404_no_media(client, fake_evidence_co
 
 #404: No Case
 @pytest.mark.asyncio
-async def test_integration_delete_evidence_404_no_case(client, fake_evidence_context):
+async def test_integration_delete_evidence_404_no_case(client, fake_evidence_context, ensure_user_exists):
     case_id = str(uuid.uuid4())
     media_id = fake_evidence_context["media_id"]
     creator = "testerAdmin"
 
+    admin_id = str(uuid.uuid4())
+    conn = await get_connection()
+    try:
+        await ensure_user_exists(conn, admin_id, creator, "ADMIN")
+    finally:
+        await conn.close()
+
     mock_investigator = {
-        "id": str(uuid.uuid4()),
+        "id": admin_id,
         "username": creator,
         "role": "ADMIN"
     }
