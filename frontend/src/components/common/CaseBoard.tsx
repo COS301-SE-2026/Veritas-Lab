@@ -14,6 +14,7 @@ import { getCapturedAt } from '@/lib/data/captureTime';
 import { generateBoard, toEvidenceNode, evidenceNodeId  } from '@/lib/data/boardGenerator';
 import type { CaseBoard, SavedEdge } from '@/types/components';
 import { CaseEdgeData } from "./customEdge";
+import { getCaseBoard, saveCaseBoard } from '@/lib/api/caseBoard';
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
@@ -61,7 +62,7 @@ function formatBoard(nodes: Node[], edges: Edge[]): CaseBoard {
     return out;
 }
 
-function extractBoard(board: CaseBoard, evidenceList: CaseEvidence[]): { nodes: Node[], edges: Edge[] } {
+function extractBoard(board: CaseBoard | null | undefined, evidenceList: CaseEvidence[]): { nodes: Node[], edges: Edge[] } {
     if (!board) return { nodes: [], edges: [] };
 
     const evidenceNodes: Node[] = [];
@@ -113,7 +114,66 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
     const noteCount = useRef(0);
     const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
     const [fullscreen, setFullscreen] = useState(false);
+    const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [savedCaseBoard, setSavedCaseBoard] = useState<string>(() => JSON.stringify(formatBoard([], [])));
 
+    //loads the case board and restores it if it exists
+    const loadedCaseId = useRef<string | null>(null);
+    useEffect(() => {
+        if (loadedCaseId.current === caseId) return;
+        let cancelled = false;
+
+        getCaseBoard(caseId)
+            .then((board) => {
+                if (cancelled) return;
+                const restored = extractBoard(board, evidenceList);
+                if (restored.nodes.length === 0) return;
+                setNodes(restored.nodes);
+                setEdges(restored.edges);
+                setSavedCaseBoard(JSON.stringify(formatBoard(restored.nodes, restored.edges)));
+                setTimeout(() => fitView({ padding: 0.1 }), 50);
+            }).catch(() => {
+            });
+        return () => {
+            cancelled = true;
+        }
+    }, [caseId, evidenceList, setNodes, setEdges, fitView]);
+
+    const currentCaseBoard = useMemo(() => JSON.stringify(formatBoard(nodes, edges)), [nodes, edges]);
+    const unsaved = currentCaseBoard !== savedCaseBoard;
+
+    const save = async (options?: { keepalive?: boolean }) => {
+        const snapshot = currentCaseBoard;
+        const board: CaseBoard = JSON.parse(snapshot);
+
+        if (!options?.keepalive) setSaveState('saving');
+        try {
+            await saveCaseBoard(caseId, board, options);
+            setSavedCaseBoard(snapshot);
+            if (!options?.keepalive) {
+                setSaveState('saved');
+                setTimeout(() => setSaveState('idle'), 1000);
+            }
+        } catch {
+            if (!options?.keepalive) setSaveState('error');
+        }
+    }
+
+    const autoSave = useRef<() => void>(() => {});
+
+    useEffect(() => {
+        autoSave.current = () => {
+            if (unsaved) void save({ keepalive: true });
+        }
+    })
+    useEffect(() => () => autoSave.current(), []);
+    useEffect(() => {
+        const onPageHide = () => autoSave.current();
+        window.addEventListener('pagehide', onPageHide);
+        return () => window.removeEventListener('pagehide', onPageHide);
+    }, []);
+
+    //the logic for exiting fullscreen mode
     useEffect(() => {
         if (!fullscreen) return
 
@@ -230,6 +290,9 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         canGenerate={capturedAt.some((time) => time != null)}
                         fullscreen={fullscreen}
                         onToggleFullscreen={() => setFullscreen((val) => !val)}
+                        onSave={() => void save()}
+                        saveState={saveState}
+                        unsaved={unsaved}
                     />
                 </div>
                     <div className={`w-full shrink-0 lg:w-72 ${fullscreen ? 'min-h-0 overflow-y-auto' : ''}`}>

@@ -16,13 +16,14 @@ export async function getCaseBoard(caseId: string): Promise<CaseBoard | null> {
     return data as CaseBoard | null;
 }
 
-export async function saveCaseBoard(caseId: string, caseBoard: CaseBoard): Promise<void> {
+export async function saveCaseBoard(caseId: string, caseBoard: CaseBoard, options?: { keepalive?: boolean }): Promise<void> {
     const res = await apiFetch(`/api/saveCaseBoard/${caseId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(caseBoard),
+        keepalive: options?.keepalive
     });
 
     const data = await res.json().catch(() => null);

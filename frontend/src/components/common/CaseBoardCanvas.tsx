@@ -20,6 +20,9 @@ type CaseBoardCanvasProps = {
     canGenerate: boolean;
     fullscreen?: boolean
     onToggleFullscreen?: () => void;
+    onSave?: () => void;
+    saveState?: 'idle' | 'saving' | 'saved' | 'error';
+    unsaved?: boolean;
 };
 
 const nodeTypes = { 
