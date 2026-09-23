@@ -5,7 +5,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
 import CustomEdge from '@/components/common/customEdge'
-import { Layers, StickyNote, Minus, Maximize, Minimize2, Maximize2, Plus } from 'lucide-react';
+import { Layers, StickyNote, Minus, Maximize, Minimize2, Maximize2, Plus, Loader2, Check, Save } from 'lucide-react';
 import NoteNode from '@/components/common/noteNode'
 import Button from '@/components/ui/button'
 type CaseBoardCanvasProps = {
@@ -34,12 +34,15 @@ const edgeTypes = {
 };
 
 // A better toolbar than the defualt one 
-function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, onToggleFullscreen } : Readonly<{ 
+function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, onToggleFullscreen, onSave, saveState, unsaved } : Readonly<{ 
     onAddNote: () => void; 
     edgesOnTop: boolean; 
     onToggleEdges: () => void; 
     fullscreen?: boolean; 
-    onToggleFullscreen?: () => void 
+    onToggleFullscreen?: () => void
+    onSave?: () => void;
+    saveState?: 'idle' | 'saving' | 'saved' | 'error';
+    unsaved?: boolean;
 }>) {
     const { zoom } = useViewport();
     const { zoomIn, zoomOut, fitView } = useReactFlow();
@@ -102,11 +105,50 @@ function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, 
                     </button>
                 </>
             )}
+
+            {onSave && (
+                <>
+                    <div className='vl-float-divider'/>
+                    <button
+                        type='button'
+                        onClick={onSave}
+                        disabled={saveState === 'saving' || !unsaved}
+                        title={unsaved ? 'Save board' : 'Board is up to date'}
+                        className='vl-float-btn disabled:opacity-50'
+                    >
+                        {saveState === 'saving' && <Loader2 size={16} className='animate-spin' />}
+                        {saveState === 'saved' && <Check size={16} />}
+                        {saveState !== 'saving' && saveState !== 'saved' && <Save size={16} />}
+                        {saveState === 'saving' ? 'Saving' : unsaved ? 'Save' : 'Saved'}
+                    </button>
+                </>
+            )}
+
+            {saveState === 'error' && (
+                <div className='vl-float-error text-(--color-surface)'>
+                    Error saving board
+                </div>
+            )}
         </div>
     )
 }
 
-export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdgesChange, onConnect, onAddNote, onGenerate, canGenerate, fullscreen = false, onToggleFullscreen  }: CaseBoardCanvasProps) {
+export default function CaseBoardCanvas({ 
+    id, 
+    nodes, 
+    edges, 
+    onNodesChange, 
+    onEdgesChange, 
+    onConnect, 
+    onAddNote, 
+    onGenerate, 
+    canGenerate, 
+    fullscreen = false, 
+    onToggleFullscreen,
+    onSave,
+    saveState,
+    unsaved
+}: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
     const boxRef = useRef<HTMLDivElement | null>(null);
     const { screenToFlowPosition, fitView } = useReactFlow();
@@ -149,7 +191,10 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
                 edgesOnTop={edgesOnTop}
                 onToggleEdges={() => setEdgesOnTop((event) => !event)}
                 fullscreen={fullscreen}
-                onToggleFullscreen={onToggleFullscreen} 
+                onToggleFullscreen={onToggleFullscreen}
+                onSave={onSave}
+                saveState={saveState}
+                unsaved={unsaved}
             />
         </Panel>
     	</ReactFlow>
