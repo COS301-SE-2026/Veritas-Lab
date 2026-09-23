@@ -125,7 +125,7 @@ export default function CaseBoardCanvas({ id, nodes, edges, onNodesChange, onEdg
     return (
     <div 
         ref={(el) => { ref(el); boxRef.current = el; }}
-        className={`relative h-[70vh] min-h-[480px] w-full overflow-hidden rounded-[var(--radius-xl)] border border-dashed bg-(--color-surface) ${isDropTarget ? 'border-(--color-secondary)' : 'border-(--color-line-strong)'}`}>
+        className={`relative h-[70vh] min-h-[480px] w-full overflow-hidden rounded-[var(--radius-xl)] border border-dashed bg-(--color-surface) ${fullscreen ? 'h-full min-h-0' : 'h-[70vh] min-h-[480px]'} ${isDropTarget ? 'border-(--color-secondary)' : 'border-(--color-line-strong)'}`}>
     	<ReactFlow
 			nodes={nodes}
 			edges={displayEdges}

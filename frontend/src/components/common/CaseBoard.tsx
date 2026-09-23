@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { CaseEvidence } from '@/types/api';
 import EvidenceCard from "@/components/common/evidenceCard";
 import { useNodesState, useEdgesState, Node, Edge, ReactFlowProvider, useReactFlow, addEdge, Connection} from '@xyflow/react';
@@ -35,6 +35,31 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
     const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
     const noteCount = useRef(0);
     const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
+    const [fullscreen, setFullscreen] = useState(false);
+
+    useEffect(() => {
+        if (!fullscreen) return
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if(event.key !== 'Escape') return;
+
+            const active = document.activeElement;
+            const stillTyping = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+            if (stillTyping) return;
+            setFullscreen(false);
+        }
+        const prevOverflow = document.body.style.overflow;
+
+        window.addEventListener('keydown', onKeyDown);
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            window.removeEventListener('keydown', onKeyDown);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [fullscreen])
+
+    // Adds a new note node to the baord
     const onAddNote = (position: { x: number; y: number }) => {
         const newNode: Node<NoteNodeData> = {
             id: `note-${Date.now()}-${noteCount.current++}`,
@@ -48,11 +73,13 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
         ]);    
     }
 
+    // Gets the timestamp for each evidance
     const capturedAt = useMemo(() => 
         evidenceList.map((e) => 
             getCapturedAt(e.reportArtifacts)
     ), [evidenceList]);
 
+    // Generates the case board automatically
     const generate = () => {
         const board = generateBoard(evidenceList, capturedAt);
         setNodes(board.nodes);
@@ -60,6 +87,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
         setTimeout(() => fitView({ padding: 0.1, duration: 500 }), 50);
     }
 
+    // Gets the info of evidence node currently selected so it could be used to get it's report
     const selectedEvidence = useMemo(() => {
         const node = nodes.find((n) => n.selected && n.type === 'evidence');
         if(!node) return null;
@@ -90,8 +118,12 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
             }}
         >
             
-            <div className="flex flex-col gap-6 lg:flex-row">
-                <div className="flex-1">
+            <div className={
+                    fullscreen
+                        ? 'fixed inset-0 z-50 flex flex-col gap-4 bg-(--color-surface-muted) p-4 lg:flex-row'
+                        : 'flex flex-col gap-6 lg:flex-row'
+                }>
+                <div className={fullscreen ? 'min-h-0 min-w-0 flex-1' : 'flex-1'}>
                     <CaseBoardCanvas 
                         id="droppable"
                         nodes={nodes}
@@ -102,9 +134,11 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         onAddNote={onAddNote}
                         onGenerate={generate}
                         canGenerate={capturedAt.some((time) => time != null)}
+                        fullscreen={fullscreen}
+                        onToggleFullscreen={() => setFullscreen((val) => !val)}
                     />
                 </div>
-                    <div className="w-full shrink-0 lg:w-72">
+                    <div className={`w-full shrink-0 lg:w-72 ${fullscreen ? 'min-h-0 overflow-y-auto' : ''}`}>
                         <div className="vl-panel p-5">
                             <SliderBar
                                 filters={TABS}
