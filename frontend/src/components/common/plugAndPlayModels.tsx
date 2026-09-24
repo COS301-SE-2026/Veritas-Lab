@@ -1,9 +1,13 @@
 import { UploadCloud, BrainCircuit, FileBox, X, FileCheck2 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import { useState } from 'react';
+import Label from '@/components/ui/label';
+import { runModel, type ClassificationResult } from '@/lib/ai'
+
 export default function PlugAndPlayModels() {
     const [file, setFile] = useState<File | null>(null);
-
+    const [error, setError] = useState<string | null>(null);
+    const [results, setResults] = useState<ClassificationResult | null>(null);
     //formats the files size so it's easier to read
     const fileSizeAsBytes = (bytes: number) => {
         if (bytes < 1024) {
@@ -15,10 +19,23 @@ export default function PlugAndPlayModels() {
         }
     }
 
+    const runCustomModel = async (file: File) => {
+        try {
+            const newResults = await runModel(file, );
+            setResults(newResults);
+            setError(null);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Failed to run model');
+        }
+
+    }
+
     //this sets the file state and resets the input
     const onChangeFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0] || null;
-        setFile(selectedFile);
+        if (selectedFile) {
+            setFile(selectedFile);
+        }
         event.target.value = '';
     }
     return (
@@ -61,7 +78,7 @@ export default function PlugAndPlayModels() {
                     </label>
 
                     {file && (
-                        <div className="mt-4 flex items-center gap-2 rounded-[var(--radius-sm)] bg-(--color-surface-muted) p-2 text-sm text-(--color-text-strong) py-3">
+                        <div className="mt-5 flex items-center gap-2 rounded-[var(--radius-sm)] bg-(--color-surface-muted) p-2 text-sm text-(--color-text-strong) py-3">
                             <FileBox size={16} className="inline-block mr-2" />
                             <div className="text-sm text-(--color-text-strong)">{file.name}</div>
                             <div className="text-sm text-(--color-text-subtle)">{file.type}</div>
@@ -76,9 +93,15 @@ export default function PlugAndPlayModels() {
                             </button>
                         </div>
                     )}
-
-                    <div className="mt-4 flex justify-end">
-                        <Button variant="submit" type="submit" text="Run Model" disabled={!file}/>
+                    <div className="mt-5 flex items-center">
+                        <div>
+                            {file && (
+                                <Label htmlFor='load' text={error ? error : 'Model loaded successfully'} variant={error ? 'error' : 'success'}/>
+                            )}
+                        </div>
+                        <div className="ml-auto">
+                            <Button variant="submit" type="submit" text="Run Model" disabled={!file} onClick={runCustomModel}/>
+                        </div>
                     </div>
                 </form>
             </div>
