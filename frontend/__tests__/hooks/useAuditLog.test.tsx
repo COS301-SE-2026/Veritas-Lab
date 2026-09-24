@@ -13,33 +13,23 @@ describe('useAuditLog', () => {
     it('fetches and returns audit log info', async () => {
         const mockedGetAllAudit = getAllAudit as jest.MockedFunction<typeof getAllAudit>;
         const mockedResponse = {
-            auditLogs: [
+            status: 'success',
+            cases: [
                 {
-                    caseID: 'case-1',
-                    events: [
-                        {
-                            timestamp: '2026-05-01T05:00:00.000Z',
-                            user: 'Invest Admin',
-                            action: 'Created case',
-                        },
-                        {
-                            timestamp: '2026-05-02T10:30:00.000Z',
-                            user: 'Invest Admin',
-                            action: 'Added evidence',
-                        }
-                    ]
+                    caseId: 'case-1',
+                    caseName: 'Alpha Fraud',
+                    eventCount: 2,
+                    lastEventTimestamp: '2026-05-02T10:30:00.000Z',
+                    caseExists: true,
                 },
                 {
-                    caseID: 'case-2',
-                    events: [
-                        {
-                            timestamp: '2026-05-03T14:15:00.000Z',
-                            user: 'Invest Admin',
-                            action: 'Closed case',
-                        }
-                    ]
-                }
-            ]
+                    caseId: 'case-2',
+                    caseName: 'Beta Theft',
+                    eventCount: 1,
+                    lastEventTimestamp: '2026-05-03T14:15:00.000Z',
+                    caseExists: true,
+                },
+            ],
         };
         mockedGetAllAudit.mockResolvedValue(mockedResponse);
 

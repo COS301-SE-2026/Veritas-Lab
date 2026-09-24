@@ -34,7 +34,7 @@ export default function CaseCard({ caseTitle, caseDescription, caseStatus, href,
                             borderColor: `color-mix(in srgb, ${risk.colorVar} 35%, transparent)`,
                         }}
                     >
-                        {riskScore} | {risk.label}
+                        {(riskScore as number).toFixed(1)} | {risk.label}
                     </span>
                 </div>
             )}
