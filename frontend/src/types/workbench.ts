@@ -85,7 +85,8 @@ export type WorkbenchPanelProps = {
 };
 
 export type SaveAnnotationsPayload = {
-    evidenceId: string;
+    caseId: string
+    mediaId: string;
     annotations: Annotation[];
 };
 
@@ -106,4 +107,13 @@ export type ReportModalProps = {
     mediaName: string;
     certainty: number | null;
     findings: string | null;
+};
+
+export type ReportPanelProps = {
+    mediaUrl?: string;
+    mediaKind?: MediaKind;
+    mediaName: string;
+    certainty: number | null;
+    findings: string | null;
+    onClose?: () => void;
 };
