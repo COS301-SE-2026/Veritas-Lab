@@ -2476,7 +2476,7 @@ async def save_case_board(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    cookie = await verify_jwt(request)
+    cookie = await verify_jwt(request, connection)
     user_role = cookie.get("role")
     verify_not_user(user_role)
     user_name = cookie.get("username")
@@ -3377,7 +3377,7 @@ async def get_case_board(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = await verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     user_role = payload.get("role")
     verify_not_user(user_role)
  
