@@ -21,7 +21,7 @@ export async function getCaseBoard(caseId: string): Promise<CaseBoard | null> {
 }
 
 export async function saveCaseBoard(caseId: string, caseBoard: CaseBoard, options?: { keepalive?: boolean }): Promise<void> {
-    const res = await apiFetch(`/api/saveCaseBoard/${caseId}`, {
+    const res = await apiFetch(`/api/saveCaseBoard`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
