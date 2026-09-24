@@ -47,6 +47,12 @@ export type EvidenceCardProps = {
     caseId?: string;
     canDelete?: boolean;
     onDeleted?: () => void | Promise<void>;
+    variant?: 'default' | 'case-board';
+    capturedAt?: string | null;
+    reportCertainty?: number | null;
+    annotationCount?: number;
+    placed?: boolean;
+    selected?: boolean;
 };
 //case evidence delete
 export type EvidenceDeleteButtonProps = {
@@ -179,3 +185,37 @@ export type Audience = {
     description: string;
     icon: LucideIcon;
 };
+
+export type BoardPosition = {
+    x: number;
+    y: number;
+}
+
+export type SavedEvidenceNode = {
+    mediaId: string;
+    position: BoardPosition;
+}
+
+export type SavedNoteNode = {
+    id: string;
+    position: BoardPosition;
+    text: string;
+}
+
+export type SavedEdge = {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    variant?: 'timeline';
+}
+
+export type CaseBoard = {
+    nodes: {
+        evidenceNodes: SavedEvidenceNode[];
+        noteNodes: SavedNoteNode[];
+    };
+    edges: SavedEdge[];
+}

@@ -279,6 +279,7 @@ async def test_integration_create_case_name_too_long(client):
         }
     }
 
+@pytest.mark.asyncio
 async def test_integration_create_case_user_role_can_create(client, ensure_user_exists):
     user_id = str(uuidlib.uuid4())
 
