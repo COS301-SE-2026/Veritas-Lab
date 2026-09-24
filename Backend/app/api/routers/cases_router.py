@@ -65,7 +65,7 @@ USER_UNAUTHORIZED_403 = {
                     "example": {
                         "detail": {
                             "status": "error",
-                            "message": "User unauthorized"
+                            "message": USER_UNAUTHORIZED
                         }
                     }
                 }
@@ -128,13 +128,37 @@ class save_annotations_payload(BaseModel):
     annotations: List[Dict[str, Any]]
     model_config = ConfigDict(populate_by_name=True)
 
+class save_case_board_payload(BaseModel):
+    case_id: str = Field(..., alias="caseId")
+    case_board: Any = Field(..., alias="caseBoard")
+    model_config = ConfigDict(populate_by_name=True)
+
 class success_response(BaseModel):
     status: str = Field(..., examples=["success"])
 
 class error_response(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
-  
+
+class case_board_response(BaseModel):
+    status: str = Field(..., examples=["success"])
+    caseId: str = Field(..., examples=["19dccebd-302b-412a-b77e-3167f79837d1"])
+    caseBoard: Any = Field(
+        ...,
+        examples=[
+            {
+                "nodes": [
+                    {
+                        "id": "1", 
+                        "type": "note", 
+                        "text": "Suspect vehicle"
+                    }
+                ], 
+                "edges": []
+            }
+        ]
+    )
+
 async def validate_case_assignment_request(request: Request, assign_request: assign_case_request, connection: asyncpg.Connection):
     payload = await verify_jwt(request, connection)
 
@@ -147,7 +171,7 @@ async def validate_case_assignment_request(request: Request, assign_request: ass
             status_code=403,
             detail={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
@@ -493,7 +517,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                 status_code=403,
                 detail={
                     "status": "error",
-                    "message": "User unauthorized"
+                    "message": USER_UNAUTHORIZED
                 }
             )
 
@@ -695,7 +719,7 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 status_code=403,
                 detail={
                     "status": "error",
-                    "message": "User unauthorized"
+                    "message": USER_UNAUTHORIZED
                 }
             )
 
@@ -1046,7 +1070,7 @@ async def close_case(
             status_code=403,
             detail={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
@@ -1563,7 +1587,7 @@ async def delete_comment(
                     "example": {
                         "detail":{
                             "status": "error",
-                            "message": "User unauthorized"
+                            "message": USER_UNAUTHORIZED
                         }
                     }
                 }
@@ -1689,7 +1713,7 @@ async def retreive_comments(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "User unauthorized"
+                                    "message": USER_UNAUTHORIZED
                                 }
                             }
                         },
@@ -1698,7 +1722,7 @@ async def retreive_comments(
                             "value": {
                                 "detail": {
                                     "status": "error",
-                                    "message": "User unauthorized"
+                                    "message": USER_UNAUTHORIZED
                                 }
                             }
                         }
@@ -2210,7 +2234,7 @@ async def _save_annotations(
                 "application/json": {
                     "example": {
                         "status": "error", 
-                        "message": "User unauthorized"
+                        "message": USER_UNAUTHORIZED
                     }
                 }
             },
@@ -2295,6 +2319,204 @@ async def save_annotations(
                 "message": DATABASE_ERROR_MESSAGE
             }
         )
+
+async def save_case_board_helper(
+    connection: asyncpg.Connection,
+    case_id: UUID,
+    case_board: str,
+    user_name: str
+):
+    try:
+        async with connection.transaction():
+            authorized_case = await connection.fetchrow(
+                """
+                SELECT CaseId
+                FROM "Cases_DB"."Cases"
+                WHERE CaseId = $1
+                    AND CaseAssigned = $2
+                    AND CaseState = 'PUBLISHED'
+                """,
+                case_id,
+                user_name
+            )
+ 
+            if authorized_case is None:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "status": "error",
+                        "message": USER_UNAUTHORIZED
+                    }
+                )
+
+            await connection.fetchrow(
+                """
+                INSERT INTO "Cases_DB"."CaseBoard" (CaseId, CaseBoard)
+                VALUES ($2, $1::jsonb)
+                ON CONFLICT (CaseId) DO UPDATE
+                    SET CaseBoard = EXCLUDED.CaseBoard
+                RETURNING CaseBoardId;
+                """,
+                case_board,
+                case_id
+            )
+ 
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+ 
+@router.post("/saveCaseBoard",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Save Case Board",
+    description=(
+        "Creates or updates the JSONB case board for a case. Only the investigator "
+        "or admin currently assigned to the case may save its board, and the case "
+        "must be in the Published state."
+    ),
+    response_model=success_response,
+    responses={
+        200: {
+            "description": "Case board successfully saved.",
+            "model": success_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success"
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Unauthorized - JWT errors (missing, invalid, or expired)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Expired JWT": {
+                            "summary": "JWT Token Expired",
+                            "value": {
+                                "status": "error",
+                                "message": "Signature has expired."
+                            }
+                        },
+                        "No authorization": {
+                            "summary": "Missing JWT Cookie or Header",
+                            "value": {
+                                "status": "error",
+                                "message": "Not authenticated"
+                            }
+                        },
+                        "Invalid token": {
+                            "summary": "Invalid JWT Signature/Malformed",
+                            "value": {
+                                "status": "error",
+                                "message": "Invalid token"
+                            }
+                        },
+                        "Invalid UUID": {
+                            "summary": "Invalid Case UUID",
+                            "value": {
+                                "status": "error",
+                                "message": "badly formed hexadecimal UUID string"
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Forbidden - User is not the investigator/admin currently assigned to the case, or the case is not Puublished.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "message": USER_UNAUTHORIZED
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error - Database failure or unhandled exception.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Database error"
+                                }
+                            }
+                        },
+                        "Server Exception": {
+                            "summary": "Unexpected Error",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "An unexpected error occurred"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        },
+    }
+)
+async def save_case_board(
+    payload: save_case_board_payload,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    cookie = verify_jwt(request)
+    user_role = cookie.get("role")
+    verify_not_user(user_role)
+    user_name = cookie.get("username")
+ 
+    try:
+        case_id = transform_to_uuid(payload.case_id)
+        case_board_json_str = json.dumps(payload.case_board)
+        await save_case_board_helper(
+            connection,
+            case_id,
+            case_board_json_str,
+            user_name
+        )
+ 
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success"
+            }
+        )
+ 
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
 
 @router.get(
     "/getAudit/caseID/{case_id}",
@@ -2999,7 +3221,7 @@ async def publish_case(
             status_code=403,
             detail={
                 "status": "error",
-                "message": "User unauthorized"
+                "message": USER_UNAUTHORIZED
             }
         )
 
@@ -3045,6 +3267,183 @@ async def publish_case(
         }
                 
     except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+
+@router.get(
+    "/CaseBoard/{case_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    tags=["caseboard"],
+    summary="Get Case Board",
+    description=(
+        "Returns the JSONB case board for a case. USER accounts may never view "
+        "a case board. INVESTIGATOR and ADMIN accounts may view the board of "
+        "any case that is not in the OPEN state; OPEN cases are rejected the "
+        "same way an unauthorized role is."
+    ),
+    response_model=case_board_response,
+    responses={
+        200: {
+            "description": "Case board successfully retrieved.",
+            "model": case_board_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "caseId": "19dccebd-302b-412a-b77e-3167f79837d1",
+                        "caseBoard": {
+                            "nodes": [
+                                {
+                                    "id": "1", 
+                                    "type": "note", 
+                                    "text": "Suspect vehicle"
+                                }
+                            ],
+                            "edges": []
+                        }
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Bad Request - CaseId is malformed",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "'not-a-valid-uuid' is not a valid UUID format"
+                        }
+                    }
+                }
+            },
+        },
+        401: INVALID_TOKEN_401,
+        403: USER_UNAUTHORIZED_403,
+        404: {
+            "description": "Not Found - Case does not exist.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": CASE_NOT_FOUND
+                        }
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal Server Error - Database failure or unhandled exception.",
+            "model": error_response,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "Database Error": {
+                            "summary": "Database Failure",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "Database error"
+                                }
+                            }
+                        },
+                        "Server Exception": {
+                            "summary": "Unexpected Error",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": "An unexpected error occurred"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        },
+    }
+)
+async def get_case_board(
+    case_id: str,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+    user_role = payload.get("role")
+    verify_not_user(user_role)
+ 
+    validated_case_id = Case(case_id=case_id).case_id
+ 
+    try:
+        case_row = await connection.fetchrow(
+            """
+            SELECT CaseState
+            FROM "Cases_DB"."Cases"
+            WHERE CaseId = $1
+            """,
+            validated_case_id
+        )
+ 
+        if case_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "status": "error",
+                    "message": CASE_NOT_FOUND
+                }
+            )
+ 
+        if case_row["casestate"] == "OPEN":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+ 
+        board_row = await connection.fetchrow(
+            """
+            SELECT CaseBoard
+            FROM "Cases_DB"."CaseBoard"
+            WHERE CaseId = $1
+            """,
+            validated_case_id
+        )
+ 
+        case_board = board_row["caseboard"] if board_row is not None else None
+        if isinstance(case_board, str):
+            case_board = json.loads(case_board)
+ 
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "caseId": str(validated_case_id),
+                "caseBoard": case_board
+            }
+        )
+ 
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail={

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft, FileText } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
@@ -42,7 +42,14 @@ export default function WorkbenchPage() {
     const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
-
+    const searchParams = useSearchParams();
+    const from = searchParams.get('from');
+    let backHref;
+    if (from === 'board') {
+        backHref = `/case-page/${caseId}?tab=${encodeURIComponent('Case Board')}`;
+    } else {
+        backHref = `/case-page/${caseId}`;
+    }
     const pickSelectedAnnotation = (id: string | null) => {
         setSelectedId(id);
         if (id === null) return;
@@ -60,7 +67,7 @@ export default function WorkbenchPage() {
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
-                const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
+                const match = data.evidence.find((item) => item.mediaId === evidenceId) ?? null;
                 setEvidence(match);
             })
             .catch((error) => {
@@ -88,12 +95,12 @@ export default function WorkbenchPage() {
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
 
-    const handleSave = () => saveAnnotations({ evidenceId, annotations });
+    const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
 
     return (
         <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">
             <Link
-                href={`/case-page/${caseId}`}
+                href={backHref}
                 className="inline-flex items-center gap-2 text-sm font-medium text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
             >
                 <ArrowLeft size={16} />

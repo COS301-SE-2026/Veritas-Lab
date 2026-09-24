@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from "react";
 //import { getCookie } from '@/auth/cookie';
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
 import EvidenceCard from "@/components/common/evidenceCard";
@@ -14,8 +14,9 @@ import CaseEditButton from "@/components/common/caseEditButton";
 import Label from "@/components/ui/label";
 import AuditTimeline from "@/components/common/auditTimeline";
 import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
+import CaseBoard from "@/components/common/caseBoard";
 
-const TABS = ['Evidence', 'Comments', 'Audit Timeline'] as const;
+const TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -23,9 +24,15 @@ export default function CasePage() {
     const [error, setError] = useState<string | null>(null);
     const userRole = useUserRole();
     const currentUser = useCurrentUser();
+    const router = useRouter();
     const params = useParams<{ id: string }>();
     const id = params.id;
-    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
+    const searchParams = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    const initialTab = TABS.includes(tabParam as typeof TABS[number])
+        ? (tabParam as typeof TABS[number])
+        : 'Evidence';
+    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(initialTab);
 
     useEffect(() => {
         let isActive = true;
@@ -127,7 +134,7 @@ export default function CasePage() {
                     <SliderBar //changed sliderbar to fetch TABS and actively change page layout
                         filters={TABS}
                         defaultFilter={activeTab}
-                        onChange={(tab) => setActiveTab(tab)}
+                        onChange={(tab) => {setActiveTab(tab); router.replace(`/case-page/${id}?tab=${encodeURIComponent(tab)}`, { scroll: false })}}
                         className='w-full max-w-xl'
                     />
                 </div>
@@ -138,15 +145,16 @@ export default function CasePage() {
                             <div className="flex flex-wrap gap-4">
                                 {evidenceList.length > 0 ? evidenceList.map((evidence) => (
                                     <EvidenceCard
-                                        key={evidence.reportId}
-                                        mediaName={evidence.mediaName}
+                                        key={evidence.mediaId}
+                                        mediaName={evidence.casePerspective}
                                         mediaUrl={evidence.mediaUrl}
                                         mediaExtension={evidence.mediaExtension}
-                                        href={`/case-page/${id}/workbench/${evidence.reportId}`}
+                                        href={`/case-page/${id}/workbench/${evidence.mediaId}`}
                                         mediaId={evidence.mediaId}
                                         caseId={id}
                                         canDelete={canDeleteEvidence}
                                         onDeleted={reloadCaseData}
+                                        variant="default"
                                     />
                                 )) : (
                                     <div className="w-full rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
@@ -162,13 +170,15 @@ export default function CasePage() {
                             />
                         ) : activeTab === 'Audit Timeline' ? (
                             <AuditTimeline caseId={id} />
+                        ) : activeTab === 'Case Board' ? (
+                            <CaseBoard caseId={id} evidenceList={evidenceList}/>
                         ) : (
                             <div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
                                 {activeTab} is not available yet.
                             </div>
                         )}
                     </div>
-
+                    {activeTab !== 'Case Board' ? (
                     <div className="w-full shrink-0 lg:w-72">
                         <div className="vl-panel p-5">
                             <h2 className="text-lg font-bold text-(--color-text-strong)">Case details</h2>
@@ -193,6 +203,7 @@ export default function CasePage() {
                             />
                         ) : null}
                     </div>
+                    ) : null}
                 </div>
             </div>
             {canUploadEvidence ? (
