@@ -72,7 +72,7 @@ def test_delete_comment_success(monkeypatch):
     client.cookies.clear()
     override_get_connection(mock_connection_success())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "Normal User",
@@ -94,7 +94,7 @@ def test_delete_comment_invalid_jwt(monkeypatch):
     client.cookies.clear()
     override_get_connection(mock_connection_success())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -120,7 +120,7 @@ def test_delete_comment_missing_jwt_cookie(monkeypatch):
     client.cookies.clear()
     override_get_connection(mock_connection_success())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -146,7 +146,7 @@ def test_delete_comment_not_found(monkeypatch):
     client.cookies.clear()
     override_get_connection(mock_connection_no_row())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "Normal User",
@@ -170,7 +170,7 @@ def test_delete_comment_unauthorized_user(monkeypatch):
     client.cookies.clear()
     override_get_connection(mock_connection_no_row())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "other-user-id",
             "username": "Different User",
@@ -194,7 +194,7 @@ def test_delete_comment_database_error(monkeypatch):
     client.cookies.clear()
     override_get_connection(mock_connection_database_error())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "Normal User",
@@ -227,7 +227,7 @@ def test_delete_comment_uses_comment_id_and_username(monkeypatch):
     client.cookies.clear()
     mock_connection = override_get_connection(mock_connection_success())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "Normal User",
@@ -256,7 +256,7 @@ def test_delete_comment_closes_connection_on_success(monkeypatch):
     client.cookies.clear()
     mock_connection = override_get_connection(mock_connection_success())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "Normal User",
@@ -275,7 +275,7 @@ def test_delete_comment_closes_connection_on_database_error(monkeypatch):
     client.cookies.clear()
     mock_connection = override_get_connection(mock_connection_database_error())
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "Normal User",
