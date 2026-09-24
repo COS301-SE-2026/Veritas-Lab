@@ -26,7 +26,7 @@ jest.mock('@/components/common/annotationLayer', () => ({
 }));
 
 const workbenchCanvasProps: WorkbenchCanvasProps = {
-    mediaUrl: null,
+    mediaUrl: undefined,
     mediaKind: 'unsupported',
     mediaName: 'evidence.file',
     active: true,

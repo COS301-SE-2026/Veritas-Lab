@@ -38,6 +38,7 @@ describe('useCase', () => {
 				caseCreationDate: '2026-05-01T09:00:00.000Z',
 			},
 			evidence: [],
+			comments: [],
 		} as Awaited<ReturnType<typeof fetchCase>>);
 		mockedCloseCase.mockResolvedValue({ status: 'success' });
 		mockedDeleteEvidence.mockResolvedValue({ status: 'success' });

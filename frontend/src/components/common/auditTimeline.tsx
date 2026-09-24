@@ -31,7 +31,9 @@ export default function AuditTimeline({ caseId }: AuditTimelineProps) {
         return <Label text="Loading timeline..." htmlFor="loading" variant="info" />;
     }
     if (!timeline) {
-        return <Label text="No timeline data available." htmlFor="no-timeline" variant="info" />;
+        return (<div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
+            No timeline data available yet.
+        </div>)
     }
 
     return(
