@@ -20,6 +20,8 @@ INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
 DATABASE_ERROR="Database error"
 EXPIRED_TOKEN = "Token has expired"
+TOKEN_ISSUE_LEEWAY = timedelta(seconds=5)
+TOKEN_REVOCATION_GRACE = timedelta(seconds=30)
 
 INVALID_TOKEN_401 = {
             "description": "Authentication failed",
@@ -86,7 +88,10 @@ class error_response(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
 
-def verify_jwt(request: Request) -> dict:
+# Decodes the JWT cookie and verifies its claims against the Users table.
+# The username and role inside the token are not trusted on their own: they must match the stored user,
+# and the token must not be older than the last token issued to that user
+async def verify_jwt(request: Request, connection: asyncpg.Connection) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise HTTPException(
@@ -103,8 +108,6 @@ def verify_jwt(request: Request) -> dict:
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-
-        return payload
 
     except ExpiredSignatureError:
         raise HTTPException(
@@ -123,6 +126,80 @@ def verify_jwt(request: Request) -> dict:
                 "message": INVALID_TOKEN
             }
         )
+
+    user_id = payload.get("sub")
+    username = payload.get("username")
+    role = payload.get("role")
+    expiry = payload.get("exp")
+
+    if not validate_uuid(user_id) or not username or not role or expiry is None:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT userid, username, userrole, userjwtissued
+            FROM "Users_DB"."Users"
+            WHERE userid = $1::uuid
+            """,
+            user_id
+        )
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR
+            }
+        )
+
+    # The user must still exist and the token's claims must match what is stored for them
+    if row is None or row["username"] != username or row["userrole"] != role:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    if is_token_revoked(expiry, row["userjwtissued"]):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    return {
+        "sub": str(row["userid"]),
+        "username": row["username"],
+        "role": row["userrole"],
+        "exp": expiry
+    }
+
+# Tokens only carry exp, so the issue time is the expiry minus the configured token lifetime.
+# A token issued before the user's latest login/refresh (userjwtissued) is revoked, but only once
+# TOKEN_REVOCATION_GRACE has passed since that newer token, so requests already in flight during a refresh still succeed.
+# TOKEN_ISSUE_LEEWAY covers exp being truncated to whole seconds and userjwtissued being set just after the token is made.
+def is_token_revoked(expiry: int | float, last_issued: datetime | None) -> bool:
+    if last_issued is None:
+        return False
+
+    token_issued = datetime.fromtimestamp(expiry, tz=timezone.utc) - timedelta(minutes=auth_settings.TOKEN_EXPIRE)
+
+    if token_issued >= last_issued - TOKEN_ISSUE_LEEWAY:
+        return False
+
+    return datetime.now(timezone.utc) - last_issued > TOKEN_REVOCATION_GRACE
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
@@ -685,7 +762,7 @@ async def fetch_users(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     try:
-        payload = verify_jwt(request)
+        payload = await verify_jwt(request, connection)
 
         if payload.get("role") != "ADMIN":
             raise HTTPException(
@@ -898,7 +975,7 @@ async def change_user_role(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     if payload.get("role") != "ADMIN":
         raise HTTPException(
@@ -1132,7 +1209,7 @@ async def delete_user(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     #Verify the JWT for security
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     user_id = user_id.strip()
 
     #Authorization. Only Admins can delete
@@ -1309,7 +1386,7 @@ async def change_password(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     if is_system_init_user(payload.get("sub")):
         raise HTTPException(
             status_code=400,
