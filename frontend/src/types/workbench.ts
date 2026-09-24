@@ -68,8 +68,8 @@ export type AnnotationListProps = {
     onRemove: (id: string) => void;
 };
 
-// Workbench tools which now has both annotations and metadata compar.
-export type WorkbenchTool = 'Annotations' | 'Compare';
+// Workbench tools which now has both annotations and metadata compar and plug and play models or PAPModels.
+export type WorkbenchTool = 'PAPModels' | 'Annotations' | 'Compare';
 
 export type WorkbenchPanelProps = {
     activeWorkbenchTool: WorkbenchTool | null;

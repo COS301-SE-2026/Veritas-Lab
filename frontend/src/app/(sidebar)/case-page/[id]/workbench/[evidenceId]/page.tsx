@@ -15,6 +15,7 @@ import { fetchCase } from '@/lib/api/case';
 import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
+import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -94,6 +95,7 @@ export default function WorkbenchPage() {
     const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const comparisonActive = activeWorkbenchTool === 'Compare';
+    const PAPModelsActive = activeWorkbenchTool === 'PAPModels';
 
     const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
 
@@ -125,7 +127,7 @@ export default function WorkbenchPage() {
 
             <div className="mt-6 flex flex-col gap-6 lg:flex-row">
                 <div className="min-w-0 flex-1">
-                    <div className={comparisonActive ? 'hidden' : 'block'} aria-hidden={comparisonActive}>
+                    <div className={(comparisonActive || PAPModelsActive) ? 'hidden' : 'block'} aria-hidden={comparisonActive}>
                         <WorkbenchCanvas
                             video={video}
                             mediaUrl={mediaUrl}
@@ -141,14 +143,18 @@ export default function WorkbenchPage() {
                         />
                     </div>
 
-                    {comparisonActive ? (
+                    {comparisonActive && (
                         <MetadataComparison
                             mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
                             className="h-[min(75vh,900px)]"
                         />
-                    ) : null}
+                    )}
+
+                    {PAPModelsActive && (
+                        <PlugAndPlayModels />
+                    )}
                 </div>
 
                 <WorkbenchPanel

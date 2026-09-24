@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Columns2, Pencil, Save, Trash2 } from 'lucide-react';
+import { Columns2, Pencil, Save, Trash2, BrainCircuit  } from 'lucide-react';
 import SliderBar from '@/components/ui/sliderBar';
 import Button from '@/components/ui/button';
 import AnnotationList from '@/components/common/annotationList';
@@ -26,6 +26,7 @@ export default function WorkbenchPanel({
 
     const isAnnotationsActive = activeWorkbenchTool === 'Annotations';
     const isCompareActive = activeWorkbenchTool === 'Compare';
+    const isPAPModelsActive = activeWorkbenchTool === 'PAPModels';
 
     const handleSave = async () => {
         setSaveStatus('saving');
@@ -50,6 +51,15 @@ export default function WorkbenchPanel({
                 <h2 className="text-lg font-bold text-(--color-text-strong)">Tools</h2>
                 <p className="mt-1 text-xs text-(--color-text-muted)">Select a tool to work on this evidence.</p>
             </div>
+            
+            <button
+                type="button"
+                onClick={() => onSelectWorkbenchTool(isPAPModelsActive ? null : 'PAPModels')}
+                className={toolButtonClasses(isPAPModelsActive)}
+            >
+                <BrainCircuit size={16} className="shrink-0" />
+                Plug and Play Models
+            </button>
 
             <button
                 type="button"
