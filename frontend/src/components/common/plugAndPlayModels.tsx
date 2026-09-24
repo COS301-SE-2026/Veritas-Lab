@@ -1,12 +1,25 @@
-import { UploadCloud, BrainCircuit, FileBox, X } from 'lucide-react';
+import { UploadCloud, BrainCircuit, FileBox, X, FileCheck2 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import { useState } from 'react';
 export default function PlugAndPlayModels() {
     const [file, setFile] = useState<File | null>(null);
 
+    //formats the files size so it's easier to read
+    const fileSizeAsBytes = (bytes: number) => {
+        if (bytes < 1024) {
+            return `${bytes} B`;
+        } else if (bytes < 1024 * 1024) {
+            return `${(bytes / 1024).toFixed(2)} KB`;
+        } else {
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+    }
+
+    //this sets the file state and resets the input
     const onChangeFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0] || null;
         setFile(selectedFile);
+        event.target.value = '';
     }
     return (
         <>
@@ -17,7 +30,7 @@ export default function PlugAndPlayModels() {
                 </div>
 
                 <p className="text-sm text-(--color-text-muted)">
-                    Load your own ONNX models and run them on evidence files.
+                    Load up your own capable ONNX models and run them on evidence files.
                 </p>
                 <form>
                     <label 
@@ -31,16 +44,28 @@ export default function PlugAndPlayModels() {
                             className="hidden"
                             onChange={onChangeFile}
                         />  
-                            <UploadCloud size={36} className="text-(--color-b-600)" />
+                        {!file && (
+                            <>
+                                <UploadCloud size={36} className="text-(--color-b-600)" />
                                 <p className="text-sm font-semibold text-(--color-text-strong)">Click to browse</p>
                                 <p className="text-xs text-(--color-text-subtle)">Only .onnx files are supported</p>
+                            </>
+                        )}
+                        {file && (
+                            <>
+                                <FileCheck2 size={36} className="text-(--color-b-600)" />
+                                <p className="text-sm font-semibold text-(--color-text-strong)">File selected</p>
+                                <p className="text-xs text-(--color-text-subtle)">Click to choose a different file</p>
+                            </>
+                        )}
                     </label>
 
                     {file && (
                         <div className="mt-4 flex items-center gap-2 rounded-[var(--radius-sm)] bg-(--color-surface-muted) p-2 text-sm text-(--color-text-strong) py-3">
                             <FileBox size={16} className="inline-block mr-2" />
-                            <span className="text-sm text-(--color-text-strong)">{file.name}</span>
-                            <div>{file.size} bytes</div>
+                            <div className="text-sm text-(--color-text-strong)">{file.name}</div>
+                            <div className="text-sm text-(--color-text-subtle)">{file.type}</div>
+                            <div>{fileSizeAsBytes(file.size)}</div>
                             
                             <button
                                 type="button"
@@ -51,7 +76,10 @@ export default function PlugAndPlayModels() {
                             </button>
                         </div>
                     )}
-                    <Button variant="submit" type="submit" text="Run Model" />
+
+                    <div className="mt-4 flex justify-end">
+                        <Button variant="submit" type="submit" text="Run Model" disabled={!file}/>
+                    </div>
                 </form>
             </div>
         </>
