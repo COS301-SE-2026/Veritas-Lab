@@ -1,8 +1,9 @@
-import { UploadCloud, BrainCircuit, FileBox, X, FileCheck2 } from 'lucide-react';
+import { UploadCloud, BrainCircuit, FileBox, X, FileCheck2, ChevronDown } from 'lucide-react';
 import Button from '@/components/ui/button';
 import { useState } from 'react';
 import Label from '@/components/ui/label';
-import { runModel, ClassificationResult, ModelConfig, ImageModelConfig, VideoModelConfig, PdfModelConfig , BaseModelConfig} from '@/lib/ai'
+import { runModel, ClassificationResult, ModelConfig, ImageModelConfig, VideoModelConfig, PdfModelConfig , BaseModelConfig, ActivationType} from '@/lib/ai'
+import Dropdown from '@/components/ui/dropdown';
 
 type PlugAndPlayModelsProps = {
     mediaUrl: string;
@@ -46,10 +47,21 @@ const defaultPdfModelConfig: PdfModelConfig = {
     ... defaultBaseModelConfig,
 }
 
+type advancedModelConfigOptions = {
+    activation: ActivationType;
+    inputWidth: number;
+    inputHeight: number;
+    mean: [number, number, number];
+    std: [number, number, number];
+}
+
 export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: PlugAndPlayModelsProps) {
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<ClassificationResult | null>(null);
+    const [modelConfig, setModelConfig] = useState<ModelConfig | null>(null);
+    const [customConfig, isCustomConfig] = useState<boolean>(false);
+    const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
     //formats the files size so it's easier to read
     const fileSizeAsBytes = (bytes: number) => {
         if (bytes < 1024) {
@@ -77,8 +89,26 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
 
     const runCustomModel = async (file: File) => {
         try {
-            const evidenceFile = fetchEvidenceFile(mediaUrl, mediaName);
-            const newResults = await runModel(file, evidenceFile, );
+            const evidenceFile = await fetchEvidenceFile(mediaUrl, mediaName);
+            if (customConfig && !modelConfig) {
+                throw new Error('Custom model config is required when using a custom model');
+            }
+            if (!modelConfig) {
+                switch (mediaKind) {
+                    case 'image':
+                        setModelConfig(defaultImageModelConfig);
+                        break;
+                    case 'video':
+                        setModelConfig(defaultVideoModelConfig);
+                        break;
+                    case 'pdf':
+                        setModelConfig(defaultPdfModelConfig);
+                        break;
+                    default:
+                        throw new Error(`Unsupported media kind: ${mediaKind}`);
+                }
+            }
+            const newResults = await runModel(file, evidenceFile, modelConfig);
             setResults(newResults);
             setError(null);
         } catch (error) {
@@ -150,6 +180,100 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                             </button>
                         </div>
                     )}
+
+                    <div>
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+                            className="mt-5 text-sm text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
+                        >
+                            Advanced Model Config Options
+                            <ChevronDown size={16} className={`inline-block ml-2 transition-transform ${showAdvancedConfig ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
+
+                    {showAdvancedConfig && (
+                        <>
+                            <div className="mt-5 vl-panel flex flex-col gap-4 p-4">
+                                <label htmlFor="activation" className="block text-sm font-medium text-(--color-text-strong)">
+                                    Activation Function
+                                </label>
+                                <Dropdown
+                                    options={[
+                                        { value: 'sigmoid', label: 'Sigmoid' },
+                                        { value: 'softmax', label: 'Softmax' },
+                                        { value: 'none', label: 'None' },
+                                    ]}
+                                />
+                                <label htmlFor="inputWidth" className="block text-sm font-medium text-(--color-text-strong)">
+                                    Input Width
+                                </label>
+                                <input
+                                    type="number"
+                                    id="inputWidth"
+                                    className="vl-input"
+                                    placeholder="Enter input width"
+                                />
+                                <label htmlFor="inputHeight" className="block text-sm font-medium text-(--color-text-strong)">
+                                    Input Height
+                                </label>
+                                <input
+                                    type="number"
+                                    id="inputHeight"
+                                    className="vl-input"
+                                    placeholder="Enter input height"
+                                />
+                                <label htmlFor="mean" className="block text-sm font-medium text-(--color-text-strong)">
+                                    Mean
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        id="mean-1"
+                                        className="vl-input"
+                                        placeholder="Enter 1st mean value"
+                                    />
+                                    <input
+                                        type="text"
+                                        id="mean-2"
+                                        className="vl-input"
+                                        placeholder="Enter 2nd mean value"
+                                    />
+                                    <input
+                                        type="text"
+                                        id="mean-3"
+                                        className="vl-input"
+                                        placeholder="Enter 3rd mean value"
+                                    />
+                                </div>
+
+                                <label htmlFor="std" className="block text-sm font-medium text-(--color-text-strong)">
+                                    Standard Deviation
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        id="std-1"
+                                        className="vl-input"
+                                        placeholder="Enter 1st std value"
+                                    />
+                                    <input
+                                        type="text"
+                                        id="std-2"
+                                        className="vl-input"
+                                        placeholder="Enter 2nd std value"
+                                    />
+                                    <input
+                                        type="text"
+                                        id="std-3"
+                                        className="vl-input"
+                                        placeholder="Enter 3rd std value"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
                     <div className="mt-5 flex items-center">
                         <div>
                             {file && (
