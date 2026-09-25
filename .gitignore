@@ -7,3 +7,5 @@ Commands.md
 dataset
 test.txt
 .vscode/settings.json
+*.safetensors
+Backend/app/ai/best_video_model.pt
