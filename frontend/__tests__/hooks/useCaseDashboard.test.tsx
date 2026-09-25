@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import useCaseDashboard, { CaseSummary } from '@/lib/hooks/useCaseDashboard';
+import useCaseDashboard from '@/lib/hooks/useCaseDashboard';
+import type { CaseSummary } from '@/types/hooks';
 import { fetchCases } from '../../src/lib/api/dashboard';
 
 jest.mock('../../src/lib/api/dashboard', () => ({
