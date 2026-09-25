@@ -7,7 +7,7 @@ export interface ClassificationResult {
     classification: string;
 }
 
-interface BaseModelConfig {
+export interface BaseModelConfig {
     activation: ActivationType;
     classLabels: [string, string];
     aiClassIndex: 0 | 1;

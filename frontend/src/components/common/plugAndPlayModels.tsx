@@ -2,7 +2,7 @@ import { UploadCloud, BrainCircuit, FileBox, X, FileCheck2 } from 'lucide-react'
 import Button from '@/components/ui/button';
 import { useState } from 'react';
 import Label from '@/components/ui/label';
-import { runModel, type ClassificationResult } from '@/lib/ai'
+import { runModel, ClassificationResult, ModelConfig, ImageModelConfig, VideoModelConfig, PdfModelConfig , BaseModelConfig} from '@/lib/ai'
 
 type PlugAndPlayModelsProps = {
     mediaUrl: string;
@@ -10,6 +10,41 @@ type PlugAndPlayModelsProps = {
     mediaKind: string;
 };
 
+const defaultBaseModelConfig: BaseModelConfig = {
+    activation: 'SIGMOID',
+    classLabels: ['AUTHENTIC', 'AI'],
+    aiClassIndex: 1,
+    threshold: 0.7,
+};
+
+const defaultImageModelConfig: ImageModelConfig = {
+    mediaType: 'IMAGE',
+    inputWidth: 224,
+    inputHeight: 224,
+    mean: [0.485, 0.456, 0.406],
+    std: [0.229, 0.224, 0.225],
+    ... defaultBaseModelConfig,
+}
+
+const defaultVideoModelConfig: VideoModelConfig = {
+    mediaType: 'VIDEO',
+    frameCount: 8,
+    inputWidth: 224,
+    inputHeight: 224,
+    mean: [0.485, 0.456, 0.406],
+    std: [0.229, 0.224, 0.225],
+    ... defaultBaseModelConfig,
+}
+
+const defaultPdfModelConfig: PdfModelConfig = {
+    mediaType: 'PDF',
+    pageCount: 4,
+    inputWidth: 224,
+    inputHeight: 224,
+    mean: [0.485, 0.456, 0.406],
+    std: [0.229, 0.224, 0.225],
+    ... defaultBaseModelConfig,
+}
 
 export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: PlugAndPlayModelsProps) {
     const [file, setFile] = useState<File | null>(null);
@@ -36,7 +71,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
 
         const blob = await res.blob();
         const file: File = new File([blob], mediaName, { type: blob.type });
-        
+
         return file;
     }
 
