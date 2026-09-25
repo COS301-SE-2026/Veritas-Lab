@@ -15,7 +15,7 @@ const defaultBaseModelConfig: BaseModelConfig = {
     activation: 'SIGMOID',
     classLabels: ['AUTHENTIC', 'AI'],
     aiClassIndex: 1,
-    threshold: 0.7,
+    threshold: 0.5,
 };
 
 const defaultVisualConfig: visualConfig = {

@@ -251,8 +251,10 @@ export async function processPdf(file: File, config: PdfModelConfig): Promise<or
     }
 
     const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
     const buffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({data: buffer}).promise;
+    const loadingTask = pdfjsLib.getDocument({data: buffer});
+    const pdf = await loadingTask.promise;
     const maxPages = Math.min(config.pageCount, pdf.numPages);
     const tensors: ort.Tensor[] = [];
 
@@ -287,7 +289,7 @@ export async function processPdf(file: File, config: PdfModelConfig): Promise<or
 
         return tensors;
     } finally {
-        await pdf.destroy();
+        await loadingTask.destroy();
     }
 }
 
