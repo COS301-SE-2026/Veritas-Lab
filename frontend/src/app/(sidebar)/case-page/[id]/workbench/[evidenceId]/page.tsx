@@ -18,7 +18,7 @@ import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
 
-const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata', 'PAPModels'];
+const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata', 'Plug-and-Play Models'];
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -97,7 +97,7 @@ export default function WorkbenchPage() {
     const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const metadataActive = activeWorkbenchTool === 'Metadata';
-    const PAPModelsActive = activeWorkbenchTool === 'PAPModels';
+    const PAPModelsActive = activeWorkbenchTool === 'Plug-and-Play Models';
 
     const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
 
@@ -132,7 +132,7 @@ export default function WorkbenchPage() {
                     filters={WORKBENCH_TABS}
                     defaultFilter={activeWorkbenchTool}
                     onChange={(tab) => setActiveWorkbenchTool(tab)}
-                    className="w-full max-w-sm"
+                    className="w-full max-w-xl"
                 />
             </div>
 

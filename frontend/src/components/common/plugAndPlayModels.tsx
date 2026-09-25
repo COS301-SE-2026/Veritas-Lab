@@ -4,7 +4,14 @@ import { useState } from 'react';
 import Label from '@/components/ui/label';
 import { runModel, type ClassificationResult } from '@/lib/ai'
 
-export default function PlugAndPlayModels() {
+type PlugAndPlayModelsProps = {
+    mediaUrl: string;
+    mediaName: string;
+    mediaKind: string;
+};
+
+
+export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: PlugAndPlayModelsProps) {
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<ClassificationResult | null>(null);
@@ -19,9 +26,24 @@ export default function PlugAndPlayModels() {
         }
     }
 
+    //fetches the evidence from r2 also THERE WILL PROBABLY BE R2 CORS ISSUES. 
+    async function fetchEvidenceFile(mediaUrl: string, mediaName: string): Promise<File> {
+        const res = await fetch(mediaUrl);
+
+        if (!res.ok) {
+            throw new Error(`Failed to load evidence file: ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const file: File = new File([blob], mediaName, { type: blob.type });
+        
+        return file;
+    }
+
     const runCustomModel = async (file: File) => {
         try {
-            const newResults = await runModel(file, );
+            const evidenceFile = fetchEvidenceFile(mediaUrl, mediaName);
+            const newResults = await runModel(file, evidenceFile, );
             setResults(newResults);
             setError(null);
         } catch (error) {
