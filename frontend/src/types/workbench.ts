@@ -69,11 +69,9 @@ export type AnnotationListProps = {
 };
 
 // Workbench tools which now has both annotations and metadata compar and plug and play models or PAPModels.
-export type WorkbenchTool = 'PAPModels' | 'Annotations' | 'Compare';
+export type WorkbenchTool = 'PAPModels' | 'Annotations' | 'Metadata';
 
 export type WorkbenchPanelProps = {
-    activeWorkbenchTool: WorkbenchTool | null;
-    onSelectWorkbenchTool: (tool: WorkbenchTool | null) => void;
     activeTool: AnnotationTool;
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];

@@ -125,7 +125,7 @@ export default function WorkbenchPage() {
                 </Button>
             </div>
 
-            <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+            <div className="mt-6 flex items-start gap-6">
                 <div className="min-w-0 flex-1">
                     <div className={(comparisonActive || PAPModelsActive) ? 'hidden' : 'block'} aria-hidden={comparisonActive}>
                         <WorkbenchCanvas
@@ -148,7 +148,7 @@ export default function WorkbenchPage() {
                             mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
-                            className="h-[min(75vh,900px)]"
+                            className="h-[calc(100dvh-14rem)] min-h-[32rem]"
                         />
                     )}
 

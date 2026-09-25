@@ -231,6 +231,7 @@ def _row_to_case(row: dict) -> Case:
 
     case.case_id = row["caseid"]
     case.case_state = row["casestate"]
+    case.case_assigned = row.get("caseassigned")
     case.case_creation_date = row["casecreationdate"]
 
     return case
