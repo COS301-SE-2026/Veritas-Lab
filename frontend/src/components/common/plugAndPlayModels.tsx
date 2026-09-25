@@ -6,7 +6,7 @@ import { runModel, ClassificationResult, ModelConfig, ImageModelConfig, VideoMod
 import Dropdown from '@/components/ui/dropdown';
 
 type PlugAndPlayModelsProps = {
-    mediaUrl: string;
+    mediaUrl: string | undefined;
     mediaName: string;
     mediaKind: string;
 };
@@ -23,32 +23,6 @@ const defaultVisualConfig: visualConfig = {
     std: [0.229, 0.224, 0.225],
 }
 
-const defaultImageModelConfig: ImageModelConfig = {
-    mediaType: 'IMAGE',
-    inputWidth: 224,
-    inputHeight: 224,
-    ... defaultVisualConfig,
-    ... defaultBaseModelConfig,
-}
-
-const defaultVideoModelConfig: VideoModelConfig = {
-    mediaType: 'VIDEO',
-    frameCount: 8,
-    inputWidth: 224,
-    inputHeight: 224,
-    ... defaultVisualConfig,
-    ... defaultBaseModelConfig,
-}
-
-const defaultPdfModelConfig: PdfModelConfig = {
-    mediaType: 'PDF',
-    pageCount: 4,
-    inputWidth: 224,
-    inputHeight: 224,
-    ... defaultVisualConfig,
-    ... defaultBaseModelConfig,
-}
-
 type advancedModelConfigOptions = {
     activation: ActivationType;
     inputWidth: number;
@@ -63,7 +37,6 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<ClassificationResult | null>(null);
-    const [modelConfig, setModelConfig] = useState<ModelConfig | null>(null);
     const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [advancedConfig, setAdvancedConfig] = useState<advancedModelConfigOptions>({
@@ -83,7 +56,10 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
     }
 
     //fetches the evidence from r2 also THERE WILL PROBABLY BE R2 CORS ISSUES. 
-    async function fetchEvidenceFile(mediaUrl: string, mediaName: string): Promise<File> {
+    async function fetchEvidenceFile(mediaUrl: string | undefined, mediaName: string): Promise<File> {
+        if (!mediaUrl) {
+            throw new Error('Media URL is undefined');
+        }
         const res = await fetch(mediaUrl);
 
         if (!res.ok) {
@@ -96,7 +72,9 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
         return file;
     }
 
-    const runCustomModel = async () => {
+
+    const runCustomModel = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         try {
             if (!file) {
                 throw new Error('No model file selected');
@@ -109,15 +87,16 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                 inputWidth: advancedConfig.inputWidth,
                 inputHeight: advancedConfig.inputHeight,
             }
+            let modelConfig: ModelConfig;
             switch (mediaKind) {
                 case 'image':
-                    setModelConfig({ ...config, mediaType: 'IMAGE'});
+                    modelConfig = { ...config, mediaType: 'IMAGE' };
                     break;
                 case 'video':
-                    setModelConfig({ ...config, mediaType: 'VIDEO', frameCount: 8 });
+                    modelConfig = { ...config, mediaType: 'VIDEO', frameCount: 8 };
                     break;
                 case 'pdf':
-                    setModelConfig({ ...config, mediaType: 'PDF', pageCount: 4 });
+                    modelConfig = { ...config, mediaType: 'PDF', pageCount: 4 };
                     break;
                 default:
                     throw new Error(`Unsupported media kind: ${mediaKind}`);
@@ -130,6 +109,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
             const newResults = await runModel(file, evidenceFile, modelConfig);
             setIsRunning(false);
             setResults(newResults);
+            console.log('Model run completed successfully:', newResults);
             setError(null);
         } catch (error) {
             setIsRunning(false);
@@ -157,7 +137,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                 <p className="text-sm text-(--color-text-muted)">
                     Load up your own capable ONNX models and run them on evidence files.
                 </p>
-                <form>
+                <form onSubmit={runCustomModel}>
                     <label 
                         htmlFor="file"
                         className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-(--color-line-strong) bg-(--color-surface-muted) p-10 transition-colors duration-200 hover:border-(--color-secondary) hover:bg-(--color-b-50)"
@@ -222,9 +202,9 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                                     </label>
                                     <Dropdown
                                         options={[
-                                            { value: 'sigmoid', label: 'Sigmoid' },
-                                            { value: 'softmax', label: 'Softmax' },
-                                            { value: 'none', label: 'None' },
+                                            { value: 'SIGMOID', label: 'Sigmoid' },
+                                            { value: 'SOFTMAX', label: 'Softmax' },
+                                            { value: 'NONE', label: 'None' },
                                         ]}
                                         onChange={(e) => {
                                             setAdvancedConfig({
@@ -285,7 +265,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                             )}
                         </div>
                         <div className="ml-auto">
-                            <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!file || isRunning} onClick={runCustomModel}/>
+                            <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!file || isRunning} />
                         </div>
                     </div>
                 </form>

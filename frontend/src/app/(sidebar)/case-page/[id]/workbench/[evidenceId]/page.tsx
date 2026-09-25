@@ -164,7 +164,7 @@ export default function WorkbenchPage() {
                     )}
 
                     {PAPModelsActive && (
-                        <PlugAndPlayModels />
+                        <PlugAndPlayModels mediaUrl={mediaUrl} mediaName={mediaName} mediaKind={mediaKind} />
                     )}
                 </div>
 
