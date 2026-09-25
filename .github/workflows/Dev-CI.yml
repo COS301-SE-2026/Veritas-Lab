@@ -186,7 +186,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  lfs: true
+                  lfs: false
 
             - name: set up Python
               uses: actions/setup-python@v5
