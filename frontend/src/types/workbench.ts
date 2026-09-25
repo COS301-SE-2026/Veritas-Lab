@@ -69,11 +69,9 @@ export type AnnotationListProps = {
 };
 
 // Workbench tools which now has both annotations and metadata compar.
-export type WorkbenchTool = 'Annotations' | 'Compare';
+export type WorkbenchTool = 'Annotations' | 'Metadata';
 
 export type WorkbenchPanelProps = {
-    activeWorkbenchTool: WorkbenchTool | null;
-    onSelectWorkbenchTool: (tool: WorkbenchTool | null) => void;
     activeTool: AnnotationTool;
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];
