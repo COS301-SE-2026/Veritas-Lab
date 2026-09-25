@@ -41,8 +41,14 @@ jobs:
           run: |
             mkdir -p Backend/app/ai/audio
             mkdir -p Backend/app/ai/lexical_detector
+
+            echo "Downloading video model..."
             aws s3 cp "${VIDEO_MODEL_S3_URL}" Backend/app/ai/best_video_model.pt --endpoint-url "${R2_URL}"
+
+            echo "Downloading audio model..."
             aws s3 cp "${AUDIO_MODEL_S3_URL}" Backend/app/ai/audio/model.safetensors --endpoint-url "${R2_URL}"
+
+            echo "Downloading lexical model..."
             aws s3 cp "${LEXICAL_MODEL_S3_URL}" Backend/app/ai/lexical_detector/model.safetensors --endpoint-url "${R2_URL}"
 
         - name: Verify models
