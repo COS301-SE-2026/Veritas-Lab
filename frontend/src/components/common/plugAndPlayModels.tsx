@@ -18,12 +18,16 @@ const defaultBaseModelConfig: BaseModelConfig = {
     threshold: 0.7,
 };
 
+const defaultVisualConfig: visualConfig = {
+    mean: [0.485, 0.456, 0.406],
+    std: [0.229, 0.224, 0.225],
+}
+
 const defaultImageModelConfig: ImageModelConfig = {
     mediaType: 'IMAGE',
     inputWidth: 224,
     inputHeight: 224,
-    mean: [0.485, 0.456, 0.406],
-    std: [0.229, 0.224, 0.225],
+    ... defaultVisualConfig,
     ... defaultBaseModelConfig,
 }
 
@@ -32,8 +36,7 @@ const defaultVideoModelConfig: VideoModelConfig = {
     frameCount: 8,
     inputWidth: 224,
     inputHeight: 224,
-    mean: [0.485, 0.456, 0.406],
-    std: [0.229, 0.224, 0.225],
+    ... defaultVisualConfig,
     ... defaultBaseModelConfig,
 }
 
@@ -42,8 +45,7 @@ const defaultPdfModelConfig: PdfModelConfig = {
     pageCount: 4,
     inputWidth: 224,
     inputHeight: 224,
-    mean: [0.485, 0.456, 0.406],
-    std: [0.229, 0.224, 0.225],
+    ... defaultVisualConfig,
     ... defaultBaseModelConfig,
 }
 
@@ -51,17 +53,24 @@ type advancedModelConfigOptions = {
     activation: ActivationType;
     inputWidth: number;
     inputHeight: number;
+}
+
+type visualConfig = {
     mean: [number, number, number];
     std: [number, number, number];
 }
-
 export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: PlugAndPlayModelsProps) {
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<ClassificationResult | null>(null);
     const [modelConfig, setModelConfig] = useState<ModelConfig | null>(null);
-    const [customConfig, isCustomConfig] = useState<boolean>(false);
     const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
+    const [isRunning, setIsRunning] = useState<boolean>(false);
+    const [advancedConfig, setAdvancedConfig] = useState<advancedModelConfigOptions>({
+        activation: 'SIGMOID',
+        inputWidth: 224,
+        inputHeight: 224,
+    });
     //formats the files size so it's easier to read
     const fileSizeAsBytes = (bytes: number) => {
         if (bytes < 1024) {
@@ -87,31 +96,43 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
         return file;
     }
 
-    const runCustomModel = async (file: File) => {
+    const runCustomModel = async () => {
         try {
+            if (!file) {
+                throw new Error('No model file selected');
+            }
             const evidenceFile = await fetchEvidenceFile(mediaUrl, mediaName);
-            if (customConfig && !modelConfig) {
-                throw new Error('Custom model config is required when using a custom model');
+            const config = {
+                ...defaultBaseModelConfig,
+                ...defaultVisualConfig,
+                activation: advancedConfig.activation,
+                inputWidth: advancedConfig.inputWidth,
+                inputHeight: advancedConfig.inputHeight,
             }
+            switch (mediaKind) {
+                case 'image':
+                    setModelConfig({ ...config, mediaType: 'IMAGE'});
+                    break;
+                case 'video':
+                    setModelConfig({ ...config, mediaType: 'VIDEO', frameCount: 8 });
+                    break;
+                case 'pdf':
+                    setModelConfig({ ...config, mediaType: 'PDF', pageCount: 4 });
+                    break;
+                default:
+                    throw new Error(`Unsupported media kind: ${mediaKind}`);
+            }
+
             if (!modelConfig) {
-                switch (mediaKind) {
-                    case 'image':
-                        setModelConfig(defaultImageModelConfig);
-                        break;
-                    case 'video':
-                        setModelConfig(defaultVideoModelConfig);
-                        break;
-                    case 'pdf':
-                        setModelConfig(defaultPdfModelConfig);
-                        break;
-                    default:
-                        throw new Error(`Unsupported media kind: ${mediaKind}`);
-                }
+                throw new Error('Model configuration is not set');
             }
+            setIsRunning(true);
             const newResults = await runModel(file, evidenceFile, modelConfig);
+            setIsRunning(false);
             setResults(newResults);
             setError(null);
         } catch (error) {
+            setIsRunning(false);
             setError(error instanceof Error ? error.message : 'Failed to run model');
         }
 
@@ -194,81 +215,64 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
 
                     {showAdvancedConfig && (
                         <>
-                            <div className="mt-5 vl-panel flex flex-col gap-4 p-4">
-                                <label htmlFor="activation" className="block text-sm font-medium text-(--color-text-strong)">
-                                    Activation Function
-                                </label>
-                                <Dropdown
-                                    options={[
-                                        { value: 'sigmoid', label: 'Sigmoid' },
-                                        { value: 'softmax', label: 'Softmax' },
-                                        { value: 'none', label: 'None' },
-                                    ]}
-                                />
-                                <label htmlFor="inputWidth" className="block text-sm font-medium text-(--color-text-strong)">
-                                    Input Width
-                                </label>
-                                <input
-                                    type="number"
-                                    id="inputWidth"
-                                    className="vl-input"
-                                    placeholder="Enter input width"
-                                />
-                                <label htmlFor="inputHeight" className="block text-sm font-medium text-(--color-text-strong)">
-                                    Input Height
-                                </label>
-                                <input
-                                    type="number"
-                                    id="inputHeight"
-                                    className="vl-input"
-                                    placeholder="Enter input height"
-                                />
-                                <label htmlFor="mean" className="block text-sm font-medium text-(--color-text-strong)">
-                                    Mean
-                                </label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        id="mean-1"
-                                        className="vl-input"
-                                        placeholder="Enter 1st mean value"
-                                    />
-                                    <input
-                                        type="text"
-                                        id="mean-2"
-                                        className="vl-input"
-                                        placeholder="Enter 2nd mean value"
-                                    />
-                                    <input
-                                        type="text"
-                                        id="mean-3"
-                                        className="vl-input"
-                                        placeholder="Enter 3rd mean value"
+                            <div className="mt-5 vl-panel flex flex-col gap-4 p-4 bg-(--color-surface-muted)">
+                                <div>
+                                    <label htmlFor="activation" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                        Activation Function
+                                    </label>
+                                    <Dropdown
+                                        options={[
+                                            { value: 'sigmoid', label: 'Sigmoid' },
+                                            { value: 'softmax', label: 'Softmax' },
+                                            { value: 'none', label: 'None' },
+                                        ]}
+                                        onChange={(e) => {
+                                            setAdvancedConfig({
+                                                ...advancedConfig,
+                                                activation: e.target.value as ActivationType,
+                                            });
+                                        }}
                                     />
                                 </div>
-
-                                <label htmlFor="std" className="block text-sm font-medium text-(--color-text-strong)">
-                                    Standard Deviation
-                                </label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        id="std-1"
-                                        className="vl-input"
-                                        placeholder="Enter 1st std value"
-                                    />
-                                    <input
-                                        type="text"
-                                        id="std-2"
-                                        className="vl-input"
-                                        placeholder="Enter 2nd std value"
-                                    />
-                                    <input
-                                        type="text"
-                                        id="std-3"
-                                        className="vl-input"
-                                        placeholder="Enter 3rd std value"
-                                    />
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label htmlFor="inputWidth" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                            Input Width
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="inputWidth"
+                                            className="vl-input"
+                                            value={advancedConfig.inputWidth}
+                                            min={1}
+                                            onChange={(e) => {
+                                                setAdvancedConfig({
+                                                    ...advancedConfig,
+                                                    inputWidth: parseInt(e.target.value) || 0,
+                                                });
+                                            }}
+                                            placeholder="Enter input width"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="inputHeight" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                            Input Height
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="inputHeight"
+                                            className="vl-input"
+                                            value={advancedConfig.inputHeight}
+                                            min={1}
+                                            onChange={(e) => {
+                                                setAdvancedConfig({
+                                                    ...advancedConfig,
+                                                    inputHeight: parseInt(e.target.value) || 0,
+                                                });
+                                            }}
+                                            placeholder="Enter input height"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </>
@@ -281,7 +285,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                             )}
                         </div>
                         <div className="ml-auto">
-                            <Button variant="submit" type="submit" text="Run Model" disabled={!file} onClick={runCustomModel}/>
+                            <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!file || isRunning} onClick={runCustomModel}/>
                         </div>
                     </div>
                 </form>
