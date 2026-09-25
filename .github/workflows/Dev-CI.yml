@@ -29,7 +29,7 @@ jobs:
             key: ai-models-v1
 
         - name: Download models from R2
-          if: steps.model-cache.outputs.cache-hit != 'true'
+          if: ${{ steps.model-cache.outputs.cache-hit != 'true' }}
           env:
             AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -61,8 +61,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
-                with:
-                  lfs: false
+              with:
+                lfs: false
 
             - name: Restore model cache
               uses: actions/cache@v4
