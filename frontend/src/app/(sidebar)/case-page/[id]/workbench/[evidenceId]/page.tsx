@@ -8,6 +8,7 @@ import WorkbenchPanel from '@/components/common/workbenchPanel';
 import MetadataComparison from '@/components/common/workbenchMetadataComp';
 import ReportModal from '@/components/common/reportModal';
 import Button from '@/components/ui/button';
+import SliderBar from '@/components/ui/sliderBar';
 import useAnnotations from '@/lib/hooks/useAnnotations';
 import useReportModal from '@/lib/hooks/useEvidenceReport';
 import { saveAnnotations } from '@/lib/api/workbench';
@@ -15,6 +16,8 @@ import { fetchCase } from '@/lib/api/case';
 import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
+
+const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata'];
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -36,8 +39,7 @@ export default function WorkbenchPage() {
     } = useAnnotations();
     const { isReportOpen, openReport, closeReport } = useReportModal();
 
-    // Which workbench tool is open. By default none are open
-    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool | null>(null);
+    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool>('Annotations');
 
     const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
@@ -86,7 +88,7 @@ export default function WorkbenchPage() {
     //changed video metadata to be supported, used to be unsupported which is why it wasnt rendering (sorry i forgot to change that)
     const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
-    const comparisonActive = activeWorkbenchTool === 'Compare';
+    const metadataActive = activeWorkbenchTool === 'Metadata';
 
     const handleSave = () => saveAnnotations({ evidenceId, annotations });
 
@@ -104,9 +106,9 @@ export default function WorkbenchPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-(--color-text-strong)">{mediaName}</h1>
                     <p className="mt-1 text-sm text-(--color-text-muted)">
-                        {comparisonActive
-                            ? 'Showing extracted metadata in place of the preview. Close the tool to return to the media.'
-                            : 'Use the tools on the right to work on this evidence.'}
+                        {metadataActive
+                            ? 'Showing extracted metadata in place of the preview. Switch to Annotations to return to the media.'
+                            : 'Use the annotation controls on the right to work on this evidence.'}
                     </p>
                     {error ? <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p> : null}
                 </div>
@@ -116,9 +118,18 @@ export default function WorkbenchPage() {
                 </Button>
             </div>
 
-            <div className="mt-6 flex items-start gap-6">
+            <div className="mt-6">
+                <SliderBar<WorkbenchTool>
+                    filters={WORKBENCH_TABS}
+                    defaultFilter={activeWorkbenchTool}
+                    onChange={(tab) => setActiveWorkbenchTool(tab)}
+                    className="w-full max-w-sm"
+                />
+            </div>
+
+            <div className="mt-6 flex flex-col items-start gap-6 lg:flex-row">
                 <div className="min-w-0 flex-1">
-                    <div className={comparisonActive ? 'hidden' : 'block'} aria-hidden={comparisonActive}>
+                    <div className={metadataActive ? 'hidden' : 'block'} aria-hidden={metadataActive}>
                         <WorkbenchCanvas
                             video={video}
                             mediaUrl={mediaUrl}
@@ -134,7 +145,7 @@ export default function WorkbenchPage() {
                         />
                     </div>
 
-                    {comparisonActive ? (
+                    {metadataActive ? (
                         <MetadataComparison
                             mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
@@ -144,18 +155,18 @@ export default function WorkbenchPage() {
                     ) : null}
                 </div>
 
-                <WorkbenchPanel
-                    activeWorkbenchTool={activeWorkbenchTool}
-                    onSelectWorkbenchTool={setActiveWorkbenchTool}
-                    activeTool={activeTool}
-                    onToolChange={setActiveTool}
-                    annotations={annotations}
-                    selectedId={selectedId}
-                    onSelectAnnotation={pickSelectedAnnotation}
-                    onRemoveAnnotation={removeAnnotation}
-                    onClearAll={clearAll}
-                    onSave={handleSave}
-                />
+                {annotationsActive ? (
+                    <WorkbenchPanel
+                        activeTool={activeTool}
+                        onToolChange={setActiveTool}
+                        annotations={annotations}
+                        selectedId={selectedId}
+                        onSelectAnnotation={pickSelectedAnnotation}
+                        onRemoveAnnotation={removeAnnotation}
+                        onClearAll={clearAll}
+                        onSave={handleSave}
+                    />
+                ) : null}
             </div>
 
             <ReportModal
