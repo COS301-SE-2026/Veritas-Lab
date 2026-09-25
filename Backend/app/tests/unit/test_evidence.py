@@ -681,7 +681,7 @@ async def test_add_evidence_pdf_being_uploaded_success(mockUuid,mockPdfReaderCla
 def test_delete_evidence_missing_jwt(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         raise HTTPException(
             status_code=401,
             detail={"status": "error", "message": "Missing authorization header"}
@@ -708,7 +708,7 @@ def test_delete_evidence_missing_jwt(monkeypatch):
 def test_delete_evidence_success(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "admin-id",
             "username": "admin_user",
@@ -741,7 +741,7 @@ def test_delete_evidence_success(monkeypatch):
 def test_delete_evidence_invalid_media_id(monkeypatch):
     client.cookies.clear()
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "admin-id",
             "username": "admin_user",
@@ -774,7 +774,7 @@ def test_delete_evidence_user_forbidden(monkeypatch):
     connection.fetchrow = AsyncMock(return_value=None)
     monkeypatch.setattr(cases_router.asyncpg, "connect", lambda: connection)
 
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {
             "sub": "user-id",
             "username": "some_user",

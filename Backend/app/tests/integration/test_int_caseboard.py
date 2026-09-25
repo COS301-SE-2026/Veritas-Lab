@@ -17,13 +17,29 @@ USER_SETTINGS = User_Settings()
 async def fake_case_board_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
-    user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
+    
+    # 1. Distinct Investigator 
+    invest_id = str(uuid.uuid4())
+    base_invest = "invest"
+    invest_name = f"{base_invest}_{invest_id[:8]}"
+    
+    # 2. Distinct Creator
+    creator_id = str(uuid.uuid4())
+    base_creator = "creator"
+    creator_name = f"{base_creator}_{creator_id[:8]}"
 
     try:
-        await ensure_user_exists(conn, user_id, "TestInvest", "INVESTIGATOR")
+        # Create investigator and update role explicitly
+        await ensure_user_exists(conn, invest_id, base_invest)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'INVESTIGATOR', invest_id)
+        
+        # Create creator and update role explicitly
+        await ensure_user_exists(conn, creator_id, base_creator)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'USER', creator_id)
 
         async with conn.transaction():
-            await conn.execute(f"SET LOCAL app.current_user_id = '{user_id}';")
+            # Set the local user context for the audit logs
+            await conn.execute(f"SET LOCAL app.current_user_id = '{creator_id}';")
 
             case_id = str(uuid.uuid4())
             await conn.execute(
@@ -34,12 +50,13 @@ async def fake_case_board_context(ensure_user_exists):
                 """,
                 uuid.UUID(case_id),
                 "Integration Test Case Board Case",
-                "CaseCreator",
+                creator_name, # Created by the user
                 "Integration test case description",
                 "OPEN",
             )
             created_ids["case_id"] = case_id
 
+            await conn.execute(f"SET LOCAL app.current_user_id = '{invest_id}';")
             await conn.execute(
                 """
                 UPDATE "Cases_DB"."Cases"
@@ -48,14 +65,14 @@ async def fake_case_board_context(ensure_user_exists):
                 WHERE CaseId = $1
                 """,
                 uuid.UUID(case_id),
-                "TestInvest",
+                invest_name, # Assigned to the investigator
             )
 
-        yield {"case_id": case_id}
+        yield {"case_id": case_id, "user_id": invest_id, "username": invest_name}
 
     finally:
         async with conn.transaction():
-            await conn.execute(f"SET LOCAL app.current_user_id = '{user_id}';")
+            await conn.execute(f"SET LOCAL app.current_user_id = '{invest_id}';")
 
             if "case_id" in created_ids:
                 await conn.execute(
@@ -105,8 +122,8 @@ async def check_case_board(case_id, expected_case_board=None):
 async def test_integration_save_case_board_success(client, fake_case_board_context):
     case_id = fake_case_board_context["case_id"]
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": fake_case_board_context["user_id"],
+        "username": fake_case_board_context["username"],
         "role": "INVESTIGATOR",
     }
 
@@ -150,8 +167,8 @@ async def test_integration_save_case_board_success(client, fake_case_board_conte
 async def test_integration_save_case_board_overwrites_existing(client, fake_case_board_context):
     case_id = fake_case_board_context["case_id"]
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": fake_case_board_context["user_id"],
+        "username": fake_case_board_context["username"],
         "role": "INVESTIGATOR",
     }
 
@@ -194,14 +211,14 @@ async def test_integration_save_case_board_overwrites_existing(client, fake_case
     await check_case_board(case_id, second_payload["caseBoard"])
 
 
-# Test 401, Invalid UUID
+# Test 400, Invalid UUID
 @pytest.mark.asyncio
 async def test_integration_save_case_board_invalid_uuid(client, fake_case_board_context):
     case_id = fake_case_board_context["case_id"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": fake_case_board_context["user_id"],
+        "username": fake_case_board_context["username"],
         "role": "INVESTIGATOR",
     }
 
@@ -262,16 +279,26 @@ async def test_integration_save_case_board_invalid_jwt(client, fake_case_board_c
 
 # 403 - User doesn't have permission. Role is USER
 @pytest.mark.asyncio
-async def test_integration_save_case_board_user_unauthorized(client, fake_case_board_context):
+async def test_integration_save_case_board_user_unauthorized(client, fake_case_board_context, ensure_user_exists):
     case_id = fake_case_board_context["case_id"]
 
-    mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+    conn = await get_connection()
+    user_id = str(uuid.uuid4())
+    base_name = "testuser"
+    username = f"{base_name}_{user_id[:8]}"
+    try:
+        await ensure_user_exists(conn, user_id, base_name)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'USER', user_id)
+    finally:
+        await conn.close()
+
+    mock_user = {
+        "id": user_id,
+        "username": username,
         "role": "USER",
     }
 
-    test_token = create_token(mock_invest)
+    test_token = create_token(mock_user)
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
@@ -302,16 +329,20 @@ async def test_integration_save_case_board_unassigned_investigator_forbidden(
 ):
     case_id = fake_case_board_context["case_id"]
 
-    other_user_id = "1c2d3e4f-5678-4abc-9def-0123456789ab"
+    other_user_id = str(uuid.uuid4())
+    base_other = "otherinv"
+    other_username = f"{base_other}_{other_user_id[:8]}"
+    
     conn = await get_connection()
     try:
-        await ensure_user_exists(conn, other_user_id, "OtherInvest", "INVESTIGATOR")
+        await ensure_user_exists(conn, other_user_id, base_other)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'INVESTIGATOR', other_user_id)
     finally:
         await conn.close()
 
     mock_invest = {
         "id": other_user_id,
-        "username": "OtherInvest",
+        "username": other_username,
         "role": "INVESTIGATOR",
     }
 
@@ -343,7 +374,8 @@ async def test_integration_save_case_board_unassigned_investigator_forbidden(
 @pytest_asyncio.fixture
 async def seeded_case_board(fake_case_board_context):
     case_id = fake_case_board_context["case_id"]
-    user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
+    user_id = fake_case_board_context["user_id"]
+    username = fake_case_board_context["username"]
 
     board_data = {
         "nodes": [
@@ -370,9 +402,11 @@ async def seeded_case_board(fake_case_board_context):
             )
     finally:
         await conn.close()
+        
     return {
         "case_id": case_id,
         "user_id": user_id,
+        "username": username,
         "board_data": board_data,
     }
 
@@ -383,7 +417,7 @@ async def test_integration_get_case_board_success(client, seeded_case_board):
 
     mock_invest = {
         "id": seeded_case_board["user_id"],
-        "username": "TestInvest",
+        "username": seeded_case_board["username"],
         "role": "INVESTIGATOR",
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
@@ -401,8 +435,8 @@ async def test_integration_get_case_board_none_returns_null(client, fake_case_bo
     case_id = fake_case_board_context["case_id"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": fake_case_board_context["user_id"],
+        "username": fake_case_board_context["username"],
         "role": "INVESTIGATOR",
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
@@ -416,10 +450,20 @@ async def test_integration_get_case_board_none_returns_null(client, fake_case_bo
     assert data["caseBoard"] is None
 
 @pytest.mark.asyncio
-async def test_integration_get_case_board_invalid_uuid(client):
+async def test_integration_get_case_board_invalid_uuid(client, ensure_user_exists):
+    conn = await get_connection()
+    user_id = str(uuid.uuid4())
+    base_name = "testinvest"
+    username = f"{base_name}_{user_id[:8]}"
+    try:
+        await ensure_user_exists(conn, user_id, base_name)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'INVESTIGATOR', user_id)
+    finally:
+        await conn.close()
+
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": user_id,
+        "username": username,
         "role": "INVESTIGATOR",
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))
@@ -441,12 +485,22 @@ async def test_integration_get_case_board_invalid_jwt(client, seeded_case_board)
     assert response.json()["detail"]["status"] == "error"
     
 @pytest.mark.asyncio
-async def test_integration_get_case_board_user_unauthorized(client, seeded_case_board):
+async def test_integration_get_case_board_user_unauthorized(client, seeded_case_board, ensure_user_exists):
     case_id = seeded_case_board["case_id"]
 
+    conn = await get_connection()
+    user_id = str(uuid.uuid4())
+    base_name = "testuser"
+    username = f"{base_name}_{user_id[:8]}"
+    try:
+        await ensure_user_exists(conn, user_id, base_name)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'USER', user_id)
+    finally:
+        await conn.close()
+
     mock_user = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestUser",
+        "id": user_id,
+        "username": username,
         "role": "USER",
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_user))
@@ -457,12 +511,22 @@ async def test_integration_get_case_board_user_unauthorized(client, seeded_case_
     assert response.json()["detail"]["status"] == "error"
 
 @pytest.mark.asyncio
-async def test_integration_get_case_board_not_found(client):
+async def test_integration_get_case_board_not_found(client, ensure_user_exists):
     non_existent_case_id = str(uuid.uuid4())
 
+    conn = await get_connection()
+    user_id = str(uuid.uuid4())
+    base_name = "testinvest"
+    username = f"{base_name}_{user_id[:8]}"
+    try:
+        await ensure_user_exists(conn, user_id, base_name)
+        await conn.execute('UPDATE "Users_DB"."Users" SET userrole = $1 WHERE userid = $2::uuid', 'INVESTIGATOR', user_id)
+    finally:
+        await conn.close()
+
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": user_id,
+        "username": username,
         "role": "INVESTIGATOR",
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_invest))

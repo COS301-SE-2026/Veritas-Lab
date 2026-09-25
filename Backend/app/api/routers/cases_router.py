@@ -159,8 +159,8 @@ class case_board_response(BaseModel):
         ]
     )
 
-def validate_case_assignment_request(request: Request, assign_request: assign_case_request):
-    payload = verify_jwt(request)
+async def validate_case_assignment_request(request: Request, assign_request: assign_case_request, connection: asyncpg.Connection):
+    payload = await verify_jwt(request, connection)
 
     role = payload.get("role")
     user_id = payload.get("sub")
@@ -377,7 +377,7 @@ async def create_case(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     case = Case(
         case_name=case_request.title, 
@@ -484,7 +484,7 @@ async def create_case(
     }
 )
 async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     role = payload.get("role")
     username = payload.get("username")
 
@@ -682,7 +682,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
     }
 )
 async def get_single_case(case_id: str, request: Request, connection: Annotated[asyncpg.Connection, Depends(get_connection)]):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     case_id = Case(case_id=case_id).case_id
 
     role = payload.get("role")
@@ -925,7 +925,7 @@ async def upload_evidence(
     media: Annotated[UploadFile, File()],
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     #verify_not_user(payload.get("role"))
     #Now open to all roles
@@ -1063,7 +1063,7 @@ async def close_case(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     role = payload.get("role")
 
     if role not in ["INVESTIGATOR", "ADMIN"]:
@@ -1244,7 +1244,7 @@ async def update_case(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     if not case_request.CaseID:
         raise HTTPException(
@@ -1392,7 +1392,7 @@ async def update_comment(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     case_uuid = Case(case_id=case_id).case_id
     executor_id=payload.get("sub")
@@ -1492,7 +1492,7 @@ async def delete_comment(
     comment_id: int,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     username = payload.get("username")
     executor_id=payload.get("sub")
     
@@ -1626,7 +1626,7 @@ async def retreive_comments(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
 
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     user_role=payload.get("role")
     verify_not_user(user_role) 
 
@@ -1784,7 +1784,7 @@ async def delete_evidence(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     #Can raise the 401 errors
     
     #verify_not_user(user_role)
@@ -1934,7 +1934,7 @@ async def create_comment(
     req: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(req)
+    payload = await verify_jwt(req, connection)
     # Need to document 
 
     role = payload.get("role")
@@ -2085,7 +2085,7 @@ async def delete_case(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
 
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     
     if not case_request.CaseID:
         raise HTTPException(
@@ -2275,7 +2275,7 @@ async def save_annotations(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    cookie=verify_jwt(request)
+    cookie=await verify_jwt(request, connection)
     user_role=cookie.get("role")
     # Checking authorization
     verify_not_user(user_role)
@@ -2477,7 +2477,7 @@ async def save_case_board(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    cookie = verify_jwt(request)
+    cookie = await verify_jwt(request, connection)
     user_role = cookie.get("role")
     verify_not_user(user_role)
     user_name = cookie.get("username")
@@ -2606,7 +2606,7 @@ async def get_case_audit_events(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     validated_case_id = Case(case_id=case_id).case_id
 
@@ -2823,7 +2823,7 @@ async def get_audited_cases(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     if payload.get("role") != "ADMIN":
         raise HTTPException(
@@ -2970,9 +2970,10 @@ async def assign_case(
     request: Request, 
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    user_id, username = validate_case_assignment_request(
+    user_id, username = await validate_case_assignment_request(
         request,
-        assign_request
+        assign_request,
+        connection
     )
 
     try:
@@ -3089,9 +3090,10 @@ async def unassign_case(
     request: Request, 
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    user_id, username = validate_case_assignment_request(
+    user_id, username = await validate_case_assignment_request(
         request,
-        assign_request
+        assign_request,
+        connection
     )
 
     try:
@@ -3210,7 +3212,7 @@ async def publish_case(
     request: Request, 
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     user_id = payload.get("sub")
     username = payload.get("username")
     role = payload.get("role")
@@ -3376,7 +3378,7 @@ async def get_case_board(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     user_role = payload.get("role")
     verify_not_user(user_role)
  
