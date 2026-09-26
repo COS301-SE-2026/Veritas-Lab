@@ -245,7 +245,11 @@ def _row_to_case(row: dict) -> Case:
 
     return case
 
-def _format_case_evidence(row: dict, include_report: bool) -> dict:
+def _format_case_evidence(
+    row: dict,
+    include_report: bool,
+    plug_and_play: list
+) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
@@ -297,6 +301,8 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 if isinstance(row["automatedannotations"], str)
                 else (row["automatedannotations"] or [])
             ),
+
+            "plugAndPlay": plug_and_play,
 
             "reportArtifacts": (
                 json.loads(row["reportartifacts"])
@@ -574,10 +580,10 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         "Returns a single case with its comments and evidence. "
         "Any authenticated user can view a case they created, regardless of its state. "
         "ADMIN and INVESTIGATOR users can additionally view any PUBLISHED or CLOSED case. "
-        "ADMIN and INVESTIGATOR users receive evidence annotations and report-related "
-        "information whenever they can access the case. "
-        "USER accounts only receive annotations and report-related information when "
-        "the case is CLOSED."
+        "ADMIN and INVESTIGATOR users receive evidence annotations, automated annotations, "
+        "plug-and-play model results, and report-related information whenever they can access the case. "
+        "USER accounts only receive annotations, automated annotations, plug-and-play model results, "
+        "and report-related information when the case is CLOSED."
     ),
     responses={
         200: {
@@ -784,6 +790,42 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                             }
                                         ],
 
+                                        "plugAndPlay": [
+                                            {
+                                                "PNPModelId": 1,
+                                                "mediaId": "11111111-2222-3333-4444-555555555555",
+                                                "modelName": "ImageAuthenticityModel",
+                                                "modelResult": {
+                                                    "modelName": "ImageAuthenticityModel",
+                                                    "fileName": "image-model.onnx",
+                                                    "results": {
+                                                        "classification": "AI",
+                                                        "confidence": 0.91
+                                                    },
+                                                    "config": {},
+                                                    "date": "2026-09-26T14:00:00Z"
+                                                },
+                                                "uploadDate": "2026-09-26T14:05:00+00:00"
+                                            },
+
+                                            {
+                                                "PNPModelId": 2,
+                                                "mediaId": "11111111-2222-3333-4444-555555555555",
+                                                "modelName": "SecondaryImageModel",
+                                                "modelResult": {
+                                                    "modelName": "SecondaryImageModel",
+                                                    "fileName": "secondary-image-model.onnx",
+                                                    "results": {
+                                                        "classification": "AUTHENTIC",
+                                                        "confidence": 0.84
+                                                    },
+                                                    "config": {},
+                                                    "date": "2026-09-26T14:10:00Z"
+                                                },
+                                                "uploadDate": "2026-09-26T14:12:00+00:00"
+                                            }
+                                        ],
+
                                         "reportArtifacts": {},
 
                                         "reportFindings": {
@@ -981,7 +1023,7 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
         case = _row_to_case(row)
 
         evidence_rows = await connection.fetch(
-             """
+            """
             SELECT
                 ev.evidence_id AS "mediaid",
                 ev.case_perspective AS "caseperspective",
@@ -999,7 +1041,12 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 m.MediaTypeId AS "mediatypeid",
                 m.MediaName AS "medianame",
                 m.MediaExtension AS "mediaextension",
-                m.MediaBucket AS "mediabucket"
+                m.MediaBucket AS "mediabucket",
+
+                p.PNPModelId AS "pnpmodelid",
+                p.ModelName AS "pnpmodelname",
+                p.ModelResult AS "pnpmodelresult",
+                p.UploadDate AS "pnpuploaddate"
 
             FROM "Cases_DB"."Cases" c
 
@@ -1012,14 +1059,46 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
 
             JOIN "Cases_DB"."MediaType" m
                 ON media.MediaType = m.MediaTypeId
-            
+
             LEFT JOIN "Cases_DB"."AutomatedAnnotations" auto
                 ON auto.MediaId = media.MediaId
 
+            LEFT JOIN "Cases_DB"."PNPModels" p
+                ON p.MediaId = media.MediaId
+
             WHERE c.CaseId = $1
+
             """,
             case_id,
         )
+
+        evidence_map = {}
+
+        for evidence_row in evidence_rows:
+            media_id = evidence_row["mediaid"]
+
+            if media_id not in evidence_map:
+                evidence_map[media_id] = {
+                    "row": evidence_row,
+                    "plugAndPlay": []
+                }
+
+            if evidence_row["pnpmodelid"] is not None:
+                evidence_map[media_id]["plugAndPlay"].append({
+                    "PNPModelId": evidence_row["pnpmodelid"],
+                    "mediaId": str(media_id),
+                    "modelName": evidence_row["pnpmodelname"],
+                    "modelResult": (
+                        json.loads(evidence_row["pnpmodelresult"])
+                        if isinstance(evidence_row["pnpmodelresult"], str)
+                        else evidence_row["pnpmodelresult"]
+                    ),
+                    "uploadDate": (
+                        evidence_row["pnpuploaddate"].isoformat()
+                        if evidence_row["pnpuploaddate"]
+                        else None
+                    )
+                })
 
         can_view_report = role in ["ADMIN", "INVESTIGATOR"] or row["casestate"] == "CLOSED"
 
@@ -1028,8 +1107,8 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
             "case": case.to_json(),
             "comments": await case.get_comments(connection),
             "evidence": [
-                _format_case_evidence(evidence_row, include_report=can_view_report)
-                for evidence_row in evidence_rows
+                _format_case_evidence(item["row"], include_report=can_view_report, plug_and_play=item["plugAndPlay"])
+                for item in evidence_map.values()
             ]
         })
 
