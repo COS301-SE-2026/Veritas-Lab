@@ -24,8 +24,14 @@ def pnp_request():
         mediaId="11111111-1111-1111-1111-111111111111",
         caseId="22222222-2222-2222-2222-222222222222",
         data={
-            "classification": "AI",
-            "confidence": 0.91
+            "modelName": "TestModel",
+            "fileName": "test.onnx",
+            "results": {
+                "classification": "AI",
+                "confidence": 0.91
+            },
+            "config": {},
+            "date": "2026-09-26T14:00:00Z"
         }
     )
 
@@ -37,6 +43,7 @@ async def test_create_pnp_success(mock_verify_jwt, pnp_request):
     connection.fetchrow.return_value = {
         "pnpmodelid": 1,
         "mediaid": pnp_request.mediaId,
+        "modelname": "TestModel",
         "modelresult": pnp_request.data,
         "uploaddate": None
     }
@@ -61,8 +68,9 @@ async def test_create_pnp_admin_success(mock_verify_jwt, pnp_request):
     request = MagicMock()
     connection = AsyncMock()
     connection.fetchrow.return_value = {
-        "pnpmodelid": 2,
+        "pnpmodelid": 1,
         "mediaid": pnp_request.mediaId,
+        "modelname": "TestModel",
         "modelresult": pnp_request.data,
         "uploaddate": None
     }

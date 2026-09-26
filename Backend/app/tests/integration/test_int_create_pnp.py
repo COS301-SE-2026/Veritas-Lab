@@ -1,24 +1,42 @@
 import pytest
-from app.auth.auth import COOKIE_NAME, create_token
 import uuid
 import json
+
+from app.auth.auth import COOKIE_NAME, create_token
+
+
+def valid_pnp_data(
+    model_name="TestModel",
+    classification="AI",
+    confidence=0.91
+):
+    return {
+        "modelName": model_name,
+        "fileName": "test.onnx",
+        "results": {
+            "classification": classification,
+            "confidence": confidence
+        },
+        "config": {},
+        "date": "2026-09-26T14:00:00Z"
+    }
 
 @pytest.mark.asyncio
 async def test_integration_create_pnp_investigator_success(client, pnp_case_context):
     context = pnp_case_context
 
     client.cookies.clear()
-    client.cookies.set(COOKIE_NAME, context["investigator_token"])
+    client.cookies.set(
+        COOKIE_NAME,
+        context["investigator_token"]
+    )
 
     response = client.post(
         "/api/createPNP",
         json={
             "mediaId": str(context["media_id"]),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AI",
-                "confidence": 0.91
-            }
+            "data": valid_pnp_data()
         }
     )
 
@@ -30,7 +48,7 @@ async def test_integration_create_pnp_investigator_success(client, pnp_case_cont
 
     row = await context["conn"].fetchrow(
         """
-        SELECT MediaId, ModelResult
+        SELECT MediaId, ModelName, ModelResult
         FROM "Cases_DB"."PNPModels"
         WHERE MediaId = $1
         ORDER BY UploadDate DESC
@@ -41,11 +59,14 @@ async def test_integration_create_pnp_investigator_success(client, pnp_case_cont
 
     assert row is not None
     assert row["mediaid"] == context["media_id"]
+    assert row["modelname"] == "TestModel"
 
     model_result = json.loads(row["modelresult"])
 
-    assert model_result["classification"] == "AI"
-    assert model_result["confidence"] == 0.91
+    assert model_result["modelName"] == "TestModel"
+    assert model_result["fileName"] == "test.onnx"
+    assert model_result["results"]["classification"] == "AI"
+    assert model_result["results"]["confidence"] == 0.91
 
 @pytest.mark.asyncio
 async def test_integration_create_pnp_user_forbidden(client, pnp_case_context):
@@ -59,9 +80,7 @@ async def test_integration_create_pnp_user_forbidden(client, pnp_case_context):
         json={
             "mediaId": str(context["media_id"]),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AI"
-            }
+            "data": valid_pnp_data()
         }
     )
 
@@ -91,9 +110,7 @@ async def test_integration_create_pnp_unassigned_investigator_forbidden(client, 
         json={
             "mediaId": str(context["media_id"]),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AI"
-            }
+            "data": valid_pnp_data()
         }
     )
 
@@ -110,9 +127,7 @@ async def test_integration_create_pnp_missing_cookie(client, pnp_case_context):
         json={
             "mediaId": str(context["media_id"]),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AI"
-            }
+            "data": valid_pnp_data()
         }
     )
 
@@ -130,9 +145,7 @@ async def test_integration_create_pnp_invalid_token(client, pnp_case_context):
         json={
             "mediaId": str(context["media_id"]),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AI"
-            }
+            "data": valid_pnp_data()
         }
     )
 
@@ -150,9 +163,7 @@ async def test_integration_create_pnp_media_not_in_case(client, pnp_case_context
         json={
             "mediaId": str(uuid.uuid4()),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AI"
-            }
+            "data": valid_pnp_data()
         }
     )
 
@@ -181,12 +192,62 @@ async def test_integration_create_pnp_admin_success(client, pnp_case_context):
         json={
             "mediaId": str(context["media_id"]),
             "caseId": str(context["case_id"]),
-            "data": {
-                "classification": "AUTHENTIC",
-                "confidence": 0.88
-            }
+            "data": valid_pnp_data(
+                model_name="AdminTestModel",
+                classification="AUTHENTIC",
+                confidence=0.88
+            )
         }
     )
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
+
+    row = await context["conn"].fetchrow(
+        """
+        SELECT ModelName, ModelResult
+        FROM "Cases_DB"."PNPModels"
+        WHERE MediaId = $1
+        ORDER BY UploadDate DESC
+        LIMIT 1
+        """,
+        context["media_id"]
+    )
+
+    assert row is not None
+    assert row["modelname"] == "AdminTestModel"
+
+    model_result = json.loads(row["modelresult"])
+
+    assert model_result["results"]["classification"] == "AUTHENTIC"
+    assert model_result["results"]["confidence"] == 0.88
+
+@pytest.mark.asyncio
+async def test_integration_create_pnp_missing_model_name(client, pnp_case_context):
+    context = pnp_case_context
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE_NAME, context["investigator_token"])
+
+    response = client.post(
+        "/api/createPNP",
+        json={
+            "mediaId": str(context["media_id"]),
+            "caseId": str(context["case_id"]),
+            "data": {
+                "fileName": "test.onnx",
+                "results": {
+                    "classification": "AI",
+                    "confidence": 0.91
+                },
+                "config": {},
+                "date": "2026-09-26T14:00:00Z"
+            }
+        }
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {
+        "status": "error",
+        "message": "Model name is required"
+    }

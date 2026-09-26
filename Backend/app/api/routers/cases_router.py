@@ -3726,6 +3726,20 @@ async def get_case_board(
             }
         },
 
+        400: {
+            "description": "Model name is required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Model name is required"
+                        }
+                    }
+                }
+            }
+        },
+
         401: {
             "description": "Invalid or missing authentication token",
             "content": {
@@ -3785,26 +3799,43 @@ async def create_plug_and_play(
         )
 
     username = payload.get("username")
+    model_name = pnp_request.data.get("modelName")
+
+    if not model_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Model name is required"
+            }
+        )
 
     try:
         row = await connection.fetchrow(
             """
             INSERT INTO "Cases_DB"."PNPModels"
-                (MediaId, ModelResult)
+                (MediaId, ModelName, ModelResult)
             SELECT
                 $1::uuid,
-                $2::jsonb
+                $2,
+                $3::jsonb
             FROM "Cases_DB"."Cases" c
-            WHERE c.caseid = $3::uuid
-            AND c.caseassigned = $4
-            AND EXISTS (
-                SELECT 1
-                FROM unnest(c.evidence) AS e
-                WHERE (e).evidence_id = $1::uuid
-            )
-            RETURNING PNPModelId, MediaId, ModelResult, UploadDate;
+            WHERE c.caseid = $4::uuid
+              AND c.caseassigned = $5
+              AND EXISTS (
+                  SELECT 1
+                  FROM unnest(c.evidence) AS e
+                  WHERE (e).evidence_id = $1::uuid
+              )
+            RETURNING
+                PNPModelId,
+                MediaId,
+                ModelName,
+                ModelResult,
+                UploadDate;
             """,
             pnp_request.mediaId,
+            model_name,
             json.dumps(pnp_request.data),
             pnp_request.caseId,
             username
