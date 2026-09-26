@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useSidebar } from '@/context/SidebarContext';
 import { useLogOut } from '@/lib/hooks/useLogOut';
 import { useUserRole } from '@/context/UserRoleContext';
 import Image from 'next/image';
 // Uses Lucide for some nice icons. Pretty cool. // for admin we can change but user-star looks best atm
 import {
-    ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle, Settings, ScrollText,
+    ChevronLeft, Menu, Home, LogOut, UserStar, HelpCircle, Settings, ScrollText, FolderOpen, MessagesSquare, Route, Presentation
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import ResetPasswordModal from '@/components/common/resetPasswordModal';
@@ -17,6 +17,8 @@ import ResetPasswordModal from '@/components/common/resetPasswordModal';
 export default function Sidebar() {
     const pathname = usePathname();
     const caseId = pathname.split('/')[2];
+    const searchParams = useSearchParams();
+    const activeCaseTab = searchParams.get('tab');
     const userRole = useUserRole();
     const { collapsed, toggle } = useSidebar();
     const { logOut } = useLogOut();
@@ -28,7 +30,12 @@ export default function Sidebar() {
         ...(userRole === 'ADMIN' ? [{ label: 'Audit Logs', href: '/audit-log', icon: ScrollText }] : []),
         { label: 'Help', href: '/help', icon: HelpCircle },
     ];
-    const caseTabs = [ 'Evidence', 'Comments', 'Audit Timeline', 'Case Board' ]
+    const caseTabs = [ 
+        { tab: 'Evidence', icon: FolderOpen }, 
+        { tab: 'Comments', icon: MessagesSquare }, 
+        { tab: 'Audit Timeline', icon: Route }, 
+        { tab: 'Case Board', icon: Presentation } 
+    ];
 
     const footerItemClasses = (collapsed: boolean) =>
         `flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/[0.06] text-white/80 hover:bg-white/[0.14] hover:text-white -translate-x-1 hover:translate-x-0 transition-[transform,background-color,color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`;
@@ -64,7 +71,7 @@ export default function Sidebar() {
                                             ? 'justify-center py-3 pl-0 pr-4 -mr-3'
                                             : 'justify-start py-3 pl-4 pr-16 -mr-12'}
                                     ${isActive
-                                            ? 'bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
+                                            ? 'ml-2 bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
                                             : 'bg-white/[0.06] text-white/80 -translate-x-1 hover:translate-x-0 hover:bg-white/[0.14] hover:text-white'}
                                 `}
                             >
@@ -75,29 +82,32 @@ export default function Sidebar() {
                     );
                 })}
                 {caseId && (
+                    <div className="mt-4 mb-3 px-4 text-xs font-semibold text-white/60 uppercase tracking-wider">
+                        {collapsed ? 'Case' : 'Current Case'}
+                    </div>
+                )}
+                {caseId && (
                     <>
-                        <div>
-                            {caseTabs.map((tab) => {
-                                const isActive = pathname.includes(`tab=${tab}`);
-                                return (
-                                    <Link
-                                        key={tab}
-                                        href={`/case-page/${caseId}?tab=${tab}`}
-                                        className={`group relative flex items-center gap-3 text-sm rounded-l-full rounded-r-none transition-[transform,background-color,color] duration-200 ease-out
-                                            ${collapsed
-                                                ? 'justify-center py-3 pl-0 pr-4 -mr-3'
-                                                : 'justify-start py-3 pl-4 pr-16 -mr-12'}
-                                            ${isActive
-                                                ? 'bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
-                                                : 'bg-white/[0.06] text-white/80 -translate-x-1 hover:translate-x-0 hover:bg-white/[0.14] hover:text-white'}
-                                        `}
-                                    >
-                                        
-                                        {!collapsed && <span className="truncate">{tab}</span>}
-                                    </Link>
-                                );
-                            })}
-                        </div>
+                        {caseTabs.map(({ tab, icon: Icon }) => {
+                            
+                            return (
+                                <Link
+                                    key={tab}
+                                    href={`/case-page/${caseId}?tab=${tab}`}
+                                    className={`group relative flex items-center gap-3 text-sm rounded-l-full rounded-r-none transition-[transform,background-color,color] duration-200 ease-out
+                                        ${collapsed
+                                            ? 'justify-center py-3 pl-0 pr-4 -mr-3'
+                                            : 'justify-start py-3 pl-4 pr-16 -mr-12'}
+                                        ${activeCaseTab === tab
+                                            ? 'ml-2 bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
+                                            : 'bg-white/[0.06] text-white/80 -translate-x-1 hover:translate-x-0 hover:bg-white/[0.14] hover:text-white'}
+                                    `}
+                                >
+                                    <Icon size={18} className="shrink-0" />
+                                    {!collapsed && <span className="truncate">{tab}</span>}
+                                </Link>
+                            );
+                        })}
                     </>
                 )}
             </nav>
