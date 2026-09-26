@@ -16,6 +16,7 @@ import { fetchCase } from '@/lib/api/case';
 import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
+import { normalizeAnnotations } from '@/lib/workbenchAnnotations';
 
 const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata'];
 
@@ -33,6 +34,8 @@ export default function WorkbenchPage() {
         setSelectedId,
         addShape,
         addNote,
+        addHighlight,
+        resolveHighlight,
         removeAnnotation,
         clearAll,
         loadAnnotations,
@@ -76,7 +79,7 @@ export default function WorkbenchPage() {
 
     if (evidence !== seededForm) {
         setSeededForm(evidence);
-        loadAnnotations(evidence?.annotations ?? []);
+        loadAnnotations(normalizeAnnotations(evidence?.annotations));
     }
     const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
@@ -142,6 +145,8 @@ export default function WorkbenchPage() {
                             onSelectAnnotation={pickSelectedAnnotation}
                             onAddShape={addShape}
                             onAddNote={addNote}
+                            onAddHighlight={addHighlight}
+                            onResolveHighlight={resolveHighlight}
                         />
                     </div>
 
@@ -157,6 +162,7 @@ export default function WorkbenchPage() {
 
                 {annotationsActive ? (
                     <WorkbenchPanel
+                        mediaKind={mediaKind}
                         activeTool={activeTool}
                         onToolChange={setActiveTool}
                         annotations={annotations}
