@@ -2,7 +2,7 @@ import pytest
 from app.auth.auth import COOKIE_NAME, create_token
 
 @pytest.mark.asyncio
-async def test_integration_delete_pnp_investigator_success(client, delete_pnp_context):
+async def test_integration_delete_pnp_investigator_forbidden(client, delete_pnp_context):
     context = delete_pnp_context
 
     client.cookies.clear()
@@ -17,11 +17,8 @@ async def test_integration_delete_pnp_investigator_success(client, delete_pnp_co
         }
     )
 
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "success",
-        "message": "Plug-and-play data deleted successfully"
-    }
+    assert response.status_code == 403
+    assert response.json()["detail"]["status"] == "error"
 
     row = await context["conn"].fetchrow(
         """
@@ -34,7 +31,7 @@ async def test_integration_delete_pnp_investigator_success(client, delete_pnp_co
         context["model_name"]
     )
 
-    assert row is None
+    assert row is not None
 
 @pytest.mark.asyncio
 async def test_integration_delete_pnp_admin_success(client, delete_pnp_context):

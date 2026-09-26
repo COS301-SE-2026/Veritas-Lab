@@ -3872,9 +3872,8 @@ async def create_plug_and_play(
     summary="Delete plug-and-play model result",
     description=(
         "Deletes a plug-and-play model result for a media item. "
-        "Only ADMIN and INVESTIGATOR users may use this endpoint. "
-        "The user must be assigned to the specified case and the media item "
-        "must belong to that case's evidence."
+        "Only ADMIN users may use this endpoint. "
+        "The media item must belong to the specified case."
     ),
     responses={
         200: {
@@ -3904,7 +3903,7 @@ async def create_plug_and_play(
         },
 
         403: {
-            "description": "User is unauthorized or is not assigned to the case",
+            "description": "User is unauthorized or the PNP result does not belong to the specified case",
             "content": {
                 "application/json": {
                     "example": {
@@ -3940,9 +3939,8 @@ async def delete_plug_and_play(
     payload = await verify_jwt(request, connection)
 
     role = payload.get("role")
-    username = payload.get("username")
 
-    if role not in ["ADMIN", "INVESTIGATOR"]:
+    if role != "ADMIN":
         raise HTTPException(
             status_code=403,
             detail={
@@ -3959,7 +3957,6 @@ async def delete_plug_and_play(
             WHERE p.MediaId = $1::uuid
               AND p.ModelName = $2
               AND c.CaseId = $3::uuid
-              AND c.CaseAssigned = $4
               AND EXISTS (
                   SELECT 1
                   FROM unnest(c.evidence) AS e
@@ -3969,6 +3966,168 @@ async def delete_plug_and_play(
             """,
             pnp_request.mediaId,
             pnp_request.modelName,
+            pnp_request.caseId
+        )
+
+        if row is None:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "Plug-and-play data deleted successfully"
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.post(
+    "/updatePNP",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Update plug-and-play model result",
+    description=(
+        "Updates plug-and-play model data for a media item. "
+        "Only ADMIN and INVESTIGATOR users may use this endpoint. "
+        "The user must be assigned to the specified case and the media item "
+        "must belong to that case's evidence."
+    ),
+    responses={
+        200: {
+            "description": "Plug-and-play data updated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Plug-and-play data updated successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Model name is required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Model name is required"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Invalid or missing authentication token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User not authenticated"
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User is unauthorized or is not assigned to the case",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": USER_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+        
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def update_plug_and_play(
+    pnp_request: plug_and_play_request,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = await verify_jwt(request, connection)
+
+    role = payload.get("role")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
+
+    username = payload.get("username")
+    model_name = pnp_request.data.get("modelName")
+
+    if not model_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Model name is required"
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."PNPModels" p
+            SET ModelResult = $1::jsonb
+            FROM "Cases_DB"."Cases" c
+            WHERE p.MediaId = $2::uuid
+              AND p.ModelName = $3
+              AND c.CaseId = $4::uuid
+              AND c.CaseAssigned = $5
+              AND EXISTS (
+                  SELECT 1
+                  FROM unnest(c.evidence) AS e
+                  WHERE (e).evidence_id = p.MediaId
+              )
+            RETURNING
+                p.PNPModelId,
+                p.MediaId,
+                p.ModelName,
+                p.ModelResult,
+                p.UploadDate;
+            """,
+            json.dumps(pnp_request.data),
+            pnp_request.mediaId,
+            model_name,
             pnp_request.caseId,
             username
         )
@@ -3984,7 +4143,7 @@ async def delete_plug_and_play(
 
         return {
             "status": "success",
-            "message": "Plug-and-play data deleted successfully"
+            "message": "Plug-and-play data updated successfully"
         }
 
     except asyncpg.PostgresError:

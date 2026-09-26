@@ -27,28 +27,23 @@ def delete_pnp_request():
     )
 
 @pytest.mark.asyncio
-async def test_delete_pnp_investigator_success(mock_verify_jwt, delete_pnp_request):
+async def test_delete_pnp_investigator_forbidden(mock_verify_jwt, delete_pnp_request):
     request = MagicMock()
-
     connection = AsyncMock()
-    connection.fetchrow.return_value = {
-        "pnpmodelid": 1
-    }
 
     mock_jwt = mock_verify_jwt({
         "username": "Test_Investigator",
         "role": "INVESTIGATOR"
     })
 
-    response = await delete_plug_and_play(delete_pnp_request, request, connection)
+    with pytest.raises(HTTPException) as exc:
+        await delete_plug_and_play(
+            delete_pnp_request,
+            request,
+            connection
+        )
 
-    assert response == {
-        "status": "success",
-        "message": "Plug-and-play data deleted successfully"
-    }
-
-    mock_jwt.assert_awaited_once_with(request, connection)
-    connection.fetchrow.assert_awaited_once()
+    assert exc.value.status_code == 403
 
 @pytest.mark.asyncio
 async def test_delete_pnp_admin_success(mock_verify_jwt, delete_pnp_request):
@@ -100,7 +95,7 @@ async def test_delete_pnp_not_found_or_not_assigned(mock_verify_jwt, delete_pnp_
 
     mock_jwt = mock_verify_jwt({
         "username": "Test_Investigator",
-        "role": "INVESTIGATOR"
+        "role": "ADMIN"
     })
 
     with pytest.raises(HTTPException) as exc:
@@ -144,7 +139,7 @@ async def test_delete_pnp_passes_correct_values(mock_verify_jwt, delete_pnp_requ
 
     mock_verify_jwt({
         "username": "Test_Investigator",
-        "role": "INVESTIGATOR"
+        "role": "ADMIN"
     })
 
     await delete_plug_and_play(delete_pnp_request, request, connection)
@@ -154,4 +149,3 @@ async def test_delete_pnp_passes_correct_values(mock_verify_jwt, delete_pnp_requ
     assert args[1] == delete_pnp_request.mediaId
     assert args[2] == delete_pnp_request.modelName
     assert args[3] == delete_pnp_request.caseId
-    assert args[4] == "Test_Investigator"
