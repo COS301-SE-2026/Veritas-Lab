@@ -1,6 +1,7 @@
 import { ClassificationResult, ModelConfig } from '@/lib/ai';
 import { getCertaintyMeta } from '@/lib/report';
-import { ShieldCheck, ShieldQuestion, ShieldAlert, ShieldX, LucideIcon } from 'lucide-react';
+import { ShieldCheck, ShieldQuestion, ShieldAlert, ShieldX, LucideIcon, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 const certIcon: Record<number, LucideIcon> = {
     0: ShieldCheck,
@@ -9,6 +10,7 @@ const certIcon: Record<number, LucideIcon> = {
     3: ShieldX, //we should review these i chose them quite rushed and i think we might already be using one of them elsewhere.
 };
 export default function PlugAndPlayReport({ results, modelName, fileName, config, date }: { results: ClassificationResult, modelName: string, fileName: string, config: ModelConfig, date: string }) {
+    const [showRawConfig, setShowRawConfig] = useState(false);
     const probability = results.aiProbability;
     const percentage = (probability * 100).toFixed(2);
     const getCertainty = () => {
@@ -52,7 +54,7 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
            <div className='vl-panel flex flex-col gap-4 p-6'>
                 <div>
                     <h1 className='text-lg font-semibold'>Plug and Play Report</h1>
-                    <p className='text-sm text-muted-foreground'>Created on {date}</p>
+                    <p className='mt-3 text-sm text-(--color-text-muted)'>Created on {date}</p>
                 </div>
 
                 <div
@@ -77,45 +79,45 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
 
                 <div>
                     <h2 className='text-md font-semibold'>Model Configuration</h2>
-                    <div className='flex flex-col gap-3 mt-2'>
+                    <div className='flex flex-col gap-1 mt-2'>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Activation:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.activation}</p>
+                            <p className='ml-auto font-semibold text-sm'>{config.activation}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Input Width:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.inputWidth}</p>
+                            <p className='ml-auto font-semibold text-sm'>{config.inputWidth}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Input Height:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.inputHeight}</p>
+                            <p className='ml-auto font-semibold text-sm'>{config.inputHeight}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>AI Class Index:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.aiClassIndex}</p>
+                            <p className='ml-auto font-semibold text-sm'>{config.aiClassIndex}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>AI Threshold:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.threshold}</p>
+                            <p className='ml-auto font-semibold text-sm'>{config.threshold}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Mean:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>[{config.mean.join(', ')}]</p>
+                            <p className='ml-auto font-semibold text-sm'>[{config.mean.join(', ')}]</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Std:</p>
-                            <p className='ml-auto font-medium text-(--color-text-strong)'>[{config.std.join(', ')}]</p>
+                            <p className='ml-auto font-semibold text-sm'>[{config.std.join(', ')}]</p>
                         </div>
                         {config.mediaType === 'IMAGE' && (
                             <div className='flex'>
                                 <p className='text-(--color-text-muted)'>Media Type:</p>
-                                <p className='ml-auto font-medium text-(--color-text-strong)'>Image</p>
+                                <p className='ml-auto font-semibold text-sm'>Image</p>
                             </div>
                         )}
                         {config.mediaType === 'PDF' && (
                             <div className='flex'>
                                 <p className='text-(--color-text-muted)'>Media Type:</p>
-                                <p className='ml-auto font-medium text-(--color-text-strong)'>PDF</p>
+                                <p className='ml-auto font-semibold text-sm'>PDF</p>
                             </div>
 
                         )}
@@ -123,20 +125,29 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
                             <>
                                 <div className='flex'>
                                     <p className='text-(--color-text-muted)'>Media Type:</p>
-                                    <p className='ml-auto font-medium text-(--color-text-strong)'>Video</p>
+                                    <p className='ml-auto font-semibold text-sm'>Video</p>
                                 </div>
                                 <div className='flex'>
                                     <p className='text-(--color-text-muted)'>Video frames scanned:</p>
-                                    <p className='ml-auto font-medium text-(--color-text-strong)'>{config.frameCount}</p>
+                                    <p className='ml-auto font-semibold text-sm'>{config.frameCount}</p>
                                 </div>
                             </>
                         )}
                     </div>
-                    <div className='mt-3'>
-                        <h2 className='text-md font-semibold'>Config</h2>
-                        <pre className='vl-panel text-sm p-4 bg-(--color-surface-muted)'>
-                            {JSON.stringify(config, null, 2)}
-                        </pre>
+                    <div>
+                        <button
+                                type="button"
+                                onClick={() => setShowRawConfig(!showRawConfig)}
+                                className="mt-5 text-sm font-semibold text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
+                            >
+                                Show Raw Config
+                                <ChevronDown size={16} className={`inline-block ml-2 transition-transform ${showRawConfig ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showRawConfig && (
+                            <pre className='vl-panel mt-3 text-sm p-4 bg-(--color-surface-muted)'>
+                                {JSON.stringify(config, null, 2)}
+                            </pre>
+                        )}
                     </div>
                 </div>
            </div>

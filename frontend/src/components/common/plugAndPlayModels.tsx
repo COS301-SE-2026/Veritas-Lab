@@ -167,7 +167,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                     <form onSubmit={runCustomModel}>
                         <label 
                             htmlFor="file"
-                            className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-(--color-line-strong) bg-(--color-surface-muted) p-10 transition-colors duration-200 hover:border-(--color-secondary) hover:bg-(--color-b-50)"
+                            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-(--color-line-strong) bg-(--color-surface-muted) p-10 transition-colors duration-200 hover:border-(--color-secondary) hover:bg-(--color-b-50)"
                         >
                             <input
                                 id="file"
