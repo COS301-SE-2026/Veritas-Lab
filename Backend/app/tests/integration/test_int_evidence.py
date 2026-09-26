@@ -25,6 +25,15 @@ async def fake_evidence_context(ensure_user_exists):
             "TestInvest", 
             "INVESTIGATOR"
         )
+
+        # verify_jwt only accepts tokens matching a stored user, so every identity the tests use is seeded here
+        other_investigator_id = str(uuid.uuid4())
+        other_investigator_name = await ensure_user_exists(conn, other_investigator_id, "UnauthorizedUser", "INVESTIGATOR")
+        user_id = str(uuid.uuid4())
+        user_name = await ensure_user_exists(conn, user_id, "UnauthorizedUser", "USER")
+        admin_id = str(uuid.uuid4())
+        admin_name = await ensure_user_exists(conn, admin_id, "testerAdmin", "ADMIN")
+
         await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
         media_type_row = await conn.fetchrow(
             """
@@ -99,6 +108,12 @@ async def fake_evidence_context(ensure_user_exists):
             "bucket": media_bucket,
             "file_key": file_key,
             "executor_id": executor_id,
+            "other_investigator_id": other_investigator_id,
+            "other_investigator_name": other_investigator_name,
+            "user_id": user_id,
+            "user_name": user_name,
+            "admin_id": admin_id,
+            "admin_name": admin_name,
         }
 
     finally:
@@ -179,8 +194,8 @@ async def test_integration_delete_evidence_403_not_creator(client, fake_evidence
     media_id = fake_evidence_context["media_id"]
 
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": "UnauthorizedUser",
+        "id": fake_evidence_context["other_investigator_id"],
+        "username": fake_evidence_context["other_investigator_name"],
         "role": "INVESTIGATOR"
     }
     client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
@@ -199,8 +214,8 @@ async def test_integration_delete_evidence_403_user(client, fake_evidence_contex
     media_id = fake_evidence_context["media_id"]
 
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": "UnauthorizedUser",
+        "id": fake_evidence_context["user_id"],
+        "username": fake_evidence_context["user_name"],
         "role": "USER"
     }
     client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
@@ -220,8 +235,8 @@ async def test_integration_delete_evidence_400_case_id(client, fake_evidence_con
     media_id = fake_evidence_context["media_id"]
 
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": "UnauthorizedUser",
+        "id": fake_evidence_context["other_investigator_id"],
+        "username": fake_evidence_context["other_investigator_name"],
         "role": "INVESTIGATOR"
     }
     client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
@@ -278,7 +293,7 @@ async def test_integration_delete_evidence_admin_success(
     admin_id = str(uuid.uuid4())
     conn = await get_connection()
     try:
-        await ensure_user_exists(conn, admin_id, creator, "ADMIN")
+        creator = await ensure_user_exists(conn, admin_id, creator, "ADMIN")
     finally:
         await conn.close()
 
@@ -310,11 +325,9 @@ async def test_integration_delete_evidence_admin_success(
 async def test_integration_delete_evidence_404_no_media(client, fake_evidence_context):
     case_id = fake_evidence_context["case_id"]
     media_id = str(uuid.uuid4())
-    creator = fake_evidence_context["creator"]
-
     mock_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": creator,
+        "id": fake_evidence_context["admin_id"],
+        "username": fake_evidence_context["admin_name"],
         "role": "ADMIN"
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_investigator))
@@ -331,11 +344,9 @@ async def test_integration_delete_evidence_404_no_media(client, fake_evidence_co
 async def test_integration_delete_evidence_404_no_case(client, fake_evidence_context):
     case_id = str(uuid.uuid4())
     media_id = fake_evidence_context["media_id"]
-    creator = "testerAdmin"
-
     mock_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": creator,
+        "id": fake_evidence_context["admin_id"],
+        "username": fake_evidence_context["admin_name"],
         "role": "ADMIN"
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_investigator))
