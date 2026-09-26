@@ -1,9 +1,17 @@
 import { ClassificationResult, ModelConfig } from '@/lib/ai';
+import { getCertaintyMeta } from '@/lib/report';
+import { ShieldCheck, ShieldQuestion, ShieldAlert, ShieldX, LucideIcon } from 'lucide-react';
 
+const certIcon: Record<number, LucideIcon> = {
+    0: ShieldCheck,
+    1: ShieldQuestion,
+    2: ShieldAlert,
+    3: ShieldX, //we should review these i chose them quite rushed and i think we might already be using one of them elsewhere.
+};
 export default function PlugAndPlayReport({ results, modelName, fileName, config, date }: { results: ClassificationResult, modelName: string, fileName: string, config: ModelConfig, date: string }) {
     const probability = results.aiProbability;
     const percentage = (probability * 100).toFixed(2);
-    const certainty = () => {
+    const getCertainty = () => {
         if (probability >= 0.8) {
             return 3
         } else if (probability >= 0.6) {
@@ -12,9 +20,12 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
             return 1;
         }
     }
+    const certainty = getCertainty();
+    const certaintyMeta = getCertaintyMeta(certainty);
+    const CertaintyIcon = certainty !== null ? (certIcon[certainty] ?? ShieldQuestion) : ShieldQuestion;
 
     function getFindings() {
-        switch (certainty()) {
+        switch (certainty) {
             case 1:
                 return {
                     report: `The AI model ${modelName} has analyzed the file ${fileName} ` +
@@ -42,6 +53,21 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
                 <div>
                     <h1 className='text-lg font-semibold'>Plug and Play Report</h1>
                     <p className='text-sm text-muted-foreground'>Created on {date}</p>
+                </div>
+
+                <div
+                    className="flex shrink-0 items-center gap-3 rounded-[var(--radius-md)] border p-4"
+                    style={{ borderColor: `${certaintyMeta.colorVar}40`, backgroundColor: `${certaintyMeta.colorVar}14` }}
+                >
+                    <CertaintyIcon size={22} className="shrink-0" style={{ color: certaintyMeta.colorVar }} />
+                    <div>
+                        <p className="text-sm font-bold" style={{ color: certaintyMeta.colorVar }}>
+                            {certaintyMeta.label}
+                        </p>
+                        <p className="text-sm text-(--color-text-strong)">
+                            {certaintyMeta.description}
+                        </p>
+                    </div>
                 </div>
 
                 <div>
@@ -75,7 +101,7 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
                         </>
                     )}
                     <div className='mt-3'>
-                        <h2 className='text-md font-semibold'>Findings</h2>
+                        <h2 className='text-md font-semibold'>Config</h2>
                         <pre className='vl-panel text-sm p-4 bg-(--color-surface-muted)'>
                             {JSON.stringify(config, null, 2)}
                         </pre>
