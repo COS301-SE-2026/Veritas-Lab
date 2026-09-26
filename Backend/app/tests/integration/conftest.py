@@ -214,3 +214,132 @@ async def get_automated_annotations(media_id):
 
     finally:
         await connection.close()
+
+@pytest_asyncio.fixture
+async def pnp_case_context(case_assignment_context):
+    context = case_assignment_context
+    conn = context["conn"]
+
+    media_type_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    case_id = uuid.uuid4()
+
+    await conn.execute(
+        """
+        SELECT set_config('app.current_user_id', $1, false)
+        """,
+        context["investigator_id"]
+    )
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."MediaType"
+            (MediaTypeId, MediaName, MediaBucket, MediaExtension)
+        VALUES
+            ($1, $2, $3, $4)
+        """,
+        media_type_id,
+        f"PNP_Test_Type_{str(media_type_id)[:8]}",
+        "pnp-test-bucket",
+        f".{str(media_type_id)[:4]}"
+    )
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."Media"
+            (MediaId, MediaType, MediaHash, MediaAnnotations)
+        VALUES
+            ($1, $2, $3, $4::jsonb)
+        """,
+        media_id,
+        media_type_id,
+        f"pnp-test-hash-{media_id}",
+        "{}"
+    )
+
+    # CaseAssigned must be NULL when the case is first created.
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."Cases"
+            (
+                CaseId,
+                CaseName,
+                CaseCreator,
+                CaseDescription,
+                CaseState,
+                evidence
+            )
+        VALUES
+            (
+                $1,
+                $2,
+                $3,
+                $4,
+                'PUBLISHED',
+                ARRAY[
+                    ROW($5::uuid, $6::text)::"Cases_DB".evidence_type
+                ]
+            )
+        """,
+        case_id,
+        "PNP Integration Test Case",
+        context["creator_name"],
+        "Case used for PNP integration testing",
+        media_id,
+        "Test evidence"
+    )
+
+    # Assign the case only after creation.
+    await conn.execute(
+        """
+        UPDATE "Cases_DB"."Cases"
+        SET CaseAssigned = $1
+        WHERE CaseId = $2
+        """,
+        context["investigator_name"],
+        case_id
+    )
+
+    context["cases"].append(str(case_id))
+
+    try:
+        yield {
+            **context,
+            "case_id": case_id,
+            "media_id": media_id,
+            "media_type_id": media_type_id
+        }
+
+    finally:
+        await conn.execute(
+            """
+            SELECT set_config('app.current_user_id', $1, false)
+            """,
+            context["investigator_id"]
+        )
+
+        await conn.execute(
+            """
+            DELETE FROM "Cases_DB"."PNPModels"
+            WHERE MediaId = $1
+            """,
+            media_id
+        )
+
+        # The case contains this media in its evidence array, but there is no FK
+        # from evidence to Media, so deleting Media before the Case is acceptable.
+        await conn.execute(
+            """
+            DELETE FROM "Cases_DB"."Media"
+            WHERE MediaId = $1
+            """,
+            media_id
+        )
+
+        await conn.execute(
+            """
+            DELETE FROM "Cases_DB"."MediaType"
+            WHERE MediaTypeId = $1
+            """,
+            media_type_id
+        )
