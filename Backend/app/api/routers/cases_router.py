@@ -3768,7 +3768,7 @@ async def create_plug_and_play(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     role = payload.get("role")
 
     if role not in ["ADMIN", "INVESTIGATOR"]:
