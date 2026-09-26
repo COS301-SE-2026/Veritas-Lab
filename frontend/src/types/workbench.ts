@@ -14,7 +14,7 @@ export type AnnotationPoint = {
 };
 
 /** The tools currently planned for the workbench. More may be added later. */
-export type AnnotationTool = 'Select' | 'Draw' | 'Comment';
+export type AnnotationTool = 'Select' | 'Draw' | 'Comment' | 'Highlight';
 
 /** A freehand shape drawn on the overlay, e.g. circling a suspicious region. */
 export type ShapeAnnotation = {
@@ -104,4 +104,22 @@ export type ReportModalProps = {
     mediaName: string;
     certainty: number | null;
     findings: string | null;
+};
+export type AnnotationSource = 'USER' | 'AI';
+
+export type HighlightRect = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+};
+
+export type HighlightAnnotation = {
+    id: string;
+    kind: 'highlight';
+    page: number;
+    text: string;
+    rects?: HighlightRect[];
+    source?: AnnotationSource;
+    timeStamp?: number;
 };
