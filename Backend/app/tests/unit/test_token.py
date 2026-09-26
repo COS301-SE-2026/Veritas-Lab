@@ -66,7 +66,7 @@ def test_refresh_token_does_not_need_refreshing(monkeypatch):
             "sub": "mock-user-id",
             "username": "test_user",
             "role": "INVESTIGATOR",
-            "exp": (datetime.now(timezone.utc) + timedelta(minutes=unexpired_minutes)).timestamp()
+            "exp": (datetime.now(timezone.utc) + timedelta(hours=5)).timestamp()
         }
     
     monkeypatch.setattr(

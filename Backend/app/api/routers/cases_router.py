@@ -263,11 +263,29 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
     }
 
     if include_report:
+        heatmap_url = None
+
+        if media_extension.lower() in [".jpg", ".jpeg", ".png"]:
+            heatmap_url = presign_client.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": "heatmaps",
+                    "Key": f"{media_id}.png"
+                },
+                ExpiresIn=3600
+            )
+
         evidence.update({
             "annotations": (
                 json.loads(row["annotations"])
                 if isinstance(row["annotations"], str)
                 else (row["annotations"] or [])
+            ),
+
+            "automatedAnnotations": (
+                json.loads(row["automatedannotations"])
+                if isinstance(row["automatedannotations"], str)
+                else (row["automatedannotations"] or [])
             ),
 
             "reportArtifacts": (
@@ -276,7 +294,7 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 else row["reportartifacts"]
             ),
 
-            "reportFindings": row["reportfindings"],
+            "reportFindings": json.loads(row["reportfindings"]) if isinstance(row["reportfindings"], str) else row["reportfindings"],
             "reportComments": row["reportcomments"],
             "reportCertainty": row["reportcertainty"],
             
@@ -285,6 +303,8 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
                 if row["reportdatecreation"]
                 else None
             ),
+
+            "heatmapUrl": heatmap_url,
         })
 
     return evidence
@@ -555,7 +575,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
             "content": {
                 "application/json": {
                     "examples": {
-                        "Investigator or admin": {
+                        "Investigator or admin - Image": {
                             "summary": (
                                 "ADMIN or INVESTIGATOR viewing a PUBLISHED "
                                 "or CLOSED case"
@@ -581,11 +601,227 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                         "mediaTypeId": "99999999-8888-7777-6666-555555555555",
                                         "mediaUrl": "https://example.com/presigned-url",
                                         "annotations": [],
+                                        "automatedAnnotations": [
+                                            {
+                                                "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                                                "kind": "shape",
+                                                "source": "AI",
+                                                "points": [
+                                                    {"x": 20.0, "y": 15.0},
+                                                    {"x": 70.0, "y": 15.0},
+                                                    {"x": 70.0, "y": 65.0},
+                                                    {"x": 20.0, "y": 65.0},
+                                                    {"x": 20.0, "y": 15.0}
+                                                ]
+                                            }
+                                        ],
+
                                         "reportArtifacts": {},
-                                        "reportFindings": "No manipulation detected.",
+
+                                        "reportFindings": {
+                                            "risk_level": 3,
+                                            "ai_probability": 0.91,
+                                            "classification": "AI-generated",
+                                            "confidence_percentage": 91.0,
+                                            "reasons": [
+                                                {
+                                                    "message": "Suspicious visual patterns detected."
+                                                }
+                                            ],
+                                            "findings": "No camera metadata was found."
+                                        },
+
                                         "reportComments": "Reviewed by investigator.",
                                         "reportCertainty": 3,
-                                        "reportDateCreation": "2026-05-21T10:15:00+00:00"
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": "https://example.com/presigned-heatmap-url"
+                                    }
+                                ]
+                            }
+                        },
+
+                        "Investigator or admin - PDF": {
+                            "summary": (
+                                "ADMIN or INVESTIGATOR viewing a PUBLISHED "
+                                "or CLOSED case containing PDF evidence"
+                            ),
+                            "value": {
+                                "status": "success",
+                                "case": {
+                                    "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                    "caseName": "Document Verification",
+                                    "caseCreator": "normal_user",
+                                    "caseDescription": "PDF authenticity investigation",
+                                    "caseState": "PUBLISHED",
+                                    "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                                },
+                                "comments": [],
+                                "evidence": [
+                                    {
+                                        "mediaId": "22222222-3333-4444-5555-666666666666",
+                                        "casePerspective": "Submitted document",
+                                        "mediaName": "report.pdf",
+                                        "mediaBucket": "pdfs",
+                                        "mediaExtension": ".pdf",
+                                        "mediaTypeId": "88888888-7777-6666-5555-444444444444",
+                                        "mediaUrl": "https://example.com/presigned-url",
+                                        "annotations": [],
+                                        "automatedAnnotations": [
+                                            {
+                                                "id": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+                                                "kind": "highlight",
+                                                "source": "AI",
+                                                "text": "This section of the document was identified as suspicious."
+                                            },
+                                            {
+                                                "id": "cccccccc-dddd-eeee-ffff-aaaaaaaaaaaa",
+                                                "kind": "highlight",
+                                                "source": "AI",
+                                                "text": "Another suspicious section detected by the lexical analysis."
+                                            }
+                                        ],
+
+                                        "reportArtifacts": {},
+
+                                        "reportFindings": {
+                                            "risk_level": 3,
+                                            "ai_probability": 0.9985,
+                                            "classification": "AI-generated",
+                                            "lexical_ai_probability": 0.94,
+                                            "suspicious_chunks": [
+                                                {
+                                                    "text": "This section of the document was identified as suspicious.",
+                                                    "ai_probability": 0.96
+                                                },
+                                                {
+                                                    "text": "Another suspicious section detected by the lexical analysis.",
+                                                    "ai_probability": 0.91
+                                                }
+                                            ],
+                                            "summary": "The document shows strong indications of AI-generated content.",
+                                            "reasons": [
+                                                "Lexical patterns strongly influenced the classification."
+                                            ],
+                                            "branch_contributions": {
+                                                "fonts": 0.12,
+                                                "lexical": 0.61,
+                                                "metadata": 0.18
+                                            },
+                                            "findings": "No suspicious metadata anomalies found."
+                                        },
+
+                                        "reportComments": "Reviewed by investigator.",
+                                        "reportCertainty": 3,
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": None
+                                    }
+                                ]
+                            }
+                        },
+
+                        "Investigator or admin - Video": {
+                            "summary": (
+                                "ADMIN or INVESTIGATOR viewing a PUBLISHED "
+                                "or CLOSED case containing video evidence"
+                            ),
+                            "value": {
+                                "status": "success",
+                                "case": {
+                                    "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                    "caseName": "Video Verification",
+                                    "caseCreator": "normal_user",
+                                    "caseDescription": "Video authenticity investigation",
+                                    "caseState": "PUBLISHED",
+                                    "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                                },
+                                "comments": [],
+                                "evidence": [
+                                    {
+                                        "mediaId": "33333333-4444-5555-6666-777777777777",
+                                        "casePerspective": "Security footage",
+                                        "mediaName": "footage.mp4",
+                                        "mediaBucket": "videos",
+                                        "mediaExtension": ".mp4",
+                                        "mediaTypeId": "77777777-6666-5555-4444-333333333333",
+                                        "mediaUrl": "https://example.com/presigned-url",
+                                        "annotations": [],
+                                        "automatedAnnotations": [
+                                            {
+                                                "id": "dddddddd-eeee-ffff-aaaa-bbbbbbbbbbbb",
+                                                "kind": "shape",
+                                                "source": "AI",
+                                                "timeStamp": 2.4,
+                                                "points": [
+                                                    {"x": 0.0, "y": 0.0},
+                                                    {"x": 50.0, "y": 0.0},
+                                                    {"x": 50.0, "y": 50.0},
+                                                    {"x": 0.0, "y": 50.0},
+                                                    {"x": 0.0, "y": 0.0}
+                                                ]
+                                            },
+                                            {
+                                                "id": "eeeeeeee-ffff-aaaa-bbbb-cccccccccccc",
+                                                "kind": "shape",
+                                                "source": "AI",
+                                                "timeStamp": 6.8,
+                                                "points": [
+                                                    {"x": 50.0, "y": 50.0},
+                                                    {"x": 100.0, "y": 50.0},
+                                                    {"x": 100.0, "y": 100.0},
+                                                    {"x": 50.0, "y": 100.0},
+                                                    {"x": 50.0, "y": 50.0}
+                                                ]
+                                            }
+                                        ],
+
+                                        "reportArtifacts": {},
+
+                                        "reportFindings": {
+                                            "risk_level": 2,
+                                            "prediction": "AI-generated",
+                                            "ai_probability": 0.81,
+                                            "authentic_probability": 0.19,
+
+                                            "visual": {
+                                                "prediction": "AI-generated",
+                                                "ai_probability": 0.87,
+                                                "authentic_probability": 0.13,
+                                                "frame_importance": [
+                                                    {
+                                                        "sampled_frame": 1,
+                                                        "frame_index": 72,
+                                                        "timestamp": 2.4,
+                                                        "importance": 0.18,
+                                                        "most_influential_zone": 0
+                                                    },
+                                                    {
+                                                        "sampled_frame": 4,
+                                                        "frame_index": 204,
+                                                        "timestamp": 6.8,
+                                                        "importance": 0.14,
+                                                        "most_influential_zone": 3
+                                                    }
+                                                ]
+                                            },
+
+                                            "audio": {
+                                                "available": True,
+                                                "prediction": "Authentic",
+                                                "ai_probability": 0.34
+                                            },
+
+                                            "fusion": {
+                                                "visual_weight": 0.7,
+                                                "audio_weight": 0.3
+                                            },
+
+                                            "findings": "No suspicious metadata anomalies found."
+                                        },
+
+                                        "reportComments": "Reviewed by investigator.",
+                                        "reportCertainty": 2,
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": None
                                     }
                                 ]
                             }
@@ -741,6 +977,8 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 ev.case_perspective AS "caseperspective",
 
                 media.MediaAnnotations AS "annotations",
+                auto.MediaAnnotations AS "automatedannotations",
+
                 media.ReportArtifacts AS "reportartifacts",
                 media.ReportFindings AS "reportfindings",
                 media.ReportComments AS "reportcomments",
@@ -764,6 +1002,9 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
 
             JOIN "Cases_DB"."MediaType" m
                 ON media.MediaType = m.MediaTypeId
+            
+            LEFT JOIN "Cases_DB"."AutomatedAnnotations" auto
+                ON auto.MediaId = media.MediaId
 
             WHERE c.CaseId = $1
             """,

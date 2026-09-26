@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock, patch
-
+import cv2
 import numpy as np
 import pytest
 import torch
@@ -71,11 +71,23 @@ def test_read_video_frames_raises_when_no_frames_decoded(mock_video_capture):
 @patch("app.training.video.dataset.cv2.resize")
 @patch("app.training.video.dataset.cv2.cvtColor")
 @patch("app.training.video.dataset.cv2.VideoCapture")
-def test_read_video_frames_returns_tensor(mock_video_capture, mock_cvt_color, mock_resize):
+def test_read_video_frames_returns_tensor(
+    mock_video_capture,
+    mock_cvt_color,
+    mock_resize
+):
     mock_cap = MagicMock()
 
     mock_cap.isOpened.return_value = True
-    mock_cap.get.return_value = 3
+
+    def mock_get(prop):
+        if prop == cv2.CAP_PROP_FRAME_COUNT:
+            return 3
+        if prop == cv2.CAP_PROP_FPS:
+            return 30.0
+        return 0
+
+    mock_cap.get.side_effect = mock_get
 
     frame0 = np.ones((10, 10, 3), dtype=np.uint8) * 10
     frame1 = np.ones((10, 10, 3), dtype=np.uint8) * 20
@@ -90,13 +102,23 @@ def test_read_video_frames_returns_tensor(mock_video_capture, mock_cvt_color, mo
 
     mock_video_capture.return_value = mock_cap
     mock_cvt_color.side_effect = lambda frame, _: frame
-    mock_resize.side_effect = lambda frame, size, interpolation: np.resize(frame, (size[1], size[0], 3))
+    mock_resize.side_effect = (
+        lambda frame, size, interpolation:
+        np.resize(frame, (size[1], size[0], 3))
+    )
 
-    result = read_video_frames("video.mp4", num_frames=3, image_size=4)
+    video, sampled_indices, fps = read_video_frames(
+        "video.mp4",
+        num_frames=3,
+        image_size=4
+    )
 
-    assert isinstance(result, torch.Tensor)
-    assert result.shape == (3, 3, 4, 4)
-    assert result.dtype == torch.float32
+    assert isinstance(video, torch.Tensor)
+    assert video.shape == (3, 3, 4, 4)
+    assert video.dtype == torch.float32
+
+    assert sampled_indices == [0, 1, 2]
+    assert fps == 30.0
 
     mock_video_capture.assert_called_once_with("video.mp4")
     mock_cap.release.assert_called_once()
@@ -104,10 +126,22 @@ def test_read_video_frames_returns_tensor(mock_video_capture, mock_cvt_color, mo
 @patch("app.training.video.dataset.cv2.resize")
 @patch("app.training.video.dataset.cv2.cvtColor")
 @patch("app.training.video.dataset.cv2.VideoCapture")
-def test_read_video_frames_converts_and_resizes_selected_frames(mock_video_capture, mock_cvt_color, mock_resize):
+def test_read_video_frames_converts_and_resizes_selected_frames(
+    mock_video_capture,
+    mock_cvt_color,
+    mock_resize
+):
     mock_cap = MagicMock()
     mock_cap.isOpened.return_value = True
-    mock_cap.get.return_value = 2
+
+    def mock_get(prop):
+        if prop == cv2.CAP_PROP_FRAME_COUNT:
+            return 2
+        if prop == cv2.CAP_PROP_FPS:
+            return 30.0
+        return 0
+
+    mock_cap.get.side_effect = mock_get
 
     frame = np.zeros((8, 8, 3), dtype=np.uint8)
 
@@ -118,24 +152,45 @@ def test_read_video_frames_converts_and_resizes_selected_frames(mock_video_captu
     ]
 
     mock_video_capture.return_value = mock_cap
+
     converted = np.ones((8, 8, 3), dtype=np.uint8)
     resized = np.ones((4, 4, 3), dtype=np.uint8)
+
     mock_cvt_color.return_value = converted
     mock_resize.return_value = resized
 
-    result = read_video_frames("video.mp4", num_frames=2, image_size=4)
+    video, sampled_indices, fps = read_video_frames(
+        "video.mp4",
+        num_frames=2,
+        image_size=4
+    )
 
     assert mock_cvt_color.call_count == 2
     assert mock_resize.call_count == 2
-    assert result.shape == (2, 3, 4, 4)
+
+    assert video.shape == (2, 3, 4, 4)
+    assert sampled_indices == [0, 1]
+    assert fps == 30.0
 
 @patch("app.training.video.dataset.cv2.resize")
 @patch("app.training.video.dataset.cv2.cvtColor")
 @patch("app.training.video.dataset.cv2.VideoCapture")
-def test_read_video_frames_uses_nearest_available_frame(mock_video_capture, mock_cvt_color, mock_resize):
+def test_read_video_frames_uses_nearest_available_frame(
+    mock_video_capture,
+    mock_cvt_color,
+    mock_resize
+):
     mock_cap = MagicMock()
     mock_cap.isOpened.return_value = True
-    mock_cap.get.return_value = 5
+
+    def mock_get(prop):
+        if prop == cv2.CAP_PROP_FRAME_COUNT:
+            return 5
+        if prop == cv2.CAP_PROP_FPS:
+            return 30.0
+        return 0
+
+    mock_cap.get.side_effect = mock_get
 
     frame0 = np.zeros((4, 4, 3), dtype=np.uint8)
     frame1 = np.ones((4, 4, 3), dtype=np.uint8) * 10
@@ -151,9 +206,16 @@ def test_read_video_frames_uses_nearest_available_frame(mock_video_capture, mock
     mock_cvt_color.side_effect = lambda frame, _: frame
     mock_resize.side_effect = lambda frame, size, interpolation: frame
 
-    result = read_video_frames("video.mp4", num_frames=4, image_size=4)
-    assert isinstance(result, torch.Tensor)
-    assert result.shape[0] == 4
+    video, sampled_indices, fps = read_video_frames(
+        "video.mp4",
+        num_frames=4,
+        image_size=4
+    )
+
+    assert isinstance(video, torch.Tensor)
+    assert video.shape[0] == 4
+    assert len(sampled_indices) == 4
+    assert fps == 30.0
 
 def test_clip_constants():
     assert CLIP_MEAN.shape == (3,)
@@ -268,15 +330,33 @@ def test_dataset_length(tmp_path):
 def test_dataset_getitem(mock_read_video_frames, tmp_path):
     authentic_dir = tmp_path / "0_authentic"
     authentic_dir.mkdir()
+
     video_path = authentic_dir / "real.mp4"
     video_path.touch()
 
     fake_video = torch.zeros((8, 3, 224, 224))
-    mock_read_video_frames.return_value = fake_video
-    dataset = video_binary_dataset(tmp_path, num_frames=8, image_size=224)
+    fake_indices = list(range(8))
+    fake_fps = 30.0
+
+    mock_read_video_frames.return_value = (
+        fake_video,
+        fake_indices,
+        fake_fps
+    )
+
+    dataset = video_binary_dataset(
+        tmp_path,
+        num_frames=8,
+        image_size=224
+    )
 
     result = dataset[0]
-    mock_read_video_frames.assert_called_once_with(video_path, num_frames=8, image_size=224)
+
+    mock_read_video_frames.assert_called_once_with(
+        video_path,
+        num_frames=8,
+        image_size=224
+    )
 
     assert torch.equal(result["video"], fake_video)
     assert result["label"].item() == 0
@@ -284,18 +364,39 @@ def test_dataset_getitem(mock_read_video_frames, tmp_path):
     assert result["path"] == str(video_path)
 
 @patch("app.training.video.dataset.read_video_frames")
-def test_dataset_getitem_ai_label(mock_read_video_frames, tmp_path):
+def test_dataset_getitem_ai_label(
+    mock_read_video_frames,
+    tmp_path
+):
     ai_dir = tmp_path / "1_ai"
     ai_dir.mkdir()
 
     video_path = ai_dir / "fake.mp4"
     video_path.touch()
 
-    mock_read_video_frames.return_value = (torch.zeros((4, 3, 64, 64)))
-    dataset = video_binary_dataset(tmp_path, num_frames=4, image_size=64)
+    fake_video = torch.zeros((4, 3, 64, 64))
+    fake_indices = list(range(4))
+    fake_fps = 30.0
+
+    mock_read_video_frames.return_value = (
+        fake_video,
+        fake_indices,
+        fake_fps
+    )
+
+    dataset = video_binary_dataset(
+        tmp_path,
+        num_frames=4,
+        image_size=64
+    )
+
     result = dataset[0]
 
     assert result["label"].item() == 1
     assert result["label"].dtype == torch.float32
 
-    mock_read_video_frames.assert_called_once_with(video_path, num_frames=4, image_size=64)
+    mock_read_video_frames.assert_called_once_with(
+        video_path,
+        num_frames=4,
+        image_size=64
+    )

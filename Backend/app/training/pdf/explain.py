@@ -44,7 +44,9 @@ def load_detector(model_path):
 def prepare_inputs(pdf_path, checkpoint):
     features = extract_pdf_features(pdf_path)
     text = extract_pdf_text(pdf_path)
-    lexical_score = lexical_ai_probability(text)
+
+    lexical_result = lexical_ai_probability(text)
+    lexical_score = lexical_result["ai_probability"]
 
     object_vocab = checkpoint["object_vocab"]
     font_vocab = checkpoint["font_vocab"]
@@ -66,12 +68,11 @@ def prepare_inputs(pdf_path, checkpoint):
             float(features.get(key, 0))
             for key in checkpoint["basic_keys"]
         ] +
-
         [
-            float(
-                features["line_features"].get(key, 0)
-            ) for key in checkpoint["line_keys"]
-        ], dtype=np.float32
+            float(features["line_features"].get(key, 0))
+            for key in checkpoint["line_keys"]
+        ],
+        dtype=np.float32
     )
 
     line_mean = np.array(
@@ -88,11 +89,10 @@ def prepare_inputs(pdf_path, checkpoint):
 
     object_numeric = np.array(
         [
-            float(
-                features["object_features"].get(key,0)
-            )
+            float(features["object_features"].get(key, 0))
             for key in checkpoint["object_keys"]
-        ], dtype=np.float32
+        ],
+        dtype=np.float32
     )
 
     object_mean = np.array(
@@ -109,11 +109,10 @@ def prepare_inputs(pdf_path, checkpoint):
 
     font_numeric = np.array(
         [
-            float(
-                features["font_features"].get(key, 0)
-            )
+            float(features["font_features"].get(key, 0))
             for key in checkpoint["font_keys"]
-        ], dtype=np.float32
+        ],
+        dtype=np.float32
     )
 
     font_mean = np.array(
@@ -160,7 +159,7 @@ def prepare_inputs(pdf_path, checkpoint):
         )
     }
 
-    return features, lexical_score, tensors
+    return features, lexical_result, tensors
 
 def predict_probability(model, tensors):
     with torch.no_grad():
@@ -313,33 +312,41 @@ def create_summary(prediction, probability, contributions):
         f"{strongest_direction}."
     )
 
-def explain_pdf(pdf_path,model_path="app/ai/pdf_detector.pt"):
+def explain_pdf(pdf_path, model_path="app/ai/pdf_detector.pt"):
     model, checkpoint = load_detector(model_path)
+    features, lexical_result, tensors = prepare_inputs(pdf_path, checkpoint)
 
-    features, lexical_score, tensors = prepare_inputs(pdf_path, checkpoint)
+    lexical_score = lexical_result["ai_probability"]
+    suspicious_chunks = lexical_result["suspicious_chunks"]
 
     full_probability = predict_probability(model, tensors)
 
-    contributions = (
-        calculate_branch_contributions(
-            model,
-            tensors,
-            checkpoint,
-            full_probability
-        )
+    contributions = calculate_branch_contributions(
+        model,
+        tensors,
+        checkpoint,
+        full_probability
     )
 
-    prediction = "AI-generated" if full_probability >= 0.5 else "Authentic"
+    prediction = (
+        "AI-generated"
+        if full_probability >= 0.5
+        else "Authentic"
+    )
 
-    sorted_contributions = sorted(contributions.items(), key=lambda item: abs(item[1]), reverse=True)
+    sorted_contributions = sorted(
+        contributions.items(),
+        key=lambda item: abs(item[1]),
+        reverse=True
+    )
 
     sentences = [
         contribution_sentence(
             branch,
             contribution
         )
-        for branch, contribution
-        in sorted_contributions
+        
+        for branch, contribution in sorted_contributions
     ]
 
     summary = create_summary(
@@ -352,12 +359,12 @@ def explain_pdf(pdf_path,model_path="app/ai/pdf_detector.pt"):
         "prediction": prediction,
         "ai_probability": full_probability,
         "lexical_ai_probability": lexical_score,
+        "suspicious_chunks": suspicious_chunks,
         "summary": summary,
         "explanations": sentences,
         "branch_contributions": {
             branch: contribution
-            for branch, contribution
-            in sorted_contributions
+            for branch, contribution in sorted_contributions
         }
     }
 
