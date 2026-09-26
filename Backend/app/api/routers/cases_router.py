@@ -77,6 +77,11 @@ router = APIRouter(
     tags=["Cases"]
 )
 
+class plug_and_play_request(BaseModel):
+    mediaId: str
+    data: dict
+    caseId: str
+
 class audit_event(BaseModel):
     timestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
     user: str | None = Field(..., examples=["investigator_user"])
@@ -3683,6 +3688,137 @@ async def get_case_board(
             }
         )
     except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.post(
+    "/createPNP",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Create plug-and-play model result",
+    description=(
+        "Stores plug-and-play model output for a media item. "
+        "Only ADMIN and INVESTIGATOR users may use this endpoint. "
+        "The user must be assigned to the specified case and the media item "
+        "must belong to that case's evidence."
+    ),
+    responses={
+        200: {
+            "description": "Plug-and-play data saved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Plug-and-play data saved successfully"
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Invalid or missing authentication token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User not authenticated"
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "User is unauthorized or is not assigned to the case",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": USER_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def create_plug_and_play(
+    pnp_request: plug_and_play_request,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = verify_jwt(request)
+    role = payload.get("role")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
+
+    username = payload.get("username")
+
+    try:
+        row = await connection.fetchrow(
+            """
+            INSERT INTO "Cases_DB"."PNPModels"
+                (MediaId, ModelResult)
+            SELECT
+                $1::uuid,
+                $2::jsonb
+            FROM "Cases_DB"."Cases" c
+            WHERE c.caseid = $3::uuid
+            AND c.caseassigned = $4
+            AND EXISTS (
+                SELECT 1
+                FROM unnest(c.evidence) AS e
+                WHERE (e).evidence_id = $1::uuid
+            )
+            RETURNING PNPModelId, MediaId, ModelResult, UploadDate;
+            """,
+            pnp_request.mediaId,
+            json.dumps(pnp_request.data),
+            pnp_request.caseId,
+            username
+        )
+
+        if row is None:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "Plug-and-play data saved successfully"
+        }
+
+    except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={
