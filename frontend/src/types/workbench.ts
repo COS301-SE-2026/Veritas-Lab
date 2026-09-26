@@ -122,6 +122,8 @@ export type advancedModelConfigOptions = {
     activation: ActivationType;
     inputWidth: number;
     inputHeight: number;
+    pageCount?: number;
+    frameCount?: number;
 }
 
 export type visualConfig = {

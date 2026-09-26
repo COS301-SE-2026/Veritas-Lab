@@ -6,6 +6,7 @@ import { runModel, ClassificationResult, ModelConfig, BaseModelConfig, Activatio
 import Dropdown from '@/components/ui/dropdown';
 import { advancedModelConfigOptions, visualConfig, PAPData } from '@/types/workbench';
 import { sendPAPModelResults } from '@/lib/api/workbench';
+import PlugAndPlayReport from '@/components/common/plugAndPlayReport';
 
 type PlugAndPlayModelsProps = {
     mediaUrl: string | undefined;
@@ -32,6 +33,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     const [error, setError] = useState<string | null>(null);
     const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
     const [isRunning, setIsRunning] = useState<boolean>(false);
+    const [resultsData, setResultsData] = useState<PAPData | null>(null);
     const [advancedConfig, setAdvancedConfig] = useState<advancedModelConfigOptions>({
         activation: 'SIGMOID',
         inputWidth: 224,
@@ -95,6 +97,8 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                 activation: advancedConfig.activation,
                 inputWidth: advancedConfig.inputWidth,
                 inputHeight: advancedConfig.inputHeight,
+                pageCount: advancedConfig.pageCount || 4,
+                frameCount: advancedConfig.frameCount || 8,
             }
             let modelConfig: ModelConfig;
             switch (mediaKind) {
@@ -102,10 +106,10 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                     modelConfig = { ...config, mediaType: 'IMAGE' };
                     break;
                 case 'video':
-                    modelConfig = { ...config, mediaType: 'VIDEO', frameCount: 8 };
+                    modelConfig = { ...config, mediaType: 'VIDEO'};
                     break;
                 case 'pdf':
-                    modelConfig = { ...config, mediaType: 'PDF', pageCount: 4 };
+                    modelConfig = { ...config, mediaType: 'PDF'};
                     break;
                 default:
                     throw new Error(`Unsupported media kind: ${mediaKind}`);
@@ -118,6 +122,15 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
             const date = new Date().toISOString();
             const newResults = await runModel(modelFile, evidenceFile, modelConfig);
             setIsRunning(false);
+
+            setResultsData({
+                modelName: modelFile.name,
+                fileName: evidenceFile.name,
+                results: newResults,
+                config: modelConfig,
+                date: date
+            });
+            
             console.log('Model run completed successfully:', newResults);
             sendResults(newResults, modelFile.name, evidenceFile.name, modelConfig, date);
             setError(null);
@@ -138,148 +151,202 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     }
     return (
         <>
-            <div className="vl-panel flex flex-col gap-4 p-6">
-                <div className="flex items-center gap-2">
-                    <BrainCircuit size={24} />
-                    <h2 className="text-lg font-semibold">Plug and Play Models</h2>
-                </div>
+        <div className="flex gap-4">
+            <div className="min-w-[750px]">
+                <div className="vl-panel flex flex-col gap-4 p-6">
+                    <div className="flex items-center gap-2">
+                        <BrainCircuit size={24} />
+                        <h2 className="text-lg font-semibold">Plug and Play Models</h2>
+                    </div>
 
-                <p className="text-sm text-(--color-text-muted)">
-                    Load up your own capable ONNX models and run them on evidence files.
-                </p>
-                <form onSubmit={runCustomModel}>
-                    <label 
-                        htmlFor="file"
-                        className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-(--color-line-strong) bg-(--color-surface-muted) p-10 transition-colors duration-200 hover:border-(--color-secondary) hover:bg-(--color-b-50)"
-                    >
-                        <input
-                            id="file"
-                            type="file"
-                            accept=".onnx"
-                            className="hidden"
-                            onChange={onChangeFile}
-                        />  
-                        {!modelFile && (
-                            <>
-                                <UploadCloud size={36} className="text-(--color-b-600)" />
-                                <p className="text-sm font-semibold text-(--color-text-strong)">Click to browse</p>
-                                <p className="text-xs text-(--color-text-subtle)">Only .onnx files are supported</p>
-                            </>
-                        )}
+                    <p className="text-sm text-(--color-text-muted)">
+                        Load up your own capable ONNX models and run them on evidence files.
+                    </p>
+                    <form onSubmit={runCustomModel}>
+                        <label 
+                            htmlFor="file"
+                            className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-(--color-line-strong) bg-(--color-surface-muted) p-10 transition-colors duration-200 hover:border-(--color-secondary) hover:bg-(--color-b-50)"
+                        >
+                            <input
+                                id="file"
+                                type="file"
+                                accept=".onnx"
+                                className="hidden"
+                                onChange={onChangeFile}
+                            />  
+                            {!modelFile && (
+                                <>
+                                    <UploadCloud size={36} className="text-(--color-b-600)" />
+                                    <p className="text-sm font-semibold text-(--color-text-strong)">Click to browse</p>
+                                    <p className="text-xs text-(--color-text-subtle)">Only .onnx files are supported</p>
+                                </>
+                            )}
+                            {modelFile && (
+                                <>
+                                    <FileCheck2 size={36} className="text-(--color-b-600)" />
+                                    <p className="text-sm font-semibold text-(--color-text-strong)">File selected</p>
+                                    <p className="text-xs text-(--color-text-subtle)">Click to choose a different file</p>
+                                </>
+                            )}
+                        </label>
+
                         {modelFile && (
-                            <>
-                                <FileCheck2 size={36} className="text-(--color-b-600)" />
-                                <p className="text-sm font-semibold text-(--color-text-strong)">File selected</p>
-                                <p className="text-xs text-(--color-text-subtle)">Click to choose a different file</p>
-                            </>
+                            <div className="mt-5 flex items-center gap-2 rounded-[var(--radius-sm)] bg-(--color-surface-muted) p-2 text-sm text-(--color-text-strong) py-3">
+                                <FileBox size={16} className="inline-block mr-2" />
+                                <div className="text-sm text-(--color-text-strong)">{modelFile.name}</div>
+                                <div className="text-sm text-(--color-text-subtle)">{modelFile.type}</div>
+                                <div>{fileSizeAsBytes(modelFile.size)}</div>
+                                
+                                <button
+                                    type="button"
+                                    onClick={() => setModelFile(null)}
+                                    className="ml-auto rounded-full p-1 text-(--color-text-muted) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text-strong)"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
                         )}
-                    </label>
 
-                    {modelFile && (
-                        <div className="mt-5 flex items-center gap-2 rounded-[var(--radius-sm)] bg-(--color-surface-muted) p-2 text-sm text-(--color-text-strong) py-3">
-                            <FileBox size={16} className="inline-block mr-2" />
-                            <div className="text-sm text-(--color-text-strong)">{modelFile.name}</div>
-                            <div className="text-sm text-(--color-text-subtle)">{modelFile.type}</div>
-                            <div>{fileSizeAsBytes(modelFile.size)}</div>
-                            
+                        <div>
                             <button
                                 type="button"
-                                onClick={() => setModelFile(null)}
-                                className="ml-auto rounded-full p-1 text-(--color-text-muted) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text-strong)"
+                                onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+                                className="mt-5 text-sm text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
                             >
-                                <X size={16} />
+                                Advanced Model Config Options
+                                <ChevronDown size={16} className={`inline-block ml-2 transition-transform ${showAdvancedConfig ? 'rotate-180' : ''}`} />
                             </button>
                         </div>
-                    )}
 
-                    <div>
-                        <button
-                            type="button"
-                            onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
-                            className="mt-5 text-sm text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
-                        >
-                            Advanced Model Config Options
-                            <ChevronDown size={16} className={`inline-block ml-2 transition-transform ${showAdvancedConfig ? 'rotate-180' : ''}`} />
-                        </button>
-                    </div>
-
-                    {showAdvancedConfig && (
-                        <>
-                            <div className="mt-5 vl-panel flex flex-col gap-4 p-4 bg-(--color-surface-muted)">
-                                <div>
-                                    <label htmlFor="activation" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
-                                        Activation Function
-                                    </label>
-                                    <Dropdown
-                                        options={[
-                                            { value: 'SIGMOID', label: 'Sigmoid' },
-                                            { value: 'SOFTMAX', label: 'Softmax' },
-                                            { value: 'NONE', label: 'None' },
-                                        ]}
-                                        onChange={(e) => {
-                                            setAdvancedConfig({
-                                                ...advancedConfig,
-                                                activation: e.target.value as ActivationType,
-                                            });
-                                        }}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        {showAdvancedConfig && (
+                            <>
+                                <div className="mt-5 vl-panel flex flex-col gap-4 p-4 bg-(--color-surface-muted)">
                                     <div>
-                                        <label htmlFor="inputWidth" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
-                                            Input Width
+                                        <label htmlFor="activation" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                            Activation Function
                                         </label>
-                                        <input
-                                            type="number"
-                                            id="inputWidth"
-                                            className="vl-input"
-                                            value={advancedConfig.inputWidth}
-                                            min={1}
+                                        <Dropdown
+                                            options={[
+                                                { value: 'SIGMOID', label: 'Sigmoid' },
+                                                { value: 'SOFTMAX', label: 'Softmax' },
+                                                { value: 'NONE', label: 'None' },
+                                            ]}
                                             onChange={(e) => {
                                                 setAdvancedConfig({
                                                     ...advancedConfig,
-                                                    inputWidth: parseInt(e.target.value) || 0,
+                                                    activation: e.target.value as ActivationType,
                                                 });
                                             }}
-                                            placeholder="Enter input width"
                                         />
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <label htmlFor="inputWidth" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                                Input Width
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="inputWidth"
+                                                className="vl-input"
+                                                value={advancedConfig.inputWidth}
+                                                min={1}
+                                                onChange={(e) => {
+                                                    setAdvancedConfig({
+                                                        ...advancedConfig,
+                                                        inputWidth: parseInt(e.target.value) || 0,
+                                                    });
+                                                }}
+                                                placeholder="Enter input width"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="inputHeight" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                                Input Height
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="inputHeight"
+                                                className="vl-input"
+                                                value={advancedConfig.inputHeight}
+                                                min={1}
+                                                onChange={(e) => {
+                                                    setAdvancedConfig({
+                                                        ...advancedConfig,
+                                                        inputHeight: parseInt(e.target.value) || 0,
+                                                    });
+                                                }}
+                                                placeholder="Enter input height"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
-                                        <label htmlFor="inputHeight" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
-                                            Input Height
-                                        </label>
-                                        <input
-                                            type="number"
-                                            id="inputHeight"
-                                            className="vl-input"
-                                            value={advancedConfig.inputHeight}
-                                            min={1}
-                                            onChange={(e) => {
-                                                setAdvancedConfig({
-                                                    ...advancedConfig,
-                                                    inputHeight: parseInt(e.target.value) || 0,
-                                                });
-                                            }}
-                                            placeholder="Enter input height"
-                                        />
+                                        {mediaKind === 'video' && (
+                                            <div>
+                                                <label htmlFor="frameCount" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                                    Frame Count
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    id="frameCount"
+                                                    className="vl-input"
+                                                    value={advancedConfig.frameCount}
+                                                    min={1}
+                                                    onChange={(e) => {
+                                                        setAdvancedConfig({
+                                                            ...advancedConfig,
+                                                            frameCount: parseInt(e.target.value) || 8,
+                                                        });
+                                                    }}
+                                                    placeholder="Enter frame count"
+                                                />
+                                            </div>   
+                                        )}
+                                        {mediaKind === 'pdf' && (
+                                            <div>
+                                                <label htmlFor="pageCount" className="mb-1 block text-sm font-medium text-(--color-text-strong)">
+                                                    Page Count
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    id="pageCount"
+                                                    className="vl-input"
+                                                    value={advancedConfig.pageCount}
+                                                    min={1}
+                                                    onChange={(e) => {
+                                                        setAdvancedConfig({
+                                                            ...advancedConfig,
+                                                            pageCount: parseInt(e.target.value) || 4,
+                                                        });
+                                                    }}
+                                                    placeholder="Enter page count"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+                            </>
+                        )}
+
+                        <div className="mt-5 flex items-center">
+                            <div>
+                                {(error && !isRunning) && (
+                                    <Label htmlFor='run' text={error} variant={'error'}/>
+                                )}
                             </div>
-                        </>
-                    )}
-
-                    <div className="mt-5 flex items-center">
-                        <div>
-                            {(error && !isRunning) && (
-                                <Label htmlFor='run' text={error} variant={'error'}/>
-                            )}
+                            <div className="ml-auto">
+                                <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!modelFile || isRunning} />
+                            </div>
                         </div>
-                        <div className="ml-auto">
-                            <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!modelFile || isRunning} />
-                        </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
+            {resultsData && (
+                <div>
+                    <PlugAndPlayReport results={resultsData.results} modelName={resultsData.modelName} fileName={resultsData.fileName} config={resultsData.config} date={resultsData.date} />
+                </div>   
+            )}
+            
+        </div>
         </>
     );
 }
