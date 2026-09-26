@@ -77,29 +77,61 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
 
                 <div>
                     <h2 className='text-md font-semibold'>Model Configuration</h2>
-                    <p className='text-sm text-muted-foreground'>Activation: {config.activation}</p>
-                    <p className='text-sm text-muted-foreground'>Input Width: {config.inputWidth}</p>
-                    <p className='text-sm text-muted-foreground'>Input Height: {config.inputHeight}</p>
-                    <p className='text-sm text-muted-foreground'>AI Class Index: {config.aiClassIndex}</p>
-                    <p className='text-sm text-muted-foreground'>AI Threshold: {config.threshold}</p>
-                    <p className='text-sm text-muted-foreground'>Mean: [{config.mean.join(', ')}]</p>
-                    <p className='text-sm text-muted-foreground'>Std: [{config.std.join(', ')}]</p>
-                    {config.mediaType === 'IMAGE' && (
-                        <p className='text-sm text-muted-foreground'>Media Type: Image</p>
-                    )}
-                    {config.mediaType === 'PDF' && (
-                        <>
-                            <p className='text-sm text-muted-foreground'>Media Type: PDF</p>
-                            <p className='text-sm text-muted-foreground'>Pages scanned: {config.pageCount}</p>
-                        </>
+                    <div className='flex flex-col gap-3 mt-2'>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>Activation:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.activation}</p>
+                        </div>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>Input Width:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.inputWidth}</p>
+                        </div>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>Input Height:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.inputHeight}</p>
+                        </div>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>AI Class Index:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.aiClassIndex}</p>
+                        </div>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>AI Threshold:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>{config.threshold}</p>
+                        </div>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>Mean:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>[{config.mean.join(', ')}]</p>
+                        </div>
+                        <div className='flex'>
+                            <p className='text-(--color-text-muted)'>Std:</p>
+                            <p className='ml-auto font-medium text-(--color-text-strong)'>[{config.std.join(', ')}]</p>
+                        </div>
+                        {config.mediaType === 'IMAGE' && (
+                            <div className='flex'>
+                                <p className='text-(--color-text-muted)'>Media Type:</p>
+                                <p className='ml-auto font-medium text-(--color-text-strong)'>Image</p>
+                            </div>
+                        )}
+                        {config.mediaType === 'PDF' && (
+                            <div className='flex'>
+                                <p className='text-(--color-text-muted)'>Media Type:</p>
+                                <p className='ml-auto font-medium text-(--color-text-strong)'>PDF</p>
+                            </div>
 
-                    )}
-                    {config.mediaType === 'VIDEO' && (
-                        <>
-                            <p className='text-sm text-muted-foreground'>Media Type: Video</p>
-                            <p className='text-sm text-muted-foreground'>Video frames scanned: {config.frameCount}</p>
-                        </>
-                    )}
+                        )}
+                        {config.mediaType === 'VIDEO' && (
+                            <>
+                                <div className='flex'>
+                                    <p className='text-(--color-text-muted)'>Media Type:</p>
+                                    <p className='ml-auto font-medium text-(--color-text-strong)'>Video</p>
+                                </div>
+                                <div className='flex'>
+                                    <p className='text-(--color-text-muted)'>Video frames scanned:</p>
+                                    <p className='ml-auto font-medium text-(--color-text-strong)'>{config.frameCount}</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
                     <div className='mt-3'>
                         <h2 className='text-md font-semibold'>Config</h2>
                         <pre className='vl-panel text-sm p-4 bg-(--color-surface-muted)'>
