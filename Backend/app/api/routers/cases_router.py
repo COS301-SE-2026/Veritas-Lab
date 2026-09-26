@@ -110,6 +110,7 @@ class create_case_request(BaseModel):
 class delete_plug_and_play_request(BaseModel):
     mediaId: str
     caseId: str
+    modelName: str
 
 class create_single_case_request(BaseModel):
     CaseID: str | None = None
@@ -3870,7 +3871,7 @@ async def create_plug_and_play(
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Delete plug-and-play model result",
     description=(
-        "Deletes plug-and-play model data for a media item. "
+        "Deletes a plug-and-play model result for a media item. "
         "Only ADMIN and INVESTIGATOR users may use this endpoint. "
         "The user must be assigned to the specified case and the media item "
         "must belong to that case's evidence."
@@ -3929,7 +3930,6 @@ async def create_plug_and_play(
                 }
             }
         }
-        
     }
 )
 async def delete_plug_and_play(
@@ -3957,8 +3957,9 @@ async def delete_plug_and_play(
             DELETE FROM "Cases_DB"."PNPModels" p
             USING "Cases_DB"."Cases" c
             WHERE p.MediaId = $1::uuid
-              AND c.CaseId = $2::uuid
-              AND c.CaseAssigned = $3
+              AND p.ModelName = $2
+              AND c.CaseId = $3::uuid
+              AND c.CaseAssigned = $4
               AND EXISTS (
                   SELECT 1
                   FROM unnest(c.evidence) AS e
@@ -3967,6 +3968,7 @@ async def delete_plug_and_play(
             RETURNING p.PNPModelId;
             """,
             pnp_request.mediaId,
+            pnp_request.modelName,
             pnp_request.caseId,
             username
         )

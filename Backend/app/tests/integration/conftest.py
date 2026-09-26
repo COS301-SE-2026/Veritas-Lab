@@ -6,7 +6,7 @@ from app.core.env import Postgres_Settings
 from fastapi.testclient import TestClient
 from app.api.main import app
 from app.auth.auth import create_token
-
+import json
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
@@ -343,3 +343,46 @@ async def pnp_case_context(case_assignment_context):
             """,
             media_type_id
         )
+
+@pytest_asyncio.fixture
+async def delete_pnp_context(pnp_case_context):
+    context = pnp_case_context
+    conn = context["conn"]
+
+    model_name = "TestModel"
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."PNPModels"
+            (MediaId, ModelName, ModelResult)
+        VALUES
+            ($1, $2, $3::jsonb)
+        """,
+        context["media_id"],
+        model_name,
+        json.dumps({
+            "modelName": model_name,
+            "fileName": "test.onnx",
+            "results": {
+                "classification": "AI",
+                "confidence": 0.91
+            },
+            "config": {},
+            "date": "2026-09-26T14:00:00Z"
+        })
+    )
+
+    yield {
+        **context,
+        "model_name": model_name
+    }
+
+    await conn.execute(
+        """
+        DELETE FROM "Cases_DB"."PNPModels"
+        WHERE MediaId = $1
+        AND ModelName = $2
+        """,
+        context["media_id"],
+        model_name
+    )
