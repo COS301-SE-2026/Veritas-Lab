@@ -18,7 +18,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     const caseId = pathname.split('/')[2];
     const searchParams = useSearchParams();
-    const activeCaseTab = searchParams.get('tab');
+    const activeCaseTab = searchParams.get('tab') ?? 'Evidence';
     const userRole = useUserRole();
     const { collapsed, toggle } = useSidebar();
     const { logOut } = useLogOut();
