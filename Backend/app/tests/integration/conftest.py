@@ -215,6 +215,59 @@ async def get_automated_annotations(media_id):
     finally:
         await connection.close()
 
+async def create_pnp_row(
+    conn,
+    media_id,
+    model_name="TestModel",
+    file_name="test.onnx",
+    classification="AI",
+    confidence=0.91,
+    config=None,
+    date="2026-09-26T14:00:00Z"
+):
+    if config is None:
+        config = {}
+
+    model_result = {
+        "modelName": model_name,
+        "fileName": file_name,
+        "results": {
+            "classification": classification,
+            "confidence": confidence
+        },
+        "config": config,
+        "date": date
+    }
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."PNPModels"
+            (MediaId, ModelName, ModelResult)
+        VALUES
+            ($1, $2, $3::jsonb)
+        """,
+        media_id,
+        model_name,
+        json.dumps(model_result)
+    )
+
+    return model_result
+
+async def delete_pnp_row(
+    conn,
+    media_id,
+    model_name
+):
+    await conn.execute(
+        """
+        DELETE FROM "Cases_DB"."PNPModels"
+        WHERE MediaId = $1
+          AND ModelName = $2
+        """,
+        media_id,
+        model_name
+    )
+
 @pytest_asyncio.fixture
 async def pnp_case_context(case_assignment_context):
     context = case_assignment_context
@@ -351,38 +404,53 @@ async def delete_pnp_context(pnp_case_context):
 
     model_name = "TestModel"
 
-    await conn.execute(
-        """
-        INSERT INTO "Cases_DB"."PNPModels"
-            (MediaId, ModelName, ModelResult)
-        VALUES
-            ($1, $2, $3::jsonb)
-        """,
+    await create_pnp_row(
+        conn,
         context["media_id"],
-        model_name,
-        json.dumps({
-            "modelName": model_name,
-            "fileName": "test.onnx",
-            "results": {
-                "classification": "AI",
-                "confidence": 0.91
-            },
-            "config": {},
-            "date": "2026-09-26T14:00:00Z"
-        })
+        model_name=model_name,
+        file_name="test.onnx",
+        classification="AI",
+        confidence=0.91
     )
 
-    yield {
-        **context,
-        "model_name": model_name
-    }
+    try:
+        yield {
+            **context,
+            "model_name": model_name
+        }
 
-    await conn.execute(
-        """
-        DELETE FROM "Cases_DB"."PNPModels"
-        WHERE MediaId = $1
-        AND ModelName = $2
-        """,
+    finally:
+        await delete_pnp_row(
+            conn,
+            context["media_id"],
+            model_name
+        )
+
+@pytest_asyncio.fixture
+async def update_pnp_context(pnp_case_context):
+    context = pnp_case_context
+    conn = context["conn"]
+
+    model_name = "TestModel"
+
+    await create_pnp_row(
+        conn,
         context["media_id"],
-        model_name
+        model_name=model_name,
+        file_name="original.onnx",
+        classification="AI",
+        confidence=0.60
     )
+
+    try:
+        yield {
+            **context,
+            "model_name": model_name
+        }
+
+    finally:
+        await delete_pnp_row(
+            conn,
+            context["media_id"],
+            model_name
+        )
