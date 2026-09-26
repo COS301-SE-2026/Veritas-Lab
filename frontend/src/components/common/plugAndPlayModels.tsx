@@ -28,7 +28,7 @@ const defaultVisualConfig: visualConfig = {
 }
 
 export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, caseId, mediaId }: PlugAndPlayModelsProps) {
-    const [file, setFile] = useState<File | null>(null);
+    const [modelFile, setModelFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
     const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -66,21 +66,26 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     }
 
     //sends the results to the backend
-    const sendResults = async (results: ClassificationResult, modelName: string, config: ModelConfig, date: string) => {
+    const sendResults = async (results: ClassificationResult, modelName: string, fileName: string, config: ModelConfig, date: string) => {
         const data: PAPData = {
             modelName: modelName,
+            fileName: fileName,
             results: results,
             config: config,
             date: date, 
         }
-        await sendPAPModelResults({ caseId, mediaId, data })
+        try {
+            await sendPAPModelResults({ caseId, mediaId, data })
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Failed to send results to backend');
+        }
     }
 
     //runs the model on the current file
     const runCustomModel = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         try {
-            if (!file) {
+            if (!modelFile) {
                 throw new Error('No model file selected');
             }
             const evidenceFile = await fetchEvidenceFile(mediaUrl, mediaName);
@@ -111,10 +116,10 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
             }
             setIsRunning(true);
             const date = new Date().toISOString();
-            const newResults = await runModel(file, evidenceFile, modelConfig);
+            const newResults = await runModel(modelFile, evidenceFile, modelConfig);
             setIsRunning(false);
             console.log('Model run completed successfully:', newResults);
-            sendResults(newResults, file.name, modelConfig, date);
+            sendResults(newResults, modelFile.name, evidenceFile.name, modelConfig, date);
             setError(null);
         } catch (error) {
             setIsRunning(false);
@@ -127,7 +132,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     const onChangeFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0] || null;
         if (selectedFile) {
-            setFile(selectedFile);
+            setModelFile(selectedFile);
         }
         event.target.value = '';
     }
@@ -154,14 +159,14 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                             className="hidden"
                             onChange={onChangeFile}
                         />  
-                        {!file && (
+                        {!modelFile && (
                             <>
                                 <UploadCloud size={36} className="text-(--color-b-600)" />
                                 <p className="text-sm font-semibold text-(--color-text-strong)">Click to browse</p>
                                 <p className="text-xs text-(--color-text-subtle)">Only .onnx files are supported</p>
                             </>
                         )}
-                        {file && (
+                        {modelFile && (
                             <>
                                 <FileCheck2 size={36} className="text-(--color-b-600)" />
                                 <p className="text-sm font-semibold text-(--color-text-strong)">File selected</p>
@@ -170,16 +175,16 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                         )}
                     </label>
 
-                    {file && (
+                    {modelFile && (
                         <div className="mt-5 flex items-center gap-2 rounded-[var(--radius-sm)] bg-(--color-surface-muted) p-2 text-sm text-(--color-text-strong) py-3">
                             <FileBox size={16} className="inline-block mr-2" />
-                            <div className="text-sm text-(--color-text-strong)">{file.name}</div>
-                            <div className="text-sm text-(--color-text-subtle)">{file.type}</div>
-                            <div>{fileSizeAsBytes(file.size)}</div>
+                            <div className="text-sm text-(--color-text-strong)">{modelFile.name}</div>
+                            <div className="text-sm text-(--color-text-subtle)">{modelFile.type}</div>
+                            <div>{fileSizeAsBytes(modelFile.size)}</div>
                             
                             <button
                                 type="button"
-                                onClick={() => setFile(null)}
+                                onClick={() => setModelFile(null)}
                                 className="ml-auto rounded-full p-1 text-(--color-text-muted) transition-colors hover:bg-(--color-surface-hover) hover:text-(--color-text-strong)"
                             >
                                 <X size={16} />
@@ -265,15 +270,12 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
 
                     <div className="mt-5 flex items-center">
                         <div>
-                            {error && (
+                            {(error && !isRunning) && (
                                 <Label htmlFor='run' text={error} variant={'error'}/>
-                            )}
-                            {!error && (
-                                <Label htmlFor='run' text={'Model ran successfully'} variant={'success'}/>
                             )}
                         </div>
                         <div className="ml-auto">
-                            <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!file || isRunning} />
+                            <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!modelFile || isRunning} />
                         </div>
                     </div>
                 </form>

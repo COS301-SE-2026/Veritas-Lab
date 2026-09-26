@@ -131,6 +131,7 @@ export type visualConfig = {
 
 export type PAPData = {
     modelName: string;
+    fileName: string;
     results: ClassificationResult;
     config: ModelConfig;
     date: string;
