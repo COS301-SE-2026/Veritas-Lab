@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import type { Annotation, AnnotationPoint, AnnotationTool } from '@/types/workbench';
+import type { Annotation, AnnotationPoint, AnnotationTool, HighlightRect } from '@/types/workbench';
 
 let fallbackIdCounter = 0;
 
@@ -18,11 +18,6 @@ function createAnnotationId(): string {
     return `annotation-${Date.now()}-${fallbackIdCounter}`;
 }
 
-/**
- * Owns all workbench annotation state (drawn shapes and comment notes) purely on the
- * client, no backend calls yet. This is intentional: the workbench is currently a
- * frontend-only scaffold, persistence will be wired up once the API contract exists.
- */
 export default function useAnnotations() {
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [activeTool, setActiveTool] = useState<AnnotationTool>('Select');
@@ -32,7 +27,7 @@ export default function useAnnotations() {
         // A single point isn't a meaningful shape, ignore accidental clicks.
         if (points.length < 2) return;
 
-        const shape: Annotation = { id: createAnnotationId(), kind: 'shape', page, points, timeStamp };
+        const shape: Annotation = { id: createAnnotationId(), kind: 'shape', page, points, timeStamp, source: 'USER' };
         setAnnotations((current) => [...current, shape]);
         setSelectedId(shape.id);
     };
@@ -41,18 +36,37 @@ export default function useAnnotations() {
         const trimmedText = text.trim();
         if (!trimmedText) return;
 
-        const note: Annotation = { id: createAnnotationId(), kind: 'note', page, position, text: trimmedText, timeStamp };
+        const note: Annotation = { id: createAnnotationId(), kind: 'note', page, position, text: trimmedText, timeStamp, source: 'USER' };
         setAnnotations((current) => [...current, note]);
         setSelectedId(note.id);
     };
+    //add highlighting annotation and automation
+    const addHighlight = (text: string, rects: HighlightRect[], page: number) => {
+        const trimmedText = text.trim();
+        if (!trimmedText || rects.length === 0) return;
+
+        const highlight: Annotation = { id: createAnnotationId(), kind: 'highlight', page, text: trimmedText, rects, source: 'USER' };
+        setAnnotations((current) => [...current, highlight]);
+        setSelectedId(highlight.id);
+    };
+
+    const resolveHighlight = (id: string, rects: HighlightRect[]) => {
+        setAnnotations((current) => current.map((annotation) => (
+            annotation.id === id && annotation.kind === 'highlight'
+                ? { ...annotation, rects }
+                : annotation
+        )));
+    };
 
     const removeAnnotation = (id: string) => {
-        setAnnotations((current) => current.filter((annotation) => annotation.id !== id));
+        setAnnotations((current) => current.filter((annotation) => (
+            annotation.id !== id || annotation.source === 'AI'
+        )));
         setSelectedId((current) => (current === id ? null : current));
     };
 
     const clearAll = () => {
-        setAnnotations([]);
+        setAnnotations((current) => current.filter((annotation) => annotation.source === 'AI'));
         setSelectedId(null);
     };
 
@@ -69,6 +83,8 @@ export default function useAnnotations() {
         setSelectedId,
         addShape,
         addNote,
+        addHighlight,
+        resolveHighlight,
         removeAnnotation,
         clearAll,
         loadAnnotations,
