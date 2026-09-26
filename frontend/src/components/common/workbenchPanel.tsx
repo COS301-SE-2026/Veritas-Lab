@@ -4,12 +4,17 @@ import { Save, Trash2 } from 'lucide-react';
 import SliderBar from '@/components/ui/sliderBar';
 import Button from '@/components/ui/button';
 import AnnotationList from '@/components/common/annotationList';
-import type { AnnotationTool, WorkbenchPanelProps } from '@/types/workbench';
+import type { AnnotationTool, MediaKind, WorkbenchPanelProps } from '@/types/workbench';
 import Label from '@/components/ui/label';
 
-const ANNOTATION_TOOLS: readonly AnnotationTool[] = ['Select', 'Draw', 'Comment'];
+const BASE_TOOLS: readonly AnnotationTool[] = ['Select', 'Draw', 'Comment'];
+const PDF_TOOLS: readonly AnnotationTool[] = ['Select', 'Draw', 'Comment', 'Highlight']
+
+const toolsFor = (mediaKind: MediaKind): readonly AnnotationTool[] =>
+    mediaKind === 'pdf' ? PDF_TOOLS : BASE_TOOLS;
 
 export default function WorkbenchPanel({
+    mediaKind,
     activeTool,
     onToolChange,
     annotations,
@@ -42,7 +47,7 @@ export default function WorkbenchPanel({
 
             <div className="flex flex-col gap-4 border-t border-(--color-line) pt-4">
                 <SliderBar<AnnotationTool>
-                    filters={ANNOTATION_TOOLS}
+                    filters={toolsFor(mediaKind)}
                     defaultFilter={activeTool}
                     onChange={onToolChange}
                     className="w-full"
