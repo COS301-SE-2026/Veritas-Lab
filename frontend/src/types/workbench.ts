@@ -23,6 +23,7 @@ export type ShapeAnnotation = {
     page: number;
     points: AnnotationPoint[];
     timeStamp?: number;
+    source?: AnnotationSource;
 };
 
 /** A text note pinned to a specific point on the media. */
@@ -33,9 +34,10 @@ export type NoteAnnotation = {
     position: AnnotationPoint;
     text: string;
     timeStamp?: number;
+    source?: AnnotationSource;
 };
 
-export type Annotation = ShapeAnnotation | NoteAnnotation;
+export type Annotation = ShapeAnnotation | NoteAnnotation | HighlightAnnotation;
 
 export type WorkbenchCanvasProps = {
     mediaUrl?: string;
@@ -48,6 +50,8 @@ export type WorkbenchCanvasProps = {
     onSelectAnnotation: (id: string | null) => void;
     onAddShape: (points: AnnotationPoint[], page: number, timeStamp?: number) => void;
     onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
+    onAddHighlight: (text: string, rects: HighlightRect[], page: number) => void;
+    onResolveHighlight: (id: string, rects: HighlightRect[]) => void;
     video?: React.RefObject<HTMLVideoElement | null>;
 };
 
@@ -72,6 +76,7 @@ export type AnnotationListProps = {
 export type WorkbenchTool = 'Annotations' | 'Metadata';
 
 export type WorkbenchPanelProps = {
+    mediaKind: MediaKind;
     activeTool: AnnotationTool;
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];
