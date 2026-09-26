@@ -2,13 +2,17 @@ import { UploadCloud, BrainCircuit, FileBox, X, FileCheck2, ChevronDown } from '
 import Button from '@/components/ui/button';
 import { useState } from 'react';
 import Label from '@/components/ui/label';
-import { runModel, ClassificationResult, ModelConfig, ImageModelConfig, VideoModelConfig, PdfModelConfig , BaseModelConfig, ActivationType} from '@/lib/ai'
+import { runModel, ClassificationResult, ModelConfig, BaseModelConfig, ActivationType} from '@/lib/ai'
 import Dropdown from '@/components/ui/dropdown';
+import { advancedModelConfigOptions, visualConfig, PAPData } from '@/types/workbench';
+import { sendPAPModelResults } from '@/lib/api/workbench';
 
 type PlugAndPlayModelsProps = {
     mediaUrl: string | undefined;
     mediaName: string;
     mediaKind: string;
+    caseId: string;
+    mediaId: string;
 };
 
 const defaultBaseModelConfig: BaseModelConfig = {
@@ -23,20 +27,9 @@ const defaultVisualConfig: visualConfig = {
     std: [0.229, 0.224, 0.225],
 }
 
-type advancedModelConfigOptions = {
-    activation: ActivationType;
-    inputWidth: number;
-    inputHeight: number;
-}
-
-type visualConfig = {
-    mean: [number, number, number];
-    std: [number, number, number];
-}
-export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: PlugAndPlayModelsProps) {
+export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, caseId, mediaId }: PlugAndPlayModelsProps) {
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [results, setResults] = useState<ClassificationResult | null>(null);
     const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [advancedConfig, setAdvancedConfig] = useState<advancedModelConfigOptions>({
@@ -72,7 +65,18 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
         return file;
     }
 
+    //sends the results to the backend
+    const sendResults = async (results: ClassificationResult, modelName: string, config: ModelConfig, date: string) => {
+        const data: PAPData = {
+            modelName: modelName,
+            results: results,
+            config: config,
+            date: date, 
+        }
+        await sendPAPModelResults({ caseId, mediaId, data })
+    }
 
+    //runs the model on the current file
     const runCustomModel = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         try {
@@ -106,10 +110,11 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
                 throw new Error('Model configuration is not set');
             }
             setIsRunning(true);
+            const date = new Date().toISOString();
             const newResults = await runModel(file, evidenceFile, modelConfig);
             setIsRunning(false);
-            setResults(newResults);
             console.log('Model run completed successfully:', newResults);
+            sendResults(newResults, file.name, modelConfig, date);
             setError(null);
         } catch (error) {
             setIsRunning(false);
@@ -260,8 +265,11 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind }: Pl
 
                     <div className="mt-5 flex items-center">
                         <div>
-                            {file && (
-                                <Label htmlFor='load' text={error ? error : 'Model loaded successfully'} variant={error ? 'error' : 'success'}/>
+                            {error && (
+                                <Label htmlFor='run' text={error} variant={'error'}/>
+                            )}
+                            {!error && (
+                                <Label htmlFor='run' text={'Model ran successfully'} variant={'success'}/>
                             )}
                         </div>
                         <div className="ml-auto">

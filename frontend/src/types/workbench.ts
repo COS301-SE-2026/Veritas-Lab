@@ -3,6 +3,8 @@
 // The overlay never touches the underlying media, it only stores shapes/notes
 // positioned relative to it, see AnnotationPoint below.
 
+import { ActivationType, ClassificationResult, ModelConfig } from "@/lib/ai";
+
 /**
  * A point expressed as a percentage (0-100) of the media's rendered width/height.
  * Using percentages instead of raw pixels keeps annotations aligned with the media
@@ -114,4 +116,28 @@ export type ReportPanelProps = {
     certainty: number | null;
     findings: string | null;
     onClose?: () => void;
+};
+
+export type advancedModelConfigOptions = {
+    activation: ActivationType;
+    inputWidth: number;
+    inputHeight: number;
+}
+
+export type visualConfig = {
+    mean: [number, number, number];
+    std: [number, number, number];
+}
+
+export type PAPData = {
+    modelName: string;
+    results: ClassificationResult;
+    config: ModelConfig;
+    date: string;
+}
+
+export type PAPModelResultsPayload = {
+    caseId: string;
+    mediaId: string;
+    data: PAPData;
 };
