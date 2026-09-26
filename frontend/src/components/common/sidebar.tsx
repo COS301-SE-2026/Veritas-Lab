@@ -16,6 +16,7 @@ import ResetPasswordModal from '@/components/common/resetPasswordModal';
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const caseId = pathname.split('/')[2];
     const userRole = useUserRole();
     const { collapsed, toggle } = useSidebar();
     const { logOut } = useLogOut();
@@ -27,6 +28,7 @@ export default function Sidebar() {
         ...(userRole === 'ADMIN' ? [{ label: 'Audit Logs', href: '/audit-log', icon: ScrollText }] : []),
         { label: 'Help', href: '/help', icon: HelpCircle },
     ];
+    const caseTabs = [ 'Evidence', 'Comments', 'Audit Timeline', 'Case Board' ]
 
     const footerItemClasses = (collapsed: boolean) =>
         `flex items-center gap-3 text-sm rounded-l-full rounded-r-none bg-white/[0.06] text-white/80 hover:bg-white/[0.14] hover:text-white -translate-x-1 hover:translate-x-0 transition-[transform,background-color,color] duration-200 ease-out ${collapsed ? 'justify-center py-3 pr-4 -mr-3 w-full' : 'justify-start py-3 pl-4 pr-16 -mr-12 w-full'}`;
@@ -72,6 +74,32 @@ export default function Sidebar() {
                         </div>
                     );
                 })}
+                {caseId && (
+                    <>
+                        <div>
+                            {caseTabs.map((tab) => {
+                                const isActive = pathname.includes(`tab=${tab}`);
+                                return (
+                                    <Link
+                                        key={tab}
+                                        href={`/case-page/${caseId}?tab=${tab}`}
+                                        className={`group relative flex items-center gap-3 text-sm rounded-l-full rounded-r-none transition-[transform,background-color,color] duration-200 ease-out
+                                            ${collapsed
+                                                ? 'justify-center py-3 pl-0 pr-4 -mr-3'
+                                                : 'justify-start py-3 pl-4 pr-16 -mr-12'}
+                                            ${isActive
+                                                ? 'bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
+                                                : 'bg-white/[0.06] text-white/80 -translate-x-1 hover:translate-x-0 hover:bg-white/[0.14] hover:text-white'}
+                                        `}
+                                    >
+                                        
+                                        {!collapsed && <span className="truncate">{tab}</span>}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </nav>
 
             <footer className={`pb-6 ${collapsed ? 'pl-2' : 'pl-7'} space-y-3`}>

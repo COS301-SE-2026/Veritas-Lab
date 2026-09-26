@@ -30,10 +30,9 @@ export default function CasePage() {
     const id = params.id;
     const searchParams = useSearchParams();
     const tabParam = searchParams.get('tab');
-    const initialTab = TABS.includes(tabParam as typeof TABS[number])
+    const activeTab = TABS.includes(tabParam as typeof TABS[number])
         ? (tabParam as typeof TABS[number])
         : 'Evidence';
-    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>(initialTab);
 
     useEffect(() => {
         let isActive = true;
@@ -141,7 +140,7 @@ export default function CasePage() {
                     <SliderBar //changed sliderbar to fetch TABS and actively change page layout
                         filters={TABS}
                         defaultFilter={activeTab}
-                        onChange={(tab) => {setActiveTab(tab); router.replace(`/case-page/${id}?tab=${encodeURIComponent(tab)}`, { scroll: false })}}
+                        onChange={(tab) => router.push(`/case-page/${id}?tab=${tab}`)}
                         className='w-full max-w-xl'
                     />
                 </div>
