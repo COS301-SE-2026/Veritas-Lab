@@ -46,8 +46,8 @@ export type AdminUser = {
 };
 
 export type CaseEvidence = {
-    reportId: string;
     mediaId: string;
+    casePerspective: string;
     mediaName: string;
     mediaBucket: string;
     mediaExtension: string;

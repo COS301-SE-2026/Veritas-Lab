@@ -20,28 +20,28 @@ async def assign_context(ensure_user_exists):
     creator_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
 
-    await ensure_user_exists(
+    investigator_name = await ensure_user_exists(
         conn,
         investigator_id,
         INVESTIGATOR,
         "INVESTIGATOR"
     )
 
-    await ensure_user_exists(
+    admin_name = await ensure_user_exists(
         conn,
         admin_id,
         ADMIN,
         "ADMIN"
     )
 
-    await ensure_user_exists(
+    creator_name = await ensure_user_exists(
         conn,
         creator_id,
         CREATOR,
         "USER"
     )
 
-    await ensure_user_exists(
+    user_name = await ensure_user_exists(
         conn,
         user_id,
         USER,
@@ -55,28 +55,31 @@ async def assign_context(ensure_user_exists):
             "conn": conn,
 
             "investigator_id": investigator_id,
+            "investigator_name": investigator_name,
             "investigator_token": create_token(
                 {
                     "id": investigator_id,
-                    "username": INVESTIGATOR,
+                    "username": investigator_name,
                     "role": "INVESTIGATOR"
                 }
             ),
 
             "admin_id": admin_id,
+            "admin_name": admin_name,
             "admin_token": create_token(
                 {
                     "id": admin_id,
-                    "username": ADMIN,
+                    "username": admin_name,
                     "role": "ADMIN"
                 }
             ),
 
             "creator_id": creator_id,
+            "creator_name": creator_name,
             "creator_token": create_token(
                 {
                     "id": creator_id,
-                    "username": CREATOR,
+                    "username": creator_name,
                     "role": "USER"
                 }
             ),
@@ -84,7 +87,7 @@ async def assign_context(ensure_user_exists):
             "user_token": create_token(
                 {
                     "id": user_id,
-                    "username": USER,
+                    "username": user_name,
                     "role": "USER"
                 }
             ),
@@ -107,10 +110,11 @@ async def assign_context(ensure_user_exists):
 async def seed_case(
     ctx,
     state="PUBLISHED",
-    creator=CREATOR,
+    creator=None,
     assigned=None
 ):
     conn = ctx["conn"]
+    creator = creator or ctx["creator_name"]
     case_id = uuid.uuid4()
 
     await conn.execute(
@@ -172,7 +176,7 @@ async def test_investigator_can_assign_published_case(client, assign_context):
         uuid.UUID(case_id)
     )
 
-    assert assigned == INVESTIGATOR
+    assert assigned == ctx["investigator_name"]
 
 @pytest.mark.asyncio
 async def test_admin_can_assign_published_case(client, assign_context):
@@ -198,7 +202,7 @@ async def test_admin_can_assign_published_case(client, assign_context):
         uuid.UUID(case_id)
     )
 
-    assert assigned == ADMIN
+    assert assigned == ctx["admin_name"]
 
 @pytest.mark.asyncio
 async def test_user_cannot_assign_case(client, assign_context):
@@ -272,7 +276,7 @@ async def test_cannot_assign_already_assigned_case(client, assign_context):
         WHERE caseid = $1
         """,
         uuid.UUID(case_id),
-        ADMIN
+        ctx["admin_name"]
     )
 
     client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
@@ -295,12 +299,12 @@ async def test_cannot_assign_already_assigned_case(client, assign_context):
         uuid.UUID(case_id)
     )
 
-    assert assigned == ADMIN
+    assert assigned == ctx["admin_name"]
 
 @pytest.mark.asyncio
 async def test_investigator_cannot_assign_own_case(client, assign_context):
     ctx = assign_context
-    case_id = await seed_case(ctx, creator=INVESTIGATOR)
+    case_id = await seed_case(ctx, creator=ctx["investigator_name"])
     client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
 
     response = client.patch(

@@ -3,6 +3,8 @@ import WorkbenchPage from '@/app/(sidebar)/case-page/[id]/workbench/[evidenceId]
 import { fetchCase } from '@/lib/api/case';
 import { saveAnnotations } from '@/lib/api/workbench';
 import type { CaseEvidence, CaseResponse } from '@/types/api';
+
+let mockSearchParams = new URLSearchParams();
 jest.mock('@/lib/api/case', () => ({
     fetchCase: jest.fn(),
 }));
@@ -10,7 +12,10 @@ jest.mock('@/lib/api/workbench', () => ({
     saveAnnotations: jest.fn(),
 }));
 jest.mock('next/navigation', () => ({
-    useParams: () => ({ id: 'case-1', evidenceId: 'report-1' }),
+    useParams: () => ({ id: 'case-1', evidenceId: 'media-1' }),
+    useSearchParams: () => mockSearchParams,
+    useRouter: () => ({ push: jest.fn() , replace: jest.fn(), back: jest.fn() }),
+    usePathname: () => '/case-page/case-1/workbench/media-1',
 }));
 jest.mock('next/link', () => ({
     __esModule: true,
@@ -47,8 +52,8 @@ jest.mock('next/dynamic', () => () => {
     return DynamicComponent;
 });
 const evidenceFixture: CaseEvidence = {
-    reportId: 'report-1',
     mediaId: 'media-1',
+    casePerspective: 'Suspicious Screenshot.png',
     mediaName: 'Suspicious Screenshot.png',
     mediaBucket: 'bucket-1',
     mediaExtension: 'png',
@@ -89,6 +94,7 @@ describe('WorkbenchPage (integration)', () => {
     beforeEach(() => {
         jest.resetAllMocks();
         mockedFetchCase.mockResolvedValue(caseFixture);
+        mockSearchParams = new URLSearchParams();
     });
     const openAnnotationsTool = async () => {
         await screen.findByAltText('Suspicious Screenshot.png');
@@ -152,7 +158,8 @@ describe('WorkbenchPage (integration)', () => {
         fireEvent.click(screen.getByRole('button', { name: /^Save$/ }));
         await waitFor(() =>
             expect(mockedSaveAnnotations).toHaveBeenCalledWith({
-                evidenceId: 'report-1',
+                caseId: 'case-1',
+                mediaId: 'media-1',
                 annotations: evidenceFixture.annotations,
             })
         );
@@ -202,13 +209,21 @@ describe('WorkbenchPage (integration)', () => {
     it('falls back to a generic title and empty preview when the case fails to load', async () => {
         mockedFetchCase.mockRejectedValue(new Error('Failed to load evidence media'));
         render(<WorkbenchPage />);
-        expect(await screen.findByRole('heading', { name: 'Evidence report-1' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'Evidence media-1' })).toBeInTheDocument();
         expect(screen.getByText('No media preview available yet')).toBeInTheDocument();
     });
     it('falls back to a generic title when the case loads but has no matching evidence', async () => {
         mockedFetchCase.mockResolvedValue({ ...caseFixture, evidence: [] });
         render(<WorkbenchPage />);
-        expect(await screen.findByRole('heading', { name: 'Evidence report-1' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'Evidence media-1' })).toBeInTheDocument();
         expect(screen.getByText('No media preview available yet')).toBeInTheDocument();
     });
+
+    //back button testing
+    it('navigates back to the case board when arriving from the board', async () => {
+        mockSearchParams = new URLSearchParams({ from: 'board' });
+        render(<WorkbenchPage />);
+        const backLink = await screen.findByRole('link', { name: /Back to case/i });
+        expect(backLink).toHaveAttribute('href', '/case-page/case-1?tab=Case%20Board');
+    })
 });

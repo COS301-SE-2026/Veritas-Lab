@@ -691,3 +691,12 @@ FOR EACH ROW
 EXECUTE FUNCTION "Cases_DB".prevent_duplicate_evidence_in_array();
 
 DROP TABLE "Cases_DB"."Reports";
+
+-- The table for WOW factor case board
+CREATE SEQUENCE case_board_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE IF NOT EXISTS "Cases_DB"."CaseBoard" (
+    CaseBoardId int PRIMARY KEY DEFAULT nextval('case_board_seq'),
+    CaseId UUID NOT NULL UNIQUE REFERENCES "Cases_DB"."Cases"(CaseId) ON DELETE CASCADE ON UPDATE CASCADE,
+    CaseBoard JSONB
+)

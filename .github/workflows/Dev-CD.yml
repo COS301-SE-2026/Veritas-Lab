@@ -18,27 +18,66 @@ jobs:
         steps:
             - uses: actions/checkout@v7
               with: 
-                    lfs: true
+                lfs: false
+
+            - name: Restore model cache
+              id: model-cache
+              uses: actions/cache@v4
+              with:
+                path: |
+                  Backend/app/ai/best_video_model.pt
+                  Backend/app/ai/audio/model.safetensors
+                  Backend/app/ai/lexical_detector/model.safetensors
+                key: ai-models-v1
+
+            - name: Download models from R2
+              if: ${{ steps.model-cache.outputs.cache-hit != 'true' }}
+              env:
+                AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+                AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+                AWS_DEFAULT_REGION: auto
+                R2_URL: ${{ secrets.R2_URL }}
+                VIDEO_MODEL_S3_URL: ${{ secrets.VIDEO_MODEL_S3_URL }}
+                AUDIO_MODEL_S3_URL: ${{ secrets.AUDIO_MODEL_S3_URL }}
+                LEXICAL_MODEL_S3_URL: ${{ secrets.LEXICAL_MODEL_S3_URL }}
+              run: |
+                mkdir -p Backend/app/ai/audio
+                mkdir -p Backend/app/ai/lexical_detector
+
+                aws s3 cp "${VIDEO_MODEL_S3_URL}" Backend/app/ai/best_video_model.pt --endpoint-url "${R2_URL}"
+                aws s3 cp "${AUDIO_MODEL_S3_URL}" Backend/app/ai/audio/model.safetensors --endpoint-url "${R2_URL}"
+                aws s3 cp "${LEXICAL_MODEL_S3_URL}" Backend/app/ai/lexical_detector/model.safetensors --endpoint-url "${R2_URL}"
+
+            - name: Verify models
+              run: |
+                test -s Backend/app/ai/best_video_model.pt
+                test -s Backend/app/ai/audio/model.safetensors
+                test -s Backend/app/ai/lexical_detector/model.safetensors
+
             - uses: docker/login-action@v4
               with:
-                    registry: ghcr.io
-                    username: ${{ github.actor }}
-                    password: ${{ secrets.GITHUB_TOKEN }}
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
             - uses: docker/build-push-action@v7
               with:
-                    context: ./Backend
-                    push: true
-                    tags: ghcr.io/cos301-se-2026/veritas-lab-backend:dev-${{ github.sha }}
+                context: ./Backend
+                push: true
+                tags: ghcr.io/cos301-se-2026/veritas-lab-backend:dev-${{ github.sha }}
+
             - uses: docker/build-push-action@v7
               with:
-                    context: ./frontend
-                    push: true
-                    tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:dev-${{ github.sha }}
+                context: ./frontend
+                push: true
+                tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:dev-${{ github.sha }}
+
             - uses: azure/login@v3
               with:
-                    client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_DEV }}
-                    tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DEV }}
-                    subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DEV }}
+                client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_DEV }}
+                tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DEV }}
+                subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DEV }}
+                
             - uses: azure/webapps-deploy@v3
               with:
                 app-name: veritas-lab-dev
@@ -51,7 +90,7 @@ jobs:
                             "isMain": true,
                             "authType": "UserCredentials",
                             "userName": "${{ secrets.GHCR_USERNAME }}",
-                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                            "passwordSecret": "${{ secrets.GHCR_PAT }}"
                         },
                         {
                             "name": "backend",
@@ -60,6 +99,6 @@ jobs:
                             "isMain": false,
                             "authType": "UserCredentials",
                             "userName": "${{ secrets.GHCR_USERNAME }}",
-                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
+                            "passwordSecret": "${{ secrets.GHCR_PAT }}"
                         }
                     ]

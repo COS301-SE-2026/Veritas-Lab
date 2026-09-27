@@ -7,14 +7,8 @@ jest.mock('../../../src/lib/hooks/useCaseDashboard');
 jest.mock('../../../src/context/UserRoleContext');
 const mockUseCaseDashboard = useCaseDashboard as jest.MockedFunction<typeof useCaseDashboard>;
 const mockUseUserRole = useUserRole as jest.MockedFunction<typeof useUserRole>; //fix for permission error
-const baseHookState = {
-    searchQuery: '',
-    setSearchQuery: jest.fn(),
-    statusFilter: 'All',
-    setStatusFilter: jest.fn(),
-    sortKey: 'caseCreationDate',
-    setSortKey: jest.fn(),
-    visibleCases: [
+
+const visibleCases = [
         {
             caseId: '4f2f5e15-2f2b-4d18-9c5b-8b7b7cbe1b7d',
             caseReviews: { stage: 'intake' },
@@ -23,7 +17,21 @@ const baseHookState = {
             caseClosed: false,
             caseCreationDate: '2026-05-01T09:00:00.000Z',
         },
-    ],
+];
+const baseHookState: ReturnType<typeof useCaseDashboard> = {
+    searchQuery: '',
+    setSearchQuery: jest.fn(),
+    statusFilter: 'All',
+    setStatusFilter: jest.fn(),
+    sortKey: 'caseCreationDate',
+    setSortKey: jest.fn(),
+    userRole: 'USER',
+    setUserRole: jest.fn(),
+    visibleCases: visibleCases,
+    allCases: visibleCases,
+    refreshCases: jest.fn(),
+    isLoading: false,
+    error: null,
     showDashboardCards: false,
 };
 

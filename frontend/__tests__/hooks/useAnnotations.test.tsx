@@ -17,7 +17,7 @@ describe('useAnnotations', () => {
             result.current.addShape([
                 { x: 10, y: 10 },
                 { x: 20, y: 20 },
-            ]);
+            ], 1);
         });
 
         expect(result.current.annotations).toHaveLength(1);
@@ -29,7 +29,7 @@ describe('useAnnotations', () => {
         const { result } = renderHook(() => useAnnotations());
 
         act(() => {
-            result.current.addShape([{ x: 10, y: 10 }]);
+            result.current.addShape([{ x: 10, y: 10 }], 1);
         });
 
         expect(result.current.annotations).toHaveLength(0);
@@ -39,7 +39,7 @@ describe('useAnnotations', () => {
         const { result } = renderHook(() => useAnnotations());
 
         act(() => {
-            result.current.addNote({ x: 30, y: 40 }, '  Looks tampered  ');
+            result.current.addNote({ x: 30, y: 40 }, '  Looks tampered  ', 1);
         });
 
         expect(result.current.annotations).toHaveLength(1);
@@ -53,7 +53,7 @@ describe('useAnnotations', () => {
         const { result } = renderHook(() => useAnnotations());
 
         act(() => {
-            result.current.addNote({ x: 30, y: 40 }, '   ');
+            result.current.addNote({ x: 30, y: 40 }, '   ', 1);
         });
 
         expect(result.current.annotations).toHaveLength(0);
@@ -63,7 +63,7 @@ describe('useAnnotations', () => {
         const { result } = renderHook(() => useAnnotations());
 
         act(() => {
-            result.current.addNote({ x: 5, y: 5 }, 'Suspicious edge');
+            result.current.addNote({ x: 5, y: 5 }, 'Suspicious edge', 1);
         });
         const noteId = result.current.annotations[0].id;
 
@@ -79,8 +79,8 @@ describe('useAnnotations', () => {
         const { result } = renderHook(() => useAnnotations());
 
         act(() => {
-            result.current.addNote({ x: 5, y: 5 }, 'First note');
-            result.current.addShape([{ x: 0, y: 0 }, { x: 1, y: 1 }]);
+            result.current.addNote({ x: 5, y: 5 }, 'First note', 1);
+            result.current.addShape([{ x: 0, y: 0 }, { x: 1, y: 1 }], 1);
         });
         expect(result.current.annotations).toHaveLength(2);
 

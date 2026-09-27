@@ -69,6 +69,8 @@ async def fake_upload_context(ensure_user_exists):
         open_case_id = str(uuid.uuid4())
         other_case_id = str(uuid.uuid4())
         closed_case_id = str(uuid.uuid4())
+        user_owner_id = str(uuid.uuid4())
+        user_owned_case_id = str(uuid.uuid4())
 
         created_ids.update(
             {
@@ -77,11 +79,15 @@ async def fake_upload_context(ensure_user_exists):
                 "closed_case_id": closed_case_id,
                 "creator_user_id": creator_user_id,
                 "other_user_id": other_user_id,
+                "user_owner_id": user_owner_id,
+                "user_owned_case_id": user_owned_case_id,
             }
         )
 
-        await ensure_user_exists(conn, creator_user_id, CASE_CREATOR, "INVESTIGATOR")
-        await ensure_user_exists(conn, other_user_id, OTHER_INVESTIGATOR, "INVESTIGATOR")
+        # verify_jwt checks tokens against the stored usernames, so tokens and case rows use these
+        creator_name = await ensure_user_exists(conn, creator_user_id, CASE_CREATOR, "INVESTIGATOR")
+        other_name = await ensure_user_exists(conn, other_user_id, OTHER_INVESTIGATOR, "INVESTIGATOR")
+        user_owner_name = await ensure_user_exists(conn, user_owner_id, "TestUploadUser", "USER")
 
         await conn.execute("SELECT set_config('app.current_user_id', $1, false)", creator_user_id)
 
@@ -93,7 +99,7 @@ async def fake_upload_context(ensure_user_exists):
             """,
             uuid.UUID(open_case_id),
             f"Upload evidence test case {open_case_id[:8]}",
-            CASE_CREATOR,
+            creator_name,
             "Integration test case for evidence upload",
             "OPEN",
         )
@@ -106,7 +112,7 @@ async def fake_upload_context(ensure_user_exists):
             """,
             uuid.UUID(other_case_id),
             f"Upload evidence test case {other_case_id[:8]}",
-            OTHER_INVESTIGATOR,
+            other_name,
             "Integration test case for evidence upload",
             "OPEN",
         )
@@ -119,10 +125,12 @@ async def fake_upload_context(ensure_user_exists):
             """,
             uuid.UUID(closed_case_id),
             f"Upload evidence test case {closed_case_id[:8]}",
-            CASE_CREATOR,
+            creator_name,
             "Integration test case for evidence upload",
             "CLOSED",
         )
+
+        await insert_case(conn, user_owned_case_id, user_owner_name, False, user_owner_id)
 
         await conn.execute(
             """
@@ -141,7 +149,11 @@ async def fake_upload_context(ensure_user_exists):
             "other_case_id": other_case_id,
             "closed_case_id": closed_case_id,
             "creator_user_id": creator_user_id,
+            "creator_name": creator_name,
             "other_user_id": other_user_id,
+            "user_owner_id": user_owner_id,
+            "user_owner_name": user_owner_name,
+            "user_owned_case_id": user_owned_case_id,
         }
 
     finally:
@@ -149,6 +161,7 @@ async def fake_upload_context(ensure_user_exists):
             uuid.UUID(created_ids["open_case_id"]),
             uuid.UUID(created_ids["other_case_id"]),
             uuid.UUID(created_ids["closed_case_id"]),
+            uuid.UUID(created_ids["user_owned_case_id"]),
         ]
 
         media_ids = []
@@ -177,6 +190,7 @@ async def fake_upload_context(ensure_user_exists):
             [
                 uuid.UUID(created_ids["creator_user_id"]),
                 uuid.UUID(created_ids["other_user_id"]),
+                uuid.UUID(created_ids["user_owner_id"]),
             ],
         )
 
@@ -205,7 +219,7 @@ def upload(client, case_id, content, filename="evidence.png"):
 async def test_integration_upload_evidence_success(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+        cookie_for(fake_upload_context["creator_name"], "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     response = upload(
@@ -250,7 +264,7 @@ async def test_integration_upload_evidence_success(client, fake_upload_context):
 async def test_integration_upload_evidence_duplicate_returns_409(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+        cookie_for(fake_upload_context["creator_name"], "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     content = png_bytes("duplicate")
@@ -269,12 +283,12 @@ async def test_integration_upload_evidence_duplicate_returns_409(client, fake_up
 async def test_integration_upload_evidence_owner_can_upload_regardless_of_role(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "USER", fake_upload_context["creator_user_id"]),
+        cookie_for(fake_upload_context["user_owner_name"], "USER", fake_upload_context["user_owner_id"]),
     )
 
     response = upload(
         client,
-        fake_upload_context["open_case_id"],
+        fake_upload_context["user_owned_case_id"],
         png_bytes("standard-user-owner"),
     )
 
@@ -285,7 +299,7 @@ async def test_integration_upload_evidence_owner_can_upload_regardless_of_role(c
 async def test_integration_upload_evidence_not_case_creator(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+        cookie_for(fake_upload_context["creator_name"], "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     response = upload(
@@ -301,7 +315,7 @@ async def test_integration_upload_evidence_not_case_creator(client, fake_upload_
 async def test_integration_upload_evidence_closed_case(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+        cookie_for(fake_upload_context["creator_name"], "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     response = upload(
@@ -314,10 +328,10 @@ async def test_integration_upload_evidence_closed_case(client, fake_upload_conte
 
 
 @pytest.mark.asyncio
-async def test_integration_upload_evidence_malformed_case_id(client):
+async def test_integration_upload_evidence_malformed_case_id(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", str(uuid.uuid4())),
+        cookie_for(fake_upload_context["creator_name"], "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     response = upload(client, "not-a-valid-uuid", png_bytes("malformed"))
@@ -330,7 +344,7 @@ async def test_integration_upload_evidence_malformed_case_id(client):
 async def test_integration_upload_evidence_unsupported_extension(client, fake_upload_context):
     client.cookies.set(
         COOKIE_NAME,
-        cookie_for(CASE_CREATOR, "INVESTIGATOR", fake_upload_context["creator_user_id"]),
+        cookie_for(fake_upload_context["creator_name"], "INVESTIGATOR", fake_upload_context["creator_user_id"]),
     )
 
     response = upload(

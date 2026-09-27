@@ -8,12 +8,77 @@ on:
             - database/changes/how-evidence-is-put-on-a-case
     workflow_dispatch:
 jobs:
+
+    download-models:
+      runs-on: ubuntu-latest
+      timeout-minutes: 15
+
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            lfs: false
+
+        - name: Restore model cache
+          id: model-cache
+          uses: actions/cache@v4
+          with:
+            path: |
+              Backend/app/ai/best_video_model.pt
+              Backend/app/ai/audio/model.safetensors
+              Backend/app/ai/lexical_detector/model.safetensors
+            key: ai-models-v1
+
+        - name: Download models from R2
+          if: ${{ steps.model-cache.outputs.cache-hit != 'true' }}
+          env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+            AWS_DEFAULT_REGION: auto
+            R2_URL: ${{ secrets.R2_URL }}
+            VIDEO_MODEL_S3_URL: ${{ secrets.VIDEO_MODEL_S3_URL }}
+            AUDIO_MODEL_S3_URL: ${{ secrets.AUDIO_MODEL_S3_URL }}
+            LEXICAL_MODEL_S3_URL: ${{ secrets.LEXICAL_MODEL_S3_URL }}
+          run: |
+            mkdir -p Backend/app/ai/audio
+            mkdir -p Backend/app/ai/lexical_detector
+
+            echo "Downloading video model..."
+            aws s3 cp "${VIDEO_MODEL_S3_URL}" Backend/app/ai/best_video_model.pt --endpoint-url "${R2_URL}"
+
+            echo "Downloading audio model..."
+            aws s3 cp "${AUDIO_MODEL_S3_URL}" Backend/app/ai/audio/model.safetensors --endpoint-url "${R2_URL}"
+
+            echo "Downloading lexical model..."
+            aws s3 cp "${LEXICAL_MODEL_S3_URL}" Backend/app/ai/lexical_detector/model.safetensors --endpoint-url "${R2_URL}"
+
+        - name: Verify models
+          run: |
+            test -s Backend/app/ai/best_video_model.pt
+            test -s Backend/app/ai/audio/model.safetensors
+            test -s Backend/app/ai/lexical_detector/model.safetensors
+            ls -lh Backend/app/ai/best_video_model.pt
+            ls -lh Backend/app/ai/audio/model.safetensors
+            ls -lh Backend/app/ai/lexical_detector/model.safetensors
+
     docker-build:
+        needs: download-models
         runs-on: ubuntu-latest
         timeout-minutes: 15
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                lfs: false
+
+            - name: Restore model cache
+              uses: actions/cache@v4
+              with:
+                lfs: false
+                path: |
+                  Backend/app/ai/best_video_model.pt
+                  Backend/app/ai/audio/model.safetensors
+                  Backend/app/ai/lexical_detector/model.safetensors
+                key: ai-models-v1
 
             - name: build Docker images
               env:
@@ -97,10 +162,22 @@ jobs:
                   docker compose down -v --rmi all --remove-orphans
 
     backend-unit-tests:
+        needs: download-models
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
+              with:
+                lfs: false
+
+            - name: Restore model cache
+              uses: actions/cache@v4
+              with:
+                path: |
+                  Backend/app/ai/best_video_model.pt
+                  Backend/app/ai/audio/model.safetensors
+                  Backend/app/ai/lexical_detector/model.safetensors
+                key: ai-models-v1
 
             - name: set up Python
               uses: actions/setup-python@v5
@@ -186,7 +263,16 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  lfs: true
+                  lfs: false
+
+            - name: Restore model cache
+              uses: actions/cache@v4
+              with:
+                path: |
+                  Backend/app/ai/best_video_model.pt
+                  Backend/app/ai/audio/model.safetensors
+                  Backend/app/ai/lexical_detector/model.safetensors
+                key: ai-models-v1
 
             - name: set up Python
               uses: actions/setup-python@v5

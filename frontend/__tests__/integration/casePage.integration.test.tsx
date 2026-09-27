@@ -14,6 +14,11 @@ jest.mock('@/lib/api/case', () => ({
 }));
 jest.mock('next/navigation', () => ({
     useParams: () => ({ id: 'case-1' }),
+    useSearchParams: () => new URLSearchParams(),
+    useRouter: () => ({
+        replace: jest.fn(),
+    }),
+    usePathname: () => '/case-page/case-1',
 }));
 
 const mockUseUserRole = jest.fn();
@@ -57,13 +62,14 @@ const baseCase = {
         caseName: 'Alpha Fraud',
         caseDescription: 'Suspicious transaction pattern',
         caseCreator: 'investigator.one',
+        caseReviews: null,
         caseClosed: false,
         caseCreationDate: '2026-05-01T09:00:00.000Z',
     },
     evidence: [
         {
-            reportId: 'report-1',
             mediaId: 'media-1',
+            casePerspective: 'Screenshot.png',
             mediaName: 'Screenshot.png',
             mediaUrl: 'https://example.com/screenshot.png',
             mediaExtension: 'png',
@@ -253,8 +259,8 @@ describe('CasePage (integration)', () => {
         const updatedEvidence = [
             ...baseCase.evidence,
             {
-                reportId: 'report-2',
                 mediaId: 'media-2',
+                casePerspective: 'newfile.png',
                 mediaName: 'newfile.png',
                 mediaUrl: 'https://example.com/newfile.png',
                 mediaExtension: 'png',

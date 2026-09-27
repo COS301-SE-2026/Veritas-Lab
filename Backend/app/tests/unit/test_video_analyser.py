@@ -88,7 +88,7 @@ def test_audio_classifier_predict_authentic(
     classifier = ai_audio_classifier(model_path="fake/path", sample_rate=4, duration_seconds=1)
     result = classifier.predict("audio.wav")
 
-    assert result["prediction"] is "Authentic"
+    assert result["prediction"] == "Authentic"
     assert result["confidence"] == pytest.approx(0.9)
 
 @patch("app.training.video.analyser.ai_audio_classifier")

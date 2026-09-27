@@ -50,6 +50,8 @@ async def ensure_user_exists():
         )
         created_users.append(user_id)
 
+        return unique_username
+
     yield _ensure_user
 
     if created_users:
@@ -95,44 +97,39 @@ async def case_assignment_context(ensure_user_exists):
     creator_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
 
-    investigator = f"Test_Investigator_{investigator_id[:8]}"
-    admin = f"Test_Admin_{admin_id[:8]}"
-    other_investigator = f"Other_Investigator_{other_investigator_id[:8]}"
-    creator = f"Test_Creator_{creator_id[:8]}"
-    user = f"Test_User_{user_id[:8]}"
-
-    await ensure_user_exists(
+    # verify_jwt checks token usernames against the database, so use the usernames that were actually stored
+    investigator = await ensure_user_exists(
         conn,
         investigator_id,
-        investigator,
+        "Test_Investigator",
         "INVESTIGATOR"
     )
 
-    await ensure_user_exists(
+    admin = await ensure_user_exists(
         conn,
         admin_id,
-        admin,
+        "Test_Admin",
         "ADMIN"
     )
 
-    await ensure_user_exists(
+    other_investigator = await ensure_user_exists(
         conn,
         other_investigator_id,
-        other_investigator,
+        "Other_Investigator",
         "INVESTIGATOR"
     )
 
-    await ensure_user_exists(
+    creator = await ensure_user_exists(
         conn,
         creator_id,
-        creator,
+        "Test_Creator",
         "USER"
     )
 
-    await ensure_user_exists(
+    user = await ensure_user_exists(
         conn,
         user_id,
-        user,
+        "Test_User",
         "USER"
     )
 

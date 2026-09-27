@@ -24,7 +24,7 @@ def override_database_dependency():
 CASE_ID = "12345678-abcd-ef01-2345-6789abcdef01"
 
 def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="mock_investigator", role="INVESTIGATOR"):
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {"sub": sub, "username": username, "role": role}
 
     monkeypatch.setattr(

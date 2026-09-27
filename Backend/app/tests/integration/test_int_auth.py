@@ -65,7 +65,7 @@ async def test_integration_user_login_success(client):
         "email": USER_SETTINGS.E2E_USER_EMAIL,
         "password": USER_SETTINGS.E2E_USER_PASSWORD
     }
-    before_login_time = datetime.now(timezone.utc)
+    issued_before = await fetch_jwt_issued()
 
     response = client.post("/api/login", json=payload)
 
@@ -89,19 +89,16 @@ async def test_integration_user_login_success(client):
         jwt_issued_at = row["userjwtissued"]
         assert jwt_issued_at is not None, "No JWT issue db entry"
 
-        if jwt_issued_at.tzinfo is None:
-            before_login_time = before_login_time.replace(tzinfo=None)
-
-        assert jwt_issued_at >= (before_login_time - timedelta(seconds=1)), (
+        assert issued_before is None or jwt_issued_at > issued_before, (
             f"userjwtissued timestamp ({jwt_issued_at}) was not updated during this test. "
         )
     finally:
         await connection.close()
 
-async def check_no_jwt_issued(before_login_time):
-    connection=await  get_connection()
+async def fetch_jwt_issued():
+    connection = await get_connection()
     try:
-        row = await connection.fetchrow(
+        return await connection.fetchval(
             """
             SELECT userjwtissued 
             FROM "Users_DB"."Users" 
@@ -109,16 +106,17 @@ async def check_no_jwt_issued(before_login_time):
             """,
             USER_SETTINGS.E2E_USER_EMAIL
         )
-
-
-        jwt_issued_at = row["userjwtissued"]
-        
-
-        assert jwt_issued_at < before_login_time , (
-            f"userjwtissued timestamp ({jwt_issued_at}) was updated while testing a failure. "
-        )
     finally:
         await connection.close()
+
+# userjwtissued is written with the database's clock, which can drift from this machine's clock,
+# so compare against the stored value from before the request instead of datetime.now()
+async def check_no_jwt_issued(issued_before):
+    jwt_issued_at = await fetch_jwt_issued()
+
+    assert jwt_issued_at == issued_before, (
+        f"userjwtissued timestamp ({jwt_issued_at}) was updated while testing a failure. "
+    )
 
 
 @pytest.mark.asyncio
@@ -128,7 +126,7 @@ async def test_integration_login_invalid_password_failure(client):
         "email": USER_SETTINGS.E2E_USER_EMAIL,
         "password": "Failedp@ssword"
     }
-    before_login_time = datetime.now(timezone.utc)
+    issued_before = await fetch_jwt_issued()
 
     response = client.post("/api/login", json=payload)
 
@@ -137,7 +135,7 @@ async def test_integration_login_invalid_password_failure(client):
     data = response.json()
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == "Invalid or missing password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
-    await check_no_jwt_issued(before_login_time)
+    await check_no_jwt_issued(issued_before)
 
 @pytest.mark.asyncio
 async def test_integration_login_wrong_password_failure(client):
@@ -146,7 +144,7 @@ async def test_integration_login_wrong_password_failure(client):
         "email": USER_SETTINGS.E2E_USER_EMAIL,
         "password": "Failedp@ssword1246"
     }
-    before_login_time = datetime.now(timezone.utc)
+    issued_before = await fetch_jwt_issued()
 
     response = client.post("/api/login", json=payload)
 
@@ -155,7 +153,7 @@ async def test_integration_login_wrong_password_failure(client):
     data = response.json()
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == AMBIGUOUS_ERROR
-    await check_no_jwt_issued(before_login_time)
+    await check_no_jwt_issued(issued_before)
 
 
 
@@ -166,7 +164,7 @@ async def test_integration_login_no_email_failure(client):
         "email": "",
         "password": USER_SETTINGS.E2E_USER_PASSWORD
     }
-    before_login_time = datetime.now(timezone.utc)
+    issued_before = await fetch_jwt_issued()
 
     response = client.post("/api/login", json=payload)
 
@@ -175,7 +173,7 @@ async def test_integration_login_no_email_failure(client):
     data = response.json()
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
-    await check_no_jwt_issued(before_login_time)
+    await check_no_jwt_issued(issued_before)
 
 @pytest.mark.asyncio
 async def test_integration_login_invalid_email_failure(client):
@@ -184,7 +182,7 @@ async def test_integration_login_invalid_email_failure(client):
         "email": "kleis#to",
         "password": USER_SETTINGS.E2E_USER_PASSWORD
     }
-    before_login_time = datetime.now(timezone.utc)
+    issued_before = await fetch_jwt_issued()
 
     response = client.post("/api/login", json=payload)
 
@@ -193,26 +191,7 @@ async def test_integration_login_invalid_email_failure(client):
     data = response.json()
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == "Invalid or missing email field. E.g of a valid email: veritas@lab.com"
-    connection=await  get_connection()
-    try:
-        row = await connection.fetchrow(
-            """
-            SELECT userjwtissued 
-            FROM "Users_DB"."Users" 
-            WHERE useremail = $1
-            """,
-            USER_SETTINGS.E2E_USER_EMAIL
-        )
-
-
-        jwt_issued_at = row["userjwtissued"]
-        
-
-        assert jwt_issued_at < before_login_time , (
-            f"userjwtissued timestamp ({jwt_issued_at}) was updated while testing a failure. "
-        )
-    finally:
-        await connection.close()
+    await check_no_jwt_issued(issued_before)
 
 @pytest.mark.asyncio
 async def test_integration_login_wrong_email_failure(client):
@@ -221,7 +200,7 @@ async def test_integration_login_wrong_email_failure(client):
         "email": "Pepsi@gmail.com",
         "password": USER_SETTINGS.E2E_USER_PASSWORD
     }
-    before_login_time = datetime.now(timezone.utc)
+    issued_before = await fetch_jwt_issued()
 
     response = client.post("/api/login", json=payload)
 
@@ -230,7 +209,7 @@ async def test_integration_login_wrong_email_failure(client):
     data = response.json()
     assert data["detail"]["status"] == "error"
     assert data["detail"]["message"] == AMBIGUOUS_ERROR
-    await check_no_jwt_issued(before_login_time)
+    await check_no_jwt_issued(issued_before)
 
 @pytest.mark.asyncio
 async def test_integration_register_success(client):
@@ -1469,3 +1448,99 @@ async def test_integration_refresh_token_missing_required_fields(client):
             "message": "Token missing required fields"
         }
     }
+
+
+# verify_jwt checks every token against the stored user, so a token that was valid stops working once the user changes
+def verify_jwt_cookie(user_id: str, username: str, role: str) -> str:
+    return create_token({"id": user_id, "username": username, "role": role})
+
+@pytest.mark.asyncio
+async def test_integration_verify_jwt_rejects_deleted_user(client, ensure_user_exists):
+    user_id = str(uuidlib.uuid4())
+    connection = await get_connection()
+
+    try:
+        username = await ensure_user_exists(connection, user_id, "VerifyDeleted", "INVESTIGATOR")
+
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, verify_jwt_cookie(user_id, username, "INVESTIGATOR"))
+        assert client.get("/api/getCases").status_code == 200
+
+        await connection.execute(
+            'DELETE FROM "Users_DB"."Users" WHERE userid = $1',
+            uuidlib.UUID(user_id)
+        )
+
+        response = client.get("/api/getCases")
+    finally:
+        await connection.close()
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["message"] == INVALID_TOKEN
+
+@pytest.mark.asyncio
+async def test_integration_verify_jwt_rejects_token_after_role_change(client, ensure_user_exists):
+    user_id = str(uuidlib.uuid4())
+    connection = await get_connection()
+
+    try:
+        username = await ensure_user_exists(connection, user_id, "VerifyDemoted", "ADMIN")
+
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, verify_jwt_cookie(user_id, username, "ADMIN"))
+        assert client.get("/api/getCases").status_code == 200
+
+        await connection.execute(
+            'UPDATE "Users_DB"."Users" SET userrole = $2 WHERE userid = $1',
+            uuidlib.UUID(user_id),
+            "USER"
+        )
+
+        response = client.get("/api/getCases")
+    finally:
+        await connection.close()
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["message"] == INVALID_TOKEN
+
+@pytest.mark.asyncio
+async def test_integration_verify_jwt_rejects_token_older_than_latest_issue(client, ensure_user_exists):
+    user_id = str(uuidlib.uuid4())
+    connection = await get_connection()
+
+    try:
+        username = await ensure_user_exists(connection, user_id, "VerifyRevoked", "INVESTIGATOR")
+
+        # Tokens only carry exp, so this token was issued two minutes ago
+        issued_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+        old_token = jwt.encode(
+            {
+                "sub": user_id,
+                "username": username,
+                "role": "INVESTIGATOR",
+                "exp": issued_at + timedelta(minutes=AUTH_SETTINGS.TOKEN_EXPIRE)
+            },
+            AUTH_SETTINGS.JWT_SECRET,
+            algorithm=AUTH_SETTINGS.HASH
+        )
+
+        # A newer token was issued a minute ago (e.g. a later login), which is past the grace period
+        await connection.execute(
+            'UPDATE "Users_DB"."Users" SET userjwtissued = $2 WHERE userid = $1',
+            uuidlib.UUID(user_id),
+            datetime.now(timezone.utc) - timedelta(minutes=1)
+        )
+
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, old_token)
+        old_response = client.get("/api/getCases")
+
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, verify_jwt_cookie(user_id, username, "INVESTIGATOR"))
+        new_response = client.get("/api/getCases")
+    finally:
+        await connection.close()
+
+    assert old_response.status_code == 401
+    assert old_response.json()["detail"]["message"] == INVALID_TOKEN
+    assert new_response.status_code == 200

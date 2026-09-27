@@ -19,28 +19,28 @@ async def publish_context(ensure_user_exists):
     admin_id = str(uuid.uuid4())
     other_user_id = str(uuid.uuid4())
 
-    await ensure_user_exists(
+    user_name = await ensure_user_exists(
         conn,
         user_id,
         USER,
         "USER"
     )
 
-    await ensure_user_exists(
+    investigator_name = await ensure_user_exists(
         conn,
         investigator_id,
         INVESTIGATOR,
         "INVESTIGATOR"
     )
 
-    await ensure_user_exists(
+    admin_name = await ensure_user_exists(
         conn,
         admin_id,
         ADMIN,
         "ADMIN"
     )
 
-    await ensure_user_exists(
+    other_user_name = await ensure_user_exists(
         conn,
         other_user_id,
         OTHER_USER,
@@ -54,37 +54,41 @@ async def publish_context(ensure_user_exists):
             "conn": conn,
 
             "user_id": user_id,
+            "user_name": user_name,
             "user_token": create_token(
                 {
                     "id": user_id,
-                    "username": USER,
+                    "username": user_name,
                     "role": "USER"
                 }
             ),
 
             "investigator_id": investigator_id,
+            "investigator_name": investigator_name,
             "investigator_token": create_token(
                 {
                     "id": investigator_id,
-                    "username": INVESTIGATOR,
+                    "username": investigator_name,
                     "role": "INVESTIGATOR"
                 }
             ),
 
             "admin_id": admin_id,
+            "admin_name": admin_name,
             "admin_token": create_token(
                 {
                     "id": admin_id,
-                    "username": ADMIN,
+                    "username": admin_name,
                     "role": "ADMIN"
                 }
             ),
 
             "other_user_id": other_user_id,
+            "other_user_name": other_user_name,
             "other_user_token": create_token(
                 {
                     "id": other_user_id,
-                    "username": OTHER_USER,
+                    "username": other_user_name,
                     "role": "USER"
                 }
             ),
@@ -111,11 +115,12 @@ async def publish_context(ensure_user_exists):
 
 async def seed_case(
     ctx,
-    creator=USER,
+    creator=None,
     creator_id=None,
     state="OPEN"
 ):
     conn = ctx["conn"]
+    creator = creator or ctx["user_name"]
     case_id = uuid.uuid4()
 
     if creator_id is None:
@@ -161,7 +166,7 @@ async def test_user_can_publish_own_open_case(client, publish_context):
 
     case_id = await seed_case(
         ctx,
-        creator=USER,
+        creator=ctx["user_name"],
         creator_id=ctx["user_id"]
     )
 
@@ -198,7 +203,7 @@ async def test_investigator_can_publish_own_open_case(client, publish_context):
     ctx = publish_context
     case_id = await seed_case(
         ctx,
-        creator=INVESTIGATOR,
+        creator=ctx["investigator_name"],
         creator_id=ctx["investigator_id"]
     )
 
@@ -229,7 +234,7 @@ async def test_admin_can_publish_own_open_case(client, publish_context):
     ctx = publish_context
     case_id = await seed_case(
         ctx,
-        creator=ADMIN,
+        creator=ctx["admin_name"],
         creator_id=ctx["admin_id"]
     )
 
@@ -260,7 +265,7 @@ async def test_user_cannot_publish_another_users_case(client, publish_context):
     ctx = publish_context
     case_id = await seed_case(
         ctx,
-        creator=OTHER_USER,
+        creator=ctx["other_user_name"],
         creator_id=ctx["other_user_id"]
     )
 
@@ -298,7 +303,7 @@ async def test_cannot_publish_already_published_case(client, publish_context):
 
     case_id = await seed_case(
         ctx,
-        creator=USER,
+        creator=ctx["user_name"],
         creator_id=ctx["user_id"],
         state="PUBLISHED"
     )
@@ -323,7 +328,7 @@ async def test_cannot_publish_closed_case(client, publish_context):
 
     case_id = await seed_case(
         ctx,
-        creator=USER,
+        creator=ctx["user_name"],
         creator_id=ctx["user_id"],
         state="CLOSED"
     )
@@ -410,8 +415,9 @@ async def test_publish_case_rejects_invalid_role(client, publish_context):
         }
     )
 
-    assert response.status_code == 403
+    # No stored user can hold this role, so the token fails verification before the role check
+    assert response.status_code == 401
     assert response.json()["detail"] == {
         "status": "error",
-        "message": "User unauthorized"
+        "message": "Invalid token"
     }
