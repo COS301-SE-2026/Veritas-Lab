@@ -4,6 +4,8 @@ from typing import Any
 from PIL import Image
 import torch
 from torchvision.models import EfficientNet_B0_Weights
+import numpy as np
+from uuid import uuid4
 
 from app.training.image.explanation import (
     GradCAM,
@@ -105,5 +107,38 @@ def predict_and_explain(
             "metadata_fields_found": sorted(metadata.keys()),
         },
         "heatmap_path": str(heatmap_path),
+        "heatmap": heatmap,
         "warning": "The risk level and reasons are supporting indicators, not definitive proof that an image is authentic or AI-generated."
+    }
+
+def heatmap_to_annotation(heatmap: np.ndarray, threshold: float = 0.6) -> dict | None:
+    mask = heatmap >= threshold
+    ys, xs = np.where(mask)
+
+    if len(xs) == 0 or len(ys) == 0:
+        return None
+
+    height, width = heatmap.shape
+
+    x1 = xs.min()
+    x2 = xs.max()
+    y1 = ys.min()
+    y2 = ys.max()
+
+    left = (x1 / width) * 100
+    right = (x2 / width) * 100
+    top = (y1 / height) * 100
+    bottom = (y2 / height) * 100
+
+    return {
+        "id": str(uuid4()),
+        "kind": "shape",
+        "source": "AI",
+        "points": [
+            {"x": left, "y": top},
+            {"x": right, "y": top},
+            {"x": right, "y": bottom},
+            {"x": left, "y": bottom},
+            {"x": left, "y": top},
+        ],
     }

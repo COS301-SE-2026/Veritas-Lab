@@ -1,9 +1,9 @@
-import exiftool
 from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIPDFDetector
 import asyncio
-
+from typing import Any
+from uuid import uuid4
 
 FRAUD_MESSAGE = "Lacks original authoring metadata; highly suspicious as it has been modified, re-rendered, or stripped by external software."
 PDF_METADATA_PRODUCER="PDF:Producer"
@@ -144,54 +144,33 @@ class PDFService(MediaService):
             "lexical_ai_probability": (
                 result["lexical_ai_probability"]
             ),
+            "suspicious_chunks": result["suspicious_chunks"],
             "branch_contributions": (
                 result["branch_contributions"]
             )
         }
 
-    def create_findings_string(self, input: dict) -> str:
-        if input is None or input == {}:
-            return "No findings"
+    async def automated_annotations(self, **kwargs: Any):
+        ai_analysis = kwargs["ai_analysis"]
 
-        output = "Metadata:\n"
+        suspicious_chunks = ai_analysis.get(
+            "suspicious_chunks",
+            []
+        )
 
-        if input.get("findings") is None or input.get("findings") == "":
-            output += "No metadata findings.\n"
-        else:
-            output += f"{input['findings']}\n"
+        annotations = []
 
-        output += "AI Classifier:\n"
+        for chunk in suspicious_chunks:
+            text = chunk.get("text", "").strip()
 
-        ai_probability = input.get("ai_probability")
-        classification = input.get("classification")
-        reasons = input.get("reasons", [])
-        summary = input.get("summary")
+            if not text:
+                continue
 
-        if ai_probability is not None:
-            output += (
-                f"The AI classifier found an AI probability of "
-                f"{ai_probability * 100:.2f}%.\n"
-            )
-        else:
-            output += "AI classifier analysis unavailable.\n"
-            return output
+            annotations.append({
+                "id": str(uuid4()),
+                "kind": "highlight",
+                "source": "AI",
+                "text": text
+            })
 
-        if classification:
-            output += f"Classification: {classification}\n"
-
-        if summary:
-            output += f"Summary: {summary}\n"
-
-        if reasons:
-            output += "Reasons:\n"
-
-            for reason in reasons:
-                if isinstance(reason, dict):
-                    message = reason.get("message")
-
-                    if message:
-                        output += f" - {message}\n"
-                else:
-                    output += f" - {reason}\n"
-
-        return output
+        return annotations
