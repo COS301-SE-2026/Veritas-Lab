@@ -1,8 +1,30 @@
 from pathlib import Path
 from app.core.media_service import MediaService, AnalysisFindings
 from app.ai.detector import AIVideoDetector
+from typing import Any
+from uuid import uuid4
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
+
+def zone_to_points(zone_index: int, zones_per_dim: int = 2):
+    row = zone_index // zones_per_dim
+    col = zone_index % zones_per_dim
+
+    zone_width = 100 / zones_per_dim
+    zone_height = 100 / zones_per_dim
+
+    left = col * zone_width
+    right = (col + 1) * zone_width
+    top = row * zone_height
+    bottom = (row + 1) * zone_height
+
+    return [
+        {"x": left, "y": top},
+        {"x": right, "y": top},
+        {"x": right, "y": bottom},
+        {"x": left, "y": bottom},
+        {"x": left, "y": top}
+    ]
 
 class VideoService(MediaService):
     def __init__(self) -> None:
@@ -169,79 +191,34 @@ class VideoService(MediaService):
         analysis_findings.Findings = self.empty_findings(analysis_findings.Findings)            
         return analysis_findings
 
-    def create_findings_string(self, input: dict) -> str:
-        if input is None or input == {}:
-            return "No findings"
+    async def automated_annotations(self, **kwargs: Any):
+        ai_analysis = kwargs["ai_analysis"]
 
-        output = "Metadata:\n"
+        frame_results = (
+            ai_analysis
+            .get("visual", {})
+            .get("frame_importance", [])
+        )
 
-        if input.get("findings") is None or input.get("findings") == "":
-            output += "No metadata findings.\n"
-        else:
-            output += f"{input['findings']}\n"
+        annotations = []
 
-        output += "AI Video Classifier:\n"
+        for frame in frame_results:
+            timestamp = frame.get("timestamp")
+            zone = frame.get("most_influential_zone")
 
-        ai_probability = input.get("ai_probability")
-        classification = input.get("prediction")
+            if timestamp is None or zone is None:
+                continue
 
-        if ai_probability is not None:
-            output += f"The video classifier found an AI probability of {ai_probability * 100:.2f}%.\n"
-        else:
-            output += "Video classifier analysis unavailable.\n"
-            return output
+            annotations.append({
+                "id": str(uuid4()),
+                "kind": "shape",
+                "source": "AI",
+                "timeStamp": timestamp,
+                "points": zone_to_points(
+                    zone,
+                    zones_per_dim=2
+                )
+            })
 
-        if classification:
-            output += f"Classification: {classification}\n"
-
-        visual = input.get("visual")
-
-        if visual:
-            output += "Visual Analysis:\n"
-
-            visual_probability = visual.get("ai_probability")
-            visual_prediction = visual.get("prediction")
-            explanation = visual.get("explanation")
-
-            if visual_probability is not None:
-                output += f" - AI probability: {visual_probability * 100:.2f}%\n"
-                    
-            if visual_prediction:
-                output += f" - Classification: {visual_prediction}\n"
-
-            if explanation:
-                output += f" - Explanation: {explanation}\n"
-
-        audio = input.get("audio")
-
-        if audio and audio.get("available"):
-            output += "Audio Analysis:\n"
-
-            audio_probability = audio.get("ai_probability")
-            audio_prediction = audio.get("prediction")
-
-            if audio_probability is not None:
-                output += f" - AI probability: {audio_probability * 100:.2f}%\n"
-
-            if audio_prediction:
-                output += f" - Classification: {audio_prediction}\n"
-
-        else:
-            output += "Audio Analysis:\n"
-            output += " - No usable audio was available for analysis.\n"
-
-        fusion = input.get("fusion")
-
-        if fusion:
-            visual_weight = fusion.get("visual_weight")
-            audio_weight = fusion.get("audio_weight")
-
-            output += "Combined Analysis:\n"
-
-            if visual_weight is not None:
-                output += f" - Visual weight: {visual_weight * 100:.0f}%\n"
-
-            if audio_weight is not None:
-                output += f" - Audio weight: {audio_weight * 100:.0f}%\n"
-
-        return output
+        return annotations
+        

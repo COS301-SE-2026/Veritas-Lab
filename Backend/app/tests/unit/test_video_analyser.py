@@ -174,6 +174,10 @@ async def test_analyse_combine_visual_and_audio(analysis_instance):
     analysis, mock_visual_model, mock_audio_model = analysis_instance
 
     video_tensor = torch.zeros((2, 3, 224, 224))
+
+    sampled_indices = [0, 30]
+    fps = 30.0
+
     audio_result = {
         "available": True,
         "prediction": "AI-generated",
@@ -183,15 +187,23 @@ async def test_analyse_combine_visual_and_audio(analysis_instance):
     }
 
     frame_results = [
-        {"sampled_frame": 0, "masked_probability": 0.5, "importance": 0.2},
-        {"sampled_frame": 1, "masked_probability": 0.4, "importance": 0.4}
+        {
+            "sampled_frame": 0,
+            "masked_probability": 0.5,
+            "importance": 0.2
+        },
+        {
+            "sampled_frame": 1,
+            "masked_probability": 0.4,
+            "importance": 0.4
+        }
     ]
 
     mock_audio_model.predict.return_value = audio_result
 
     with patch(
         "app.training.video.analyser.read_video_frames",
-        return_value=video_tensor
+        return_value=(video_tensor, sampled_indices, fps)
     ) as mock_read_frames, patch(
         "app.training.video.analyser.extract_audio_from_video",
         return_value="audio.wav"
@@ -202,26 +214,54 @@ async def test_analyse_combine_visual_and_audio(analysis_instance):
         "app.training.video.analyser.calculate_frame_importance",
         return_value=frame_results
     ), patch(
+        "app.training.video.analyser.calculate_most_influential_zone",
+        return_value=1
+    ) as mock_zone, patch(
         "app.training.video.analyser.build_explanation",
         return_value="explanation text"
     ), patch(
         "pathlib.Path.unlink"
     ) as mock_unlink:
-        result = await analysis.analyse("video.mp4", threshold=0.5)
 
-    mock_read_frames.assert_called_once_with(Path("video.mp4"), num_frames=analysis.num_frames)
+        result = await analysis.analyse(
+            "video.mp4",
+            threshold=0.5
+        )
+
+    mock_read_frames.assert_called_once_with(
+        Path("video.mp4"),
+        num_frames=analysis.num_frames
+    )
+
     mock_extract_audio.assert_called_once_with(Path("video.mp4"))
     mock_audio_model.predict.assert_called_once_with("audio.wav")
     mock_unlink.assert_called_once_with(missing_ok=True)
-
     mock_predict.assert_called_once()
     call_args = mock_predict.call_args
+
     assert call_args.args[0] is mock_visual_model
-    assert torch.equal(call_args.args[1], video_tensor.unsqueeze(0))
+    assert torch.equal(
+        call_args.args[1],
+        video_tensor.unsqueeze(0)
+    )
 
     assert result["prediction"] == "AI-generated"
-    assert result["ai_probability"] == pytest.approx(0.7 * 0.8 + 0.3 * 0.9)
+    assert result["ai_probability"] == pytest.approx(
+        0.7 * 0.8 + 0.3 * 0.9
+    )
+
     assert result["visual"]["prediction"] == "AI-generated"
     assert result["audio"] == audio_result
-    assert result["fusion"] == {"visual_weight": 0.7, "audio_weight": 0.3}
+    assert result["fusion"] == {
+        "visual_weight": 0.7,
+        "audio_weight": 0.3
+    }
+
     assert result["visual"]["most_influential_frame"] == frame_results[1]
+    assert frame_results[0]["frame_index"] == 0
+    assert frame_results[0]["timestamp"] == pytest.approx(0.0)
+    assert frame_results[1]["frame_index"] == 30
+    assert frame_results[1]["timestamp"] == pytest.approx(1.0)
+    assert frame_results[0]["most_influential_zone"] == 1
+    assert frame_results[1]["most_influential_zone"] == 1
+    assert mock_zone.call_count == 2

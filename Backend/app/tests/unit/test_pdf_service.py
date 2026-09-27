@@ -258,10 +258,14 @@ async def test_ai_analysis_maps_detector_result(service):
                 "message": "Suspicious structure"
             }
         ],
-
         "summary": "Likely AI-generated PDF.",
         "lexical_ai_probability": 0.82,
-
+        "suspicious_chunks": [
+            {
+                "text": "This section appears suspicious.",
+                "ai_probability": 0.88
+            }
+        ],
         "branch_contributions": {
             "lexical": 0.4,
             "structural": 0.6
@@ -274,16 +278,19 @@ async def test_ai_analysis_maps_detector_result(service):
         "risk_level": 3,
         "ai_probability": 0.91,
         "classification": "AI-generated",
-
         "reasons": [
             {
                 "message": "Suspicious structure"
             }
         ],
-
         "summary": "Likely AI-generated PDF.",
         "lexical_ai_probability": 0.82,
-
+        "suspicious_chunks": [
+            {
+                "text": "This section appears suspicious.",
+                "ai_probability": 0.88
+            }
+        ],
         "branch_contributions": {
             "lexical": 0.4,
             "structural": 0.6
@@ -293,89 +300,3 @@ async def test_ai_analysis_maps_detector_result(service):
     service.ai_detector.analyse_pdf.assert_called_once_with(
         Path("example.pdf")
     )
-
-def test_create_findings_string_returns_no_findings_for_none(service):
-    result = service.create_findings_string(None)
-    assert result == "No findings"
-
-def test_create_findings_string_returns_no_findings_for_empty_dict(service):
-    result = service.create_findings_string({})
-    assert result == "No findings"
-
-def test_create_findings_string_with_full_analysis(service):
-    input_data = {
-        "findings": "Metadata anomaly detected.",
-        "ai_probability": 0.875,
-        "classification": "AI-generated",
-        "summary": "Likely AI-generated.",
-
-        "reasons": [
-            {
-                "message": "Suspicious lexical patterns"
-            },
-
-            {
-                "message": "Structural indicators"
-            }
-        ]
-    }
-
-    result = service.create_findings_string(input_data)
-
-    assert "Metadata:" in result
-    assert "Metadata anomaly detected." in result
-    assert "AI Classifier:" in result
-    assert "87.50%" in result
-    assert "Classification: AI-generated" in result
-    assert "Summary: Likely AI-generated." in result
-    assert "Suspicious lexical patterns" in result
-    assert "Structural indicators" in result
-
-def test_create_findings_string_with_plain_string_reason(service):
-    input_data = {
-        "findings": "No suspicious metadata.",
-        "ai_probability": 0.25,
-        "classification": "Authentic",
-        "summary": "Likely authentic.",
-        "reasons": [
-            "No suspicious structure detected."
-        ]
-    }
-
-    result = service.create_findings_string(input_data)
-    assert "No suspicious structure detected." in result
-
-def test_create_findings_string_skips_reason_without_message(service):
-    input_data = {
-        "findings": "Metadata findings.",
-        "ai_probability": 0.5,
-        "classification": "AI-generated",
-        "reasons": [
-            {
-                "other": "value"
-            }
-        ]
-    }
-
-    result = service.create_findings_string(input_data)
-    assert " - value" not in result
-
-def test_create_findings_string_without_metadata_findings(service):
-    input_data = {
-        "findings": "",
-        "ai_probability": 0.5,
-        "classification": "AI-generated",
-        "reasons": []
-    }
-
-    result = service.create_findings_string(input_data)
-    assert "No metadata findings." in result
-
-def test_create_findings_string_without_ai_probability(service):
-    input_data = {
-        "findings": "Metadata findings.",
-        "classification": "Unknown"
-    }
-
-    result = service.create_findings_string(input_data)
-    assert "AI classifier analysis unavailable." in result

@@ -3,8 +3,10 @@ from pathlib import Path
 import torch
 from app.training.image.model import AIImageDetector as TrainedAIImageDetector
 from app.training.image.prediction import predict_and_explain
+from app.training.image.prediction import heatmap_to_annotation as image_automated_annotation
 from app.training.pdf.explain import explain_pdf, load_detector
 from app.training.video.analyser import video_combined_analysis
+import numpy as np
 
 MODEL_PATH = Path("app/ai/best_model.pth")
 PDF_MODEL_PATH = Path("app/ai/pdf_detector.pt")
@@ -54,6 +56,9 @@ class AIImageDetector:
 
         result["risk_level"] = risk_mapping[result["risk_level"]]
         return result
+
+    def heatmap_to_annotation(self, heatmap: np.ndarray, threshold: float = 0.6):
+        return image_automated_annotation(heatmap=heatmap, threshold=threshold)
 
 class AIPDFDetector:
     def __init__(self) -> None:
