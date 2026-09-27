@@ -522,7 +522,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         if role == "USER":
             rows = await connection.fetch(
                 """
-                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
                 FROM "Cases_DB"."Cases"
                 WHERE casecreator = $1
                 ORDER BY casecreationdate DESC
@@ -533,7 +533,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         elif role in ["ADMIN", "INVESTIGATOR"]:
             rows = await connection.fetch(
                 """
-                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
                 FROM "Cases_DB"."Cases"
                 WHERE 
                     casecreator = $1
