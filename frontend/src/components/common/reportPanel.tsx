@@ -13,6 +13,20 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
 
     const certaintyMeta = getCertaintyMeta(certainty);
     const CertaintyIcon = certainty !== null ? (certIcon[certainty] ?? ShieldQuestion) : ShieldQuestion;
+
+    const importanceMeta = (importance: 'low' | 'medium' | 'high' | undefined) => {
+        switch (importance) {
+            case 'low':
+                return { colorVar: 'var(--color-success)' };
+            case 'medium':
+                return { colorVar: 'var(--color-warning)' };
+            case 'high':
+                return { colorVar: 'var(--color-error)' };
+            default:
+                return { colorVar: 'var(--color-text-subtle)' };
+        }
+    };
+
     return (
         <>
             <div className="vl-panel flex flex-col gap-4 p-6">
@@ -34,16 +48,24 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                 </div>
 
                 <div
-                    className="flex shrink-0 items-center gap-3 rounded-[var(--radius-md)] border p-4"
+                    className="flex flex-col shrink-0 gap-3 rounded-[var(--radius-md)] border p-4"
                     style={{ borderColor: `${certaintyMeta.colorVar}40`, backgroundColor: `${certaintyMeta.colorVar}14` }}
                 >
-                    <CertaintyIcon size={22} className="shrink-0" style={{ color: certaintyMeta.colorVar }} />
-                    <div>
-                        <p className="text-sm font-bold" style={{ color: certaintyMeta.colorVar }}>
-                            {certaintyMeta.label}
-                        </p>
-                        <p className="text-sm text-(--color-text-strong)">
-                            {certaintyMeta.description}
+                    <div className="flex items-center gap-3 border-b pb-6" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
+                        <CertaintyIcon size={22} className="shrink-0" style={{ color: certaintyMeta.colorVar }} />
+                        <div>
+                            <p className="text-sm font-bold" style={{ color: certaintyMeta.colorVar }}>
+                                {certaintyMeta.label}
+                            </p>
+                            <p className="text-sm text-(--color-text-strong)">
+                                {certaintyMeta.description}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 pt-3">
+                        <p>AI Generated Probability:</p>
+                        <p className="text-2xl font-bold" style={{ color: certaintyMeta.colorVar }}>
+                            {findings?.ai_probability?.toFixed(2)}%
                         </p>
                     </div>
                 </div>
@@ -51,9 +73,24 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                 <div className="flex flex-col gap-2 pt-2">
                     <h3 className="text-sm font-bold text-(--color-text-strong)">Findings</h3>
                     {findings ? (
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--color-text-strong)">
-                            
-                        </p>
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-(--color-text-strong)">
+                            {findings?.reasons?.map((reason, index) => {
+                                const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
+                                return(
+                                    <div key={index} className="vl-panel mb-2 p-4 bg-(--color-surface-muted) rounded-[var(--radius-md)]">
+                                        <p className="text-sm font-semibold" style={{ color: importanceMeta(simpleReason?.importance).colorVar }}>
+                                            Importance {simpleReason?.importance}
+                                        </p>
+                                        <p>{typeof reason === 'string' ? reason : reason.message}</p>
+                                        <p className="text-sm font-semibold">
+                                            Suggests {simpleReason?.supports?.toLocaleLowerCase()}
+                                        </p>
+    
+                                    </div>
+
+                                )
+                            })}
+                        </div>
                     ) : (
                         <p className="text-sm text-(--color-text-subtle)">
                             No findings available yet for this evidence.

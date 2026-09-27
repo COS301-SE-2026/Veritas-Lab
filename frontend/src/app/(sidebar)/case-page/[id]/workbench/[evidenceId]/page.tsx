@@ -143,7 +143,7 @@ export default function WorkbenchPage() {
 
             <div className="mt-6 flex flex-col items-start gap-6 lg:flex-row">
                 <div className="min-w-0 flex-1">
-                    <div className={(metadataActive || PAPModelsActive) ? 'hidden' : 'block'} aria-hidden={metadataActive}>
+                    <div className={(metadataActive || PAPModelsActive || (reportActive && evidence?.heatmapUrl)) ? 'hidden' : 'block'} aria-hidden={metadataActive}>
                         <WorkbenchCanvas
                             video={video}
                             mediaUrl={mediaUrl}
@@ -172,6 +172,24 @@ export default function WorkbenchPage() {
 
                     {PAPModelsActive && (
                         <PlugAndPlayModels mediaUrl={mediaUrl} mediaName={mediaName} mediaKind={mediaKind} caseId={caseId} mediaId={evidenceId} />
+                    )}
+
+                    {reportActive && evidence?.heatmapUrl && (
+                        <WorkbenchCanvas
+                            video={video}
+                            mediaUrl={evidence?.heatmapUrl ?? mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            active={annotationsActive}
+                            activeTool={activeTool}
+                            annotations={annotations}
+                            selectedId={selectedId}
+                            onSelectAnnotation={pickSelectedAnnotation}
+                            onAddShape={addShape}
+                            onAddNote={addNote}
+                            onAddHighlight={addHighlight}
+                            onResolveHighlight={resolveHighlight}
+                        />
                     )}
                 </div>
 

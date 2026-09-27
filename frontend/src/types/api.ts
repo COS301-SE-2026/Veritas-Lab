@@ -118,6 +118,7 @@ export type AuditLogCase = {
 export type ReportReason = string | { 
     message: string; 
     supports?: 'AI' | 'AUTHENTIC' | 'INCONCLUSIVE' 
+    importance?: 'low' | 'medium' | 'high'
 };
 
 export type susChunk = {
