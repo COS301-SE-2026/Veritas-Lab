@@ -246,6 +246,17 @@ def _row_to_case(row: dict) -> Case:
 
     return case
 
+def safe_json(val, default):
+    if isinstance(val, str):
+        val = val.strip()
+    if not val:
+        return default
+    try:
+        return json.loads(val)
+    except json.JSONDecodeError:
+        return default
+    return val if val is not None else default
+
 def _format_case_evidence(
     row: dict,
     include_report: bool,
@@ -290,37 +301,20 @@ def _format_case_evidence(
                 ExpiresIn=3600
             )
 
+        created_at = row["reportdatecreation"]
+        formatted_date = (
+            created_at.isoformat() if hasattr(created_at, "isoformat") else created_at
+        )
+
         evidence.update({
-            "annotations": (
-                json.loads(row["annotations"])
-                if isinstance(row["annotations"], str)
-                else (row["annotations"] or [])
-            ),
-
-            "automatedAnnotations": (
-                json.loads(row["automatedannotations"])
-                if isinstance(row["automatedannotations"], str)
-                else (row["automatedannotations"] or [])
-            ),
-
+            "annotations": safe_json(row["annotations"], []),
+            "automatedAnnotations": safe_json(row["automatedannotations"], []),
             "plugAndPlay": plug_and_play,
-
-            "reportArtifacts": (
-                json.loads(row["reportartifacts"])
-                if isinstance(row["reportartifacts"], str)
-                else row["reportartifacts"]
-            ),
-
-            "reportFindings": json.loads(row["reportfindings"]) if isinstance(row["reportfindings"], str) else row["reportfindings"],
+            "reportArtifacts": safe_json(row["reportartifacts"], None),
+            "reportFindings": safe_json(row["reportfindings"], None),
             "reportComments": row["reportcomments"],
             "reportCertainty": row["reportcertainty"],
-            
-            "reportDateCreation": (
-                row["reportdatecreation"].isoformat()
-                if row["reportdatecreation"]
-                else None
-            ),
-
+            "reportDateCreation": formatted_date,
             "heatmapUrl": heatmap_url,
         })
 
