@@ -112,6 +112,7 @@ export type ReportModalProps = {
     mediaName: string;
     certainty: number | null;
     findings: ReportFindings | null;
+    heatmapUrl?: string | null;
 };
 
 export type ReportPanelProps = {
@@ -121,6 +122,7 @@ export type ReportPanelProps = {
     certainty: number | null;
     findings: ReportFindings | null;
     onClose?: () => void;
+    heatmapUrl?: string | null;
 };
 
 export type advancedModelConfigOptions = {

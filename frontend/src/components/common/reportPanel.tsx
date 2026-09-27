@@ -9,7 +9,7 @@ const certIcon: Record<number, LucideIcon> = {
     3: ShieldX, //we should review these i chose them quite rushed and i think we might already be using one of them elsewhere.
 };
 
-export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, findings, onClose} : Readonly<ReportPanelProps>)  {
+export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, findings, onClose, heatmapUrl} : Readonly<ReportPanelProps>)  {
 
     const certaintyMeta = getCertaintyMeta(certainty);
     const CertaintyIcon = certainty !== null ? (certIcon[certainty] ?? ShieldQuestion) : ShieldQuestion;

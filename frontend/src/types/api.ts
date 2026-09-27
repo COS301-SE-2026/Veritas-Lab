@@ -59,6 +59,7 @@ export type CaseEvidence = {
     reportCertainty: number | null;
     reportComments: string | null;
     reportDateCreation: string | null;
+    heatmapUrl?: string | null;
 };
 
 export type CaseComment = {
@@ -114,19 +115,44 @@ export type AuditLogCase = {
     caseExists: boolean;
 }
 
-export type ReportFindings = {
-    risk_level: number;
-    ai_probability: number;
-    classification: string;
-    reasons: string[];
-    summary: string;
-    lexical_ai_probability: number;
-    suspicious_chunks: susChunk[];
-    branch_contributions: Record<string, number>;
-    findings: string;
-}
+export type ReportReason = string | { 
+    message: string; 
+    supports?: 'AI' | 'AUTHENTIC' | 'INCONCLUSIVE' 
+};
 
 export type susChunk = {
     text: string;
     ai_probability: number;
-}
+};
+
+export type ReportFindings = {
+    //img and other stuff
+    risk_level: number;
+    findings?: string;
+    ai_probability?: number;
+    classification?: string;
+    prediction?: string;
+    summary?: string;
+    reasons?: ReportReason[];
+    warning?: string;
+    
+    //pdf
+    lexical_ai_probability?: number;
+    suspicious_chunks?: susChunk[];
+    branch_contributions?: Record<string, number>;
+
+    //vid
+    visual?: {
+        ai_probability?: number;
+        explanation?: string;
+        frame_importance?: { timestamp: number; importance: number }[];
+    };
+    audio?: { 
+        available?: boolean; 
+        ai_probability?: number 
+    };
+    fusion?: { 
+        visual_weight?: number; 
+        audio_weight?: number 
+    };
+};

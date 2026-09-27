@@ -196,6 +196,7 @@ export default function WorkbenchPage() {
                         mediaName={mediaName}
                         certainty={evidence?.reportCertainty ?? null}
                         findings={evidence?.reportFindings ?? null}
+                        heatmapUrl={evidence?.heatmapUrl ?? null}
                     />
                 )}
             </div>
@@ -208,6 +209,7 @@ export default function WorkbenchPage() {
                 mediaName={mediaName}
                 certainty={evidence?.reportCertainty ?? null}
                 findings={evidence?.reportFindings ?? null}
+                heatmapUrl={evidence?.heatmapUrl ?? null}
             />
         </div>
     );
