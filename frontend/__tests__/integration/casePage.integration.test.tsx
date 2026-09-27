@@ -220,7 +220,7 @@ describe('CasePage (integration)', () => {
         mockedFetchCase.mockResolvedValueOnce(baseCase as Awaited<ReturnType<typeof fetchCase>>);
         mockedFetchCase.mockResolvedValueOnce({
             ...baseCase,
-            case: { ...baseCase.case, caseClosed: true },
+            case: { ...baseCase.case, caseState: 'CLOSED', caseClosed: true },
         } as Awaited<ReturnType<typeof fetchCase>>);
         render(<CasePage />);
         await screen.findByText('Alpha Fraud');

@@ -41,7 +41,7 @@ export default function WorkbenchPanel({
     return (
         <div className="vl-panel flex w-full shrink-0 flex-col gap-4 p-5 lg:w-72">
             <div>
-                <h2 className="text-lg font-bold text-(--color-text-strong)">Annotations</h2>
+                <h2 className="text-lg font-bold text-(--color-text-strong)">Annotation tools</h2>
                 <p className="mt-1 text-xs text-(--color-text-muted)">Mark up and comment on this evidence.</p>
             </div>
 

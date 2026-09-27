@@ -218,13 +218,6 @@ export default function CasePage() {
                                 className="mt-4"
                             />
                         ) : null}
-                        {canCloseCase ? (
-                            <CaseCloseButton
-                                caseId={id}
-                                onClosed={reloadCaseData}
-                                className="mt-4"
-                            />
-                        ) : null}
                     </div>
                     ) : null}
                 </div>

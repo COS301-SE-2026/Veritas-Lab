@@ -41,8 +41,6 @@ jest.mock('@/components/common/annotationList', () => ({
 
 jest.mock('lucide-react', () => ({
     __esModule: true,
-    Columns2: () => <div data-testid="columns-icon" />,
-    Pencil: () => <div data-testid="pencil-icon" />,
     Save: () => <div data-testid="save-icon" />,
     Trash2: () => <div data-testid="trash-icon" />,
 }));
@@ -53,8 +51,7 @@ const mockAnnotations: Annotation[] = [
 ];
 
 const workbenchPanel: WorkbenchPanelProps = {
-    activeWorkbenchTool: null,
-    onSelectWorkbenchTool: jest.fn(),
+    mediaKind: 'image',
     activeTool: 'Select',
     onToolChange: jest.fn(),
     annotations: [],
@@ -76,76 +73,83 @@ beforeEach(() => {
 });
 
 describe('WorkbenchPanel', () => {
-    it('renders the workbench panel with tools and annotations', () => {
+    it('renders the panel heading and its annotation controls', () => {
         renderPanel();
-        expect(screen.getByText('Tools')).toBeInTheDocument();
-        expect(screen.getByText('Annotations')).toBeInTheDocument();   
-    });
-
-    it('renders annotation controls when Annotations tool is active', () => {
-        renderPanel({ activeWorkbenchTool: 'Annotations' });
+        expect(screen.getByText('Annotation tools')).toBeInTheDocument();
         expect(screen.getByTestId('slider-bar')).toBeInTheDocument();
         expect(screen.getByTestId('annotation-list')).toBeInTheDocument();
         expect(screen.getByText('Clear')).toBeInTheDocument();
         expect(screen.getByText('Save')).toBeInTheDocument();
     });
 
+    it('offers Select, Draw and Comment for non-pdf media', () => {
+        renderPanel({ mediaKind: 'image' });
+        const tools = screen.getByTestId('slider-bar');
+        expect(tools).toHaveTextContent('Select');
+        expect(tools).toHaveTextContent('Draw');
+        expect(tools).toHaveTextContent('Comment');
+        expect(tools).not.toHaveTextContent('Highlight');
+    });
+
+    it('adds the Highlight tool for pdf media', () => {
+        renderPanel({ mediaKind: 'pdf' });
+        expect(screen.getByTestId('slider-bar')).toHaveTextContent('Highlight');
+    });
+
+    it('marks the active tool on the tool selector', () => {
+        renderPanel({ activeTool: 'Draw' });
+        expect(screen.getByText('Draw')).toHaveAttribute('data-active', 'true');
+        expect(screen.getByText('Select')).toHaveAttribute('data-active', 'false');
+    });
+
+    it('calls onToolChange when a different tool is picked', () => {
+        const props = renderPanel({ mediaKind: 'pdf' });
+        fireEvent.click(screen.getByText('Highlight'));
+        expect(props.onToolChange).toHaveBeenCalledWith('Highlight');
+    });
+
     it('disables Clear and Save buttons when there are no annotations', () => {
-        renderPanel({ activeWorkbenchTool: 'Annotations', annotations: [] });
+        renderPanel({ annotations: [] });
         expect(screen.getByText('Clear').closest('button')).toBeDisabled();
         expect(screen.getByText('Save').closest('button')).toBeDisabled();
     });
 
     it('enables Clear and Save buttons when annotations exist', () => {
-        renderPanel({ activeWorkbenchTool: 'Annotations', annotations: mockAnnotations });
+        renderPanel({ annotations: mockAnnotations });
         expect(screen.getByText('Clear').closest('button')).not.toBeDisabled();
         expect(screen.getByText('Save').closest('button')).not.toBeDisabled();
     });
 
     it('calls onClearAll when Clear is clicked', () => {
-        const props = renderPanel({ activeWorkbenchTool: 'Annotations', annotations: mockAnnotations });
+        const props = renderPanel({ annotations: mockAnnotations });
         fireEvent.click(screen.getByText('Clear'));
         expect(props.onClearAll).toHaveBeenCalledTimes(1);
     });
 
+    it('forwards annotation selection and removal from the list', () => {
+        const props = renderPanel({ annotations: mockAnnotations });
+        fireEvent.click(screen.getByText('select-a1'));
+        fireEvent.click(screen.getByText('remove-a2'));
+        expect(props.onSelectAnnotation).toHaveBeenCalledWith('a1');
+        expect(props.onRemoveAnnotation).toHaveBeenCalledWith('a2');
+    });
+
+    it('confirms when saving succeeds', async () => {
+        const onSave = jest.fn().mockResolvedValue(undefined);
+        renderPanel({ annotations: mockAnnotations, onSave });
+
+        fireEvent.click(screen.getByText('Save'));
+
+        expect(await screen.findByText('Annotations saved successfully!')).toBeInTheDocument();
+        expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
     it('shows an error message when saving fails', async () => {
         const onSave = jest.fn().mockRejectedValue(new Error('network error'));
-        renderPanel({ activeWorkbenchTool: 'Annotations', annotations: mockAnnotations, onSave });
- 
+        renderPanel({ annotations: mockAnnotations, onSave });
+
         fireEvent.click(screen.getByText('Save'));
- 
+
         expect(await screen.findByText('network error')).toBeInTheDocument();
-    });
-
-    it('renders the View Metadata Comparison tool button', () => {
-        renderPanel();
-        expect(screen.getByText('View Metadata Comparison')).toBeInTheDocument();
-    });
-
-    it('calls onSelectWorkbenchTool with Compare when clicked while inactive', () => {
-        const props = renderPanel({ activeWorkbenchTool: null });
-        fireEvent.click(screen.getByText('View Metadata Comparison'));
-        expect(props.onSelectWorkbenchTool).toHaveBeenCalledWith('Compare');
-    });
-
-    it('calls onSelectWorkbenchTool with null when Compare is clicked while already active', () => {
-        const props = renderPanel({ activeWorkbenchTool: 'Compare' });
-        fireEvent.click(screen.getByText('View Metadata Comparison'));
-        expect(props.onSelectWorkbenchTool).toHaveBeenCalledWith(null);
-    });
-
-    it('marks the Compare button as pressed only when Compare is the active tool', () => {
-        renderPanel({ activeWorkbenchTool: 'Compare' });
-        expect(screen.getByText('View Metadata Comparison').closest('button')).toHaveAttribute(
-            'aria-pressed',
-            'true'
-        );
-    });
-
-    it('does not render annotation controls when Compare is the active tool', () => {
-        renderPanel({ activeWorkbenchTool: 'Compare', annotations: mockAnnotations });
-        expect(screen.queryByTestId('slider-bar')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('annotation-list')).not.toBeInTheDocument();
-        expect(screen.queryByText('Save')).not.toBeInTheDocument();
     });
 });

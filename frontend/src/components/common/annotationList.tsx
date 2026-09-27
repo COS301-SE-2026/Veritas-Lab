@@ -16,7 +16,7 @@ export default function AnnotationList({ annotations, selectedId, onSelect, onRe
 
             {annotations.length === 0 ? (
                 <p className="mt-2 text-sm text-(--color-text-muted)">
-                    No annotations yet. Use the Draw, Comment or Highlight tool on the media.
+                    No annotations yet. Use the Draw or Comment tool on the media.
                 </p>
             ) : (
                 <ul className="mt-4 flex flex-col gap-1.5">

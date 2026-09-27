@@ -1101,7 +1101,8 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                     )
                 })
 
-        can_view_report = role in ["ADMIN", "INVESTIGATOR"] or row["casestate"] == "CLOSED"
+        is_creator = row["casecreator"] == username
+        can_view_report = row["casestate"] == "CLOSED" if is_creator else role in ["ADMIN", "INVESTIGATOR"]
 
         return jsonable_encoder({
             "status": "success",
