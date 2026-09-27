@@ -56,7 +56,7 @@ export type CaseEvidence = {
     mediaUrl: string;
     annotations: Annotation[] | null;
     reportArtifacts: Record<string, unknown> | null;
-    reportFindings: string | null;
+    reportFindings: ReportFindings | null;
     reportCertainty: number | null;
     reportComments: string | null;
     reportDateCreation: string | null;
@@ -113,4 +113,21 @@ export type AuditLogCase = {
     eventCount: number;
     lastEventTimestamp: string;
     caseExists: boolean;
+}
+
+export type ReportFindings = {
+    risk_level: number;
+    ai_probability: number;
+    classification: string;
+    reasons: string[];
+    summary: string;
+    lexical_ai_probability: number;
+    suspicious_chunks: susChunk[];
+    branch_contributions: Record<string, number>;
+    findings: string;
+}
+
+export type susChunk = {
+    text: string;
+    ai_probability: number;
 }

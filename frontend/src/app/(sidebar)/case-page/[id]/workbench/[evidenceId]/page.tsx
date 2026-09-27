@@ -17,8 +17,9 @@ import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
+import ReportPanel from '@/components/common/reportPanel';
 
-const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata', 'Plug-and-Play Models'];
+const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata', 'Plug-and-Play Models', 'AI Report'];
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -98,6 +99,7 @@ export default function WorkbenchPage() {
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const metadataActive = activeWorkbenchTool === 'Metadata';
     const PAPModelsActive = activeWorkbenchTool === 'Plug-and-Play Models';
+    const reportActive = activeWorkbenchTool === 'AI Report';
 
     const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
 
@@ -168,7 +170,7 @@ export default function WorkbenchPage() {
                     )}
                 </div>
 
-                {annotationsActive ? (
+                {annotationsActive && (
                     <WorkbenchPanel
                         activeTool={activeTool}
                         onToolChange={setActiveTool}
@@ -179,7 +181,17 @@ export default function WorkbenchPage() {
                         onClearAll={clearAll}
                         onSave={handleSave}
                     />
-                ) : null}
+                )}
+
+                {reportActive && (
+                    <ReportPanel
+                        mediaUrl={mediaUrl}
+                        mediaKind={mediaKind}
+                        mediaName={mediaName}
+                        certainty={evidence?.reportCertainty ?? null}
+                        findings={evidence?.reportFindings ?? null}
+                    />
+                )}
             </div>
 
             <ReportModal

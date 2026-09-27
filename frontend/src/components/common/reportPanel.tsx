@@ -15,7 +15,8 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
     const CertaintyIcon = certainty !== null ? (certIcon[certainty] ?? ShieldQuestion) : ShieldQuestion;
     return (
         <>
-        <div className="flex items-start justify-between gap-4">
+            <div className="vl-panel flex flex-col gap-4 p-6">
+                <div className="flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-(--color-text-strong)">Report</h2>
                         <p className="mt-1 text-xs text-(--color-text-muted)">{mediaName}</p>
@@ -30,23 +31,6 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                             <X size={18} />
                         </button>
                     )}
-                </div>
-
-                <div className="flex shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border border-(--color-line) bg-(--color-surface-sunken)">
-                    {mediaKind === 'image' && mediaUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={mediaUrl} alt={mediaName} className="max-h-80 w-full object-contain" />
-                    ) : null}
-
-                    {mediaKind === 'pdf' && mediaUrl ? (
-                        <iframe src={mediaUrl} title={mediaName} className="h-80 w-full" />
-                    ) : null}
-
-                    {!mediaUrl || mediaKind === 'unsupported' ? (
-                        <p className="p-8 text-sm text-(--color-text-subtle)">
-                            Preview unavailable for this evidence.
-                        </p>
-                    ) : null}
                 </div>
 
                 <div
@@ -68,7 +52,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                     <h3 className="text-sm font-bold text-(--color-text-strong)">Findings</h3>
                     {findings ? (
                         <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--color-text-strong)">
-                            {findings}
+                            
                         </p>
                     ) : (
                         <p className="text-sm text-(--color-text-subtle)">
@@ -76,6 +60,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                         </p>
                     )}
                 </div>
+            </div>
         </>
     )
 }

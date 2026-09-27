@@ -4,7 +4,7 @@
 // positioned relative to it, see AnnotationPoint below.
 
 import { ActivationType, ClassificationResult, ModelConfig } from "@/lib/ai";
-
+import type { ReportFindings } from "@/types/api";
 /**
  * A point expressed as a percentage (0-100) of the media's rendered width/height.
  * Using percentages instead of raw pixels keeps annotations aligned with the media
@@ -71,7 +71,7 @@ export type AnnotationListProps = {
 };
 
 // Workbench tools which now has both annotations and metadata compar and plug and play models or PAPModels.
-export type WorkbenchTool = 'Plug-and-Play Models' | 'Annotations' | 'Metadata';
+export type WorkbenchTool = 'Plug-and-Play Models' | 'Annotations' | 'Metadata' | 'AI Report';
 
 export type WorkbenchPanelProps = {
     activeTool: AnnotationTool;
@@ -106,7 +106,7 @@ export type ReportModalProps = {
     mediaKind?: MediaKind;
     mediaName: string;
     certainty: number | null;
-    findings: string | null;
+    findings: ReportFindings | null;
 };
 
 export type ReportPanelProps = {
@@ -114,7 +114,7 @@ export type ReportPanelProps = {
     mediaKind?: MediaKind;
     mediaName: string;
     certainty: number | null;
-    findings: string | null;
+    findings: ReportFindings | null;
     onClose?: () => void;
 };
 
