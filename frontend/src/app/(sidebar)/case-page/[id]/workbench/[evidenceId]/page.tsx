@@ -90,7 +90,7 @@ export default function WorkbenchPage() {
         setSeededForm(evidence);
         loadAnnotations(normalizeAnnotations(evidence?.annotations));
     }
-    const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
+    const mediaName = evidence?.casePerspective ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = resolveMediaKind({
         mediaExtension: evidence?.mediaExtension,

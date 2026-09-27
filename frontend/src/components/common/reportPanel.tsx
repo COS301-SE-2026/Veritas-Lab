@@ -26,10 +26,20 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                 return { colorVar: 'var(--color-text-subtle)' };
         }
     };
+    const order = ['high', 'medium', 'low'];
 
+    const sortedReasons = (findings?.reasons ?? [])
+        .map(r => typeof r === 'string' ? { message: r } : r)
+        .sort((a, b) =>
+            order.indexOf(a.importance ?? 'low') -
+            order.indexOf(b.importance ?? 'low')
+        );
+    if (mediaKind === 'image') {
+
+    }
     return (
         <>
-            <div className="vl-panel flex flex-col gap-4 p-6">
+            <div className="vl-panel max-w-xl flex flex-col gap-4 p-6">
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-(--color-text-strong)">Report</h2>
@@ -69,34 +79,36 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                         </p>
                     </div>
                 </div>
-
-                <div className="flex flex-col gap-2 pt-2">
-                    <h3 className="text-sm font-bold text-(--color-text-strong)">Findings</h3>
-                    {findings ? (
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-(--color-text-strong)">
-                            {findings?.reasons?.map((reason, index) => {
-                                const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
-                                return(
-                                    <div key={index} className="vl-panel mb-2 p-4 bg-(--color-surface-muted) rounded-[var(--radius-md)]">
-                                        <p className="text-sm font-semibold" style={{ color: importanceMeta(simpleReason?.importance).colorVar }}>
-                                            Importance {simpleReason?.importance}
-                                        </p>
-                                        <p>{typeof reason === 'string' ? reason : reason.message}</p>
-                                        <p className="text-sm font-semibold">
-                                            Suggests {simpleReason?.supports?.toLocaleLowerCase()}
-                                        </p>
-    
-                                    </div>
-
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-(--color-text-subtle)">
-                            No findings available yet for this evidence.
-                        </p>
-                    )}
-                </div>
+                {mediaKind === 'image' && (
+                    <div className="flex flex-col gap-2 pt-2">
+                        {findings ? (
+                            <>
+                                <h3 className="text-sm font-bold text-(--color-text-strong)">Findings</h3>
+                                <div className="text-sm leading-relaxed text-(--color-text-strong)">
+                                    {sortedReasons.map((reason, index) => {
+                                        const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
+                                        return(
+                                            <div key={index} className="vl-panel mb-2 p-4 bg-(--color-surface-muted) rounded-[var(--radius-md)]">
+                                                <p className="text-sm font-semibold" style={{ color: importanceMeta(simpleReason?.importance).colorVar }}>
+                                                    Importance {simpleReason?.importance}
+                                                </p>
+                                                <p>{typeof reason === 'string' ? reason : reason.message}</p>
+                                                <p className="text-sm font-semibold">
+                                                    Suggests {simpleReason?.supports?.toLocaleLowerCase()}
+                                                </p>
+            
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-sm text-(--color-text-subtle)">
+                                No findings available yet for this evidence.
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     )
