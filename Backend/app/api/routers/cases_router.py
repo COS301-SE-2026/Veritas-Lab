@@ -2891,7 +2891,7 @@ async def get_audited_cases(
                 UNION ALL
 
                 SELECT
-                    cases.caseid AS caseid,,
+                    cases.caseid AS caseid,
                     2147483647,
                     NULL::timestamptz,
                     NULL::varchar,
@@ -2926,7 +2926,7 @@ async def get_audited_cases(
                     CASE
                         WHEN query_type = 'INSERT' THEN 'Case Created'
                         WHEN query_type = 'DELETE' THEN 'Case Deleted'
-                        WHEN next_cacsestate IS DISTINCT FROM old_casestate
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
                             AND next_casestate = 'PUBLISHED' THEN 'Case Published'
                         WHEN next_casestate IS DISTINCT FROM old_casestate
                             AND next_casestate = 'CLOSED' THEN 'Case Closed'
@@ -2959,7 +2959,7 @@ async def get_audited_cases(
                     END AS eventaction
                 FROM "Cases_DB"."Cases" AS cases
                 CROSS JOIN LATERAL unnest(
-                    COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[]
+                    COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
                 ) AS elm
                 INNER JOIN "Cases_DB"."Audit_Media" AS audit_media
                     ON audit_media.old_media_id = elm.evidence_id
