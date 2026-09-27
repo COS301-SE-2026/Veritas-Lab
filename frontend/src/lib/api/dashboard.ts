@@ -48,3 +48,31 @@ export async function deleteCase(caseId: string): Promise<{ status: string; mess
 	}
 	return data;
 }
+
+export async function assignCase(caseId: string): Promise<{ status: string; message?: string }> {
+	const res = await apiFetch(`/api/assignCase`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ CaseID: caseId }),
+	});
+	const data = await res.json().catch(() => null);
+	if (!res.ok) {
+		const error = data as ApiError | null
+		throw new Error(error?.detail?.message || 'Failed to assign case');
+	}
+	return data;
+}
+
+export async function unassignCase(caseId: string): Promise<{ status: string; message?: string }> {
+	const res = await apiFetch(`/api/unassignCase`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ CaseID: caseId }),
+	});
+	const data = await res.json().catch(() => null);
+	if (!res.ok) {
+		const error = data as ApiError | null
+		throw new Error(error?.detail?.message || 'Failed to unassign case');
+	}
+	return data;
+}

@@ -10,6 +10,7 @@ const CURSOR_BY_TOOL: Record<AnnotationTool, string> = {
     Select: 'cursor-default',
     Draw: 'cursor-crosshair',
     Comment: 'cursor-copy',
+    Highlight: 'cursor-text',
 };
 
 function toRelativePoint(event: { clientX: number; clientY: number }, bounds: DOMRect): AnnotationPoint {
@@ -100,7 +101,7 @@ export default function AnnotationLayer({
             onPointerUp={handlePointerUp}
             onClick={handleOverlayClick}
             onKeyDown={handleOverlayKeyDown}
-            className={`absolute inset-0 select-none ${active && !isOn ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
+            className={`absolute inset-0 select-none ${active && !isOn && activeTool !== 'Highlight' ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
         >
             {active ? (
                 <>

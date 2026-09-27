@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { CaseCardProps } from '@/types/components';
 import CaseDeleteButton from './caseDeleteButton';
+import CaseAssignButton from './caseAssignButton';
 import { getCertaintyMeta } from '@/lib/report';
 
 const STATUS_BADGE: Record<CaseCardProps['caseStatus'], string> = {
@@ -9,7 +10,7 @@ const STATUS_BADGE: Record<CaseCardProps['caseStatus'], string> = {
     'In Progress': 'vl-badge vl-badge-progress',
 };
 
-export default function CaseCard({ caseTitle, caseDescription, caseStatus, href, caseId, canDelete, onDeleted, riskScore, evidenceCount }: CaseCardProps) {
+export default function CaseCard({ caseTitle, caseDescription, caseStatus, href, caseId, canDelete, onDeleted, riskScore, evidenceCount, assignMode, onAssignmentChanged }: CaseCardProps) {
     const hasRiskScore = riskScore !== undefined && riskScore !== null && (evidenceCount !== undefined && evidenceCount !== null);
     const risk = hasRiskScore ? getCertaintyMeta(Math.round(riskScore as number)) : null;
     const cardContent = (
@@ -42,9 +43,20 @@ export default function CaseCard({ caseTitle, caseDescription, caseStatus, href,
     );
     //this will work similar to how the evidence delete worked
     const showDelete = canDelete && caseId;
-    const deleteButton = showDelete ? (
-        <div className="absolute top-3 right-3 z-10">
-            <CaseDeleteButton caseId={caseId} caseTitle={caseTitle} onDeleted={onDeleted} />
+    const showAssign = !!assignMode && !!caseId;
+    const actions = (showDelete || showAssign) ? (
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+            {showAssign ? (
+                <CaseAssignButton
+                    caseId={caseId as string}
+                    caseTitle={caseTitle}
+                    mode={assignMode as 'assign' | 'unassign'}
+                    onChanged={onAssignmentChanged}
+                />
+            ) : null}
+            {showDelete ? (
+                <CaseDeleteButton caseId={caseId as string} caseTitle={caseTitle} onDeleted={onDeleted} />
+            ) : null}
         </div>
     ) : null;
 
@@ -57,14 +69,14 @@ export default function CaseCard({ caseTitle, caseDescription, caseStatus, href,
                 >
                     {cardContent}
                 </Link>
-                {deleteButton}
+                {actions}
             </div>
         );
     }
     return (
         <div className="relative">
             {cardContent}
-            {deleteButton}
+            {actions}
         </div>
     );
 }

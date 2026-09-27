@@ -101,14 +101,14 @@ describe('WorkbenchPage (integration)', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Annotations' }));
     };
     //annotation etsts
-    it('loads the matching evidence and shows the media with no annotation controls until a tool is picked', async () => {
+    it('loads the matching evidence and shows the media with the annotation tab active by default', async () => {
         render(<WorkbenchPage />);
         expect(await screen.findByRole('heading', { name: 'Suspicious Screenshot.png' })).toBeInTheDocument();
         expect(screen.getByAltText('Suspicious Screenshot.png')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Back to case/i })).toHaveAttribute('href', '/case-page/case-1');
         expect(screen.getByRole('button', { name: 'Annotations' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'View Metadata Comparison' })).toBeInTheDocument();
-        expect(screen.queryByText('Click an annotation to view its details.')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Metadata' })).toBeInTheDocument();
+        expect(screen.getByText('Click an annotation to view its details.')).toBeInTheDocument();
     });
     it('shows pre loaded annotations from the fetched evidence once the Annotations tool is active', async () => {
         render(<WorkbenchPage />);
@@ -160,7 +160,15 @@ describe('WorkbenchPage (integration)', () => {
             expect(mockedSaveAnnotations).toHaveBeenCalledWith({
                 caseId: 'case-1',
                 mediaId: 'media-1',
-                annotations: evidenceFixture.annotations,
+                annotations: [
+                    expect.objectContaining({
+                        id: 'ann-1',
+                        kind: 'note',
+                        page: 1,
+                        text: 'Pre-existing note',
+                        source: 'USER',
+                    }),
+                ],
             })
         );
         expect(await screen.findByText('Annotations saved successfully!')).toBeInTheDocument();
@@ -185,7 +193,7 @@ describe('WorkbenchPage (integration)', () => {
     it('shows the metadata comparison', async () => {
         render(<WorkbenchPage />);
         await screen.findByAltText('Suspicious Screenshot.png');
-        fireEvent.click(screen.getByRole('button', { name: 'View Metadata Comparison' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Metadata' }));
         expect(screen.getByText('Metadata comparison')).toBeInTheDocument();
         expect(screen.getByText('EXIF:CameraModel')).toBeInTheDocument();
         expect(screen.getByText('Canon EOS 90D')).toBeInTheDocument();

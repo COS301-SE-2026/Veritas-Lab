@@ -308,6 +308,7 @@ class Case:
         self.case_name = None if case_name is None else case_name.strip()
         self.case_description = case_description
         self.case_state = "OPEN"
+        self.case_assigned = None
         if case_id is not None:
             cleaned_id = case_id.strip()
             try:
@@ -682,6 +683,7 @@ class Case:
             "caseCreator": self.case_creator,
             "caseDescription": self.case_description,
             "caseState": self.case_state,
+            "caseAssigned": self.case_assigned,
             "caseCreationDate": self.case_creation_date.isoformat() if self.case_creation_date else None
         }
 

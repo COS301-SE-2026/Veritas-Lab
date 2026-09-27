@@ -140,3 +140,20 @@ export async function deleteComment(commentId: number): Promise<{ status: string
     }
     return data;
 }
+
+export async function publishCase(caseId: string): Promise<{ status: string; message?: string }> {
+    const res = await apiFetch(`/api/publishCase`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ CaseID: caseId }),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        const error = data as ApiError | null
+        throw new Error(error?.detail?.message || 'Failed to publish case');
+    }
+    return data;
+}

@@ -278,10 +278,13 @@ def test_prepare_inputs(monkeypatch):
     monkeypatch.setattr(
         explain,
         "lexical_ai_probability",
-        lambda text: 0.75
+        lambda text: {
+            "ai_probability": 0.75,
+            "suspicious_chunks": []
+        }
     )
 
-    returned_features, lexical_score, tensors = (
+    returned_features, lexical_result, tensors = (
         explain.prepare_inputs(
             "test.pdf",
             checkpoint
@@ -289,8 +292,8 @@ def test_prepare_inputs(monkeypatch):
     )
 
     assert returned_features is features
-    assert lexical_score == 0.75
-
+    assert lexical_result["ai_probability"] == 0.75
+    assert lexical_result["suspicious_chunks"] == []
     assert tensors["lexical"].shape == (1, 1)
     assert tensors["object_ids"].tolist() == [[2, 3, 0, 0]]
     assert tensors["font_ids"].tolist() == [[2, 0, 0]]
@@ -581,7 +584,10 @@ def test_explain_pdf_ai_generated(monkeypatch):
         "prepare_inputs",
         lambda path, checkpoint: (
             {},
-            0.70,
+            {
+                "ai_probability": 0.70,
+                "suspicious_chunks": []
+            },
             tensors
         )
     )
@@ -608,6 +614,7 @@ def test_explain_pdf_ai_generated(monkeypatch):
     assert result["prediction"] == "AI-generated"
     assert result["ai_probability"] == 0.90
     assert result["lexical_ai_probability"] == 0.70
+    assert result["suspicious_chunks"] == []
     assert len(result["explanations"]) == 5
     keys = list(result["branch_contributions"].keys())
     assert keys[0] == "object_sequence"
@@ -629,7 +636,10 @@ def test_explain_pdf_authentic(monkeypatch):
         "prepare_inputs",
         lambda path, checkpoint: (
             {},
-            0.20,
+            {
+                "ai_probability": 0.20,
+                "suspicious_chunks": []
+            },
             tensors
         )
     )

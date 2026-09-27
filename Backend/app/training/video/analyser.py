@@ -14,6 +14,63 @@ AUDIO_MODEL_PATH = Path("app/ai/audio")
 VISUAL_WEIGHT = 0.7
 AUDIO_WEIGHT = 0.3
 
+def calculate_most_influential_zone(
+    model,
+    video,
+    sampled_frame_index: int,
+    original_probability: float,
+    prediction: str,
+    zones_per_dim: int = 2
+) -> int:
+    _, _, _, height, width = video.shape
+
+    zone_height = height // zones_per_dim
+    zone_width = width // zones_per_dim
+
+    zone_results = []
+
+    for zone_index in range(zones_per_dim ** 2):
+        row = zone_index // zones_per_dim
+        col = zone_index % zones_per_dim
+
+        y1 = row * zone_height
+        y2 = height if row == zones_per_dim - 1 else (row + 1) * zone_height
+
+        x1 = col * zone_width
+        x2 = width if col == zones_per_dim - 1 else (col + 1) * zone_width
+
+        masked_video = video.clone()
+
+        masked_video[
+            :,
+            sampled_frame_index,
+            :,
+            y1:y2,
+            x1:x2
+        ] = 0
+
+        masked_probability = predict_probability(
+            model,
+            masked_video
+        )
+
+        if prediction == "AI-generated":
+            importance = original_probability - masked_probability
+        else:
+            importance = masked_probability - original_probability
+
+        zone_results.append({
+            "zone": zone_index,
+            "importance": importance
+        })
+
+    strongest_zone = max(
+        zone_results,
+        key=lambda item: item["importance"]
+    )
+
+    return strongest_zone["zone"]
+
 class ai_audio_classifier:
     def __init__(self, model_path: str | Path = AUDIO_MODEL_PATH, sample_rate: int = 16000, duration_seconds: int = 4) -> None:
         self.device = torch.device("cpu")
@@ -125,10 +182,20 @@ class video_combined_analysis:
         self.visual_model.eval()
         self.audio_model = ai_audio_classifier()
 
-    async def analyse(self, video_path: str | Path, threshold: float = 0.5) -> dict:
+    async def analyse(
+        self,
+        video_path: str | Path,
+        threshold: float = 0.5
+    ) -> dict:
         video_path = Path(video_path)
-        video = read_video_frames(video_path, num_frames=self.num_frames)
+
+        video, sampled_indices, fps = read_video_frames(
+            video_path,
+            num_frames=self.num_frames
+        )
+
         video = video.unsqueeze(0).to(self.device)
+
         audio_path = extract_audio_from_video(video_path)
 
         visual_task = asyncio.to_thread(
@@ -144,7 +211,10 @@ class video_combined_analysis:
                     audio_path
                 )
 
-                visual_probability, audio_result = await asyncio.gather(visual_task, audio_task)
+                visual_probability, audio_result = await asyncio.gather(
+                    visual_task,
+                    audio_task
+                )
 
             finally:
                 Path(audio_path).unlink(missing_ok=True)
@@ -153,12 +223,22 @@ class video_combined_analysis:
             visual_probability = await visual_task
             audio_result = None
 
-        visual_prediction = "AI-generated" if visual_probability >= threshold else "Authentic"
-        
+        visual_prediction = (
+            "AI-generated"
+            if visual_probability >= threshold
+            else "Authentic"
+        )
+
         if audio_result is not None:
-            audio_probability = float(audio_result["ai_probability"])
-            final_probability = VISUAL_WEIGHT*visual_probability+AUDIO_WEIGHT*audio_probability
-            
+            audio_probability = float(
+                audio_result["ai_probability"]
+            )
+
+            final_probability = (
+                VISUAL_WEIGHT * visual_probability
+                + AUDIO_WEIGHT * audio_probability
+            )
+
             visual_weight = VISUAL_WEIGHT
             audio_weight = AUDIO_WEIGHT
 
@@ -166,7 +246,7 @@ class video_combined_analysis:
             audio_probability = None
 
             final_probability = visual_probability
-            
+
             visual_weight = 1.0
             audio_weight = 0.0
 
@@ -177,22 +257,63 @@ class video_combined_analysis:
         )
 
         frame_results = calculate_frame_importance(
-                self.visual_model,
-                video,
-                visual_probability,
-                visual_prediction
+            self.visual_model,
+            video,
+            visual_probability,
+            visual_prediction
+        )
+
+        for result in frame_results:
+            sampled_position = result["sampled_frame"]
+
+            original_frame_index = int(
+                sampled_indices[sampled_position]
             )
+
+            result["frame_index"] = original_frame_index
+
+            result["timestamp"] = (
+                float(original_frame_index / fps)
+                if fps > 0
+                else None
+            )
+
+        strongest_frames = sorted(
+            [
+                result
+                for result in frame_results
+                if result["importance"] > 0
+            ],
+            key=lambda result: result["importance"],
+            reverse=True
+        )[:8]
+
+        if visual_prediction == "AI-generated":
+            for result in strongest_frames:
+                result["most_influential_zone"] = (
+                    calculate_most_influential_zone(
+                        model=self.visual_model,
+                        video=video,
+                        sampled_frame_index=result["sampled_frame"],
+                        original_probability=visual_probability,
+                        prediction=visual_prediction,
+                        zones_per_dim=self.zones
+                    )
+                )
 
         visual_explanation = build_explanation(
             visual_prediction,
             visual_probability,
             frame_results
         )
-        
-        strongest_frame = max(frame_results, key=lambda item: item["importance"])
+
+        strongest_frame = max(
+            frame_results,
+            key=lambda item: item["importance"]
+        )
 
         return {
-            "prediction":final_prediction,
+            "prediction": final_prediction,
             "ai_probability": final_probability,
             "authentic_probability": 1.0 - final_probability,
 

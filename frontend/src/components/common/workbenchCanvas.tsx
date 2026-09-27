@@ -18,6 +18,7 @@ const TOOL_HINTS: Record<AnnotationTool, string> = {
     Select: 'Click an annotation to view its details.',
     Draw: 'Click and drag to circle the area you want to flag.',
     Comment: 'Click anywhere on the media to drop a note.',
+    Highlight: 'Select text in the document to highlight it.',
 };
 
 export default function WorkbenchCanvas({
@@ -31,6 +32,8 @@ export default function WorkbenchCanvas({
     onSelectAnnotation,
     onAddShape,
     onAddNote,
+    onAddHighlight,
+    onResolveHighlight,
     video
 }: Readonly<WorkbenchCanvasProps>) {
     const sharedLayerProps = { active, activeTool, annotations, selectedId, onSelectAnnotation, onAddShape, onAddNote };
@@ -51,8 +54,9 @@ export default function WorkbenchCanvas({
             </div>
         );
     } else if (mediaUrl && mediaKind === 'pdf') {
-        media = <WorkbenchPdf url={mediaUrl} mediaName={mediaName} {...sharedLayerProps} />;
-
+        media = (
+            <WorkbenchPdf url={mediaUrl} mediaName={mediaName} onAddHighlight={onAddHighlight} onResolveHighlight={onResolveHighlight} {...sharedLayerProps}/>
+        );
     } else if (mediaUrl && mediaKind === 'video') {
         media = <WorkbenchVideo mediaUrl={mediaUrl} mediaName={mediaName} video={video} {...sharedLayerProps} />;
     } else {

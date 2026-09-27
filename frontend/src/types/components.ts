@@ -13,7 +13,25 @@ export type CaseCardProps = {
     onDeleted?: () => void | Promise<void>;
     riskScore?: number | null;
     evidenceCount?: number;
+    assignMode?: 'assign' | 'unassign' | null;
+    onAssignmentChanged?: () => void | Promise<void>;
 };
+
+export type CasePublishButtonProps = {
+    caseId: string;
+    caseTitle: string;
+    onPublished?: () => void | Promise<void>;
+    className?: string;
+};
+
+export type CaseAssignButtonProps = {
+    caseId: string;
+    caseTitle: string;
+    mode: 'assign' | 'unassign';
+    onChanged?: () => void | Promise<void>;
+    className?: string;
+};
+
 export type CaseEditButtonProps = {
     caseId: string;
     initialName: string;

@@ -77,6 +77,11 @@ router = APIRouter(
     tags=["Cases"]
 )
 
+class plug_and_play_request(BaseModel):
+    mediaId: str
+    data: dict
+    caseId: str
+
 class audit_event(BaseModel):
     timestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
     user: str | None = Field(..., examples=["investigator_user"])
@@ -101,6 +106,11 @@ class audited_cases_response(BaseModel):
 class create_case_request(BaseModel):
     title: str | None = None
     description: str | None = None
+
+class delete_plug_and_play_request(BaseModel):
+    mediaId: str
+    caseId: str
+    modelName: str
 
 class create_single_case_request(BaseModel):
     CaseID: str | None = None
@@ -231,11 +241,27 @@ def _row_to_case(row: dict) -> Case:
 
     case.case_id = row["caseid"]
     case.case_state = row["casestate"]
+    case.case_assigned = row.get("caseassigned")
     case.case_creation_date = row["casecreationdate"]
 
     return case
 
-def _format_case_evidence(row: dict, include_report: bool) -> dict:
+def safe_json(val, default):
+    if isinstance(val, str):
+        val = val.strip()
+    if not val:
+        return default
+    try:
+        return json.loads(val)
+    except json.JSONDecodeError:
+        return default
+    return val if val is not None else default
+
+def _format_case_evidence(
+    row: dict,
+    include_report: bool,
+    plug_and_play: list
+) -> dict:
     media_id = row["mediaid"]
     media_extension = row["mediaextension"] or ""
     media_bucket = row["mediabucket"]
@@ -263,28 +289,33 @@ def _format_case_evidence(row: dict, include_report: bool) -> dict:
     }
 
     if include_report:
+        heatmap_url = None
+
+        if media_extension.lower() in [".jpg", ".jpeg", ".png"]:
+            heatmap_url = presign_client.generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": "heatmaps",
+                    "Key": f"{media_id}.png"
+                },
+                ExpiresIn=3600
+            )
+
+        created_at = row["reportdatecreation"]
+        formatted_date = (
+            created_at.isoformat() if hasattr(created_at, "isoformat") else created_at
+        )
+
         evidence.update({
-            "annotations": (
-                json.loads(row["annotations"])
-                if isinstance(row["annotations"], str)
-                else (row["annotations"] or [])
-            ),
-
-            "reportArtifacts": (
-                json.loads(row["reportartifacts"])
-                if isinstance(row["reportartifacts"], str)
-                else row["reportartifacts"]
-            ),
-
-            "reportFindings": row["reportfindings"],
+            "annotations": safe_json(row["annotations"], []),
+            "automatedAnnotations": safe_json(row["automatedannotations"], []),
+            "plugAndPlay": plug_and_play,
+            "reportArtifacts": safe_json(row["reportartifacts"], None),
+            "reportFindings": safe_json(row["reportfindings"], None),
             "reportComments": row["reportcomments"],
             "reportCertainty": row["reportcertainty"],
-            
-            "reportDateCreation": (
-                row["reportdatecreation"].isoformat()
-                if row["reportdatecreation"]
-                else None
-            ),
+            "reportDateCreation": formatted_date,
+            "heatmapUrl": heatmap_url,
         })
 
     return evidence
@@ -544,10 +575,10 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         "Returns a single case with its comments and evidence. "
         "Any authenticated user can view a case they created, regardless of its state. "
         "ADMIN and INVESTIGATOR users can additionally view any PUBLISHED or CLOSED case. "
-        "ADMIN and INVESTIGATOR users receive evidence annotations and report-related "
-        "information whenever they can access the case. "
-        "USER accounts only receive annotations and report-related information when "
-        "the case is CLOSED."
+        "ADMIN and INVESTIGATOR users receive evidence annotations, automated annotations, "
+        "plug-and-play model results, and report-related information whenever they can access the case. "
+        "USER accounts only receive annotations, automated annotations, plug-and-play model results, "
+        "and report-related information when the case is CLOSED."
     ),
     responses={
         200: {
@@ -555,7 +586,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
             "content": {
                 "application/json": {
                     "examples": {
-                        "Investigator or admin": {
+                        "Investigator or admin - Image": {
                             "summary": (
                                 "ADMIN or INVESTIGATOR viewing a PUBLISHED "
                                 "or CLOSED case"
@@ -581,11 +612,263 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
                                         "mediaTypeId": "99999999-8888-7777-6666-555555555555",
                                         "mediaUrl": "https://example.com/presigned-url",
                                         "annotations": [],
+                                        "automatedAnnotations": [
+                                            {
+                                                "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                                                "kind": "shape",
+                                                "source": "AI",
+                                                "points": [
+                                                    {"x": 20.0, "y": 15.0},
+                                                    {"x": 70.0, "y": 15.0},
+                                                    {"x": 70.0, "y": 65.0},
+                                                    {"x": 20.0, "y": 65.0},
+                                                    {"x": 20.0, "y": 15.0}
+                                                ]
+                                            }
+                                        ],
+
                                         "reportArtifacts": {},
-                                        "reportFindings": "No manipulation detected.",
+
+                                        "reportFindings": {
+                                            "risk_level": 3,
+                                            "ai_probability": 0.91,
+                                            "classification": "AI-generated",
+                                            "confidence_percentage": 91.0,
+                                            "reasons": [
+                                                {
+                                                    "message": "Suspicious visual patterns detected."
+                                                }
+                                            ],
+                                            "findings": "No camera metadata was found."
+                                        },
+
                                         "reportComments": "Reviewed by investigator.",
                                         "reportCertainty": 3,
-                                        "reportDateCreation": "2026-05-21T10:15:00+00:00"
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": "https://example.com/presigned-heatmap-url"
+                                    }
+                                ]
+                            }
+                        },
+
+                        "Investigator or admin - PDF": {
+                            "summary": (
+                                "ADMIN or INVESTIGATOR viewing a PUBLISHED "
+                                "or CLOSED case containing PDF evidence"
+                            ),
+                            "value": {
+                                "status": "success",
+                                "case": {
+                                    "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                    "caseName": "Document Verification",
+                                    "caseCreator": "normal_user",
+                                    "caseDescription": "PDF authenticity investigation",
+                                    "caseState": "PUBLISHED",
+                                    "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                                },
+                                "comments": [],
+                                "evidence": [
+                                    {
+                                        "mediaId": "22222222-3333-4444-5555-666666666666",
+                                        "casePerspective": "Submitted document",
+                                        "mediaName": "report.pdf",
+                                        "mediaBucket": "pdfs",
+                                        "mediaExtension": ".pdf",
+                                        "mediaTypeId": "88888888-7777-6666-5555-444444444444",
+                                        "mediaUrl": "https://example.com/presigned-url",
+                                        "annotations": [],
+                                        "automatedAnnotations": [
+                                            {
+                                                "id": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+                                                "kind": "highlight",
+                                                "source": "AI",
+                                                "text": "This section of the document was identified as suspicious."
+                                            },
+                                            {
+                                                "id": "cccccccc-dddd-eeee-ffff-aaaaaaaaaaaa",
+                                                "kind": "highlight",
+                                                "source": "AI",
+                                                "text": "Another suspicious section detected by the lexical analysis."
+                                            }
+                                        ],
+
+                                        "reportArtifacts": {},
+
+                                        "reportFindings": {
+                                            "risk_level": 3,
+                                            "ai_probability": 0.9985,
+                                            "classification": "AI-generated",
+                                            "lexical_ai_probability": 0.94,
+                                            "suspicious_chunks": [
+                                                {
+                                                    "text": "This section of the document was identified as suspicious.",
+                                                    "ai_probability": 0.96
+                                                },
+                                                {
+                                                    "text": "Another suspicious section detected by the lexical analysis.",
+                                                    "ai_probability": 0.91
+                                                }
+                                            ],
+                                            "summary": "The document shows strong indications of AI-generated content.",
+                                            "reasons": [
+                                                "Lexical patterns strongly influenced the classification."
+                                            ],
+                                            "branch_contributions": {
+                                                "fonts": 0.12,
+                                                "lexical": 0.61,
+                                                "metadata": 0.18
+                                            },
+                                            "findings": "No suspicious metadata anomalies found."
+                                        },
+
+                                        "reportComments": "Reviewed by investigator.",
+                                        "reportCertainty": 3,
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": None
+                                    }
+                                ]
+                            }
+                        },
+
+                        "Investigator or admin - Video": {
+                            "summary": (
+                                "ADMIN or INVESTIGATOR viewing a PUBLISHED "
+                                "or CLOSED case containing video evidence"
+                            ),
+                            "value": {
+                                "status": "success",
+                                "case": {
+                                    "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
+                                    "caseName": "Video Verification",
+                                    "caseCreator": "normal_user",
+                                    "caseDescription": "Video authenticity investigation",
+                                    "caseState": "PUBLISHED",
+                                    "caseCreationDate": "2026-05-20T19:43:02+00:00"
+                                },
+                                "comments": [],
+                                "evidence": [
+                                    {
+                                        "mediaId": "33333333-4444-5555-6666-777777777777",
+                                        "casePerspective": "Security footage",
+                                        "mediaName": "footage.mp4",
+                                        "mediaBucket": "videos",
+                                        "mediaExtension": ".mp4",
+                                        "mediaTypeId": "77777777-6666-5555-4444-333333333333",
+                                        "mediaUrl": "https://example.com/presigned-url",
+                                        "annotations": [],
+                                        "automatedAnnotations": [
+                                            {
+                                                "id": "dddddddd-eeee-ffff-aaaa-bbbbbbbbbbbb",
+                                                "kind": "shape",
+                                                "source": "AI",
+                                                "timeStamp": 2.4,
+                                                "points": [
+                                                    {"x": 0.0, "y": 0.0},
+                                                    {"x": 50.0, "y": 0.0},
+                                                    {"x": 50.0, "y": 50.0},
+                                                    {"x": 0.0, "y": 50.0},
+                                                    {"x": 0.0, "y": 0.0}
+                                                ]
+                                            },
+                                            {
+                                                "id": "eeeeeeee-ffff-aaaa-bbbb-cccccccccccc",
+                                                "kind": "shape",
+                                                "source": "AI",
+                                                "timeStamp": 6.8,
+                                                "points": [
+                                                    {"x": 50.0, "y": 50.0},
+                                                    {"x": 100.0, "y": 50.0},
+                                                    {"x": 100.0, "y": 100.0},
+                                                    {"x": 50.0, "y": 100.0},
+                                                    {"x": 50.0, "y": 50.0}
+                                                ]
+                                            }
+                                        ],
+
+                                        "plugAndPlay": [
+                                            {
+                                                "PNPModelId": 1,
+                                                "mediaId": "11111111-2222-3333-4444-555555555555",
+                                                "modelName": "ImageAuthenticityModel",
+                                                "modelResult": {
+                                                    "modelName": "ImageAuthenticityModel",
+                                                    "fileName": "image-model.onnx",
+                                                    "results": {
+                                                        "classification": "AI",
+                                                        "confidence": 0.91
+                                                    },
+                                                    "config": {},
+                                                    "date": "2026-09-26T14:00:00Z"
+                                                },
+                                                "uploadDate": "2026-09-26T14:05:00+00:00"
+                                            },
+
+                                            {
+                                                "PNPModelId": 2,
+                                                "mediaId": "11111111-2222-3333-4444-555555555555",
+                                                "modelName": "SecondaryImageModel",
+                                                "modelResult": {
+                                                    "modelName": "SecondaryImageModel",
+                                                    "fileName": "secondary-image-model.onnx",
+                                                    "results": {
+                                                        "classification": "AUTHENTIC",
+                                                        "confidence": 0.84
+                                                    },
+                                                    "config": {},
+                                                    "date": "2026-09-26T14:10:00Z"
+                                                },
+                                                "uploadDate": "2026-09-26T14:12:00+00:00"
+                                            }
+                                        ],
+
+                                        "reportArtifacts": {},
+
+                                        "reportFindings": {
+                                            "risk_level": 2,
+                                            "prediction": "AI-generated",
+                                            "ai_probability": 0.81,
+                                            "authentic_probability": 0.19,
+
+                                            "visual": {
+                                                "prediction": "AI-generated",
+                                                "ai_probability": 0.87,
+                                                "authentic_probability": 0.13,
+                                                "frame_importance": [
+                                                    {
+                                                        "sampled_frame": 1,
+                                                        "frame_index": 72,
+                                                        "timestamp": 2.4,
+                                                        "importance": 0.18,
+                                                        "most_influential_zone": 0
+                                                    },
+                                                    {
+                                                        "sampled_frame": 4,
+                                                        "frame_index": 204,
+                                                        "timestamp": 6.8,
+                                                        "importance": 0.14,
+                                                        "most_influential_zone": 3
+                                                    }
+                                                ]
+                                            },
+
+                                            "audio": {
+                                                "available": True,
+                                                "prediction": "Authentic",
+                                                "ai_probability": 0.34
+                                            },
+
+                                            "fusion": {
+                                                "visual_weight": 0.7,
+                                                "audio_weight": 0.3
+                                            },
+
+                                            "findings": "No suspicious metadata anomalies found."
+                                        },
+
+                                        "reportComments": "Reviewed by investigator.",
+                                        "reportCertainty": 2,
+                                        "reportDateCreation": "2026-05-21T10:15:00+00:00",
+                                        "heatmapUrl": None
                                     }
                                 ]
                             }
@@ -735,12 +1018,14 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
         case = _row_to_case(row)
 
         evidence_rows = await connection.fetch(
-             """
+            """
             SELECT
                 ev.evidence_id AS "mediaid",
                 ev.case_perspective AS "caseperspective",
 
                 media.MediaAnnotations AS "annotations",
+                auto.MediaAnnotations AS "automatedannotations",
+
                 media.ReportArtifacts AS "reportartifacts",
                 media.ReportFindings AS "reportfindings",
                 media.ReportComments AS "reportcomments",
@@ -751,7 +1036,12 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                 m.MediaTypeId AS "mediatypeid",
                 m.MediaName AS "medianame",
                 m.MediaExtension AS "mediaextension",
-                m.MediaBucket AS "mediabucket"
+                m.MediaBucket AS "mediabucket",
+
+                p.PNPModelId AS "pnpmodelid",
+                p.ModelName AS "pnpmodelname",
+                p.ModelResult AS "pnpmodelresult",
+                p.UploadDate AS "pnpuploaddate"
 
             FROM "Cases_DB"."Cases" c
 
@@ -765,20 +1055,56 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
             JOIN "Cases_DB"."MediaType" m
                 ON media.MediaType = m.MediaTypeId
 
+            LEFT JOIN "Cases_DB"."AutomatedAnnotations" auto
+                ON auto.MediaId = media.MediaId
+
+            LEFT JOIN "Cases_DB"."PNPModels" p
+                ON p.MediaId = media.MediaId
+
             WHERE c.CaseId = $1
+
             """,
             case_id,
         )
 
-        can_view_report = role in ["ADMIN", "INVESTIGATOR"] or row["casestate"] == "CLOSED"
+        evidence_map = {}
+
+        for evidence_row in evidence_rows:
+            media_id = evidence_row["mediaid"]
+
+            if media_id not in evidence_map:
+                evidence_map[media_id] = {
+                    "row": evidence_row,
+                    "plugAndPlay": []
+                }
+
+            if evidence_row["pnpmodelid"] is not None:
+                evidence_map[media_id]["plugAndPlay"].append({
+                    "PNPModelId": evidence_row["pnpmodelid"],
+                    "mediaId": str(media_id),
+                    "modelName": evidence_row["pnpmodelname"],
+                    "modelResult": (
+                        json.loads(evidence_row["pnpmodelresult"])
+                        if isinstance(evidence_row["pnpmodelresult"], str)
+                        else evidence_row["pnpmodelresult"]
+                    ),
+                    "uploadDate": (
+                        evidence_row["pnpuploaddate"].isoformat()
+                        if evidence_row["pnpuploaddate"]
+                        else None
+                    )
+                })
+
+        is_creator = row["casecreator"] == username
+        can_view_report = row["casestate"] == "CLOSED" if is_creator else role in ["ADMIN", "INVESTIGATOR"]
 
         return jsonable_encoder({
             "status": "success",
             "case": case.to_json(),
             "comments": await case.get_comments(connection),
             "evidence": [
-                _format_case_evidence(evidence_row, include_report=can_view_report)
-                for evidence_row in evidence_rows
+                _format_case_evidence(item["row"], include_report=can_view_report, plug_and_play=item["plugAndPlay"])
+                for item in evidence_map.values()
             ]
         })
 
@@ -3444,6 +3770,458 @@ async def get_case_board(
             }
         )
     except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.post(
+    "/createPNP",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Create plug-and-play model result",
+    description=(
+        "Stores plug-and-play model output for a media item. "
+        "Only ADMIN and INVESTIGATOR users may use this endpoint. "
+        "The user must be assigned to the specified case and the media item "
+        "must belong to that case's evidence."
+    ),
+    responses={
+        200: {
+            "description": "Plug-and-play data saved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Plug-and-play data saved successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Model name is required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Model name is required"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Invalid or missing authentication token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User not authenticated"
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "User is unauthorized or is not assigned to the case",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": USER_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def create_plug_and_play(
+    pnp_request: plug_and_play_request,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = await verify_jwt(request, connection)
+    role = payload.get("role")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
+
+    username = payload.get("username")
+    model_name = pnp_request.data.get("modelName")
+
+    if not model_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Model name is required"
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            INSERT INTO "Cases_DB"."PNPModels"
+                (MediaId, ModelName, ModelResult)
+            SELECT
+                $1::uuid,
+                $2,
+                $3::jsonb
+            FROM "Cases_DB"."Cases" c
+            WHERE c.caseid = $4::uuid
+              AND c.caseassigned = $5
+              AND EXISTS (
+                  SELECT 1
+                  FROM unnest(c.evidence) AS e
+                  WHERE (e).evidence_id = $1::uuid
+              )
+            RETURNING
+                PNPModelId,
+                MediaId,
+                ModelName,
+                ModelResult,
+                UploadDate;
+            """,
+            pnp_request.mediaId,
+            model_name,
+            json.dumps(pnp_request.data),
+            pnp_request.caseId,
+            username
+        )
+
+        if row is None:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "Plug-and-play data saved successfully"
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.post(
+    "/deletePNP",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Delete plug-and-play model result",
+    description=(
+        "Deletes a plug-and-play model result for a media item. "
+        "Only ADMIN users may use this endpoint. "
+        "The media item must belong to the specified case."
+    ),
+    responses={
+        200: {
+            "description": "Plug-and-play data deleted successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Plug-and-play data deleted successfully"
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Invalid or missing authentication token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User not authenticated"
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User is unauthorized or the PNP result does not belong to the specified case",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": USER_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def delete_plug_and_play(
+    pnp_request: delete_plug_and_play_request,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = await verify_jwt(request, connection)
+
+    role = payload.get("role")
+
+    if role != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            DELETE FROM "Cases_DB"."PNPModels" p
+            USING "Cases_DB"."Cases" c
+            WHERE p.MediaId = $1::uuid
+              AND p.ModelName = $2
+              AND c.CaseId = $3::uuid
+              AND EXISTS (
+                  SELECT 1
+                  FROM unnest(c.evidence) AS e
+                  WHERE (e).evidence_id = p.MediaId
+              )
+            RETURNING p.PNPModelId;
+            """,
+            pnp_request.mediaId,
+            pnp_request.modelName,
+            pnp_request.caseId
+        )
+
+        if row is None:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "Plug-and-play data deleted successfully"
+        }
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR_MESSAGE
+            }
+        )
+
+@router.post(
+    "/updatePNP",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Update plug-and-play model result",
+    description=(
+        "Updates plug-and-play model data for a media item. "
+        "Only ADMIN and INVESTIGATOR users may use this endpoint. "
+        "The user must be assigned to the specified case and the media item "
+        "must belong to that case's evidence."
+    ),
+    responses={
+        200: {
+            "description": "Plug-and-play data updated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Plug-and-play data updated successfully"
+                    }
+                }
+            }
+        },
+
+        400: {
+            "description": "Model name is required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Model name is required"
+                        }
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Invalid or missing authentication token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "User not authenticated"
+                        }
+                    }
+                }
+            }
+        },
+
+        403: {
+            "description": "User is unauthorized or is not assigned to the case",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": USER_UNAUTHORIZED
+                        }
+                    }
+                }
+            }
+        },
+        
+        500: {
+            "description": "Database error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": DATABASE_ERROR_MESSAGE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def update_plug_and_play(
+    pnp_request: plug_and_play_request,
+    request: Request,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    payload = await verify_jwt(request, connection)
+
+    role = payload.get("role")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": USER_UNAUTHORIZED
+            }
+        )
+
+    username = payload.get("username")
+    model_name = pnp_request.data.get("modelName")
+
+    if not model_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Model name is required"
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            UPDATE "Cases_DB"."PNPModels" p
+            SET ModelResult = $1::jsonb
+            FROM "Cases_DB"."Cases" c
+            WHERE p.MediaId = $2::uuid
+              AND p.ModelName = $3
+              AND c.CaseId = $4::uuid
+              AND c.CaseAssigned = $5
+              AND EXISTS (
+                  SELECT 1
+                  FROM unnest(c.evidence) AS e
+                  WHERE (e).evidence_id = p.MediaId
+              )
+            RETURNING
+                p.PNPModelId,
+                p.MediaId,
+                p.ModelName,
+                p.ModelResult,
+                p.UploadDate;
+            """,
+            json.dumps(pnp_request.data),
+            pnp_request.mediaId,
+            model_name,
+            pnp_request.caseId,
+            username
+        )
+
+        if row is None:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": USER_UNAUTHORIZED
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "Plug-and-play data updated successfully"
+        }
+
+    except asyncpg.PostgresError:
         raise HTTPException(
             status_code=500,
             detail={

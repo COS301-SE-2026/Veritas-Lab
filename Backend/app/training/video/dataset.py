@@ -15,7 +15,11 @@ def uniform_frame_indices(total_frames: int, num_frames: int):
 
     return np.linspace(0, total_frames - 1, num_frames).astype(np.int64)
 
-def read_video_frames(path: str | Path, num_frames: int = 8, image_size: int = 224):
+def read_video_frames(
+    path: str | Path,
+    num_frames: int = 8,
+    image_size: int = 224
+):
     path = str(path)
     cap = cv2.VideoCapture(path)
 
@@ -23,7 +27,12 @@ def read_video_frames(path: str | Path, num_frames: int = 8, image_size: int = 2
         raise RuntimeError(f"Could not open video: {path}")
 
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    indices = uniform_frame_indices(total, num_frames)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    indices = uniform_frame_indices(
+        total,
+        num_frames
+    )
 
     frames = []
     wanted = set(indices.tolist())
@@ -31,16 +40,22 @@ def read_video_frames(path: str | Path, num_frames: int = 8, image_size: int = 2
 
     while True:
         ok, frame = cap.read()
+
         if not ok:
             break
 
         if current in wanted:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(
+                frame,
+                cv2.COLOR_BGR2RGB
+            )
+
             frame = cv2.resize(
                 frame,
                 (image_size, image_size),
                 interpolation=cv2.INTER_AREA
             )
+
             frames.append((current, frame))
 
         if len(frames) == len(wanted):
@@ -51,26 +66,43 @@ def read_video_frames(path: str | Path, num_frames: int = 8, image_size: int = 2
     cap.release()
 
     if not frames:
-        raise RuntimeError(f"No frames decoded from: {path}")
+        raise RuntimeError(
+            f"No frames decoded from: {path}"
+        )
 
-    by_index = {idx: frame for idx, frame in frames}
+    by_index = {
+        idx: frame
+        for idx, frame in frames
+    }
+
     sampled = []
+    sampled_indices = []
 
     available = sorted(by_index.keys())
+
     for idx in indices:
         if idx in by_index:
-            f = by_index[idx]
+            actual_index = int(idx)
         else:
-            nearest = min(available, key=lambda x, idx=idx: abs(x - int(idx)))
-            f = by_index[nearest]
+            actual_index = min(
+                available,
+                key=lambda x, idx=idx: abs(
+                    x - int(idx)
+                )
+            )
 
-        sampled.append(f)
+        sampled.append(by_index[actual_index])
+        sampled_indices.append(actual_index)
 
     arr = np.stack(sampled).astype(np.float32) / 255.0
     arr = (arr - CLIP_MEAN) / CLIP_STD
     arr = np.transpose(arr, (0, 3, 1, 2))
 
-    return torch.from_numpy(arr)
+    return (
+        torch.from_numpy(arr),
+        sampled_indices,
+        fps
+    )
 
 class video_binary_dataset(Dataset):
     def __init__(
@@ -102,7 +134,8 @@ class video_binary_dataset(Dataset):
 
     def __getitem__(self, idx):
         path, label = self.samples[idx]
-        video = read_video_frames(
+
+        video, _, _ = read_video_frames(
             path,
             num_frames=self.num_frames,
             image_size=self.image_size

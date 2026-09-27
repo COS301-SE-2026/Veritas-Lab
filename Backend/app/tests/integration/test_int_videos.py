@@ -1,12 +1,12 @@
 from pathlib import Path
-from uuid import uuid4
-
+from uuid import uuid4, UUID
+import json
 import pytest
 
 from app.tests.integration.conftest import get_connection
 from app.core.media_service import get_object
 from app.core.video_service import VideoService
-
+from app.tests.integration.conftest import get_automated_annotations
 
 TEST_VIDEO = Path(__file__).resolve().parent / "test.mp4"
 
@@ -232,16 +232,62 @@ async def test_video_full_integration(ensure_user_exists):
         report = await get_report(media_id)
 
         assert report is not None
+
         assert report["reportartifacts"] is not None
         assert report["reportfindings"] is not None
         assert report["reportcertainty"] is not None
+        findings = json.loads(report["reportfindings"])
+        assert isinstance(findings, dict)
 
-        assert "Metadata:" in report["reportfindings"]
-        assert "AI Video Classifier:" in report["reportfindings"]
-        assert "Visual Analysis:" in report["reportfindings"]
-        assert "Audio Analysis:" in report["reportfindings"]
-        assert "Combined Analysis:" in report["reportfindings"]
+        assert findings["risk_level"] == result["risk_level"]
+        assert findings["ai_probability"] == result["ai_probability"]
+        assert findings["prediction"] == result["prediction"]
+        assert report["reportcertainty"] == result["risk_level"]
+        assert "visual" in findings
+        assert "audio" in findings
+        assert "fusion" in findings
+        assert "findings" in findings
 
+        annotation_record = await get_automated_annotations(media_id)
+
+        assert annotation_record is not None
+        assert annotation_record["mediaid"] == media_id
+        assert annotation_record["mediaannotations"] is not None
+        assert annotation_record["createdat"] is not None
+
+        annotations = annotation_record["mediaannotations"]
+
+        if isinstance(annotations, str):
+            annotations = json.loads(annotations)
+
+        assert isinstance(annotations, list)
+        assert len(annotations) <= 8
+        if visual["prediction"] == "AI-generated":
+            assert len(annotations) > 0
+
+        for annotation in annotations:
+            assert "id" in annotation
+            UUID(annotation["id"])
+
+            assert annotation["kind"] == "shape"
+            assert annotation["source"] == "AI"
+
+            assert "timeStamp" in annotation
+            assert isinstance(annotation["timeStamp"], (int, float))
+            assert annotation["timeStamp"] >= 0
+
+            assert "points" in annotation
+            assert isinstance(annotation["points"], list)
+            assert len(annotation["points"]) == 5
+
+            assert annotation["points"][0] == annotation["points"][-1]
+
+            for point in annotation["points"]:
+                assert "x" in point
+                assert "y" in point
+
+                assert 0 <= point["x"] <= 100
+                assert 0 <= point["y"] <= 100
     finally:
         if media_id is not None and case_id is not None and bucket is not None and object_name is not None:
             await delete_test_data(

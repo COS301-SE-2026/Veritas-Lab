@@ -81,18 +81,31 @@ export default function Dashboard() {
                         visibleCases.map((item) => {
                             const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' /* && item.caseCreator === currentUser?.username*/);
                             const risk = riskScores.find((score) => score.caseId === item.caseId);
+                            const canSelfAssign = userRole === 'ADMIN' || userRole === 'INVESTIGATOR';
+                            const isPublished = item.caseState === 'PUBLISHED';
+                            let assignMode: 'assign' | 'unassign' | null = null;
+                            if (canSelfAssign && isPublished) {
+                                if (item.caseAssigned && item.caseAssigned === currentUser?.username) {
+                                    assignMode = 'unassign';
+                                } else if (!item.caseAssigned && item.caseCreator !== currentUser?.username) {
+                                    assignMode = 'assign';
+                                }
+                            }
+                            const caseStatus = item.caseState === 'CLOSED' ? 'Closed' : item.caseState === 'PUBLISHED' ? 'In Progress' : 'Open';
                             return (
                                 <CaseCard
                                     key={item.caseId}
                                     caseTitle={item.caseName}
                                     caseDescription={`Created by ${item.caseCreator}`}
-                                    caseStatus={item.caseClosed ? 'Closed' : 'Open'}
+                                    caseStatus={caseStatus}
                                     href={`/case-page/${item.caseId}`}
                                     caseId={item.caseId}
                                     canDelete={canDeleteCase}
                                     onDeleted={refreshCases}
                                     riskScore={risk?.average}
                                     evidenceCount={risk?.count}
+                                    assignMode={assignMode}
+                                    onAssignmentChanged={refreshCases}
                                 />
                             );
                         })

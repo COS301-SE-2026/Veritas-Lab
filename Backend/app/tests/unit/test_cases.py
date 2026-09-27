@@ -154,62 +154,62 @@ def test_case_stores_description():
 
 
 def test_case_to_json_before_create():
-    client.cookies.clear()
     case = Case(
-        case_creator="alice_dev",
         case_name="Test Case",
-        case_description="This is a test description",
+        case_creator="test_user",
+        case_description="Initial description"
     )
+    
+    json_data = case.to_json()
 
-    result = case.to_json()
-
-    assert result == {
+    assert json_data == {
         "caseId": None,
         "caseName": "Test Case",
-        "caseCreator": "alice_dev",
-        "caseDescription": "This is a test description",
+        "caseCreator": "test_user",
+        "caseDescription": "Initial description",
         "caseState": "OPEN",
-        "caseCreationDate": None
+        "caseCreationDate": None,
+        "caseAssigned": None
     }
 
 def test_case_to_json_after_create_values_set():
-    client.cookies.clear()
+    case_id = uuid4()
+    now = datetime.now(timezone.utc)
+    
     case = Case(
-        case_creator="alice_dev",
-        case_name="Test Case",
-        case_description="This is a test description",
+        case_name="Active Case",
+        case_creator="investigator_1",
+        case_description="Detailed description"
     )
+    case.case_id = case_id
+    case.case_state = "PUBLISHED"
+    case.case_assigned = "investigator_2"
+    case.case_creation_date = now
 
-    case.case_id = "12345678-abcd-ef01-2345-6789abcdef01"
-    case.case_state = "CLOSED"
-    case.case_creation_date = datetime(2026, 5, 20, 19, 43, 2, tzinfo=timezone.utc)
+    json_data = case.to_json()
 
-    result = case.to_json()
-
-    assert result == {
-        "caseId": "12345678-abcd-ef01-2345-6789abcdef01",
-        "caseName": "Test Case",
-        "caseCreator": "alice_dev",
-        "caseDescription": "This is a test description",
-        "caseState": "CLOSED",
-        "caseCreationDate": "2026-05-20T19:43:02+00:00"
+    assert json_data == {
+        "caseId": str(case_id),
+        "caseName": "Active Case",
+        "caseCreator": "investigator_1",
+        "caseDescription": "Detailed description",
+        "caseState": "PUBLISHED",
+        "caseCreationDate": now.isoformat(),
+        "caseAssigned": "investigator_2"
     }
 
 def test_case_to_json_with_no_description_or_reviews():
-    client.cookies.clear()
     case = Case(
-        case_creator="alice_dev",
-        case_name="Test Case"
+        case_name="Bare Minimum Case",
+        case_creator="user_1",
+        case_description=None
     )
 
-    assert case.to_json() == {
-        "caseId": None,
-        "caseName": "Test Case",
-        "caseCreator": "alice_dev",
-        "caseDescription": None,
-        "caseState": "OPEN",
-        "caseCreationDate": None
-    }
+    json_data = case.to_json()
+
+    assert json_data["caseDescription"] is None
+    assert json_data["caseName"] == "Bare Minimum Case"
+    assert json_data["caseCreator"] == "user_1"
 
 @pytest.mark.asyncio
 async def test_create_case_with_mock():

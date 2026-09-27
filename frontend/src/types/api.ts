@@ -1,5 +1,4 @@
-import { Annotation } from "./workbench";
-
+import type { Annotation } from '@/types/workbench';
 export type ApiError = {
     detail: {
         status?: 'error';
@@ -23,11 +22,15 @@ export type ChangePasswordResponse = {
     message: string;
 };
 
+export type CaseState = 'OPEN' | 'PUBLISHED' | 'CLOSED';
+
 export type DashboardCase = {
     caseId: string;
     caseReviews: Record<string, unknown> | null;
     caseName: string;
     caseCreator: string;
+    caseState: CaseState;
+    caseAssigned: string | null;
     caseClosed: boolean;
     caseCreationDate: string;
 };
@@ -74,6 +77,8 @@ export type CaseResponse = {
         caseCreator: string;
         caseReviews: Record<string, unknown> | null;
         caseDescription: string | null;
+        caseState: CaseState;
+        caseAssigned: string | null;
         caseClosed: boolean;
         caseCreationDate: string | null;
     };
