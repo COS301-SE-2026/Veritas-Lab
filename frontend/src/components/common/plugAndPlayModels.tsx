@@ -7,13 +7,15 @@ import Dropdown from '@/components/ui/dropdown';
 import { advancedModelConfigOptions, visualConfig, PAPData } from '@/types/workbench';
 import { sendPAPModelResults } from '@/lib/api/workbench';
 import PlugAndPlayReport from '@/components/common/plugAndPlayReport';
-
+import { PAPReport } from '@/types/api';
+import { useEffect } from 'react';
 type PlugAndPlayModelsProps = {
     mediaUrl: string | undefined;
     mediaName: string;
     mediaKind: string;
     caseId: string;
     mediaId: string;
+    plugAndPlayReport: PAPReport[] | []
 };
 
 const defaultBaseModelConfig: BaseModelConfig = {
@@ -28,12 +30,14 @@ const defaultVisualConfig: visualConfig = {
     std: [0.229, 0.224, 0.225],
 }
 
-export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, caseId, mediaId }: PlugAndPlayModelsProps) {
+export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, caseId, mediaId, plugAndPlayReport }: PlugAndPlayModelsProps) {
     const [modelFile, setModelFile] = useState<File | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [resultsData, setResultsData] = useState<PAPData | null>(null);
+    const [fullSuccess, setFullSuccess] = useState<boolean>(false);
+    const [reportData, setReportData] = useState<PAPData[]>(plugAndPlayReport.map(report => (report.modelResult)));
     const [advancedConfig, setAdvancedConfig] = useState<advancedModelConfigOptions>({
         activation: 'SIGMOID',
         inputWidth: 224,
@@ -41,6 +45,8 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
         pageCount: 4,
         frameCount: 8,
     });
+
+    
     //formats the files size so it's easier to read
     const fileSizeAsBytes = (bytes: number) => {
         if (bytes < 1024) {
@@ -80,6 +86,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
         }
         try {
             await sendPAPModelResults({ caseId, mediaId, data })
+            setFullSuccess(true);
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Failed to send results to backend');
         }
@@ -124,14 +131,15 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
             const date = new Date().toISOString();
             const newResults = await runModel(modelFile, evidenceFile, modelConfig);
             setIsRunning(false);
-
-            setResultsData({
+            const newReport: PAPData = {
                 modelName: modelFile.name,
                 fileName: evidenceFile.name,
                 results: newResults,
                 config: modelConfig,
                 date: date
-            });
+            }
+            setReportData(prev => [ newReport, ...prev ]);
+            setResultsData(newReport);
             
             console.log('Model run completed successfully:', newResults);
             sendResults(newResults, modelFile.name, evidenceFile.name, modelConfig, date);
@@ -153,7 +161,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     }
     return (
         <>
-        <div className={`${resultsData ? "flex gap-4" : ""}`}>
+        <div className={`${reportData.length !== 0 ? "flex gap-4" : ""}`}>
             <div className="min-w-[750px]">
                 <div className="vl-panel flex flex-col gap-4 p-6">
                     <div className="flex items-center gap-2">
@@ -334,6 +342,9 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                                 {(error && !isRunning) && (
                                     <Label htmlFor='run' text={error} variant={'error'}/>
                                 )}
+                                {fullSuccess && (
+                                    <Label htmlFor='run' text="Model ran successfully!" variant={'success'}/>
+                                )}
                             </div>
                             <div className="ml-auto">
                                 <Button variant="submit" type="submit" text={isRunning ? 'Running...' : 'Run Model'} disabled={!modelFile || isRunning} />
@@ -342,11 +353,16 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
                     </form>
                 </div>
             </div>
-            {resultsData && (
+
+            {reportData.length !== 0 && (
                 <div>
-                    <PlugAndPlayReport results={resultsData.results} modelName={resultsData.modelName} fileName={resultsData.fileName} config={resultsData.config} date={resultsData.date} />
+                    <PlugAndPlayReport
+                        key={reportData[0].date}
+                        data={reportData}
+                    />
                 </div>   
             )}
+
             
         </div>
         </>

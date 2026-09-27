@@ -1,4 +1,4 @@
-import type { Annotation } from '@/types/workbench';
+import type { Annotation, PAPData } from '@/types/workbench';
 export type ApiError = {
     detail: {
         status?: 'error';
@@ -60,6 +60,7 @@ export type CaseEvidence = {
     reportComments: string | null;
     reportDateCreation: string | null;
     heatmapUrl?: string | null;
+    plugAndPlay?: PAPReport[] | []
 };
 
 export type CaseComment = {
@@ -157,3 +158,11 @@ export type ReportFindings = {
         audio_weight?: number 
     };
 };
+
+export type PAPReport = {
+    PNPModelId: number;
+    mediaId: string;
+    modelName: string;
+    modelResult: PAPData;
+    uploadDate: string;
+}

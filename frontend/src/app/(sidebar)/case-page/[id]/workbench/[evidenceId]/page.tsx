@@ -171,7 +171,7 @@ export default function WorkbenchPage() {
                     )}
 
                     {PAPModelsActive && (
-                        <PlugAndPlayModels mediaUrl={mediaUrl} mediaName={mediaName} mediaKind={mediaKind} caseId={caseId} mediaId={evidenceId} />
+                        <PlugAndPlayModels mediaUrl={mediaUrl} mediaName={mediaName} mediaKind={mediaKind} caseId={caseId} mediaId={evidenceId} plugAndPlayReport={evidence?.plugAndPlay ?? []}/>
                     )}
 
                     {reportActive && evidence?.heatmapUrl && (

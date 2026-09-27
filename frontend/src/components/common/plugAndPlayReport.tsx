@@ -1,7 +1,8 @@
 import { ClassificationResult, ModelConfig } from '@/lib/ai';
 import { getCertaintyMeta } from '@/lib/report';
-import { ShieldCheck, ShieldQuestion, ShieldAlert, ShieldX, LucideIcon, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { PAPData } from '@/types/workbench';
+import { ShieldCheck, ShieldQuestion, ShieldAlert, ShieldX, LucideIcon, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const certIcon: Record<number, LucideIcon> = {
     0: ShieldCheck,
@@ -9,9 +10,13 @@ const certIcon: Record<number, LucideIcon> = {
     2: ShieldAlert,
     3: ShieldX, //we should review these i chose them quite rushed and i think we might already be using one of them elsewhere.
 };
-export default function PlugAndPlayReport({ results, modelName, fileName, config, date }: { results: ClassificationResult, modelName: string, fileName: string, config: ModelConfig, date: string }) {
+// export default function PlugAndPlayReport({ results, modelName, fileName, config, date }: { results: ClassificationResult, modelName: string, fileName: string, config: ModelConfig, date: string
+export default function PlugAndPlayReport({ data }: { data: PAPData[] }) {
+    const [currentReportIndex, setCurrentReportIndex] = useState<number>(0);
     const [showRawConfig, setShowRawConfig] = useState(false);
-    const probability = results.aiProbability;
+    
+    const current = data[currentReportIndex];
+    const probability = current.results.aiProbability;
     const percentage = (probability * 100).toFixed(2);
     const getCertainty = () => {
         if (probability >= 0.8) {
@@ -30,20 +35,20 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
         switch (certainty) {
             case 1:
                 return {
-                    report: `The AI model ${modelName} has analyzed the file ${fileName} ` +
-                        `and determined that it is ${results.classification} with a probability of ${percentage}%. ` +
+                    report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
+                        `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
                         `The ai has low confidence in this result.`
                 };
             case 2:
                 return {
-                    report: `The AI model ${modelName} has analyzed the file ${fileName} ` +
-                        `and determined that it is ${results.classification} with a probability of ${percentage}%. ` +
+                    report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
+                        `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
                         `The ai has moderate confidence in this result.`
                 };
             case 3:
                 return {
-                    report: `The AI model ${modelName} has analyzed the file ${fileName} ` +
-                        `and determined that it is ${results.classification} with a probability of ${percentage}%. ` +
+                    report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
+                        `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
                         `The ai has high confidence in this result.`
                 };
         }
@@ -52,9 +57,32 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
     return (
         <>
            <div className='vl-panel flex flex-col gap-4 p-6'>
-                <div>
-                    <h1 className='text-lg font-semibold'>Plug and Play Report</h1>
-                    <p className='mt-3 text-sm text-(--color-text-muted)'>Created on {date}</p>
+                <div className='flex items-center justify-between'>
+                    <div>
+                        <h1 className='text-lg font-semibold'>Plug and Play Report</h1>
+                        <p className='mt-3 text-sm text-(--color-text-muted)'>Created on {current.date}</p>
+                    </div>
+                    <div className='flex flex-col items-center gap-2'>
+                        <div>
+                            <p className='text-sm text-(--color-text-muted)'>{currentReportIndex + 1} of {data.length}</p>
+                        </div>
+                        <div>
+                            <button
+                                type="button"
+                                className="text-(--color-text-muted) hover:text-(--color-text-strong) disabled:text-(--color-text-muted)"
+                                onClick={() => setCurrentReportIndex(currentReportIndex > 0 ? currentReportIndex - 1 : 0)}
+                            >
+                                <ChevronLeft size={20} />
+                            </button>
+                            <button
+                                type="button"
+                                className="text-(--color-text-muted) hover:text-(--color-text-strong) disabled:text-(--color-text-muted)"
+                                onClick={() => setCurrentReportIndex(currentReportIndex < data.length - 1 ? currentReportIndex + 1 : currentReportIndex)}
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div
@@ -82,46 +110,46 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
                     <div className='flex flex-col gap-1 mt-2'>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Activation:</p>
-                            <p className='ml-auto font-semibold text-sm'>{config.activation}</p>
+                            <p className='ml-auto font-semibold text-sm'>{current.config.activation}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Input Width:</p>
-                            <p className='ml-auto font-semibold text-sm'>{config.inputWidth}</p>
+                            <p className='ml-auto font-semibold text-sm'>{current.config.inputWidth}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Input Height:</p>
-                            <p className='ml-auto font-semibold text-sm'>{config.inputHeight}</p>
+                            <p className='ml-auto font-semibold text-sm'>{current.config.inputHeight}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>AI Class Index:</p>
-                            <p className='ml-auto font-semibold text-sm'>{config.aiClassIndex}</p>
+                            <p className='ml-auto font-semibold text-sm'>{current.config.aiClassIndex}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>AI Threshold:</p>
-                            <p className='ml-auto font-semibold text-sm'>{config.threshold}</p>
+                            <p className='ml-auto font-semibold text-sm'>{current.config.threshold}</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Mean:</p>
-                            <p className='ml-auto font-semibold text-sm'>[{config.mean.join(', ')}]</p>
+                            <p className='ml-auto font-semibold text-sm'>[{current.config.mean.join(', ')}]</p>
                         </div>
                         <div className='flex'>
                             <p className='text-(--color-text-muted)'>Std:</p>
-                            <p className='ml-auto font-semibold text-sm'>[{config.std.join(', ')}]</p>
+                            <p className='ml-auto font-semibold text-sm'>[{current.config.std.join(', ')}]</p>
                         </div>
-                        {config.mediaType === 'IMAGE' && (
+                        {current.config.mediaType === 'IMAGE' && (
                             <div className='flex'>
                                 <p className='text-(--color-text-muted)'>Media Type:</p>
                                 <p className='ml-auto font-semibold text-sm'>Image</p>
                             </div>
                         )}
-                        {config.mediaType === 'PDF' && (
+                        {current.config.mediaType === 'PDF' && (
                             <div className='flex'>
                                 <p className='text-(--color-text-muted)'>Media Type:</p>
                                 <p className='ml-auto font-semibold text-sm'>PDF</p>
                             </div>
 
                         )}
-                        {config.mediaType === 'VIDEO' && (
+                        {current.config.mediaType === 'VIDEO' && (
                             <>
                                 <div className='flex'>
                                     <p className='text-(--color-text-muted)'>Media Type:</p>
@@ -129,7 +157,7 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
                                 </div>
                                 <div className='flex'>
                                     <p className='text-(--color-text-muted)'>Video frames scanned:</p>
-                                    <p className='ml-auto font-semibold text-sm'>{config.frameCount}</p>
+                                    <p className='ml-auto font-semibold text-sm'>{current.config.frameCount}</p>
                                 </div>
                             </>
                         )}
@@ -145,7 +173,7 @@ export default function PlugAndPlayReport({ results, modelName, fileName, config
                         </button>
                         {showRawConfig && (
                             <pre className='vl-panel mt-3 text-sm p-4 bg-(--color-surface-muted)'>
-                                {JSON.stringify(config, null, 2)}
+                                {JSON.stringify(current.config, null, 2)}
                             </pre>
                         )}
                     </div>
