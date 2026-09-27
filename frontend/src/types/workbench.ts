@@ -16,7 +16,7 @@ export type AnnotationPoint = {
 };
 
 /** The tools currently planned for the workbench. More may be added later. */
-export type AnnotationTool = 'Select' | 'Draw' | 'Comment';
+export type AnnotationTool = 'Select' | 'Draw' | 'Comment' | 'Highlight';
 
 /** A freehand shape drawn on the overlay, e.g. circling a suspicious region. */
 export type ShapeAnnotation = {
@@ -25,6 +25,7 @@ export type ShapeAnnotation = {
     page: number;
     points: AnnotationPoint[];
     timeStamp?: number;
+    source?: AnnotationSource;
 };
 
 /** A text note pinned to a specific point on the media. */
@@ -35,9 +36,10 @@ export type NoteAnnotation = {
     position: AnnotationPoint;
     text: string;
     timeStamp?: number;
+    source?: AnnotationSource;
 };
 
-export type Annotation = ShapeAnnotation | NoteAnnotation;
+export type Annotation = ShapeAnnotation | NoteAnnotation | HighlightAnnotation;
 
 export type WorkbenchCanvasProps = {
     mediaUrl?: string;
@@ -50,6 +52,8 @@ export type WorkbenchCanvasProps = {
     onSelectAnnotation: (id: string | null) => void;
     onAddShape: (points: AnnotationPoint[], page: number, timeStamp?: number) => void;
     onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
+    onAddHighlight: (text: string, rects: HighlightRect[], page: number) => void;
+    onResolveHighlight: (id: string, rects: HighlightRect[]) => void;
     video?: React.RefObject<HTMLVideoElement | null>;
 };
 
@@ -74,6 +78,7 @@ export type AnnotationListProps = {
 export type WorkbenchTool = 'Plug-and-Play Models' | 'Annotations' | 'Metadata' | 'AI Report';
 
 export type WorkbenchPanelProps = {
+    mediaKind: MediaKind;
     activeTool: AnnotationTool;
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];
@@ -143,4 +148,22 @@ export type PAPModelResultsPayload = {
     caseId: string;
     mediaId: string;
     data: PAPData;
+};
+export type AnnotationSource = 'USER' | 'AI';
+
+export type HighlightRect = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+};
+
+export type HighlightAnnotation = {
+    id: string;
+    kind: 'highlight';
+    page: number;
+    text: string;
+    rects?: HighlightRect[];
+    source?: AnnotationSource;
+    timeStamp?: number;
 };

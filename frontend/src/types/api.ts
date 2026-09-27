@@ -1,5 +1,4 @@
-import { Annotation } from "./workbench";
-
+import type { Annotation } from '@/types/workbench';
 export type ApiError = {
     detail: {
         status?: 'error';
