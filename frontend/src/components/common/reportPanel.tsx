@@ -61,7 +61,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                     className="flex flex-col shrink-0 gap-3 rounded-[var(--radius-md)] border p-4"
                     style={{ borderColor: `${certaintyMeta.colorVar}40`, backgroundColor: `${certaintyMeta.colorVar}14` }}
                 >
-                    <div className="flex items-center gap-3 border-b pb-6" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
+                    <div className="flex items-center gap-3 border-b pb-5" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
                         <CertaintyIcon size={22} className="shrink-0" style={{ color: certaintyMeta.colorVar }} />
                         <div>
                             <p className="text-sm font-bold" style={{ color: certaintyMeta.colorVar }}>
@@ -72,11 +72,42 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 pt-3">
-                        <p>AI Generated Probability:</p>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold">AI Generated Probability:</p>
                         <p className="text-2xl font-bold" style={{ color: certaintyMeta.colorVar }}>
                             {findings?.ai_probability?.toFixed(2)}%
                         </p>
+                    </div>
+                    <div>
+                        {mediaKind === 'video' && (
+                            <>
+                                <div className="flex items-center justify-between gap-3 py-3 border-t" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
+                                    <p className='text-sm font-semibold text-(--color-text-muted)'>Video AI Probability:</p> 
+                                    <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
+                                        {findings?.visual?.ai_probability?.toFixed(2)}%
+                                    </p>                              
+                                    <p className='text-sm font-semibold text-(--color-text-muted)'>Audio AI Probability:</p> 
+                                    <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
+                                        {findings?.audio?.ai_probability?.toFixed(2)}%
+                                    </p>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
+                                    <p className='text-sm font-semibold text-(--color-text-muted)'>Visual weight:</p> 
+                                    <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
+                                        {findings?.fusion?.visual_weight?.toFixed(2)}%
+                                    </p>                              
+                                    <p className='text-sm font-semibold text-(--color-text-muted)'>Audio weight:</p> 
+                                    <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
+                                        {findings?.fusion?.audio_weight?.toFixed(2)}%
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="vl-panel text-sm text-(--color-text-muted) mt-3 p-3 rounded-[var(--radius-md)] border shadow-none" style={{ borderColor: `${certaintyMeta.colorVar}40`, backgroundColor: `${certaintyMeta.colorVar}14` }}>
+                                        Note: The weights indicate the relative importance of each modality in the final decision.
+                                    </p>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
                 <div>
@@ -115,7 +146,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                             </>
                         ) : (
                             <p className="text-sm text-(--color-text-subtle)">
-                                No findings available yet for this evidence.
+                                No reasons available yet for this evidence.
                             </p>
                         )}
                     </div>
@@ -124,28 +155,48 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                 {mediaKind === 'pdf' && (
                     <>
                         <div className="flex flex-col gap-2 pt-2">
-                        {findings ? (
-                            <>
-                            <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
-                                <h3 className="text-sm font-bold text-(--color-text-strong)">REASONS</h3>
-                                <div className="text-sm leading-relaxed text-(--color-text-strong)">
-                                    {sortedReasons.map((reason, index) => {
-                                        const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
-                                        return(
-                                            <div key={index} className="vl-panel mb-2 p-4 rounded-[var(--radius-md)] shadow-none"> 
-                                                <p>{simpleReason?.message}</p>
-                                            </div>
-                                        )
-                                    })}
+                            {findings ? (
+                                <>
+                                <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
+                                    <h3 className="text-sm font-bold text-(--color-text-strong)">REASONS</h3>
+                                    <div className="text-sm leading-relaxed text-(--color-text-strong)">
+                                        {sortedReasons.map((reason, index) => {
+                                            const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
+                                            return(
+                                                <div key={index} className="vl-panel mb-2 p-4 rounded-[var(--radius-md)] shadow-none"> 
+                                                    <p>{simpleReason?.message}</p>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                            </>
-                        ) : (
-                            <p className="text-sm text-(--color-text-subtle)">
-                                No findings available yet for this evidence.
-                            </p>
-                        )}
-                    </div>
+                                </>
+                            ) : (
+                                <p className="text-sm text-(--color-text-subtle)">
+                                    No reasons available yet for this evidence.
+                                </p>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {mediaKind === 'video' && (
+                    <>
+                        <div className="flex flex-col gap-2 pt-2">
+                            {findings ? (
+                                <>
+                                <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
+                                    <h3 className="text-sm font-bold text-(--color-text-strong)">REASONS</h3>
+                                    <p className="text-sm text-(--color-text-strong)">{findings.visual?.explanation}</p>
+                                </div>
+                                
+                                </>
+                            ) : (
+                                <p className="text-sm text-(--color-text-subtle)">
+                                    No reasons available yet for this evidence.
+                                </p>
+                            )}
+                        </div>
                     </>
                 )}
             </div>
