@@ -79,20 +79,29 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                         </p>
                     </div>
                 </div>
+                <div>
+                    <div className="vl-panel flex flex-col gap-1 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
+                        <h3 className="mb-1 text-sm font-bold text-(--color-text-strong)">FINDINGS</h3>
+                        <p className="text-sm text-(--color-text-strong)">
+                                {findings?.findings}
+                        </p>
+                    </div>
+                </div>
                 {mediaKind === 'image' && (
                     <div className="flex flex-col gap-2 pt-2">
                         {findings ? (
                             <>
-                                <h3 className="text-sm font-bold text-(--color-text-strong)">Findings</h3>
+                            <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
+                                <h3 className="text-sm font-bold text-(--color-text-strong)">REASONS</h3>
                                 <div className="text-sm leading-relaxed text-(--color-text-strong)">
                                     {sortedReasons.map((reason, index) => {
                                         const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
                                         return(
-                                            <div key={index} className="vl-panel mb-2 p-4 bg-(--color-surface-muted) rounded-[var(--radius-md)]">
+                                            <div key={index} className="vl-panel mb-2 p-4 rounded-[var(--radius-md)] shadow-none">
                                                 <p className="text-sm font-semibold" style={{ color: importanceMeta(simpleReason?.importance).colorVar }}>
                                                     Importance {simpleReason?.importance}
                                                 </p>
-                                                <p>{typeof reason === 'string' ? reason : reason.message}</p>
+                                                <p>{simpleReason?.message}</p>
                                                 <p className="text-sm font-semibold">
                                                     Suggests {simpleReason?.supports?.toLocaleLowerCase()}
                                                 </p>
@@ -101,6 +110,8 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                                         )
                                     })}
                                 </div>
+
+                            </div>
                             </>
                         ) : (
                             <p className="text-sm text-(--color-text-subtle)">
@@ -108,6 +119,34 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                             </p>
                         )}
                     </div>
+                )}
+
+                {mediaKind === 'pdf' && (
+                    <>
+                        <div className="flex flex-col gap-2 pt-2">
+                        {findings ? (
+                            <>
+                            <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
+                                <h3 className="text-sm font-bold text-(--color-text-strong)">REASONS</h3>
+                                <div className="text-sm leading-relaxed text-(--color-text-strong)">
+                                    {sortedReasons.map((reason, index) => {
+                                        const simpleReason = typeof reason === 'string' ? { message: reason } : reason;
+                                        return(
+                                            <div key={index} className="vl-panel mb-2 p-4 rounded-[var(--radius-md)] shadow-none"> 
+                                                <p>{simpleReason?.message}</p>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            </>
+                        ) : (
+                            <p className="text-sm text-(--color-text-subtle)">
+                                No findings available yet for this evidence.
+                            </p>
+                        )}
+                    </div>
+                    </>
                 )}
             </div>
         </>
