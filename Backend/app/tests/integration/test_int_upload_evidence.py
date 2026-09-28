@@ -9,7 +9,7 @@ from app.api.main import app
 from app.auth.auth import COOKIE_NAME, create_token
 from app.core.cases import get_object
 from app.core.env import Postgres_Settings
-from app.core.media_relay import MediaRelay
+from app.core.media_relay import media_relay
 from app.tests.integration.conftest import get_connection
 
 POSTGRES_SETTINGS = Postgres_Settings()
@@ -25,7 +25,7 @@ def stub_media_pipeline(monkeypatch):
     async def no_op(self):
         return None
 
-    monkeypatch.setattr(MediaRelay, "relay_to_service", no_op)
+    monkeypatch.setattr(media_relay, "relay_to_service", no_op)
 
 
 def cookie_for(username: str, role: str, user_id: str | None = None) -> str:

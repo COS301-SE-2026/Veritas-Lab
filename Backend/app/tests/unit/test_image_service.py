@@ -1,13 +1,13 @@
 import pytest 
-from app.core.image_service import ImageService
+from app.core.image_service import image_service
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 with patch(
-    "app.core.image_service.AIImageDetector"
+    "app.core.image_service.ai_image_detector"
 ) as mock_detector_class:
     mock_detector_class.return_value = MagicMock()
-    CONSTANT_IMAGE_SERVICE =ImageService()
+    CONSTANT_IMAGE_SERVICE =image_service()
 
 NO_CAMERA_MESSAGE="This image contains no camera metadata. It has likely been stripped by an external application or messaging platform or it is a screenshot."
 CREDENTIALS_FOUND_MESSAGE="[+] Content Credentials (C2PA) Found:"
@@ -722,10 +722,10 @@ def test_service_initialises_ai_detector() -> None:
     mock_detector = MagicMock()
 
     with patch(
-        "app.core.image_service.AIImageDetector",
+        "app.core.image_service.ai_image_detector",
         return_value=mock_detector
     ) as mock_detector_class:
-        service = ImageService()
+        service = image_service()
 
     mock_detector_class.assert_called_once_with()
     assert service.detector is mock_detector
@@ -744,10 +744,10 @@ async def test_ai_analysis_calls_detector() -> None:
     mock_detector.analyse_image.return_value = expected_result
 
     with patch(
-        "app.core.image_service.AIImageDetector",
+        "app.core.image_service.ai_image_detector",
         return_value=mock_detector
     ):
-        service = ImageService()
+        service = image_service()
 
     image_path = Path("test_image.jpg")
 
@@ -780,10 +780,10 @@ async def test_ai_analysis_returns_risk_level(risk_level: int, expected: int) ->
     }
 
     with patch(
-        "app.core.image_service.AIImageDetector",
+        "app.core.image_service.ai_image_detector",
         return_value=mock_detector
     ):
-        service = ImageService()
+        service = image_service()
 
     result = await service.ai_analysis(Path("test_image.jpg"))
 

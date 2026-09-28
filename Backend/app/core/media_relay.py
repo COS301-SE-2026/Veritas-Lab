@@ -1,6 +1,6 @@
-from app.core.image_service import ImageService
-from app.core.pdf_service import PDFService
-from app.core.video_service import VideoService
+from app.core.image_service import image_service
+from app.core.pdf_service import pdf_service
+from app.core.video_service import video_service
 from uuid import UUID
 from functools import lru_cache
 
@@ -15,17 +15,17 @@ SERVICE_TYPES = {
 @lru_cache
 def get_service(service_type: str):
     if service_type == "image":
-        return ImageService()
+        return image_service()
 
     if service_type == "pdf":
-        return PDFService()
+        return pdf_service()
 
     if service_type == "video":
-        return VideoService()
+        return video_service()
 
     raise ValueError(f"Unsupported service type: {service_type}")
 
-class MediaRelay:
+class media_relay:
     def __init__(self, media_id: UUID, extension):
         self.media_id = media_id
         self.extension = extension

@@ -1,6 +1,6 @@
 from pathlib import Path
-from app.core.media_service import MediaService, AnalysisFindings
-from app.ai.detector import AIPDFDetector
+from app.core.media_service import media_service, AnalysisFindings
+from app.ai.detector import ai_pdf_detector
 import asyncio
 from typing import Any
 from uuid import uuid4
@@ -10,10 +10,10 @@ PDF_METADATA_PRODUCER="PDF:Producer"
 PDF_METADATA_CREATOR="PDF:Creator"
 PDF_METADATA_CREATORTOOL="XMP:CreatorTool"
 
-class PDFService(MediaService):
+class pdf_service(media_service):
     def __init__(self):
         super().__init__()
-        self.ai_detector = AIPDFDetector()
+        self.ai_detector = ai_pdf_detector()
 
     def is_stripped(self,metadata:dict) -> bool:
         essential_keys = [

@@ -1,6 +1,6 @@
 from pathlib import Path
-from app.core.media_service import MediaService, AnalysisFindings
-from app.ai.detector import AIVideoDetector
+from app.core.media_service import media_service, AnalysisFindings
+from app.ai.detector import ai_video_detector
 from typing import Any
 from uuid import uuid4
 
@@ -26,10 +26,10 @@ def zone_to_points(zone_index: int, zones_per_dim: int = 2):
         {"x": left, "y": top}
     ]
 
-class VideoService(MediaService):
+class video_service(media_service):
     def __init__(self) -> None:
         super().__init__()
-        self.ai_detector = AIVideoDetector()
+        self.ai_detector = ai_video_detector()
 
     async def ai_analysis(self, path: str | Path) -> dict:
         return await self.ai_detector.analyse_video(path)
