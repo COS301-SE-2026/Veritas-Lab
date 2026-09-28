@@ -130,7 +130,7 @@ def test_get_case_audit_events_db_error(monkeypatch):
     response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 500
-    data = response.json() == {
+    assert response.json() == {
         "detail": {
             "status": "error",
             "message": cases_router.DATABASE_ERROR_MESSAGE
