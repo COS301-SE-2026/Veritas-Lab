@@ -31,7 +31,7 @@ const baseProps = {
     mediaKind: 'image' as const,
     mediaName: 'EvidenceA',
     certainty: 1,
-    findings: 'Some findings text',
+    findings: { risk_level: 1, findings: 'Some findings text' },
 };
 //alot of these tests are similar to existing workbench tests but need to be repeated for this component
 describe('ReportModal', () => {
@@ -105,7 +105,7 @@ describe('ReportModal', () => {
     });
 
     it('renders findings text when provided', () => {
-        render(<ReportModal {...baseProps} findings="Detected manipulation in metadata" />);
+        render(<ReportModal {...baseProps} findings={{ risk_level: 2, findings: 'Detected manipulation in metadata' }} />);
         expect(screen.getByText('Detected manipulation in metadata')).toBeInTheDocument();
     });
 

@@ -2,18 +2,20 @@ import { render, screen } from '@testing-library/react';
 import Dashboard from '../../../src/app/(sidebar)/dashboard/page';
 import useCaseDashboard from '../../../src/lib/hooks/useCaseDashboard';
 import { useUserRole } from '../../../src/context/UserRoleContext'; //use actual context to prevent further issues with permissions based changes
-
+import type { DashboardCase } from '../../../src/types/api';
 jest.mock('../../../src/lib/hooks/useCaseDashboard');
 jest.mock('../../../src/context/UserRoleContext');
 const mockUseCaseDashboard = useCaseDashboard as jest.MockedFunction<typeof useCaseDashboard>;
 const mockUseUserRole = useUserRole as jest.MockedFunction<typeof useUserRole>; //fix for permission error
 
-const visibleCases = [
+const visibleCases: DashboardCase[] = [
         {
             caseId: '4f2f5e15-2f2b-4d18-9c5b-8b7b7cbe1b7d',
             caseReviews: { stage: 'intake' },
             caseName: 'Alpha Fraud',
             caseCreator: 'investigator.adams',
+            caseState: 'OPEN',
+            caseAssigned: null,
             caseClosed: false,
             caseCreationDate: '2026-05-01T09:00:00.000Z',
         },
