@@ -29,10 +29,10 @@ test('a new user can register, log out, log back in and change their password', 
     const auth = authPage(page);
     const ui = shell(page);
     await auth.gotoRegister();
-    await auth.username().fill(username);
-    await auth.workEmail().fill(email);
-    await auth.password().fill(password);
-    await auth.confirmPassword().fill(password);
+    await auth.username().pressSequentially(username);
+    await auth.workEmail().pressSequentially(email);
+    await auth.password().pressSequentially(password);
+    await auth.confirmPassword().pressSequentially(password);
     const [registerResponse] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/register') && r.request().method() === 'POST'),
         auth.createAccount().click(),
@@ -46,8 +46,8 @@ test('a new user can register, log out, log back in and change their password', 
     await expect(ui.navLink('Help')).toBeVisible();
     await ui.logOut().click();
     await expect(page).toHaveURL(/\/login$/);
-    await auth.email().fill(email);
-    await auth.password().fill(password);
+    await auth.email().pressSequentially(email);
+    await auth.password().pressSequentially(password);
     const [loginResponse] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/login') && r.request().method() === 'POST'),
         auth.login().click(),
@@ -55,9 +55,9 @@ test('a new user can register, log out, log back in and change their password', 
     expect(loginResponse.status()).toBe(200);
     await expect(page).toHaveURL(/\/dashboard$/);
     await ui.settings().click();
-    await ui.currentPassword().fill(password);
-    await ui.newPassword().fill(newPassword);
-    await ui.confirmNewPassword().fill(newPassword);
+    await ui.currentPassword().pressSequentially(password);
+    await ui.newPassword().pressSequentially(newPassword);
+    await ui.confirmNewPassword().pressSequentially(newPassword);
     const [changeResponse] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/changePassword') && r.request().method() === 'POST'),
         ui.savePassword().click(),
@@ -67,16 +67,16 @@ test('a new user can register, log out, log back in and change their password', 
     await ui.logOut().click();
     await expect(page).toHaveURL(/\/login$/);
     //the old password must no longer work
-    await auth.email().fill(email);
-    await auth.password().fill(password);
+    await auth.email().pressSequentially(email);
+    await auth.password().pressSequentially(password);
     const [rejected] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/login') && r.request().method() === 'POST'),
         auth.login().click(),
     ]);
     expect(rejected.status()).not.toBe(200);
     await expect(page).toHaveURL(/\/login$/);
-    await auth.email().fill(email);
-    await auth.password().fill(newPassword);
+    await auth.email().pressSequentially(email);
+    await auth.password().pressSequentially(newPassword);
     const [accepted] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/login') && r.request().method() === 'POST'),
         auth.login().click(),
@@ -89,10 +89,10 @@ test('registration rejects a mismatched confirmation', async ({ page }) => {
     const uniqueId = randomUUID().replace(/-/g, '').slice(0, 8);
     const auth = authPage(page);
     await auth.gotoRegister();
-    await auth.username().fill(`mismatch${uniqueId}`);
-    await auth.workEmail().fill(`mismatch.${uniqueId}@veritaslab.test`);
-    await auth.password().fill('StrongPass123!');
-    await auth.confirmPassword().fill('DifferentPass123!');
+    await auth.username().pressSequentially(`mismatch${uniqueId}`);
+    await auth.workEmail().pressSequentially(`mismatch.${uniqueId}@veritaslab.test`);
+    await auth.password().pressSequentially('StrongPass123!');
+    await auth.confirmPassword().pressSequentially('DifferentPass123!');
     await auth.createAccount().click();
     await expect(page).toHaveURL(/\/register$/);
 });
@@ -100,8 +100,8 @@ test('registration rejects a mismatched confirmation', async ({ page }) => {
 test('login rejects bad credentials', async ({ page }) => {
     const auth = authPage(page);
     await auth.gotoLogin();
-    await auth.email().fill(`nobody.${randomUUID().slice(0, 8)}@veritaslab.test`);
-    await auth.password().fill('WrongPassword123!');
+    await auth.email().pressSequentially(`nobody.${randomUUID().slice(0, 8)}@veritaslab.test`);
+    await auth.password().pressSequentially('WrongPassword123!');
     const [response] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/login') && r.request().method() === 'POST'),
         auth.login().click(),

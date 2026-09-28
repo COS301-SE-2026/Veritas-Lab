@@ -2,6 +2,7 @@ import { expect, request, type APIRequestContext } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import { storageStateFor, type Role } from './roles';
+import { randomUUID } from 'crypto';
 //these are all basically going to be helper functions to be called.
 const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 export async function apiAs(role: Role): Promise<APIRequestContext> {
@@ -17,10 +18,14 @@ export async function createCase(api: APIRequestContext, title: string, descript
 //upload evidence then wait to ensure that its there (ensure no race conditions)
 export async function uploadEvidence(api: APIRequestContext, caseId: string): Promise<string> {
     const filePath = path.join(process.cwd(), 'e2e', 'image', 'test.png');
+    const unique = Buffer.concat([
+        fs.readFileSync(filePath),
+        Buffer.from(randomUUID()),
+    ]);
     const response = await api.post('/api/cases/evidence', {
         multipart: {
             case_id: caseId,
-            media: { name: 'test.png', mimeType: 'image/png', buffer: fs.readFileSync(filePath) },
+            media: { name: 'test.png', mimeType: 'image/png', buffer: unique },
         },
     });
     expect([200, 201], 'uploadEvidence').toContain(response.status());
