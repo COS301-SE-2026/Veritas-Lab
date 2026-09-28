@@ -731,7 +731,7 @@ class Case:
         row = await connection.fetchrow(
             """
             WITH case_check AS (
-                SELECT caseid, casestate
+                SELECT caseid, CaseAssigned
                 FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
             ),
@@ -740,9 +740,8 @@ class Case:
                 SELECT $1, $2, $3
                 FROM case_check
                 WHERE (
-                    $4 = 'ADMIN'
-                    OR ($4 = 'USER' AND casestate = 'CLOSED')
-                    OR ($4 = 'INVESTIGATOR')
+                    ($4 = 'USER' AND CaseAssigned = $2)
+                    OR ($4 <>'USER')
                 )
                 RETURNING commentid, caseid, username, comment, commenttimestamp
             )
@@ -779,7 +778,7 @@ class Case:
                     status_code=403, 
                     detail={
                         "status":"error",
-                        "message":"Users may only comment on closed cases"
+                        "message":"Users may only comment on cases they created"
                     }
                 )
             raise HTTPException(
