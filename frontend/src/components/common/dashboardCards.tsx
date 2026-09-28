@@ -3,8 +3,8 @@ import type { DashboardCardsProps } from '@/types/components';
 
 export default function DashboardCards({ cases = [] }: DashboardCardsProps) {
     const total = cases.length;
-    const openCount = cases.filter(c => !c.caseClosed).length;
-    const closedAllTime = cases.filter(c => c.caseClosed).length;
+    const openCount = cases.filter(c => (c.caseState === "OPEN" || c.caseState === "PUBLISHED")).length;
+    const closedAllTime = cases.filter(c => c.caseState === "CLOSED").length;
 
     const stats = [
         { label: 'Total Cases', hint: 'All time', value: total, Icon: Folders, tint: 'bg-(--color-b-50) text-(--color-b-600) ring-[color-mix(in_srgb,var(--b-500)_30%,transparent)]' },
