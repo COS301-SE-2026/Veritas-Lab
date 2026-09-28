@@ -727,11 +727,11 @@ class Case:
             )
         
         await set_audit_executor(connection, executor_id)
-
+ 
         row = await connection.fetchrow(
             """
             WITH case_check AS (
-                SELECT caseid, CaseAssigned
+                SELECT caseid, casecreator
                 FROM "Cases_DB"."Cases"
                 WHERE caseid = $1
             ),
@@ -740,8 +740,8 @@ class Case:
                 SELECT $1, $2, $3
                 FROM case_check
                 WHERE (
-                    ($4 = 'USER' AND CaseAssigned = $2)
-                    OR ($4 <>'USER')
+                    ($4 = 'USER' AND casecreator::text = $2::text)
+                    OR ($4 <> 'USER')
                 )
                 RETURNING commentid, caseid, username, comment, commenttimestamp
             )
@@ -761,33 +761,33 @@ class Case:
             comment.strip(),
             role,
         )
-
+ 
         if row is None or not row["case_exists"]:
             raise HTTPException(
                 status_code=404, 
                 detail={
-                    "status":"error",
-                    "message":CASE_NOT_FOUND
+                    "status": "error",
+                    "message": CASE_NOT_FOUND
                 }
             )
-
+ 
         if not row["comment_inserted"]:
             if role == "USER":
                 raise HTTPException(
                     status_code=403, 
                     detail={
-                        "status":"error",
-                        "message":"Users may only comment on cases they created"
+                        "status": "error",
+                        "message": "Users may only comment on cases they created"
                     }
                 )
             raise HTTPException(
                 status_code=403, 
                 detail={
-                    "status":"error",
-                    "message":"Permission denied"
+                    "status": "error",
+                    "message": "Permission denied"
                 }
             )
-
+ 
         return {
             "commentId": row["commentid"],
             "caseId": str(row["caseid"]),
