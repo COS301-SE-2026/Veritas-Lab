@@ -10,7 +10,7 @@ PDF_METADATA_PRODUCER="PDF:Producer"
 PDF_METADATA_CREATOR="PDF:Creator"
 PDF_METADATA_CREATORTOOL="XMP:CreatorTool"
 
-class PDFService(MediaService):
+class pdf_service(MediaService):
     def __init__(self):
         super().__init__()
         self.ai_detector = AIPDFDetector()

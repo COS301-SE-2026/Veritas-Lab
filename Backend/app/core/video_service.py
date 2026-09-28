@@ -26,7 +26,7 @@ def zone_to_points(zone_index: int, zones_per_dim: int = 2):
         {"x": left, "y": top}
     ]
 
-class VideoService(MediaService):
+class video_service(MediaService):
     def __init__(self) -> None:
         super().__init__()
         self.ai_detector = AIVideoDetector()

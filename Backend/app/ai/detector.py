@@ -12,7 +12,7 @@ import asyncio
 MODEL_PATH = Path("app/ai/best_model.pth")
 PDF_MODEL_PATH = Path("app/ai/pdf_detector.pt")
 
-class AIImageDetector:
+class ai_image_detector:
     def __init__(self) -> None:
         self.device = torch.device(
             "cuda"
@@ -61,7 +61,7 @@ class AIImageDetector:
     def heatmap_to_annotation(self, heatmap: np.ndarray, threshold: float = 0.6):
         return image_automated_annotation(heatmap=heatmap, threshold=threshold)
 
-class AIPDFDetector:
+class ai_pdf_detector:
     def __init__(self) -> None:
         self.model_path = PDF_MODEL_PATH
         load_detector(str(self.model_path))
@@ -83,7 +83,7 @@ class AIPDFDetector:
         result["risk_level"] = risk_level
         return result
 
-class AIVideoDetector:
+class ai_video_detector:
     def __init__(self) -> None:
         self.model = video_combined_analysis()
 

@@ -1,16 +1,16 @@
 from pathlib import Path
-from app.core.media_service import MediaService, AnalysisFindings
-from app.ai.detector import AIImageDetector
+from app.core.media_service import media_service, AnalysisFindings
+from app.ai.detector import ai_image_detector
 from starlette.concurrency import run_in_threadpool
 from typing import Any
 
 FRAUD_MESSAGE="Lacks camera data therefore highly suspicious as it is stripped and contains editing or is generated/created by software"
 
-class ImageService(MediaService):
+class image_service(media_service):
 
     def __init__(self) -> None:
         super().__init__()
-        self.detector = AIImageDetector()
+        self.detector = ai_image_detector()
     
     def is_stripped(self, metadata: dict) -> bool:
         return not any(k.startswith(("EXIF:Model", "EXIF:DateTimeOriginal")) for k in metadata.keys())
