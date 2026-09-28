@@ -20,6 +20,7 @@ export default function CaseCommentsPanel({ caseId, initialComments, currentUser
         setDraft,
         error,
         isSubmitting,
+        isLoading,
         submitComment,
         updateComment,
         removeComment,
@@ -54,7 +55,7 @@ export default function CaseCommentsPanel({ caseId, initialComments, currentUser
                         ))
                     ) : (
                         <div className="flex h-full items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) text-sm text-(--color-text-muted)">
-                            No comments yet. Start the conversation below.
+                            {isLoading ? 'Loading comments...' : 'No comments yet. Start the conversation below.'}
                         </div>
                     )}
                 </div>
