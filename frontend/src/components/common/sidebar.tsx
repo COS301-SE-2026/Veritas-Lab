@@ -45,9 +45,9 @@ export default function Sidebar() {
             className={`relative z-0 flex flex-col h-screen sticky top-0 bg-gradient-to-b from-[#26221f] via-(--color-primary) to-[#1b1817] text-white transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`}
         >
             <div className="absolute -z-20 inset-0 overflow-y-clip">
-                <div className="absolute -right-70 -top-50 h-96 w-96 -z-20 rounded-full bg-[var(--color-secondary)] opacity-10 blur-3xl" />
-                <div className="absolute right-40 bottom-90 h-96 w-96 -z-20 rounded-full bg-[var(--color-secondary)] opacity-10 blur-3xl" />
-                <div className="absolute -bottom-32 -left-16 h-80 w-80 -z-20 rounded-full bg-[var(--color-secondary)] opacity-10 blur-3xl" />
+                <div className="absolute -right-70 -top-50 h-96 w-96 -z-20 rounded-full bg-[var(--color-secondary)] opacity-15 blur-3xl" />
+                <div className="absolute right-40 bottom-90 h-96 w-96 -z-20 rounded-full bg-[var(--color-secondary)] opacity-15 blur-3xl" />
+                <div className="absolute -bottom-32 -left-16 h-80 w-80 -z-20 rounded-full bg-[var(--color-secondary)] opacity-15 blur-3xl" />
             </div>
             <header className="flex items-center justify-between px-4 py-5">
                 {!collapsed && (
