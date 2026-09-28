@@ -18,40 +18,39 @@ export default function PlugAndPlayReport({ data }: { data: PAPData[] }) {
     const current = data[currentReportIndex];
     const probability = current.results.aiProbability;
     const percentage = (probability * 100).toFixed(2);
+    const threshold = current.config.threshold;
+    const flagged = probability >= threshold;
+    
+    let margin;
+    if (margin) {
+        margin = (threshold >= 1 ? 1 : (probability - threshold) / (1 - threshold));
+    } else {
+        margin = (threshold <= 0 ? 1 : (threshold - probability) / threshold);
+    }
+
     const getCertainty = () => {
-        if (probability >= 0.8) {
-            return 3
-        } else if (probability >= 0.6) {
-            return 2;
-        } else {
+        if (!flagged) {
             return 1;
+        } else {
+            return (margin >= 0.5) ? 3 : 2;
         }
+    }
+
+    const getConfidenceLabel = () => {
+        if (margin >= 0.66) return "high"
+        if (margin >= 0.33) return "moderate"
+        return "low"
     }
     const certainty = getCertainty();
     const certaintyMeta = getCertaintyMeta(certainty);
-    const CertaintyIcon = certainty !== null ? (certIcon[certainty] ?? ShieldQuestion) : ShieldQuestion;
+    const CertaintyIcon = certIcon[certainty] || ShieldQuestion;
 
     function getFindings() {
-        switch (certainty) {
-            case 1:
-                return {
-                    report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
-                        `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
-                        `The ai has low confidence in this result.`
-                };
-            case 2:
-                return {
-                    report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
-                        `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
-                        `The ai has moderate confidence in this result.`
-                };
-            case 3:
-                return {
-                    report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
-                        `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
-                        `The ai has high confidence in this result.`
-                };
-        }
+        return {
+            report: `The AI model ${current.modelName} has analyzed the file ${current.fileName} ` +
+                `and determined that it is ${current.results.classification} with a probability of ${percentage}%. ` +
+                `The ai has ${getConfidenceLabel()} confidence in this result.`
+        };
     }
 
     return (
@@ -86,26 +85,34 @@ export default function PlugAndPlayReport({ data }: { data: PAPData[] }) {
                 </div>
 
                 <div
-                    className="flex shrink-0 items-center gap-3 rounded-[var(--radius-md)] border p-4"
+                    className="flex flex-col shrink-0 gap-3 rounded-[var(--radius-md)] border p-4"
                     style={{ borderColor: `${certaintyMeta.colorVar}40`, backgroundColor: `${certaintyMeta.colorVar}14` }}
                 >
-                    <CertaintyIcon size={22} className="shrink-0" style={{ color: certaintyMeta.colorVar }} />
-                    <div>
-                        <p className="text-sm font-bold" style={{ color: certaintyMeta.colorVar }}>
-                            {certaintyMeta.label}
-                        </p>
-                        <p className="text-sm text-(--color-text-strong)">
-                            {certaintyMeta.description}
+                    <div className="flex items-center gap-3 border-b pb-5" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
+                        <CertaintyIcon size={22} className="shrink-0" style={{ color: certaintyMeta.colorVar }} />
+                        <div>
+                            <p className="text-sm font-bold" style={{ color: certaintyMeta.colorVar }}>
+                                {certaintyMeta.label}
+                            </p>
+                            <p className="text-sm text-(--color-text-strong)">
+                                {certaintyMeta.description}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold">AI Generated Probability:</p>
+                        <p className="text-2xl font-bold" style={{ color: certaintyMeta.colorVar }}>
+                            {percentage}%
                         </p>
                     </div>
                 </div>
 
-                <div>
+                <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
                     <h2 className='text-md font-semibold'>Findings</h2>
                     <p className='text-sm text-muted-foreground'>{getFindings().report}</p>
                 </div>
 
-                <div>
+                <div className="vl-panel flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 shadow-none bg-(--color-surface-muted)">
                     <h2 className='text-md font-semibold'>Model Configuration</h2>
                     <div className='flex flex-col gap-1 mt-2'>
                         <div className='flex'>
@@ -172,7 +179,7 @@ export default function PlugAndPlayReport({ data }: { data: PAPData[] }) {
                                 <ChevronDown size={16} className={`inline-block ml-2 transition-transform ${showRawConfig ? 'rotate-180' : ''}`} />
                         </button>
                         {showRawConfig && (
-                            <pre className='vl-panel mt-3 text-sm p-4 bg-(--color-surface-muted)'>
+                            <pre className='vl-panel mt-3 text-sm p-4 bg-(--color-surface-muted) rounded-[var(--radius-md)] shadow-none'>
                                 {JSON.stringify(current.config, null, 2)}
                             </pre>
                         )}

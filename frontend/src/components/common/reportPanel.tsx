@@ -37,6 +37,11 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
     if (mediaKind === 'image') {
 
     }
+
+    const getPercentage = (value: number | undefined) => {
+        if (value === undefined) return 'N/A';
+        return `${(value * 100).toFixed(2)}`;
+    }
     return (
         <>
             <div className={`${onClose ? '' : 'vl-panel max-w-xl'} flex flex-col gap-4 p-6`}>
@@ -75,7 +80,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                     <div className="flex items-center justify-between gap-3">
                         <p className="font-semibold">AI Generated Probability:</p>
                         <p className="text-2xl font-bold" style={{ color: certaintyMeta.colorVar }}>
-                            {findings?.ai_probability?.toFixed(2)}%
+                            {mediaKind === 'image' ? findings?.ai_probability?.toFixed(2) : getPercentage(findings?.ai_probability)}%
                         </p>
                     </div>
                     <div>
@@ -84,21 +89,21 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
                                 <div className="flex items-center justify-between gap-3 py-3 border-t" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
                                     <p className='text-sm font-semibold text-(--color-text-muted)'>Video AI Probability:</p> 
                                     <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
-                                        {findings?.visual?.ai_probability?.toFixed(2)}%
+                                        {getPercentage(findings?.visual?.ai_probability)}%
                                     </p>                              
                                     <p className='text-sm font-semibold text-(--color-text-muted)'>Audio AI Probability:</p> 
                                     <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
-                                        {findings?.audio?.ai_probability?.toFixed(2)}%
+                                        {getPercentage(findings?.audio?.ai_probability)}%
                                     </p>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: `${certaintyMeta.colorVar}40` }}>
                                     <p className='text-sm font-semibold text-(--color-text-muted)'>Visual weight:</p> 
-                                    <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
-                                        {findings?.fusion?.visual_weight?.toFixed(2)}%
-                                    </p>                              
+                                    <p className="text-lg font-bold ml-5" style={{ color: certaintyMeta.colorVar }}>
+                                        {getPercentage(findings?.fusion?.visual_weight)}%
+                                    </p>
                                     <p className='text-sm font-semibold text-(--color-text-muted)'>Audio weight:</p> 
                                     <p className="text-lg font-bold" style={{ color: certaintyMeta.colorVar }}>
-                                        {findings?.fusion?.audio_weight?.toFixed(2)}%
+                                        {getPercentage(findings?.fusion?.audio_weight)}%
                                     </p>
                                 </div>
                                 <div>

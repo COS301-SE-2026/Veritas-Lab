@@ -162,7 +162,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     return (
         <>
         <div className={`${reportData.length !== 0 ? "flex gap-4" : ""}`}>
-            <div className="min-w-[750px]">
+            <div className="min-w-[600px]">
                 <div className="vl-panel flex flex-col gap-4 p-6">
                     <div className="flex items-center gap-2">
                         <BrainCircuit size={24} />
