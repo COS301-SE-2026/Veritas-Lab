@@ -220,7 +220,7 @@ async def test_timeline_requires_authentication(client, audit_context):
 @pytest.mark.asyncio
 async def test_get_all_audited_cases(client, audit_context):
     ctx = audit_context
-    await seed_case(ctx)
+    case_id = await seed_case(ctx)
 
     client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
     assert client.get("/api/getAllAudit").status_code == 403
@@ -233,8 +233,12 @@ async def test_get_all_audited_cases(client, audit_context):
     body = response.json()
     assert body["status"] == "success"
     assert set(body["cases"][0]) == {
-        "caseId", "caseName", "eventCount", "lastEventTimestamp", "caseExists"
+        "caseId", "caseName", "eventCount", "lastEventTimestamp", "caseExists", "events"
     }
+
+    seeded_case = next(c for c in body["cases"] if c["caseId"] == case_id)
+    seeded_actions = [event["action"] for event in reversed(seeded_case["events"])]
+    assert "Case Created" in seeded_actions
 
 
 @pytest.mark.asyncio
