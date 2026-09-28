@@ -53,7 +53,7 @@ const baseCases = [caseAlpha, caseBeta, caseGamma];
 const getCaseTitle = (title: string) => screen.getByText(title, { selector: 'div' });
 const findCaseTitle = (title: string) => screen.findByText(title, { selector: 'div' });
 const queryCaseTitle = (title: string) => screen.queryByText(title, { selector: 'div' });
-const getCardContainer = (title: string) => getCaseTitle(title).closest('a')!.parentElement as HTMLElement;
+const getCardContainer = (title: string) => getCaseTitle(title).closest('div.relative') as HTMLElement;
 //tests to come:
 describe('Dashboard (integration)', () => {
     const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
@@ -136,7 +136,7 @@ describe('Dashboard (integration)', () => {
         await findCaseTitle('Alpha Fraud');
         expect(within(getCardContainer('Alpha Fraud')).getByRole('button')).toBeInTheDocument();
         expect(within(getCardContainer('Gamma Report')).getByRole('button')).toBeInTheDocument();
-        expect(within(getCardContainer('Beta Review')).getByRole('button')).toBeInTheDocument();
+        expect(within(getCardContainer('Beta Review')).queryByRole('button')).not.toBeInTheDocument();
     });
     it('does not let a normal user delete any case', async () => {
         mockUseUserRole.mockReturnValue('USER');

@@ -38,9 +38,9 @@ describe('AuditLogCaseCard', () => {
     it('renders case ID and events in open state', () => {
         render(<AuditLogCaseCard caseLog={mockedCase} />);
         fireEvent.click(screen.getByRole('button'));
-        expect(screen.getByText('CaseId')).toBeInTheDocument();
+        expect(screen.getByText('CaseId:')).toBeInTheDocument();
         expect(screen.getByText('case-1')).toBeInTheDocument();
-        expect(screen.getByText('Events Count:')).toBeInTheDocument();
+        expect(screen.getByText('Event Count:')).toBeInTheDocument();
         expect(screen.getByText('1')).toBeInTheDocument();
         expect(screen.getByText('Last Event:')).toBeInTheDocument();
         expect(screen.getAllByText(new Date(mockedCase.lastEventTimestamp).toLocaleString()).length).toBeGreaterThan(0);

@@ -185,6 +185,7 @@ describe('CasePage (integration)', () => {
             case: {
                 ...baseCase.case,
                 caseState: 'PUBLISHED',
+                caseAssigned: 'admin.user',
             },
         } as Awaited<ReturnType<typeof fetchCase>>);
 
@@ -193,7 +194,7 @@ describe('CasePage (integration)', () => {
         expect(screen.getByRole('button', { name: 'Edit Case' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Upload Evidence' })).not.toBeInTheDocument();
-        expect(within(screen.getByText('Screenshot.png').closest('div.relative')!).getByRole('button')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete evidence' })).toBeInTheDocument();
     });
 
     //reviewed for new permissions
@@ -206,6 +207,7 @@ describe('CasePage (integration)', () => {
             case: {
                 ...baseCase.case,
                 caseState: 'PUBLISHED',
+                caseAssigned: 'someone.else',
             },
         } as Awaited<ReturnType<typeof fetchCase>>);
 
@@ -243,6 +245,7 @@ describe('CasePage (integration)', () => {
             case: {
                 ...baseCase.case,
                 caseState: 'PUBLISHED',
+                caseAssigned: 'investigator.one',
             },
         } as Awaited<ReturnType<typeof fetchCase>>);
 
