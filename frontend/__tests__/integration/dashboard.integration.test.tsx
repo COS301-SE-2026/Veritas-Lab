@@ -24,6 +24,8 @@ const caseAlpha: DashboardCase = {
     caseReviews: null,
     caseName: 'Alpha Fraud',
     caseCreator: 'investigator.one',
+    caseState: 'OPEN',
+    caseAssigned: null,
     caseClosed: false,
     caseCreationDate: '2026-05-01T09:00:00.000Z',
 };
@@ -32,6 +34,8 @@ const caseBeta: DashboardCase = {
     caseReviews: null,
     caseName: 'Beta Review',
     caseCreator: 'investigator.two',
+    caseState: 'CLOSED',
+    caseAssigned: null,
     caseClosed: true,
     caseCreationDate: '2026-04-01T09:00:00.000Z',
 };
@@ -40,6 +44,8 @@ const caseGamma: DashboardCase = {
     caseReviews: null,
     caseName: 'Gamma Report',
     caseCreator: 'investigator.one',
+    caseState: 'OPEN',
+    caseAssigned: null,
     caseClosed: false,
     caseCreationDate: '2026-03-01T09:00:00.000Z',
 };
@@ -157,6 +163,8 @@ describe('Dashboard (integration)', () => {
                 caseReviews: null,
                 caseName: 'Delta Investigation',
                 caseCreator: 'investigator.one',
+                caseState: 'OPEN',
+                caseAssigned: null,
                 caseClosed: false,
                 caseCreationDate: '2026-06-01T09:00:00.000Z',
             },
