@@ -39,12 +39,11 @@ export const dashboardPage = (page: Page) => ({
     caseTitle: () => page.getByLabel('Case Title'),
     caseDescription: () => page.getByLabel('Case Description'),
     submitNewCase: () => page.getByRole('button', { name: 'Create Case', exact: true }),
-    /** The wrapper that holds one case card plus its action buttons. */
     card: (title: string) => page.locator('div.relative').filter({ hasText: title }).first(),
     assignToMe: (title: string) => dashboardPage(page).card(title).getByRole('button', { name: 'Assign to me' }),
     unassign: (title: string) => dashboardPage(page).card(title).getByRole('button', { name: 'Unassign' }),
     deleteCase: (title: string) => dashboardPage(page).card(title).getByRole('button', { name: 'Delete case' }),
-    confirm: (name: string) => page.getByRole('button', { name, exact: true }),
+    confirm: (name: string) => page.getByRole('dialog').getByRole('button', { name, exact: true }),
 });
 
 export const casePage = (page: Page) => ({
@@ -64,14 +63,14 @@ export const casePage = (page: Page) => ({
     commentComposer: () => page.getByPlaceholder('Write your comment here'),
     sendComment: () => page.getByRole('button', { name: /Send Comment/ }),
     readOnlyCommentNotice: () => page.getByText(/You can read the comments on this case/),
-    // Edit modal
+    //edit modal
     editTitle: () => page.getByLabel('Case Title'),
     editDescription: () => page.getByLabel('Case Description'),
     saveChanges: () => page.getByRole('button', { name: 'Save Changes', exact: true }),
-    // Upload modal
+    //upload modal
     fileInput: () => page.locator('#file'),
     uploadMedia: () => page.getByRole('button', { name: 'Upload Media', exact: true }),
-    confirm: (name: string) => page.getByRole('button', { name, exact: true }),
+    confirm: (name: string) => page.getByRole('dialog').getByRole('button', { name, exact: true }),
 });
 
 export const workbenchPage = (page: Page) => ({
