@@ -99,13 +99,8 @@ export type AuditEvents = {
     action: string;
 }
 
-// export type AuditLogResponse = {
-//     auditLogs: AuditTimelineResponse[];
-// }
-
 export type AuditLogResponse = {
-    status: string;
-    cases: AuditLogCase[];
+    auditLogs: AuditTimelineResponse[];
 }
 
 export type AuditLogCase = {
