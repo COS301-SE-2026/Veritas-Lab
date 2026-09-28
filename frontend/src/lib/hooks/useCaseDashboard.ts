@@ -90,7 +90,7 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     const filtered = cases.filter((item) => {
-        const caseStatus: CaseStatus = item.caseClosed ? 'Closed' : 'Open';
+        const caseStatus: CaseStatus = item.caseState === 'CLOSED' ? 'Closed' : 'Open';
         const matchesStatus = statusFilter === 'All' || caseStatus === statusFilter;
 
         if (!matchesStatus) {

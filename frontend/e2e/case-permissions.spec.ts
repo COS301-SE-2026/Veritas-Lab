@@ -25,11 +25,10 @@ type Scenario = {
     assignTo?: Exclude<Role, 'USER'>;
     expected: Expected;
 };
-
 const OWNER_SECTIONS: CaseSection[] = ['Evidence', 'Comments'];
 const ALL_SECTIONS: CaseSection[] = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'];
-
 const scenarios: Scenario[] = [
+    //specific permission and roles that need to be tested
     {
         name: 'owner of an open case',
         viewer: 'USER', owner: 'USER', state: 'OPEN',
@@ -124,7 +123,7 @@ async function expectVisibility(locator: Locator, shown: boolean, label: string)
 for (const scenario of scenarios) {
     test.describe(scenario.name, () => {
         test.use({ storageState: storageStateFor(scenario.viewer) });
-
+        //permissions based buttons and controls
         test('shows exactly the controls the role allows', async ({ page }) => {
             const seeded = await seedCase({
                 owner: scenario.owner,
@@ -137,7 +136,6 @@ for (const scenario of scenarios) {
                 const nav = shell(page);
                 await ui.goto(seeded.caseId);
                 await expect(ui.title(seeded.title)).toBeVisible();
-
                 const { expected } = scenario;
                 await expectVisibility(ui.editCase(), expected.editCase, 'Edit Case');
                 await expectVisibility(ui.uploadEvidence(), expected.uploadEvidence, 'Upload Evidence');
@@ -146,8 +144,7 @@ for (const scenario of scenarios) {
                 await expectVisibility(ui.deleteEvidence(), expected.deleteEvidence, 'Delete evidence');
                 await expectVisibility(ui.viewReport(), expected.viewReport, 'View report');
                 await expectVisibility(ui.evidenceLink(), expected.workbenchLink, 'Workbench link');
-
-                // The sidebar is the only case navigation now, so it carries the rules too.
+                //the sidebar is the only case navigation now, so it carries the rules too.
                 for (const section of CASE_SECTIONS) {
                     await expectVisibility(
                         nav.caseSection(section),
@@ -172,7 +169,6 @@ for (const scenario of scenarios) {
                 const ui = casePage(page);
                 await ui.goto(seeded.caseId, 'Comments');
                 await expect(page.getByRole('heading', { name: 'Comments' })).toBeVisible();
-
                 if (scenario.expected.canComment) {
                     await expect(ui.commentComposer()).toBeVisible();
                 } else {
@@ -186,7 +182,6 @@ for (const scenario of scenarios) {
 
         test('a hidden section falls back to Evidence when typed into the URL', async ({ page }) => {
             test.skip(scenario.expected.sections.length === CASE_SECTIONS.length, 'every section is permitted here');
-
             const seeded = await seedCase({
                 owner: scenario.owner,
                 state: scenario.state,
@@ -203,11 +198,10 @@ for (const scenario of scenarios) {
         });
     });
 }
-
+//investigators tests
 test.describe('server-side enforcement', () => {
     test('an unassigned investigator cannot save annotations', async () => {
         const seeded = await seedCase({ owner: 'USER', state: 'PUBLISHED' });
-
         try {
             const api = await apiAs('INVESTIGATOR');
             const response = await api.post('/api/saveAnnotations', {
@@ -222,7 +216,6 @@ test.describe('server-side enforcement', () => {
 
     test('an investigator cannot delete a case they do not own', async () => {
         const seeded = await seedCase({ owner: 'USER', state: 'PUBLISHED', withEvidence: false });
-
         try {
             const api = await apiAs('INVESTIGATOR');
             const response = await api.delete('/api/deleteCase', { data: { CaseID: seeded.caseId } });
@@ -235,7 +228,6 @@ test.describe('server-side enforcement', () => {
 
     test('an investigator cannot delete evidence from a case they do not own', async () => {
         const seeded = await seedCase({ owner: 'USER', state: 'PUBLISHED', assignTo: 'INVESTIGATOR' });
-
         try {
             const api = await apiAs('INVESTIGATOR');
             const response = await api.post(`/api/delete/case/${seeded.caseId}/evidence/${seeded.mediaId}`);
@@ -245,10 +237,9 @@ test.describe('server-side enforcement', () => {
             await seeded.cleanup();
         }
     });
-
+    //owner
     test('the owner cannot edit their case once published', async () => {
         const seeded = await seedCase({ owner: 'USER', state: 'PUBLISHED', withEvidence: false });
-
         try {
             const api = await apiAs('USER');
             const response = await api.post('/api/updateCase', {
@@ -260,10 +251,9 @@ test.describe('server-side enforcement', () => {
             await seeded.cleanup();
         }
     });
-
+    //case doesnt show if normal user and not owner
     test('a normal user cannot read a case they do not own', async () => {
         const seeded = await seedCase({ owner: 'ADMIN', state: 'PUBLISHED', withEvidence: false });
-
         try {
             const api = await apiAs('USER');
             const response = await api.get(`/api/getSingleCase/${seeded.caseId}`);
@@ -275,10 +265,7 @@ test.describe('server-side enforcement', () => {
     });
 
     test('an admin cannot delete their own published case', async () => {
-        // Deliberately left in the database: by the rules nobody can delete it, which is
-        // the behaviour under test. Sweep these periodically if they accumulate.
         const seeded = await seedCase({ owner: 'ADMIN', state: 'PUBLISHED', withEvidence: false });
-
         const api = await apiAs('ADMIN');
         const response = await api.delete('/api/deleteCase', { data: { CaseID: seeded.caseId } });
         expect(response.status()).toBe(403);

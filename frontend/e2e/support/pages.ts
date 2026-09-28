@@ -104,5 +104,5 @@ export const auditLogPage = (page: Page) => ({
         await page.goto('/audit-log', { waitUntil: 'domcontentloaded' });
         await expect(page.getByText('View audit logs for all activities')).toBeVisible();
     },
-    cards: () => page.locator('div.rounded-\\[21px\\]'),
+    firstCard: () => page.locator('.vl-panel .space-y-3 button').first(),
 });
