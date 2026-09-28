@@ -146,9 +146,9 @@ class image_service(media_service):
 
         threshold = kwargs.get("threshold", 0.6)
 
-        annotation = self.detector.heatmap_to_annotation(
+        annotations = self.detector.heatmap_to_annotation(
             heatmap=heatmap,
             threshold=threshold
         )
 
-        return [] if annotation is None else [annotation]
+        return [] if annotations is None else annotations
