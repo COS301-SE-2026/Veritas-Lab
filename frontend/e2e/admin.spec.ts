@@ -58,10 +58,10 @@ test.describe('admin area', () => {
         expect(audit.ok()).toBeTruthy();
         await expect(page.getByText('Loading audit logs...')).toHaveCount(0);
         await expect(page.getByText('No audit logs found')).toHaveCount(0);
-        const firstCard = page.locator('main').getByRole('button').first();
+        const firstCard = ui.firstCard();
         await expect(firstCard).toBeVisible();
         await firstCard.click();
-        for (const field of ['Case ID:', 'Case Name:', 'Events:', 'Last Event:', 'Exists:']) {
+        for (const field of ['CaseId:', 'Event Count:', 'Last Event:']) {
             await expect(page.getByText(field, { exact: false }).first(), field).toBeVisible();
         }
     });

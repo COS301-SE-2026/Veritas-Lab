@@ -51,6 +51,16 @@ export function getCasePermissions({
     const isClosed = caseState === 'CLOSED';
     const isViewer = isStaff && !isOwner && !isAssigned && (isPublished || isClosed);
     const canWorkOnCase = isAssigned && isPublished;
+     if (!caseState) {
+        return {
+            isOwner: false, isAssigned: false, isViewer: false,
+            canEditCase: false, canUploadEvidence: false, canPublishCase: false,
+            canCloseCase: false, canDeleteCase: false, canDeleteEvidence: false,
+            canViewReport: false, canOpenWorkbench: false, canViewTimeline: false,
+            canViewBoard: false, canEditBoard: false, canComment: false,
+            canAnnotate: false, canUsePlugAndPlay: false,
+        };
+    }
     //completed? i think everything is correct now but might need to review
     //revisted some incorrect logic in the permissions.
     return {
@@ -70,7 +80,7 @@ export function getCasePermissions({
         canEditBoard: canWorkOnCase,
         canComment: isOwner || (isStaff && !isOpen),
         canAnnotate: canWorkOnCase,
-        canUsePlugAndPlay: isAssigned,
+        canUsePlugAndPlay: (isAssigned && isPublished),
     };
 }
 //added to ensure sidebar matches what the tabs used to be.
