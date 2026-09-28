@@ -1951,10 +1951,7 @@ async def retreive_comments(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-
-    payload = await verify_jwt(request, connection)
-    user_role=payload.get("role")
-    verify_not_user(user_role) 
+    await verify_jwt(request, connection)
 
     try:
         case = Case(case_id=case_id)

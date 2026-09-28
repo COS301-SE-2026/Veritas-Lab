@@ -733,15 +733,15 @@ class Case:
             WITH case_check AS (
                 SELECT caseid, casecreator
                 FROM "Cases_DB"."Cases"
-                WHERE caseid = $1
+                WHERE caseid = $1::uuid
             ),
             inserted AS (
                 INSERT INTO "Cases_DB"."Comments" (caseid, username, comment)
-                SELECT $1, $2, $3
+                SELECT $1::uuid, $2::varchar(100), $3::text
                 FROM case_check
                 WHERE (
-                    ($4 = 'USER' AND casecreator::text = $2::text)
-                    OR ($4 <> 'USER')
+                    ($4::text = 'USER' AND casecreator = $2::varchar(100))
+                    OR ($4::text <> 'USER')
                 )
                 RETURNING commentid, caseid, username, comment, commenttimestamp
             )
