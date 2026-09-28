@@ -1,6 +1,11 @@
 //refactor how the entire case permissions works currently
 import type { CaseState } from '@/types/api';
 import type { UserRole } from '@/types/hooks';
+
+//need to fix tabs with sidebar.
+export const CASE_TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
+export type CaseTab = (typeof CASE_TABS)[number];
+
 export type CasePermissionInput = {
     role: UserRole | null | undefined;
     username: string | null | undefined;
@@ -47,6 +52,7 @@ export function getCasePermissions({
     const isViewer = isStaff && !isOwner && !isAssigned && (isPublished || isClosed);
     const canWorkOnCase = isAssigned && isPublished;
     //completed? i think everything is correct now but might need to review
+    //revisted some incorrect logic in the permissions.
     return {
         isOwner,
         isAssigned,
@@ -55,15 +61,23 @@ export function getCasePermissions({
         canUploadEvidence: isOwner && isOpen,
         canPublishCase: isOwner && isOpen,
         canCloseCase: canWorkOnCase,
-        canDeleteCase: isOwner || (isAdmin && isAssigned),
-        canDeleteEvidence: (isOwner && isOpen) || (isAdmin && canWorkOnCase),
+        canDeleteCase: (isOwner && isOpen) || (isAdmin && !isOwner),
+        canDeleteEvidence: (isOwner && isOpen) || (isAdmin && !isOwner),
         canViewReport: isAssigned || isViewer || (isOwner && isClosed),
         canOpenWorkbench: isAssigned || isViewer,
         canViewTimeline: isAssigned || isViewer,
         canViewBoard: isAssigned || isViewer,
         canEditBoard: canWorkOnCase,
-        canComment: isOwner || isAssigned,
+        canComment: isOwner || (isStaff && !isOpen),
         canAnnotate: canWorkOnCase,
         canUsePlugAndPlay: isAssigned,
     };
+}
+//added to ensure sidebar matches what the tabs used to be.
+export function getVisibleCaseTabs(permissions: CasePermissions): CaseTab[] {
+    return CASE_TABS.filter((tab) => {
+        if (tab === 'Audit Timeline') return permissions.canViewTimeline;
+        if (tab === 'Case Board') return permissions.canViewBoard;
+        return true;
+    });
 }

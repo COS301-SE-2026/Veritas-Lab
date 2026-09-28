@@ -9,16 +9,18 @@ type CaseCommentsPanelProps = {
     caseId: string;
     initialComments: CaseComment[];
     currentUsername: string;
+    canComment?: boolean;
 };
 //the panel that contains all the case reviews/messages/comments 
 //note - we Really need to come back and ensure the naming is either consistent with DB or makes sense because currently "review" and "comment" are being used interchangably
-export default function CaseCommentsPanel({ caseId, initialComments, currentUsername }: CaseCommentsPanelProps) {
+export default function CaseCommentsPanel({ caseId, initialComments, currentUsername, canComment = true }: CaseCommentsPanelProps) {
     const {
         comments,
         draft,
         setDraft,
         error,
         isSubmitting,
+        isLoading,
         submitComment,
         updateComment,
         removeComment,
@@ -53,17 +55,23 @@ export default function CaseCommentsPanel({ caseId, initialComments, currentUser
                         ))
                     ) : (
                         <div className="flex h-full items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) text-sm text-(--color-text-muted)">
-                            No comments yet. Start the conversation below.
+                            {isLoading ? 'Loading comments...' : 'No comments yet. Start the conversation below.'}
                         </div>
                     )}
                 </div>
                 {error ? <div className="mt-2"><Label text={error} htmlFor="error" variant="error" /></div> : null}
-                <CaseCommentComposer
-                    draft={draft}
-                    isSubmitting={isSubmitting}
-                    onDraftChange={setDraft}
-                    onSubmit={submitComment}
-                />
+                {canComment ? (
+                    <CaseCommentComposer
+                        draft={draft}
+                        isSubmitting={isSubmitting}
+                        onDraftChange={setDraft}
+                        onSubmit={submitComment}
+                    />
+                ) : (
+                    <p className="mt-3 text-center text-xs text-(--color-text-subtle)">
+                        You can read the comments on this case but do not have permission to add new ones.
+                    </p>
+                )}
             </div>
         </div>
     );

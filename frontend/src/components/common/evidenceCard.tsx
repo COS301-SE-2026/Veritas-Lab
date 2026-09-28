@@ -111,7 +111,7 @@ export default function EvidenceCard({
     }
 
     const card = (
-        <div className="vl-card vl-card-interactive flex h-[204px] w-[230px] flex-col p-4">
+        <div className={`vl-card ${href ? 'vl-card-interactive' : ''} flex h-[204px] w-[230px] flex-col p-4`}> 
             <div className="truncate text-[16px] font-semibold text-(--color-text-strong)">{mediaName}</div>
             <div className="mt-3 flex flex-1 items-center justify-center overflow-hidden rounded-[14px] border border-(--color-line) bg-(--color-surface-sunken)">
                 <EvidenceThumbnail
@@ -159,11 +159,11 @@ export default function EvidenceCard({
             </div>
         );
     }
-
     return (
         <div className="relative">
             {card}
             {deleteButton}
+            {reportButton}
         </div>
     );
 }

@@ -13,12 +13,26 @@ import {
 } from 'lucide-react';
 import Button from '@/components/ui/button';
 import ResetPasswordModal from '@/components/common/resetPasswordModal';
+import { useCaseNav } from '@/context/caseNavContext';
+import type { CaseTab } from '@/lib/casePermissions';
+import type { LucideIcon } from 'lucide-react';
+
+const CASE_TAB_ICONS: Record<CaseTab, LucideIcon> = {
+    Evidence: FolderOpen,
+    Comments: MessagesSquare,
+    'Audit Timeline': Route,
+    'Case Board': Presentation,
+};
 
 export default function Sidebar() {
     const pathname = usePathname();
     const caseId = pathname.split('/')[2];
     const searchParams = useSearchParams();
-    const activeCaseTab = searchParams.get('tab') ?? 'Evidence';
+    const { caseNav } = useCaseNav();
+    const caseTabs = caseNav && caseNav.caseId === caseId ? caseNav.tabs : [];
+    const onCasePage = !!caseId && pathname === `/case-page/${caseId}`;
+    const requestedTab = searchParams.get('tab');
+    const activeCaseTab = caseTabs.includes(requestedTab as CaseTab) ? requestedTab : 'Evidence';
     const userRole = useUserRole();
     const { collapsed, toggle } = useSidebar();
     const { logOut } = useLogOut();
@@ -29,12 +43,6 @@ export default function Sidebar() {
         ...(userRole === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: UserStar }] : []),
         ...(userRole === 'ADMIN' ? [{ label: 'Audit Logs', href: '/audit-log', icon: ScrollText }] : []),
         { label: 'Help', href: '/help', icon: HelpCircle },
-    ];
-    const caseTabs = [ 
-        { tab: 'Evidence', icon: FolderOpen }, 
-        { tab: 'Comments', icon: MessagesSquare }, 
-        { tab: 'Audit Timeline', icon: Route }, 
-        { tab: 'Case Board', icon: Presentation } 
     ];
 
     const footerItemClasses = (collapsed: boolean) =>
@@ -85,24 +93,24 @@ export default function Sidebar() {
                         </div>
                     );
                 })}
-                {caseId && (
-                    <div className="mt-4 mb-3 px-4 text-xs font-semibold text-white/60 uppercase tracking-wider">
-                        {collapsed ? 'Case' : 'Current Case'}
-                    </div>
-                )}
-                {caseId && (
+                {caseTabs.length > 0 && (
                     <>
-                        {caseTabs.map(({ tab, icon: Icon }) => {
-                            
+                        <div className="mt-4 mb-3 px-4 text-xs font-semibold text-white/60 uppercase tracking-wider">
+                            {collapsed ? 'Case' : 'Current Case'}
+                        </div>
+                        {caseTabs.map((tab) => {
+                            const Icon = CASE_TAB_ICONS[tab];
+                            const isActive = onCasePage && activeCaseTab === tab;
                             return (
                                 <Link
                                     key={tab}
-                                    href={`/case-page/${caseId}?tab=${tab}`}
+                                    href={`/case-page/${caseId}?tab=${encodeURIComponent(tab)}`}
+                                    aria-current={isActive ? 'page' : undefined}
                                     className={`group relative flex items-center gap-3 text-sm rounded-l-full rounded-r-none transition-[transform,background-color,color] duration-200 ease-out
                                         ${collapsed
                                             ? 'justify-center py-3 pl-0 pr-4 -mr-3'
                                             : 'justify-start py-3 pl-4 pr-16 -mr-12'}
-                                        ${activeCaseTab === tab
+                                        ${isActive
                                             ? 'ml-2 bg-(--color-secondary) text-(--color-text) font-semibold shadow-[0_6px_18px_-8px_color-mix(in_srgb,var(--b-600)_80%,transparent)] translate-x-0'
                                             : 'bg-white/[0.06] text-white/80 -translate-x-1 hover:translate-x-0 hover:bg-white/[0.14] hover:text-white'}
                                     `}

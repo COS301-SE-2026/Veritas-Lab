@@ -1,6 +1,6 @@
 'use client'; //hook for case comments
 import { useEffect, useState } from 'react';
-import { addComment, editComment as editCommentRequest, deleteComment as deleteCommentRequest } from '@/lib/api/case';
+import { addComment, fetchComments, editComment as editCommentRequest } from '@/lib/api/case';
 import type { CaseComment } from '@/types/api';
 
 type UseCaseCommentsOptions = {
@@ -12,10 +12,29 @@ export default function useCaseComments({ caseId, initialComments }: UseCaseComm
     const [draft, setDraft] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
+    const [isLoading, setIsLoading] = useState(true);
+    //fetch on mount
     useEffect(() => {
-        setComments(initialComments);
-    }, [initialComments]);
+        let isActive = true;
+        setIsLoading(true);
+        fetchComments(caseId)
+            .then((fresh) => {
+                if (!isActive) return;
+                setComments(fresh);
+                setError(null);
+            })
+            .catch((loadError) => {
+                if (!isActive) return;
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load comments');
+            })
+            .finally(() => {
+                if (isActive) setIsLoading(false);
+            });
+        return () => {
+            isActive = false;
+        };
+    }, [caseId]);
+
     const submitComment = async () => {
         const trimmedComment = draft.trim();
 
@@ -55,6 +74,7 @@ export default function useCaseComments({ caseId, initialComments }: UseCaseComm
         setDraft,
         error,
         isSubmitting,
+        isLoading,
         submitComment,
         updateComment,
         removeComment,

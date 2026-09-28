@@ -71,7 +71,7 @@ export type AnnotationListProps = {
     annotations: Annotation[];
     selectedId: string | null;
     onSelect: (id: string) => void;
-    onRemove: (id: string) => void;
+    onRemove?: (id: string) => void;
 };
 
 // Workbench tools which now has both annotations and metadata compar and plug and play models or PAPModels.
@@ -83,6 +83,7 @@ export type WorkbenchPanelProps = {
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];
     selectedId: string | null;
+    readOnly?: boolean;
     onSelectAnnotation: (id: string) => void;
     onRemoveAnnotation: (id: string) => void;
     onClearAll: () => void;
