@@ -1,19 +1,13 @@
 'use client';
 import type { ReactNode } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import dynamic from "next/dynamic";
 import { useDraggable } from '@dnd-kit/react';
 import { GripVertical, PenLine, Clock, ClockAlert, FileText } from "lucide-react";
 import { getMediaKind } from "@/lib/media";
 import { getCertaintyMeta } from "@/lib/report";
 import type { EvidenceCardProps } from "@/types/components";
 import DeleteEvidence from "./caseEvidenceDeleteButton";
-
-const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
-    ssr: false,
-    loading: () => <span className="text-xs text-(--color-text-subtle)">Loading…</span>,
-});
+import EvidenceThumbnail from "@/components/common/evidenceThumbnail";
 
 function formatCapturedAt(value: string): string | null {
     const date = new Date(value);
@@ -37,26 +31,9 @@ export default function EvidenceCard({
         disabled: !isBoard,
     });
 
-    const mediaKind = getMediaKind(mediaExtension);
-
     if (isBoard) {
         const certainty = getCertaintyMeta(reportCertainty);
 
-        let thumby: ReactNode;
-        if (mediaUrl && mediaKind === 'pdf') {
-            thumby = <PdfThumbnail url={mediaUrl} width={52} />;
-        } else if (mediaUrl && mediaKind === 'image') {
-            thumby = (
-                <Image src={mediaUrl} alt={mediaName} width={52} height={52} unoptimized
-                       className="h-full w-full object-cover" />
-            );
-        } else {
-            thumby = (
-                <div className="font-mono text-[10px] font-semibold uppercase text-(--color-text-subtle)">
-                    {mediaExtension.replace('.', '')}
-                </div>
-            );
-        }
         const stateClasses = isDragging
             ? "border-(--color-secondary) shadow-(--shadow-pop) ring-2 ring-[color-mix(in_srgb,var(--color-secondary)_35%,transparent)] scale-[1.02]"
             : selected
@@ -80,7 +57,12 @@ export default function EvidenceCard({
                     </button>
 
                     <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-(--color-line) bg-(--color-surface-sunken)">
-                        {thumby}
+                        <EvidenceThumbnail
+                            mediaUrl={mediaUrl}
+                            mediaName={mediaName}
+                            mediaExtension={mediaExtension}
+                            width={52}
+                        />
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -128,29 +110,16 @@ export default function EvidenceCard({
         );
     }
 
-    let preview: ReactNode;
-    if (mediaUrl && mediaKind === 'pdf') {
-        preview = <PdfThumbnail url={mediaUrl} width={96} />;
-    } else if (mediaUrl && mediaKind === 'image') {
-        preview = (
-            <Image
-                src={mediaUrl}
-                alt={mediaName}
-                width={64}
-                height={64}
-                unoptimized
-                className="max-h-20 max-w-full object-contain"
-            />
-        );
-    } else {
-        preview = <span className="text-xs text-(--color-text-subtle)">No preview</span>;
-    }
-
     const card = (
         <div className="vl-card vl-card-interactive flex h-[204px] w-[230px] flex-col p-4">
             <div className="truncate text-[16px] font-semibold text-(--color-text-strong)">{mediaName}</div>
             <div className="mt-3 flex flex-1 items-center justify-center overflow-hidden rounded-[14px] border border-(--color-line) bg-(--color-surface-sunken)">
-                {preview}
+                <EvidenceThumbnail
+                    mediaUrl={mediaUrl}
+                    mediaName={mediaName}
+                    mediaExtension={mediaExtension}
+                    width={228}
+                />
             </div>
             <div className="mt-3 flex items-center justify-between">
                 <span className="vl-badge vl-badge-neutral uppercase">{mediaExtension}</span>

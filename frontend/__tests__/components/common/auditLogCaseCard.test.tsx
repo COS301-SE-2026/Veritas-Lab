@@ -1,25 +1,23 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import AuditLogCaseCard from '@/components/common/auditLogCaseCard';
-import { AuditLogCase } from '@/types/api';
+import { AuditEvents } from '@/types/api';
 jest.mock('lucide-react', () => ({
     __esModule: true,
     ChevronDown: jest.fn(() => <div data-testid="chevron-icon">ChevronDown Icon</div>),
 }));
 
 describe('AuditLogCaseCard', () => {
-    const mockedCase: AuditLogCase = {
-        caseId: 'case-1',
-        caseName: 'Case 1',
-        eventCount: 2,
-        lastEventTimestamp: '2026-09-11T11:30:00.000Z',
-        caseExists: true,
-    };
+    const mockedCase: AuditEvents[] = [{
+        timestamp: '2026-09-11T11:30:00.000Z',
+        user: 'user1',
+        action: 'Created case',
+    }];
     afterEach(() => {
         jest.clearAllMocks();
     });
 
     it('renders case ID in closed state', () => {
-        render(<AuditLogCaseCard cases={mockedCase}  />);
+        render(<AuditLogCaseCard caseId='case-1' events={mockedCase}  />);
         expect(screen.getByText('Case 1')).toBeInTheDocument();
         expect(screen.queryByText('Case Name: Case 1')).not.toBeInTheDocument();
         expect(screen.queryByText('Events: 2')).not.toBeInTheDocument();
@@ -28,7 +26,7 @@ describe('AuditLogCaseCard', () => {
     });
 
     it('renders case ID and events in open state', () => {
-        render(<AuditLogCaseCard cases={mockedCase} />);
+        render(<AuditLogCaseCard caseId='case-1' events={mockedCase} />);
         const chevy = screen.getByTestId('chevron-icon');
         fireEvent.click(chevy);
 
@@ -40,7 +38,7 @@ describe('AuditLogCaseCard', () => {
     });
 
     it('collapses events when clicking the chevron icon again', () => {
-        render(<AuditLogCaseCard cases={mockedCase} />);
+        render(<AuditLogCaseCard caseId='case-1' events={mockedCase} />);
         const chevy = screen.getByTestId('chevron-icon');
         fireEvent.click(chevy);
         expect(screen.getByText('Case ID: case-1')).toBeInTheDocument();

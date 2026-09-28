@@ -46,7 +46,6 @@ export default function Sidebar() {
         >
             <div className="absolute -z-20 inset-0 overflow-y-clip">
                 <div className="absolute -right-70 -top-50 h-96 w-96 -z-20 rounded-full bg-[var(--color-secondary)] opacity-10 blur-3xl" />
-                <div className="absolute right-40 bottom-90 h-96 w-96 -z-20 rounded-full bg-[var(--color-secondary)] opacity-10 blur-3xl" />
                 <div className="absolute -bottom-32 -left-16 h-80 w-80 -z-20 rounded-full bg-[var(--color-secondary)] opacity-10 blur-3xl" />
             </div>
             <header className="flex items-center justify-between px-4 py-5">
