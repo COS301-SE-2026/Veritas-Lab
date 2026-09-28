@@ -1008,7 +1008,7 @@ async def test_add_comment_user_blocked_on_open_case():
     assert excInfo.value.status_code == 403
     assert excInfo.value.detail == {
         "status": "error",
-        "message": "Users may only comment on closed cases"
+        "message": "Users may only comment on cases they created"
     }
 
 def make_mock_connection_with_transaction():

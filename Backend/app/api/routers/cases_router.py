@@ -1919,19 +1919,6 @@ async def delete_comment(
             }
         },
         401: INVALID_TOKEN_401,
-        403: {
-            "description": "Forbidden - User lacks sufficient permissions",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail":{
-                            "status": "error",
-                            "message": USER_UNAUTHORIZED
-                        }
-                    }
-                }
-            }
-        },
         500: {
             "description": "Internal Server Error - Database connection or unexpected server failure",
             "content": {
@@ -1963,10 +1950,7 @@ async def retreive_comments(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-
-    payload = await verify_jwt(request, connection)
-    user_role=payload.get("role")
-    verify_not_user(user_role) 
+    await verify_jwt(request, connection)
 
     try:
         case = Case(case_id=case_id)
