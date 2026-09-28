@@ -80,3 +80,15 @@ export function normalizeAnnotations(raw: unknown): Annotation[] {
     }
     return normalized;
 }
+//ensure that the two types of annotaions merge and show together.
+export function normalizeAutomatedAnnotations(raw: unknown): Annotation[] {
+    return normalizeAnnotations(raw).map((annotation) => ({ ...annotation, source: 'AI' as const }));
+}
+export function mergeEvidenceAnnotations(userAnnotations: unknown, automatedAnnotations: unknown): Annotation[] {
+    const automated = normalizeAutomatedAnnotations(automatedAnnotations);
+    const automatedIds = new Set(automated.map((annotation) => annotation.id));
+    const own = normalizeAnnotations(userAnnotations).filter(
+        (annotation) => annotation.source !== 'AI' && !automatedIds.has(annotation.id),
+    );
+    return [...automated, ...own];
+}

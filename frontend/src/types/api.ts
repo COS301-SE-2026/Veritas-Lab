@@ -54,6 +54,7 @@ export type CaseEvidence = {
     mediaTypeId: string;
     mediaUrl: string;
     annotations: Annotation[] | null;
+    automatedAnnotations?: Annotation[] | null;
     reportArtifacts: Record<string, unknown> | null;
     reportFindings: ReportFindings | null;
     reportCertainty: number | null;
