@@ -96,7 +96,7 @@ class audited_case(BaseModel):
     events: List[audit_event] = Field(..., examples=[{
         "timestamp": "2026-05-20T19:43:02+00:00",
         "user": "investigator_user",
-        "action": "UPDATE"
+        "action": "Case Created"
     }])
 
 class audited_cases_response(BaseModel):
@@ -2673,7 +2673,7 @@ async def get_case_audit_events(
             UNION ALL
 
             SELECT
-                214783647,
+                2147483647,
                 NULL::timestamptz,
                 NULL::varchar,
                 NULL::text,
@@ -2778,8 +2778,9 @@ async def get_case_audit_events(
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get all cases with audit logs",
     description=(
-        "Returns the different cases that have at least one audit entry, with the number of recorded events"
-        " and when the most recent one happened. Amdin only."
+        "Returns every case that has at least one audit entry, with the number of recorded events, "
+        "when the most recent one happened, and the case's full audit timeline (the same events "
+        "returned by `/getAudit/caseID/{case_id}`, newest first). Admin only."
     ),
     responses={
         200: {
@@ -2795,14 +2796,43 @@ async def get_case_audit_events(
                                 "caseName": "Reciepts sus",
                                 "eventCount": 5,
                                 "lastEventTimnestamp": "2026-08-12T11:01:30",
-                                "caseExists": True
+                                "caseExists": True,
+                                "events": [
+                                    {
+                                        "timestamp": "2026-08-12T11:01:30+00:00",
+                                        "user": "investigator_user",
+                                        "action": "Case Closed"
+                                    },
+                                    {
+                                        "timestamp": "2026-08-12T10:45:15+00:00",
+                                        "user": "normal_user",
+                                        "action": "Case Published"
+                                    },
+                                    {
+                                        "timestamp": "2026-08-12T10:30:00+00:00",
+                                        "user": "normal_user",
+                                        "action": "Case Created"
+                                    }
+                                ]
                             },
                             {
                                 "caseId": "987e6543-e21b-12d3-a456-426614174000",
                                 "caseName": "Idk ig",
                                 "eventCount": 2,
                                 "lastEventTimnestamp": None,
-                                "caseExists": False
+                                "caseExists": False,
+                                "events": [
+                                    {
+                                        "timestamp": "2026-08-11T09:15:00+00:00",
+                                        "user": "admin_user",
+                                        "action": "Case Deleted"
+                                    },
+                                    {
+                                        "timestamp": "2026-08-11T09:00:00+00:00",
+                                        "user": "normal_user",
+                                        "action": "Case Created"
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -2874,7 +2904,7 @@ async def get_audited_cases(
                 GROUP BY audit_events.caseid
             ),
 
-            tomeline_case_audit AS (
+            timeline_case_audit AS (
                 SELECT
                     old_case_id AS caseid,
                     audit_case_id AS ordinal,
@@ -2916,7 +2946,7 @@ async def get_audited_cases(
                 LEAD(old_casedescription) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_casedescription,
                 LEAD(old_casestate) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_casestate,
                 LEAD(old_caseassigned) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_caseassigned
-            FROM tomeline_case_audit
+            FROM timeline_case_audit
             ),
             timeline_state_events AS (
                 SELECT
