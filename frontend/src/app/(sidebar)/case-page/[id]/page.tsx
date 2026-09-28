@@ -13,7 +13,7 @@ import CaseCommentsPanel from '@/components/common/caseCommentsPanel';
 import CaseEditButton from "@/components/common/caseEditButton";
 import Label from "@/components/ui/label";
 import AuditTimeline from "@/components/common/auditTimeline";
-import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
+import { UploadCloud, CalendarDays, FileStack, User, UserSearch, FileSearch, MessagesSquare  } from "lucide-react";
 import CaseBoard from "@/components/common/caseBoard";
 import ReportModal from "@/components/common/reportModal";
 import { resolveMediaKind } from "@/lib/media";
@@ -194,6 +194,26 @@ export default function CasePage() {
                                     <CalendarDays size={16} className="shrink-0 text-(--color-text-subtle)" />
                                     <span>Created:</span>
                                     <span className="font-semibold text-(--color-text-strong)">{formatCaseDate(caseDetails?.caseCreationDate)}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-(--color-text-muted)">
+                                    <User size={16} className="shrink-0 text-(--color-text-subtle)" />
+                                    <span>Created by:</span>
+                                    <span className="ml-1 font-semibold text-(--color-text-strong)">{caseDetails?.caseCreator ?? 'Unknown'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-(--color-text-muted)">
+                                    <UserSearch size={16} className="shrink-0 text-(--color-text-subtle)" />
+                                    <span>Assigned to:</span>
+                                    <span className="ml-1 font-semibold text-(--color-text-strong)">{caseDetails?.caseAssigned ?? 'Unassigned'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-(--color-text-muted)">
+                                    <FileSearch  size={16} className="shrink-0 text-(--color-text-subtle)" />
+                                    <span>Amount of Evidence:</span>
+                                    <span className="ml-1 font-semibold text-(--color-text-strong)">{evidenceList.length ?? 0}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-(--color-text-muted)">
+                                    <MessagesSquare size={16} className="shrink-0 text-(--color-text-subtle)" />
+                                    <span>Amount of Comments:</span>
+                                    <span className="ml-1 font-semibold text-(--color-text-strong)">{caseComments.length ?? 0}</span>
                                 </div>
                             </dl>
                         </div>
