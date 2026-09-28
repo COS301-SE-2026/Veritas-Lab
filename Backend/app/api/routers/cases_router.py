@@ -1907,19 +1907,6 @@ async def delete_comment(
             }
         },
         401: INVALID_TOKEN_401,
-        403: {
-            "description": "Forbidden - User lacks sufficient permissions",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail":{
-                            "status": "error",
-                            "message": USER_UNAUTHORIZED
-                        }
-                    }
-                }
-            }
-        },
         500: {
             "description": "Internal Server Error - Database connection or unexpected server failure",
             "content": {
