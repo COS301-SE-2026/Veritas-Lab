@@ -23,7 +23,7 @@ from uuid import UUID
 from datetime import datetime, timedelta, timezone
 import uuid
 from uuid import uuid4
-from app.core.media_relay import MediaRelay
+from app.core.media_relay import media_relay
 from pathlib import Path
 import boto3
 from botocore.client import Config
@@ -1298,8 +1298,8 @@ async def upload_evidence(
         extension = Path(result["Filename"]).suffix.lower()
         media_id = UUID(result["MediaId"])
 
-        media_relay = MediaRelay(media_id=media_id, extension=extension)
-        asyncio.create_task(media_relay.relay_to_service())
+        relay = media_relay(media_id=media_id, extension=extension)
+        asyncio.create_task(relay.relay_to_service())
 
         return {
             "status": "success",

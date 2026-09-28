@@ -168,9 +168,7 @@ def analysis_instance():
     
     return analysis, mock_visual_model, mock_audio_model
 
-
-@pytest.mark.asyncio
-async def test_analyse_combine_visual_and_audio(analysis_instance):
+def test_analyse_combine_visual_and_audio(analysis_instance):
     analysis, mock_visual_model, mock_audio_model = analysis_instance
 
     video_tensor = torch.zeros((2, 3, 224, 224))
@@ -223,7 +221,7 @@ async def test_analyse_combine_visual_and_audio(analysis_instance):
         "pathlib.Path.unlink"
     ) as mock_unlink:
 
-        result = await analysis.analyse(
+        result = analysis.analyse(
             "video.mp4",
             threshold=0.5
         )

@@ -4,7 +4,7 @@ import json
 import pytest
 from app.tests.integration.conftest import get_connection
 from app.core.media_service import get_object
-from app.core.image_service import ImageService
+from app.core.image_service import image_service
 from app.tests.integration.conftest import get_automated_annotations
 
 TEST_IMAGE = Path(__file__).resolve().parent / "test.png"
@@ -178,7 +178,7 @@ async def delete_test_data(
 
 @pytest.mark.asyncio
 async def test_image_full_integration(ensure_user_exists):
-    service = ImageService()
+    service = image_service()
 
     executor_id = str(uuid4())
     base_username = "image_integration_user"

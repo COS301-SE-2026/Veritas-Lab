@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.media_relay import MediaRelay
+from app.core.media_relay import media_relay
 
 
 @pytest.mark.asyncio
@@ -20,7 +20,7 @@ async def test_relay_to_image_service():
         return_value=mock_service
     ) as mock_get_service:
 
-        relay = MediaRelay(
+        relay = media_relay(
             media_id=media_id,
             extension=".jpg"
         )
@@ -47,7 +47,7 @@ async def test_relay_to_pdf_service():
         return_value=mock_service
     ) as mock_get_service:
 
-        relay = MediaRelay(
+        relay = media_relay(
             media_id=media_id,
             extension=".pdf"
         )
@@ -64,7 +64,7 @@ async def test_relay_to_pdf_service():
 async def test_relay_raises_for_unsupported_extension():
     media_id = uuid4()
 
-    relay = MediaRelay(
+    relay = media_relay(
         media_id=media_id,
         extension=".txt"
     )
@@ -89,7 +89,7 @@ async def test_relay_to_video_service():
         return_value=mock_service
     ) as mock_get_service:
 
-        relay = MediaRelay(
+        relay = media_relay(
             media_id=media_id,
             extension=".mp4"
         )

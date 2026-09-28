@@ -25,7 +25,7 @@ def get_service(service_type: str):
 
     raise ValueError(f"Unsupported service type: {service_type}")
 
-class MediaRelay:
+class media_relay:
     def __init__(self, media_id: UUID, extension):
         self.media_id = media_id
         self.extension = extension

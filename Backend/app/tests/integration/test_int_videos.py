@@ -5,7 +5,7 @@ import pytest
 
 from app.tests.integration.conftest import get_connection
 from app.core.media_service import get_object
-from app.core.video_service import VideoService
+from app.core.video_service import video_service
 from app.tests.integration.conftest import get_automated_annotations
 
 TEST_VIDEO = Path(__file__).resolve().parent / "test.mp4"
@@ -147,7 +147,7 @@ async def delete_test_data(
 
 @pytest.mark.asyncio
 async def test_video_full_integration(ensure_user_exists):
-    service = VideoService()
+    service = video_service()
 
     executor_id = str(uuid4())
     base_username = "video_integration_user"

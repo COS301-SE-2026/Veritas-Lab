@@ -38,7 +38,7 @@ def override_database_dependency():
 @patch("asyncpg.connect")
 @patch("app.core.cases.get_object")
 @patch("uuid.uuid4")
-@patch("app.core.cases.MediaRelay")
+@patch("app.core.cases.media_relay")
 async def test_images_upload_success(mockMediaRelay,mockUuid, mockget_object, mockDbConnect):
     """
     Test successful evidence processing and extension identification

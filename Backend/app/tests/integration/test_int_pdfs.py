@@ -6,7 +6,7 @@ import json
 from app.tests.integration.conftest import get_connection
 from app.core.env import Minio_Settings, Postgres_Settings, User_Settings
 from app.core.media_service import get_object
-from app.core.pdf_service import PDFService
+from app.core.pdf_service import pdf_service
 from app.tests.integration.conftest import get_automated_annotations
 
 TEST_PDF = Path(__file__).resolve().parent / "test.pdf"
@@ -159,7 +159,7 @@ async def delete_test_data(
 async def test_pdf_full_integration(
     ensure_user_exists
 ):
-    service = PDFService()
+    service = pdf_service()
 
     executor_id = str(uuid4())
     base_username = "pdf_integration_user"

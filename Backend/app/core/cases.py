@@ -13,7 +13,7 @@ import boto3
 from botocore.client import Config
 from app.core.env import Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
-from app.core.media_relay import MediaRelay
+from app.core.media_relay import media_relay
 
 CASE_NOT_FOUND = "Case not found"
 MISSING_CASE_ID = "Case id is missing"
