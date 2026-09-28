@@ -27,7 +27,7 @@ export function credentialsFor(role: Exclude<Role, 'USER'>): Credentials {
     return { email: required('E2E_INVESTIGATOR_EMAIL'), password: required('E2E_INVESTIGATOR_PASSWORD') };
 }
 
-export type Profile = { username: string; email: string };
+export type Profile = { username: string; email: string; password?: string };
 export function readProfile(role: Role): Profile {
     const file = profileFileFor(role);
     if (!fs.existsSync(file)) {
