@@ -31,6 +31,7 @@ from mypy_boto3_s3 import S3Client
 from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_Settings
 from app.core.cases import get_object
 from app.core.database import get_connection
+import asyncio
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -1298,7 +1299,7 @@ async def upload_evidence(
         media_id = UUID(result["MediaId"])
 
         media_relay = MediaRelay(media_id=media_id, extension=extension)
-        background_task.add_task(media_relay.relay_to_service)
+        asyncio.create_task(media_relay.relay_to_service())
 
         return {
             "status": "success",

@@ -7,6 +7,7 @@ from app.training.image.prediction import heatmap_to_annotation as image_automat
 from app.training.pdf.explain import explain_pdf, load_detector
 from app.training.video.analyser import video_combined_analysis
 import numpy as np
+import asyncio
 
 MODEL_PATH = Path("app/ai/best_model.pth")
 PDF_MODEL_PATH = Path("app/ai/pdf_detector.pt")
@@ -88,7 +89,7 @@ class AIVideoDetector:
 
     async def analyse_video(self, video_path: str | Path) -> dict:
         video_path = Path(video_path)
-        result = await self.model.analyse(video_path)
+        result = await asyncio.to_thread(self.model.analyse, video_path)
 
         ai_probability = result["ai_probability"]
 

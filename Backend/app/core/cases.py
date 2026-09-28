@@ -459,7 +459,9 @@ class Case:
                     await media.seek(0)
                     
                     file_stream = io.BytesIO(file_bytes)
-                    storage_client.put_object(
+
+                    await asyncio.to_thread(
+                        storage_client.put_object,
                         Bucket=bucket_name,
                         Key=target_filename,
                         Body=file_stream,
