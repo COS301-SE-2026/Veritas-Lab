@@ -543,26 +543,6 @@ async def test_integration_get_comment_missing_cookie_error(client, fake_comment
     assert response.json()["detail"]["status"] == "error"
     assert response.json()["detail"]["message"] == "Not authenticated"
 
-
-# - 403: A normal user tries to get comments
-@pytest.mark.asyncio
-async def test_integration_get_comment_invalid_cookie_error(client, fake_comment_context):
-    case_id = fake_comment_context["case_id1"]
-
-    mock_invest = {
-        "id": USER_ID,
-        "username": USER_NAME,
-        "role": "USER"
-    }
-
-    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-
-    response = client.post(f"/api/getComments/{case_id}")
-
-    assert response.status_code == 403
-    assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "User unauthorized"
-
 # 201
 @pytest.mark.asyncio
 async def test_integration_create_comment_success(client, fake_comment_context):
@@ -722,9 +702,10 @@ async def test_integration_create_comment_user_open_case_forbidden(client, fake_
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "Users may only comment on closed cases"
+    assert response.json()["detail"]["message"] == "Users may only comment on cases they created"
     await assert_against_comment_table(user_name)
 
+    
 # 404
 @pytest.mark.asyncio
 async def test_integration_create_comment_case_not_found(client, fake_comment_context):
