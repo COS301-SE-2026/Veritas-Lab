@@ -253,9 +253,8 @@ async def test_image_full_integration(ensure_user_exists):
 
         assert heatmap_exists(media_id)
 
-        annotation_record = (
-            await get_automated_annotations(media_id)
-        )
+        annotation_record = await get_automated_annotations(media_id)
+        
 
         assert annotation_record is not None
         assert annotation_record["mediaid"] == media_id
@@ -269,32 +268,45 @@ async def test_image_full_integration(ensure_user_exists):
 
         assert isinstance(annotations, list)
 
-        assert len(annotations) <= 1
+        assert len(annotations) <= 2
 
         for annotation in annotations:
             assert "id" in annotation
             UUID(annotation["id"])
 
-            assert annotation["kind"] == "shape"
             assert annotation["source"] == "AI"
-
-            assert "points" in annotation
-            assert isinstance(annotation["points"], list)
-            assert len(annotation["points"]) == 5
-
-            assert (
-                annotation["points"][0]
-                == annotation["points"][-1]
-            )
-
-            for point in annotation["points"]:
-                assert "x" in point
-                assert "y" in point
-
-                assert 0 <= point["x"] <= 100
-                assert 0 <= point["y"] <= 100
-
             assert "timeStamp" not in annotation
+
+            if annotation["kind"] == "shape":
+                assert "points" in annotation
+                assert isinstance(annotation["points"], list)
+                assert len(annotation["points"]) == 5
+
+                assert annotation["points"][0] == annotation["points"][-1]
+                for point in annotation["points"]:
+                    assert "x" in point
+                    assert "y" in point
+
+                    assert 0 <= point["x"] <= 100
+                    assert 0 <= point["y"] <= 100
+
+            elif annotation["kind"] == "note":
+                assert "position" in annotation
+                assert "text" in annotation
+
+                position = annotation["position"]
+
+                assert "x" in position
+                assert "y" in position
+
+                assert 0 <= position["x"] <= 100
+                assert 0 <= position["y"] <= 100
+
+                assert isinstance(annotation["text"], str)
+                assert annotation["text"]
+
+            else:
+                pytest.fail(f"Unexpected annotation kind: {annotation['kind']}")
 
     finally:
         if (

@@ -209,14 +209,31 @@ class video_service(media_service):
             if timestamp is None or zone is None:
                 continue
 
+            points = zone_to_points(zone, zones_per_dim=2)
+
             annotations.append({
                 "id": str(uuid4()),
                 "kind": "shape",
                 "source": "AI",
                 "timeStamp": timestamp,
-                "points": zone_to_points(
-                    zone,
-                    zones_per_dim=2
+                "points": points
+            })
+
+            center_x = sum(point["x"] for point in points[:-1]) / len(points[:-1])
+            center_y = sum(point["y"] for point in points[:-1]) / len(points[:-1])
+
+            annotations.append({
+                "id": str(uuid4()),
+                "kind": "note",
+                "source": "AI",
+                "timeStamp": timestamp,
+                "position": {
+                    "x": center_x,
+                    "y": center_y
+                },
+                "text": (
+                    "Automated analysis identified this region as influential "
+                    "to the video's AI-manipulation assessment."
                 )
             })
 

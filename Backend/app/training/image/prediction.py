@@ -111,7 +111,7 @@ def predict_and_explain(
         "warning": "The risk level and reasons are supporting indicators, not definitive proof that an image is authentic or AI-generated."
     }
 
-def heatmap_to_annotation(heatmap: np.ndarray, threshold: float = 0.6) -> dict | None:
+def heatmap_to_annotation(heatmap: np.ndarray, threshold: float = 0.6) -> list[dict[str, Any]] | None:
     mask = heatmap >= threshold
     ys, xs = np.where(mask)
 
@@ -130,15 +130,30 @@ def heatmap_to_annotation(heatmap: np.ndarray, threshold: float = 0.6) -> dict |
     top = (y1 / height) * 100
     bottom = (y2 / height) * 100
 
-    return {
-        "id": str(uuid4()),
-        "kind": "shape",
-        "source": "AI",
-        "points": [
-            {"x": left, "y": top},
-            {"x": right, "y": top},
-            {"x": right, "y": bottom},
-            {"x": left, "y": bottom},
-            {"x": left, "y": top},
-        ],
-    }
+    center_x = (left + right) / 2
+    center_y = (top + bottom) / 2
+
+    return [
+        {
+            "id": str(uuid4()),
+            "kind": "shape",
+            "source": "AI",
+            "points": [
+                {"x": left, "y": top},
+                {"x": right, "y": top},
+                {"x": right, "y": bottom},
+                {"x": left, "y": bottom},
+                {"x": left, "y": top},
+            ],
+        },
+        {
+            "id": str(uuid4()),
+            "kind": "note",
+            "source": "AI",
+            "position": {
+                "x": center_x,
+                "y": center_y
+            },
+            "text": "The AI detected a potentially manipulated region in this area."
+        }
+    ]
