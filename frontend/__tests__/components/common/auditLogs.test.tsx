@@ -8,13 +8,13 @@ jest.mock('@/lib/hooks/useAuditLog', () => ({
 
 jest.mock('@/components/common/auditLogCaseCard', () => ({
     __esModule: true,
-    default: jest.fn(({ cases }) => (
+    default: jest.fn(({ casesLog }) => (
         <div data-testid="audit-log-case-card">
-            <div data-testid="case-id">{cases.caseId}</div>
-            <div data-testid="case-name">{cases.caseName}</div>
-            <div data-testid="case-event-count">{cases.eventCount}</div>
-            <div data-testid="case-last-event-timestamp">{cases.lastEventTimestamp}</div>
-            <div data-testid="case-exists">{cases.caseExists.toString()}</div>
+            <div data-testid="case-id">{casesLog.caseId}</div>
+            <div data-testid="case-name">{casesLog.caseName}</div>
+            <div data-testid="case-event-count">{casesLog.eventCount}</div>
+            <div data-testid="case-last-event-timestamp">{casesLog.lastEventTimestamp}</div>
+            <div data-testid="case-exists">{casesLog.caseExists.toString()}</div>
         </div>
     )),
 }));

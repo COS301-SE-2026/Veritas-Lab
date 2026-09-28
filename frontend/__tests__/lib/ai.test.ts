@@ -14,7 +14,13 @@ import {
     runModel
 } from "../../src/lib/ai";
 
-jest.mock("pdfjs-dist", () => ({getDocument: jest.fn()}));
+jest.mock("pdfjs-dist", () => ({
+    getDocument: jest.fn(),
+    GlobalWorkerOptions: {
+        workerSrc: ""
+    },
+    version: "test"
+}));
 
 const baseImageConfig: ImageModelConfig = {
     mediaType: "IMAGE",
@@ -137,7 +143,7 @@ function mockPdf() {
         destroy: jest.fn(async () => undefined)
     };
 
-    pdfjs.getDocument.mockReturnValue({promise: Promise.resolve(pdf)});
+    pdfjs.getDocument.mockReturnValue({promise: Promise.resolve(pdf), destroy: pdf.destroy});
     return {pdf, page};
 }
 

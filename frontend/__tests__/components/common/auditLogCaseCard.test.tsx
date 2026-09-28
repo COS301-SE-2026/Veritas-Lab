@@ -37,30 +37,27 @@ describe('AuditLogCaseCard', () => {
 
     it('renders case ID and events in open state', () => {
         render(<AuditLogCaseCard caseLog={mockedCase} />);
-        const chevy = screen.getByTestId('chevron-icon');
-        fireEvent.click(chevy);
-
-        expect(screen.getByText('Case ID: case-1')).toBeInTheDocument();
-        expect(screen.getByText('Case Name: Case 1')).toBeInTheDocument();
-        expect(screen.getByText('Events: 2')).toBeInTheDocument();
-        expect(screen.getByText('Last Event: 2026-09-11T11:30:00.000Z')).toBeInTheDocument();
-        expect(screen.getByText('Exists: true')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button'));
+        expect(screen.getByText('CaseId')).toBeInTheDocument();
+        expect(screen.getByText('case-1')).toBeInTheDocument();
+        expect(screen.getByText('Events Count:')).toBeInTheDocument();
+        expect(screen.getByText('1')).toBeInTheDocument();
+        expect(screen.getByText('Last Event:')).toBeInTheDocument();
+        expect(screen.getAllByText(new Date(mockedCase.lastEventTimestamp).toLocaleString()).length).toBeGreaterThan(0);
+        expect(screen.getByText('user1')).toBeInTheDocument();
+        expect(screen.getByText('Created case')).toBeInTheDocument();
     });
 
     it('collapses events when clicking the chevron icon again', () => {
         render(<AuditLogCaseCard caseLog={mockedCase} />);
-        const chevy = screen.getByTestId('chevron-icon');
-        fireEvent.click(chevy);
-        expect(screen.getByText('Case ID: case-1')).toBeInTheDocument();
-        expect(screen.getByText('Case Name: Case 1')).toBeInTheDocument();
-        expect(screen.getByText('Events: 2')).toBeInTheDocument();
-        expect(screen.getByText('Last Event: 2026-09-11T11:30:00.000Z')).toBeInTheDocument();
-        expect(screen.getByText('Exists: true')).toBeInTheDocument();
-        fireEvent.click(chevy);
-        expect(screen.queryByText('Case ID: case-1')).not.toBeInTheDocument();
-        expect(screen.queryByText('Case Name: Case 1')).not.toBeInTheDocument();
-        expect(screen.queryByText('Events: 2')).not.toBeInTheDocument();
-        expect(screen.queryByText('Last Event: 2026-09-11T11:30:00.000Z')).not.toBeInTheDocument();
-        expect(screen.queryByText('Exists: true')).not.toBeInTheDocument();
+        const button = screen.getByRole('button');
+        fireEvent.click(button)
+        expect(screen.getByText('case-1')).toBeInTheDocument();
+        expect(screen.getByText('user1')).toBeInTheDocument();
+        fireEvent.click(button);
+        expect(screen.queryByText('CaseId')).not.toBeInTheDocument();
+        expect(screen.queryByText('case-1')).not.toBeInTheDocument();
+        expect(screen.queryByText('user1')).not.toBeInTheDocument()
+        expect(screen.queryByText('Created case')).not.toBeInTheDocument();
     });
 })
