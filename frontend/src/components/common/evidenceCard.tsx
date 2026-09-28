@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useDraggable } from '@dnd-kit/react';
-import { GripVertical, PenLine, Clock, ClockAlert } from "lucide-react";
+import { GripVertical, PenLine, Clock, ClockAlert, FileText } from "lucide-react";
 import { getMediaKind } from "@/lib/media";
 import { getCertaintyMeta } from "@/lib/report";
 import type { EvidenceCardProps } from "@/types/components";
@@ -26,7 +26,7 @@ function formatCapturedAt(value: string): string | null {
 
 export default function EvidenceCard({
     mediaName, mediaUrl, mediaExtension, href, mediaId, caseId, canDelete, onDeleted, variant = 'default',
-    capturedAt, reportCertainty, annotationCount = 0, placed = false, selected = false,
+    capturedAt, reportCertainty, annotationCount = 0, placed = false, selected = false, viewReport
 }: Readonly<EvidenceCardProps>) {
     const isBoard = variant === 'case-board';
     const formattedTime = capturedAt ? formatCapturedAt(capturedAt) : null;
@@ -164,6 +164,17 @@ export default function EvidenceCard({
             <DeleteEvidence caseId={caseId} mediaId={mediaId} mediaName={mediaName} onDeleted={onDeleted} />
         </div>
     ) : null;
+    const reportButton = viewReport ? (
+        <button
+            type="button"
+            onClick={viewReport}
+            aria-label={`View report for ${mediaName}`}
+            title="View report"
+            className="absolute right-4 bottom-4 z-10 rounded-full text-(--color-text-muted) hover:text-(--color-text-strong)"
+        >
+            <FileText size={16} />
+        </button>
+    ) : null;
     //keeping same structure as much as possible (i dont want to create errors out of nowhere in the tests or rendering) hence might look messy.
     if (href) {
         return (
@@ -175,6 +186,7 @@ export default function EvidenceCard({
                     {card}
                 </Link>
                 {deleteButton}
+                {reportButton}
             </div>
         );
     }

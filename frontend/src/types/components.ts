@@ -71,6 +71,7 @@ export type EvidenceCardProps = {
     annotationCount?: number;
     placed?: boolean;
     selected?: boolean;
+    viewReport?: () => void;
 };
 //case evidence delete
 export type EvidenceDeleteButtonProps = {

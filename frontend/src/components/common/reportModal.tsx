@@ -13,6 +13,7 @@ export default function ReportModal({
     mediaName,
     certainty,
     findings,
+    heatmapUrl,
 }: Readonly<ReportModalProps>) {
     useEffect(() => {
         if (!isOpen) return;
@@ -43,6 +44,7 @@ export default function ReportModal({
                     certainty={certainty}
                     findings={findings}
                     onClose={onClose}
+                    heatmapUrl={heatmapUrl}
                 />
             </div>
         </div>

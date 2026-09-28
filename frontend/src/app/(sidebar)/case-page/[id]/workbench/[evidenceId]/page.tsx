@@ -17,8 +17,10 @@ import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 import { normalizeAnnotations } from '@/lib/workbenchAnnotations';
+import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
+import ReportPanel from '@/components/common/reportPanel';
 
-const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata'];
+const WORKBENCH_TABS: readonly WorkbenchTool[] = [ 'AI Report', 'Annotations', 'Metadata', 'Plug-and-Play Models'];
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -42,7 +44,7 @@ export default function WorkbenchPage() {
     } = useAnnotations();
     const { isReportOpen, openReport, closeReport } = useReportModal();
 
-    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool>('Annotations');
+    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool>('AI Report');
 
     const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
@@ -88,7 +90,7 @@ export default function WorkbenchPage() {
         setSeededForm(evidence);
         loadAnnotations(normalizeAnnotations(evidence?.annotations));
     }
-    const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
+    const mediaName = evidence?.casePerspective ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
     const mediaKind = resolveMediaKind({
         mediaExtension: evidence?.mediaExtension,
@@ -99,6 +101,8 @@ export default function WorkbenchPage() {
     const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind;
     const annotationsActive = activeWorkbenchTool === 'Annotations';
     const metadataActive = activeWorkbenchTool === 'Metadata';
+    const PAPModelsActive = activeWorkbenchTool === 'Plug-and-Play Models';
+    const reportActive = activeWorkbenchTool === 'AI Report';
 
     const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
 
@@ -133,13 +137,13 @@ export default function WorkbenchPage() {
                     filters={WORKBENCH_TABS}
                     defaultFilter={activeWorkbenchTool}
                     onChange={(tab) => setActiveWorkbenchTool(tab)}
-                    className="w-full max-w-sm"
+                    className="w-full max-w-xl"
                 />
             </div>
 
             <div className="mt-6 flex flex-col items-start gap-6 lg:flex-row">
                 <div className="min-w-0 flex-1">
-                    <div className={metadataActive ? 'hidden' : 'block'} aria-hidden={metadataActive}>
+                    <div className={(metadataActive || PAPModelsActive || (reportActive && evidence?.heatmapUrl)) ? 'hidden' : 'block'} aria-hidden={metadataActive}>
                         <WorkbenchCanvas
                             video={video}
                             mediaUrl={mediaUrl}
@@ -157,17 +161,39 @@ export default function WorkbenchPage() {
                         />
                     </div>
 
-                    {metadataActive ? (
+                    {metadataActive && (
                         <MetadataComparison
                             mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
                             className="h-[calc(100dvh-14rem)] min-h-[32rem]"
                         />
-                    ) : null}
+                    )}
+
+                    {PAPModelsActive && (
+                        <PlugAndPlayModels mediaUrl={mediaUrl} mediaName={mediaName} mediaKind={mediaKind} caseId={caseId} mediaId={evidenceId} plugAndPlayReport={evidence?.plugAndPlay ?? []}/>
+                    )}
+
+                    {reportActive && evidence?.heatmapUrl && (
+                        <WorkbenchCanvas
+                            video={video}
+                            mediaUrl={evidence?.heatmapUrl ?? mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            active={annotationsActive}
+                            activeTool={activeTool}
+                            annotations={annotations}
+                            selectedId={selectedId}
+                            onSelectAnnotation={pickSelectedAnnotation}
+                            onAddShape={addShape}
+                            onAddNote={addNote}
+                            onAddHighlight={addHighlight}
+                            onResolveHighlight={resolveHighlight}
+                        />
+                    )}
                 </div>
 
-                {annotationsActive ? (
+                {annotationsActive && (
                     <WorkbenchPanel
                         mediaKind={mediaKind}
                         activeTool={activeTool}
@@ -179,7 +205,18 @@ export default function WorkbenchPage() {
                         onClearAll={clearAll}
                         onSave={handleSave}
                     />
-                ) : null}
+                )}
+
+                {reportActive && (
+                    <ReportPanel
+                        mediaUrl={mediaUrl}
+                        mediaKind={mediaKind}
+                        mediaName={mediaName}
+                        certainty={evidence?.reportCertainty ?? null}
+                        findings={evidence?.reportFindings ?? null}
+                        heatmapUrl={evidence?.heatmapUrl ?? null}
+                    />
+                )}
             </div>
 
             <ReportModal
@@ -190,6 +227,7 @@ export default function WorkbenchPage() {
                 mediaName={mediaName}
                 certainty={evidence?.reportCertainty ?? null}
                 findings={evidence?.reportFindings ?? null}
+                heatmapUrl={evidence?.heatmapUrl ?? null}
             />
         </div>
     );
