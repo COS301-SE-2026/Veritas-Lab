@@ -1,4 +1,4 @@
-import type { Annotation } from '@/types/workbench';
+import type { Annotation, PAPData } from '@/types/workbench';
 export type ApiError = {
     detail: {
         status?: 'error';
@@ -55,10 +55,12 @@ export type CaseEvidence = {
     mediaUrl: string;
     annotations: Annotation[] | null;
     reportArtifacts: Record<string, unknown> | null;
-    reportFindings: string | null;
+    reportFindings: ReportFindings | null;
     reportCertainty: number | null;
     reportComments: string | null;
     reportDateCreation: string | null;
+    heatmapUrl?: string | null;
+    plugAndPlay?: PAPReport[] | []
 };
 
 export type CaseComment = {
@@ -112,4 +114,55 @@ export type AuditLogCase = {
     eventCount: number;
     lastEventTimestamp: string;
     caseExists: boolean;
+}
+
+export type ReportReason = string | { 
+    message: string; 
+    supports?: 'AI' | 'AUTHENTIC' | 'INCONCLUSIVE' 
+    importance?: 'low' | 'medium' | 'high'
+};
+
+export type susChunk = {
+    text: string;
+    ai_probability: number;
+};
+
+export type ReportFindings = {
+    //img and other stuff
+    risk_level: number;
+    findings?: string;
+    ai_probability?: number;
+    classification?: string;
+    prediction?: string;
+    summary?: string;
+    reasons?: ReportReason[];
+    warning?: string;
+    
+    //pdf
+    lexical_ai_probability?: number;
+    suspicious_chunks?: susChunk[];
+    branch_contributions?: Record<string, number>;
+
+    //vid
+    visual?: {
+        ai_probability?: number;
+        explanation?: string;
+        frame_importance?: { timestamp: number; importance: number }[];
+    };
+    audio?: { 
+        available?: boolean; 
+        ai_probability?: number 
+    };
+    fusion?: { 
+        visual_weight?: number; 
+        audio_weight?: number 
+    };
+};
+
+export type PAPReport = {
+    PNPModelId: number;
+    mediaId: string;
+    modelName: string;
+    modelResult: PAPData;
+    uploadDate: string;
 }
