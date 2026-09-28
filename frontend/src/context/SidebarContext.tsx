@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, ReactNode } from 'react';
 
-const SidebarContext = createContext({ collapsed: false, toggle: () => {} });
+const SidebarContext = createContext({ collapsed: true, toggle: () => {} });
 
 export function SidebarWrapper({ children }: { children: ReactNode }) {
     // Manages the sidebar's collapse state here instead of in the sidebar component

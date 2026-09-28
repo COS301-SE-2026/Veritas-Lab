@@ -20,7 +20,7 @@ import { normalizeAnnotations } from '@/lib/workbenchAnnotations';
 import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
 import ReportPanel from '@/components/common/reportPanel';
 
-const WORKBENCH_TABS: readonly WorkbenchTool[] = ['Annotations', 'Metadata', 'Plug-and-Play Models', 'AI Report'];
+const WORKBENCH_TABS: readonly WorkbenchTool[] = [ 'AI Report', 'Annotations', 'Metadata', 'Plug-and-Play Models'];
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
@@ -44,7 +44,7 @@ export default function WorkbenchPage() {
     } = useAnnotations();
     const { isReportOpen, openReport, closeReport } = useReportModal();
 
-    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool>('Annotations');
+    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool>('AI Report');
 
     const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);

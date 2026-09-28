@@ -39,7 +39,7 @@ export default function reportPanel({mediaUrl, mediaKind, mediaName, certainty, 
     }
     return (
         <>
-            <div className="vl-panel max-w-xl flex flex-col gap-4 p-6">
+            <div className={`${onClose ? '' : 'vl-panel max-w-xl'} flex flex-col gap-4 p-6`}>
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-(--color-text-strong)">Report</h2>

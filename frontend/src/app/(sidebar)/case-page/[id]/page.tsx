@@ -16,7 +16,9 @@ import Label from "@/components/ui/label";
 import AuditTimeline from "@/components/common/auditTimeline";
 import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
 import CaseBoard from "@/components/common/caseBoard";
-
+import ReportModal from "@/components/common/reportModal";
+import { resolveMediaKind } from "@/lib/media";
+import type { CaseEvidence } from "@/types/api";
 const TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
 export default function CasePage() {
     const { fetchCase } = useCase();
@@ -63,6 +65,7 @@ export default function CasePage() {
     }, [fetchCase, id]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [reportEvidence, setReportEvidence] = useState<CaseEvidence | null>(null);
     const openModal = () => setIsModalOpen(true);
     const closeModal = () => setIsModalOpen(false);
 
@@ -161,6 +164,7 @@ export default function CasePage() {
                                         canDelete={canDeleteEvidence}
                                         onDeleted={reloadCaseData}
                                         variant="default"
+                                        viewReport={() => setReportEvidence(evidence)}
                                     />
                                 )) : (
                                     <div className="w-full rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
@@ -225,6 +229,16 @@ export default function CasePage() {
             {canUploadEvidence ? (
                 <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={reloadCaseData} />
             ) : null}
+            <ReportModal
+                isOpen={reportEvidence !== null}
+                onClose={() => setReportEvidence(null)}
+                mediaUrl={reportEvidence?.mediaUrl}
+                mediaKind={reportEvidence ? resolveMediaKind(reportEvidence) : undefined}
+                mediaName={reportEvidence?.casePerspective ?? ''}
+                certainty={reportEvidence?.reportCertainty ?? null}
+                findings={reportEvidence?.reportFindings ?? null}
+                heatmapUrl={reportEvidence?.heatmapUrl ?? null}
+            />
         </>
     );
 }
