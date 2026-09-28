@@ -67,10 +67,10 @@ export default function AnnotationList({ annotations, selectedId, onSelect, onRe
                                             </div>
                                         ) : null}
                                     </button>
-                                    {isAi ? null : (
+                                    {isAi || !onRemove ? null : (
                                         <button
                                             type="button"
-                                            onClick={() => onRemove(annotation.id)}
+                                            onClick={() => onRemove?.(annotation.id)}
                                             aria-label="Remove annotation"
                                             className="shrink-0 rounded-full p-1 text-(--color-text-subtle) transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--color-danger)]"
                                         >

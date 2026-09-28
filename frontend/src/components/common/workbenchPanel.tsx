@@ -23,6 +23,7 @@ export default function WorkbenchPanel({
     onRemoveAnnotation,
     onClearAll,
     onSave,
+    readOnly = false,
 }: Readonly<WorkbenchPanelProps>) {
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     const [error, setError] = useState<string | null>(null);
@@ -42,51 +43,61 @@ export default function WorkbenchPanel({
         <div className="vl-panel flex w-full shrink-0 flex-col gap-4 p-5 lg:w-72">
             <div>
                 <h2 className="text-lg font-bold text-(--color-text-strong)">Annotation tools</h2>
-                <p className="mt-1 text-xs text-(--color-text-muted)">Mark up and comment on this evidence.</p>
+                <p className="mt-1 text-xs text-(--color-text-muted)">
+                    {readOnly
+                        ? 'View only. Assign yourself to the case to annotate.'
+                        : 'Mark up and comment on this evidence.'}
+                </p>
             </div>
 
             <div className="flex flex-col gap-4 border-t border-(--color-line) pt-4">
-                <SliderBar<AnnotationTool>
-                    filters={toolsFor(mediaKind)}
-                    defaultFilter={activeTool}
-                    onChange={onToolChange}
-                    className="w-full"
-                />
+                {readOnly ? null : (
+                    <SliderBar<AnnotationTool>
+                        filters={toolsFor(mediaKind)}
+                        defaultFilter={activeTool}
+                        onChange={onToolChange}
+                        className="w-full"
+                    />
+                )}
 
                 <AnnotationList
                     annotations={annotations}
                     selectedId={selectedId}
                     onSelect={onSelectAnnotation}
-                    onRemove={onRemoveAnnotation}
+                    onRemove={readOnly ? undefined : onRemoveAnnotation}
                 />
 
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="sadSack"
-                        onClick={onClearAll}
-                        disabled={annotations.length === 0}
-                        className="gap-2"
-                    >
-                        <Trash2 size={16} />
-                        <span className="text-sm font-medium">Clear</span>
-                    </Button>
-                    <Button
-                        variant="submit"
-                        onClick={handleSave}
-                        disabled={saveStatus === 'saving' || annotations.length === 0}
-                        className="ml-auto gap-2"
-                    >
-                        <Save size={16} />
-                        <span className="text-sm">{saveStatus === 'saving' ? 'Saving…' : 'Save'}</span>
-                    </Button>
-                </div>
+                {readOnly ? null : (
+                    <>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="sadSack"
+                                onClick={onClearAll}
+                                disabled={annotations.length === 0}
+                                className="gap-2"
+                            >
+                                <Trash2 size={16} />
+                                <span className="text-sm font-medium">Clear</span>
+                            </Button>
+                            <Button
+                                variant="submit"
+                                onClick={handleSave}
+                                disabled={saveStatus === 'saving' || annotations.length === 0}
+                                className="ml-auto gap-2"
+                            >
+                                <Save size={16} />
+                                <span className="text-sm">{saveStatus === 'saving' ? 'Saving...' : 'Save'}</span>
+                            </Button>
+                        </div>
 
-                {saveStatus === 'saved' ? (
-                    <Label text="Annotations saved successfully!" htmlFor="success" variant="success" />
-                ) : null}
-                {saveStatus === 'error' ? (
-                    <Label text={error} htmlFor="error" variant="error" />
-                ) : null}
+                        {saveStatus === 'saved' ? (
+                            <Label text="Annotations saved successfully!" htmlFor="success" variant="success" />
+                        ) : null}
+                        {saveStatus === 'error' ? (
+                            <Label text={error} htmlFor="error" variant="error" />
+                        ) : null}
+                    </>
+                )}
             </div>
         </div>
     );

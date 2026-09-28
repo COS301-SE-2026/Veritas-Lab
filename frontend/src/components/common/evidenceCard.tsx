@@ -12,7 +12,7 @@ import DeleteEvidence from "./caseEvidenceDeleteButton";
 
 const PdfThumbnail = dynamic(() => import("@/components/common/pdfThumbnail"), {
     ssr: false,
-    loading: () => <span className="text-xs text-(--color-text-subtle)">Loading…</span>,
+    loading: () => <span className="text-xs text-(--color-text-subtle)">Loading...</span>,
 });
 
 function formatCapturedAt(value: string): string | null {
@@ -147,7 +147,7 @@ export default function EvidenceCard({
     }
 
     const card = (
-        <div className="vl-card vl-card-interactive flex h-[204px] w-[230px] flex-col p-4">
+        <div className={`vl-card ${href ? 'vl-card-interactive' : ''} flex h-[204px] w-[230px] flex-col p-4`}> //removed hover 
             <div className="truncate text-[16px] font-semibold text-(--color-text-strong)">{mediaName}</div>
             <div className="mt-3 flex flex-1 items-center justify-center overflow-hidden rounded-[14px] border border-(--color-line) bg-(--color-surface-sunken)">
                 {preview}
@@ -177,18 +177,25 @@ export default function EvidenceCard({
     ) : null;
     //keeping same structure as much as possible (i dont want to create errors out of nowhere in the tests or rendering) hence might look messy.
     if (href) {
+        // return (
+        //     <div className="relative">
+        //         <Link
+        //             href={href}
+        //             className="block rounded-[var(--radius-lg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--b-500)_50%,transparent)] focus-visible:ring-offset-2"
+        //         >
+        //             {card}
+        //         </Link>
+        //         {deleteButton}
+        //         {reportButton}
+        //     </div>
+        // );
         return (
-            <div className="relative">
-                <Link
-                    href={href}
-                    className="block rounded-[var(--radius-lg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--b-500)_50%,transparent)] focus-visible:ring-offset-2"
-                >
-                    {card}
-                </Link>
-                {deleteButton}
-                {reportButton}
-            </div>
-        );
+        <div className="relative">
+            {card}
+            {deleteButton}
+            {reportButton}
+        </div>
+    );
     }
 
     return (

@@ -10,6 +10,7 @@ import { useUserRole, useCurrentUser } from '@/context/UserRoleContext';
 import Label from '@/components/ui/label';
 import useCaseRiskScores from '@/lib/hooks/useCaseRiskScores';
 import { Plus, FolderSearch } from 'lucide-react';
+import { getCasePermissions } from '@/lib/casePermissions';
 
 //type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 
@@ -79,7 +80,7 @@ export default function Dashboard() {
                         </div>
                     ) : (
                         visibleCases.map((item) => {
-                            const canDeleteCase = userRole === 'ADMIN' || (userRole === 'INVESTIGATOR' /* && item.caseCreator === currentUser?.username*/);
+                            const canDeleteCase = getCasePermissions({ role: userRole, username: currentUser?.username, caseCreator: item.caseCreator, caseState: item.caseState, caseAssigned: item.caseAssigned,}).canDeleteCase; //updated delete permission
                             const risk = riskScores.find((score) => score.caseId === item.caseId);
                             const canSelfAssign = userRole === 'ADMIN' || userRole === 'INVESTIGATOR';
                             const isPublished = item.caseState === 'PUBLISHED';

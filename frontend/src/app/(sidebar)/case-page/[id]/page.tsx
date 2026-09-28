@@ -1,6 +1,5 @@
 'use client';
 import React, { useState, useEffect } from "react";
-//import { getCookie } from '@/auth/cookie';
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/button";
 import SliderBar from "@/components/ui/sliderBar";
@@ -18,8 +17,10 @@ import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
 import CaseBoard from "@/components/common/caseBoard";
 import ReportModal from "@/components/common/reportModal";
 import { resolveMediaKind } from "@/lib/media";
+import { getCasePermissions } from "@/lib/casePermissions";
 import type { CaseEvidence } from "@/types/api";
 const TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
+type CaseTab = (typeof TABS)[number];
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -32,9 +33,6 @@ export default function CasePage() {
     const id = params.id;
     const searchParams = useSearchParams();
     const tabParam = searchParams.get('tab');
-    const activeTab = TABS.includes(tabParam as typeof TABS[number])
-        ? (tabParam as typeof TABS[number])
-        : 'Evidence';
 
     useEffect(() => {
         let isActive = true;
@@ -82,21 +80,31 @@ export default function CasePage() {
             setIsLoading(false);
         }
     };
-    //permissions reviewed and updated
-     const caseDetails = caseData?.case;
+
+    const caseDetails = caseData?.case;
     const evidenceList = caseData?.evidence ?? [];
     const caseComments = caseData?.comments ?? [];
     const caseState = caseDetails?.caseState ?? 'OPEN';
-    const isCaseClosed = caseState === 'CLOSED';
-    const isCaseOpen = caseState === 'OPEN';
-    //might need to still re review the permissions
-    const isOwner = !!caseDetails && caseDetails.caseCreator === currentUser?.username;
-    const canUploadEvidence = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN' || userRole === 'USER') && isOwner && isCaseOpen; //creator, before publishing
-    const canCloseCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !isCaseClosed; //need to add assigned can only close with admin
-    const canDeleteEvidence = ((userRole === 'INVESTIGATOR' && isOwner) || (userRole === 'USER' && isOwner) || userRole === 'ADMIN') && !isCaseClosed; //user that is owner or any admin
-    const canEditCase = (userRole === 'INVESTIGATOR' || userRole === 'ADMIN') && !!caseDetails /*&& caseDetails.caseCreator === currentUser?.username  change to assigned */&& !isCaseClosed; //owner and not closed
-    const canPublishCase = isOwner && isCaseOpen; //any role, own case, still open
-    
+
+    // All visibility rules live in lib/casePermissions.ts
+    const permissions = getCasePermissions({
+        role: userRole,
+        username: currentUser?.username,
+        caseCreator: caseDetails?.caseCreator,
+        caseState: caseDetails?.caseState,
+        caseAssigned: caseDetails?.caseAssigned,
+    });
+
+    const visibleTabs = TABS.filter((tab) => {
+        if (tab === 'Audit Timeline') return permissions.canViewTimeline;
+        if (tab === 'Case Board') return permissions.canViewBoard;
+        return true;
+    });
+    // A hidden tab requested via ?tab= falls back to Evidence rather than leaking the view.
+    const activeTab: CaseTab = visibleTabs.includes(tabParam as CaseTab)
+        ? (tabParam as CaseTab)
+        : 'Evidence';
+
     function formatCaseDate(dateValue?: string | null) {
         if (!dateValue) return 'Unknown';
         const date = new Date(dateValue);
@@ -119,9 +127,9 @@ export default function CasePage() {
                         </p>
                         {error ? <div className="mt-3"><Label text={error} htmlFor="error" variant="error"/></div> : null}
                     </div>
-                    {(canUploadEvidence || canEditCase) ? (
+                    {(permissions.canUploadEvidence || permissions.canEditCase) ? (
                         <div className="flex items-center gap-2">
-                            {canEditCase ? (
+                            {permissions.canEditCase ? (
                                 <CaseEditButton
                                     caseId={id}
                                     initialName={caseDetails?.caseName ?? ''}
@@ -129,7 +137,7 @@ export default function CasePage() {
                                     onUpdated={reloadCaseData}
                                 />
                             ) : null}
-                            {canUploadEvidence ? (
+                            {permissions.canUploadEvidence ? (
                                 <Button variant="submit" className="gap-2" onClick={openModal} disabled={!caseDetails}>
                                     <UploadCloud size={18} />
                                     Upload Evidence
@@ -140,8 +148,9 @@ export default function CasePage() {
                 </div>
 
                 <div className="mt-8">
-                    <SliderBar //changed sliderbar to fetch TABS and actively change page layout
-                        filters={TABS}
+                    <SliderBar //reupdated sliderbar without TABS instead making a visible version for each permissions
+                        key={visibleTabs.join('|')}
+                        filters={visibleTabs}
                         defaultFilter={activeTab}
                         onChange={(tab) => router.push(`/case-page/${id}?tab=${tab}`)}
                         className='w-full max-w-xl'
@@ -158,13 +167,13 @@ export default function CasePage() {
                                         mediaName={evidence.casePerspective}
                                         mediaUrl={evidence.mediaUrl}
                                         mediaExtension={evidence.mediaExtension}
-                                        href={`/case-page/${id}/workbench/${evidence.mediaId}`}
+                                        href={permissions.canOpenWorkbench ? `/case-page/${id}/workbench/${evidence.mediaId}` : undefined}
                                         mediaId={evidence.mediaId}
                                         caseId={id}
-                                        canDelete={canDeleteEvidence}
+                                        canDelete={permissions.canDeleteEvidence}
                                         onDeleted={reloadCaseData}
                                         variant="default"
-                                        viewReport={() => setReportEvidence(evidence)}
+                                        viewReport={permissions.canViewReport ? () => setReportEvidence(evidence) : undefined}
                                     />
                                 )) : (
                                     <div className="w-full rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
@@ -177,16 +186,13 @@ export default function CasePage() {
                                 caseId={id}
                                 initialComments={caseComments}
                                 currentUsername={currentUser?.username ?? ''}
+                                canComment={permissions.canComment}
                             />
                         ) : activeTab === 'Audit Timeline' ? (
                             <AuditTimeline caseId={id} />
                         ) : activeTab === 'Case Board' ? (
-                            <CaseBoard caseId={id} evidenceList={evidenceList}/>
-                        ) : (
-                            <div className="rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
-                                {activeTab} is not available yet.
-                            </div>
-                        )}
+                            <CaseBoard caseId={id} evidenceList={evidenceList} readOnly={!permissions.canEditBoard} />
+                        ) : null}
                     </div>
                     {activeTab !== 'Case Board' ? (
                     <div className="w-full shrink-0 lg:w-72">
@@ -207,7 +213,7 @@ export default function CasePage() {
                                 </div>
                             </dl>
                         </div>
-                        {canPublishCase ? (
+                        {permissions.canPublishCase ? (
                             <CasePublishButton
                                 caseId={id}
                                 caseTitle={caseDetails?.caseName ?? 'this case'}
@@ -215,7 +221,7 @@ export default function CasePage() {
                                 className="mt-4"
                             />
                         ) : null}
-                        {canCloseCase ? (
+                        {permissions.canCloseCase ? (
                             <CaseCloseButton
                                 caseId={id}
                                 onClosed={reloadCaseData}
@@ -226,7 +232,7 @@ export default function CasePage() {
                     ) : null}
                 </div>
             </div>
-            {canUploadEvidence ? (
+            {permissions.canUploadEvidence ? (
                 <MediaUploadModal isOpen={isModalOpen} onClose={closeModal} caseId={id} onUploaded={reloadCaseData} />
             ) : null}
             <ReportModal
