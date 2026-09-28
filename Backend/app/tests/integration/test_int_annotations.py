@@ -722,9 +722,10 @@ async def test_integration_create_comment_user_open_case_forbidden(client, fake_
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "Users may only comment on closed cases"
+    assert response.json()["detail"]["message"] == "Users may only comment on cases they created"
     await assert_against_comment_table(user_name)
 
+    
 # 404
 @pytest.mark.asyncio
 async def test_integration_create_comment_case_not_found(client, fake_comment_context):

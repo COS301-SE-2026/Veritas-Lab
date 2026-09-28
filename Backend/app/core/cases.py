@@ -751,7 +751,6 @@ class Case:
                 i.username,
                 i.comment,
                 i.commenttimestamp,
-                c.casestate,
                 (c.caseid IS NOT NULL) AS case_exists,
                 (i.commentid IS NOT NULL) AS comment_inserted
             FROM case_check c
