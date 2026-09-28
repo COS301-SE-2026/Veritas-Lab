@@ -16,7 +16,7 @@ import { fetchCase } from '@/lib/api/case';
 import { resolveMediaKind } from '@/lib/media';
 import type { CaseEvidence } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
-import { normalizeAnnotations } from '@/lib/workbenchAnnotations';
+import { mergeEvidenceAnnotations } from '@/lib/workbenchAnnotations';
 import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
 import ReportPanel from '@/components/common/reportPanel';
 
@@ -88,7 +88,7 @@ export default function WorkbenchPage() {
 
     if (evidence !== seededForm) {
         setSeededForm(evidence);
-        loadAnnotations(normalizeAnnotations(evidence?.annotations));
+        loadAnnotations(mergeEvidenceAnnotations(evidence?.annotations, evidence?.automatedAnnotations));
     }
     const mediaName = evidence?.casePerspective ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
@@ -104,7 +104,7 @@ export default function WorkbenchPage() {
     const PAPModelsActive = activeWorkbenchTool === 'Plug-and-Play Models';
     const reportActive = activeWorkbenchTool === 'AI Report';
 
-    const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations });
+    const handleSave = () => saveAnnotations({ caseId, mediaId: evidenceId, annotations: annotations.filter((annotation) => annotation.source !== 'AI'),});
 
     return (
         <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">

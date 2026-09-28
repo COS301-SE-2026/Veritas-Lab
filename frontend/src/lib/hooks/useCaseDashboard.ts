@@ -25,6 +25,12 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
     const [error, setError] = useState<string | null>(null);
     const cases = options.initialCases ?? fetchedCases;
     const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     const loadCases = async () => {
         setIsLoading(true);
@@ -76,7 +82,6 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
         })();
 
         return () => {
-            isMounted.current = false;
             isActive = false;
         };
     }, [options.initialCases]);

@@ -20,6 +20,7 @@ describe('CaseEvidenceDeleteButton', () => {
             fetchCase: jest.fn(),
             fetchCases: jest.fn(),
             addEvidence: jest.fn(),
+            publishCase: jest.fn(),
             closeCase: jest.fn(),
             deleteEvidence,
             editComment: jest.fn(),

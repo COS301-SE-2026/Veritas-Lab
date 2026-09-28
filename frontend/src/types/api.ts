@@ -54,6 +54,7 @@ export type CaseEvidence = {
     mediaTypeId: string;
     mediaUrl: string;
     annotations: Annotation[] | null;
+    automatedAnnotations?: Annotation[] | null;
     reportArtifacts: Record<string, unknown> | null;
     reportFindings: ReportFindings | null;
     reportCertainty: number | null;
@@ -99,13 +100,8 @@ export type AuditEvents = {
     action: string;
 }
 
-// export type AuditLogResponse = {
-//     auditLogs: AuditTimelineResponse[];
-// }
-
 export type AuditLogResponse = {
-    status: string;
-    cases: AuditLogCase[];
+    auditLogs: AuditTimelineResponse[];
 }
 
 export type AuditLogCase = {

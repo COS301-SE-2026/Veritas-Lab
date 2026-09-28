@@ -16,14 +16,16 @@ export default function AuditLogs() {
         return <Label text={error} htmlFor="error" variant="error" />;
     }
 
-    if (!auditLogs || !auditLogs.cases || auditLogs.cases.length === 0) {
+    if (!auditLogs || !auditLogs.auditLogs || auditLogs.auditLogs.length === 0) {
         return <Label text="No audit logs found" htmlFor="no-logs" variant="info" />;
     }
 
     return (
         <div className="space-y-3">
-            {auditLogs.cases.map((log, index) => (
-                <AuditLogCaseCard key={index} cases={log} />
+            {auditLogs.auditLogs.map((log, index) => (
+                <div key={index}>
+                    <AuditLogCaseCard key={index} caseId={log.caseID} events={log.events} />
+                </div>
             ))}
         </div>
     );

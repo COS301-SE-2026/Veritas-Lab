@@ -70,7 +70,7 @@ export async function addComment(caseId: string, comment: string) {
 
 export async function closeCase(caseId: string): Promise<{ status: string; message?: string }> {
     const res = await apiFetch(`/api/closeCase`, {
-        method: 'POST',
+    method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
         },
