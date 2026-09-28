@@ -11,13 +11,14 @@ import useAnnotations from '@/lib/hooks/useAnnotations';
 import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
 import { resolveMediaKind } from '@/lib/media';
-import { getCasePermissions } from '@/lib/casePermissions';
+import { getCasePermissions, getVisibleCaseTabs } from '@/lib/casePermissions';
 import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
 import type { CaseEvidence, CaseResponse } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
 import { mergeEvidenceAnnotations } from '@/lib/workbenchAnnotations';
 import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
 import ReportPanel from '@/components/common/reportPanel';
+import { usePublishCaseNav } from '@/context/caseNavContext';
 
 const WORKBENCH_TABS: readonly WorkbenchTool[] = [ 'AI Report', 'Annotations', 'Metadata', 'Plug-and-Play Models'];
 
@@ -100,6 +101,7 @@ export default function WorkbenchPage() {
         caseState: caseDetails?.caseState,
         caseAssigned: caseDetails?.caseAssigned,
     });
+    usePublishCaseNav(caseId, caseDetails ? getVisibleCaseTabs(permissions) : null);
     const canAnnotate = permissions.canAnnotate;
     const workbenchTabs = WORKBENCH_TABS.filter(
         (tab) => tab !== 'Plug-and-Play Models' || permissions.canUsePlugAndPlay,

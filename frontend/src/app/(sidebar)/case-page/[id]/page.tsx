@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/button";
-import SliderBar from "@/components/ui/sliderBar";
+import { usePublishCaseNav } from "@/context/caseNavContext";
 import EvidenceCard from "@/components/common/evidenceCard";
 import MediaUploadModal from "@/components/common/mediaUploadModal";
 import CaseCloseButton from "@/components/common/caseCloseButton";
@@ -17,10 +17,8 @@ import { UploadCloud, CalendarDays, FileStack } from "lucide-react";
 import CaseBoard from "@/components/common/caseBoard";
 import ReportModal from "@/components/common/reportModal";
 import { resolveMediaKind } from "@/lib/media";
-import { getCasePermissions } from "@/lib/casePermissions";
+import { getCasePermissions, getVisibleCaseTabs, type CaseTab } from "@/lib/casePermissions";
 import type { CaseEvidence } from "@/types/api";
-const TABS = ['Evidence', 'Comments', 'Audit Timeline', 'Case Board'] as const;
-type CaseTab = (typeof TABS)[number];
 export default function CasePage() {
     const { fetchCase } = useCase();
     const [caseData, setCaseData] = useState<Awaited<ReturnType<typeof fetchCase>> | null>(null);
@@ -28,7 +26,6 @@ export default function CasePage() {
     const [error, setError] = useState<string | null>(null);
     const userRole = useUserRole();
     const currentUser = useCurrentUser();
-    const router = useRouter();
     const params = useParams<{ id: string }>();
     const id = params.id;
     const searchParams = useSearchParams();
@@ -86,7 +83,7 @@ export default function CasePage() {
     const caseComments = caseData?.comments ?? [];
     const caseState = caseDetails?.caseState ?? 'OPEN';
 
-    // All visibility rules live in lib/casePermissions.ts
+    //visibility is inside casePermissions
     const permissions = getCasePermissions({
         role: userRole,
         username: currentUser?.username,
@@ -95,12 +92,8 @@ export default function CasePage() {
         caseAssigned: caseDetails?.caseAssigned,
     });
 
-    const visibleTabs = TABS.filter((tab) => {
-        if (tab === 'Audit Timeline') return permissions.canViewTimeline;
-        if (tab === 'Case Board') return permissions.canViewBoard;
-        return true;
-    });
-    // A hidden tab requested via ?tab= falls back to Evidence rather than leaking the view.
+    const visibleTabs = getVisibleCaseTabs(permissions);
+    usePublishCaseNav(id, caseDetails ? visibleTabs : null);
     const activeTab: CaseTab = visibleTabs.includes(tabParam as CaseTab)
         ? (tabParam as CaseTab)
         : 'Evidence';
@@ -147,15 +140,6 @@ export default function CasePage() {
                     ) : null}
                 </div>
 
-                <div className="mt-8">
-                    <SliderBar //reupdated sliderbar without TABS instead making a visible version for each permissions
-                        key={visibleTabs.join('|')}
-                        filters={visibleTabs}
-                        defaultFilter={activeTab}
-                        onChange={(tab) => router.push(`/case-page/${id}?tab=${tab}`)}
-                        className='w-full max-w-xl'
-                    />
-                </div>
 
                 <div className="mt-8 flex flex-col gap-6 lg:flex-row">
                     <div className="min-w-0 flex-1">
