@@ -25,7 +25,7 @@ export default function EvidenceThumbnail({ mediaUrl, mediaName, mediaExtension,
         )
     }
     if (mediaKind === 'image') {
-        return <Image src={mediaUrl} width={width} height={width} alt={mediaName} />;
+        return <Image src={mediaUrl} width={width} height={width} alt={mediaName} unoptimized />;
     }
     if (mediaKind === 'pdf') { 
         return <PdfThumbnail url={mediaUrl} width={width} />;
@@ -36,7 +36,7 @@ export default function EvidenceThumbnail({ mediaUrl, mediaName, mediaExtension,
                 <video
                     src={mediaUrl}
                     onError={() => setVideoFailed(true)}
-                    className="pointer-events-none h-full w-full"
+                    className="pointer-events-none h-full w-full object-cover"
                 />
             </div>
         )
