@@ -1,23 +1,33 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import AuditLogCaseCard from '@/components/common/auditLogCaseCard';
-import { AuditEvents } from '@/types/api';
+import { AuditEvents, AuditLogCase } from '@/types/api';
 jest.mock('lucide-react', () => ({
     __esModule: true,
     ChevronDown: jest.fn(() => <div data-testid="chevron-icon">ChevronDown Icon</div>),
 }));
 
 describe('AuditLogCaseCard', () => {
-    const mockedCase: AuditEvents[] = [{
-        timestamp: '2026-09-11T11:30:00.000Z',
-        user: 'user1',
-        action: 'Created case',
-    }];
+    const mockedCase: AuditLogCase = {
+        caseId: 'case-1',
+        caseName: 'Case 1',
+        eventCount: 1,
+        lastEventTimestamp: '2026-09-11T11:30:00.000Z',
+        caseExists: true,
+        events: [
+            {
+                
+                timestamp: '2026-09-11T11:30:00.000Z',
+                user: 'user1',
+                action: 'Created case',
+            }
+        ]
+    };
     afterEach(() => {
         jest.clearAllMocks();
     });
 
     it('renders case ID in closed state', () => {
-        render(<AuditLogCaseCard caseId='case-1' events={mockedCase}  />);
+        render(<AuditLogCaseCard caseLog={mockedCase}/>);
         expect(screen.getByText('Case 1')).toBeInTheDocument();
         expect(screen.queryByText('Case Name: Case 1')).not.toBeInTheDocument();
         expect(screen.queryByText('Events: 2')).not.toBeInTheDocument();
@@ -26,7 +36,7 @@ describe('AuditLogCaseCard', () => {
     });
 
     it('renders case ID and events in open state', () => {
-        render(<AuditLogCaseCard caseId='case-1' events={mockedCase} />);
+        render(<AuditLogCaseCard caseLog={mockedCase} />);
         const chevy = screen.getByTestId('chevron-icon');
         fireEvent.click(chevy);
 
@@ -38,7 +48,7 @@ describe('AuditLogCaseCard', () => {
     });
 
     it('collapses events when clicking the chevron icon again', () => {
-        render(<AuditLogCaseCard caseId='case-1' events={mockedCase} />);
+        render(<AuditLogCaseCard caseLog={mockedCase} />);
         const chevy = screen.getByTestId('chevron-icon');
         fireEvent.click(chevy);
         expect(screen.getByText('Case ID: case-1')).toBeInTheDocument();

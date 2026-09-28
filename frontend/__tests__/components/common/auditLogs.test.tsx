@@ -47,7 +47,7 @@ describe('AuditLogs', () => {
 
     it('renders audit logs when data is available', () => {
         const useAuditLogMock = useAuditLog as jest.Mock;
-        const mockAuditLogs =  {
+        const mockAuditLogs = {
                 status: 'success',
                 cases: [
                     {

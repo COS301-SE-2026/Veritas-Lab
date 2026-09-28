@@ -14,9 +14,14 @@ describe('useAuditLog', () => {
     it('fetches and returns audit log info', async () => {
         const mockedGetAllAudit = getAllAudit as jest.MockedFunction<typeof getAllAudit>;
         const mockedResponse: AuditLogResponse  = {
-            auditLogs: [
+            status: 'success',
+            cases: [
                 {
-                    caseID: 'case-1',
+                    caseId: 'case-1',
+                    caseName: 'Case 1',
+                    eventCount: 2,
+                    lastEventTimestamp: '2026-09-11T11:30:00.000Z',
+                    caseExists: true,
                     events: [
                         {
                             timestamp: '2026-09-11T11:30:00.000Z',
@@ -31,7 +36,11 @@ describe('useAuditLog', () => {
                     ]
                 },
                 {
-                    caseID: 'case-2',
+                    caseId: 'case-2',
+                    caseName: 'Case 2',
+                    eventCount: 2,
+                    lastEventTimestamp: '2026-09-11T12:30:00.000Z',
+                    caseExists: false,
                     events: [
                         {
                             timestamp: '2026-09-11T11:30:00.000Z',
