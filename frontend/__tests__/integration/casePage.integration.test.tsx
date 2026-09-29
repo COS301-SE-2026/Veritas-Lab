@@ -176,7 +176,7 @@ describe('CasePage (integration)', () => {
     //     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     // });
     //will need to re review the above for when self assignment is officially added for permissions
-    it('shows edit, close and evidence delete for an admin who doesnt own the case but not upload', async () => {
+    it('shows close and evidence delete for an admin who doesnt own the case but not edit or upload', async () => {
         mockUseUserRole.mockReturnValue('ADMIN');
         mockUseCurrentUser.mockReturnValue({ username: 'admin.user' });
 
@@ -191,7 +191,7 @@ describe('CasePage (integration)', () => {
 
         render(<CasePage />);
         await screen.findByText('Alpha Fraud');
-        expect(screen.getByRole('button', { name: 'Edit Case' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Edit Case' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Upload Evidence' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Delete evidence' })).toBeInTheDocument();
@@ -215,7 +215,7 @@ describe('CasePage (integration)', () => {
         await screen.findByText('Alpha Fraud');
         expect(screen.queryByRole('button', { name: 'Upload Evidence' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Delete evidence' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Edit Case' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Edit Case' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Close Case' })).toBeInTheDocument();
     });
 

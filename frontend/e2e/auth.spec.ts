@@ -67,7 +67,9 @@ test('a new user can register, log out, log back in and change their password', 
     await ui.logOut().click();
     await expect(page).toHaveURL(/\/login$/);
     //the old password must no longer work
+    await auth.email().clear();
     await auth.email().pressSequentially(email);
+    await auth.password().clear();
     await auth.password().pressSequentially(password);
     const [rejected] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/login') && r.request().method() === 'POST'),
@@ -75,7 +77,9 @@ test('a new user can register, log out, log back in and change their password', 
     ]);
     expect(rejected.status()).not.toBe(200);
     await expect(page).toHaveURL(/\/login$/);
+    await auth.email().clear();
     await auth.email().pressSequentially(email);
+    await auth.password().clear();
     await auth.password().pressSequentially(newPassword);
     const [accepted] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/api/login') && r.request().method() === 'POST'),
