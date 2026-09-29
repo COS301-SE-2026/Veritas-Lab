@@ -2943,55 +2943,17 @@ async def get_case_audit_events(
 
     validated_case_id = Case(case_id=case_id).case_id
     role = payload.get("role")
-    username = payload.get("username")
+
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": AUDIT_NOT_ALLOWED
+            }
+        )
 
     try:
-        if role not in ["ADMIN", "INVESTIGATOR"]:
-            ownership = await connection.fetchrow(
-                """
-                SELECT
-                    COALESCE(cases.casecreator, audit.old_casecreator) AS casecreator,
-                    COALESCE(cases.caseassigned, audit.old_caseassigned) AS caseassigned
-                FROM (SELECT $1::uuid AS caseid) AS target
-                LEFT JOIN "Cases_DB"."Cases" AS cases
-                    ON cases.caseid = target.caseid
-                LEFT JOIN LATERAL (
-                    SELECT old_casecreator, old_caseassigned
-                    FROM "Cases_DB"."Audit_Cases"
-                    WHERE old_case_id = target.caseid
-                    ORDER BY audit_case_id DESC
-                    LIMIT 1
-                ) AS audit ON TRUE
-                """,
-                validated_case_id
-            )
-
-            if ownership is None or username != ownership["casecreator"]:
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "status": "error",
-                        "message": AUDIT_NOT_ALLOWED
-                    }
-                )
-
-            if username != ownership["casecreator"]:
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "status": "error",
-                        "message": AUDIT_NOT_ALLOWED
-                    }
-                )
-        else:
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "status": "error",
-                    "message": AUDIT_NOT_ALLOWED
-                }
-            )
-
         rows = await connection.fetch(
             """
             WITH case_audit AS (
@@ -3007,20 +2969,19 @@ async def get_case_audit_events(
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
 
+                UNION ALL
 
-            UNION ALL
-
-            SELECT
-                2147483647,
-                NULL::timestamptz,
-                NULL::varchar,
-                NULL::text,
-                cases.casename,
-                cases.casedescription,
-                cases.casestate,
-                cases.caseassigned
-            FROM "Cases_DB"."Cases" AS cases
-            WHERE cases.caseid = $1::uuid
+                SELECT
+                    2147483647,
+                    NULL::timestamptz,
+                    NULL::varchar,
+                    NULL::text,
+                    cases.casename,
+                    cases.casedescription,
+                    cases.casestate,
+                    cases.caseassigned
+                FROM "Cases_DB"."Cases" AS cases
+                WHERE cases.caseid = $1::uuid
             ),
             case_transitions AS (
                 SELECT
@@ -3075,14 +3036,17 @@ async def get_case_audit_events(
                         WHEN 'INSERT' THEN 'Evidence Added'
                         ELSE 'Evidence Annotated'
                     END AS eventaction
-                    FROM "Cases_DB"."Audit_Media" AS audit_media
-                    INNER JOIN "Cases_DB"."Cases" AS cases
-                        ON cases.caseid = $1::uuid
-                    CROSS JOIN LATERAL unnest(
-                        COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
-                    ) AS elem
-                    WHERE elem.evidence_id = audit_media.old_media_id
-                        AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
+                FROM "Cases_DB"."Audit_Media" AS audit_media
+                INNER JOIN "Cases_DB"."Cases" AS cases
+                    ON cases.caseid = $1::uuid
+                CROSS JOIN LATERAL unnest(
+                    COALESCE(
+                        cases.evidence,
+                        ARRAY[]::"Cases_DB".evidence_type[]
+                    )
+                ) AS elem
+                WHERE elem.evidence_id = audit_media.old_media_id
+                    AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
             )
             SELECT
                 audit_events.eventtimestamp AS eventtimestamp,
