@@ -281,7 +281,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
                         ? 'fixed inset-0 z-50 flex flex-col gap-4 bg-(--color-surface-muted) p-4 lg:flex-row'
                         : 'flex flex-col gap-6 lg:flex-row'
                 }>
-                <div className={fullscreen ? 'min-h-0 min-w-0 flex-1' : 'flex-1'}>
+                <div className={fullscreen ? 'min-h-0 min-w-0 flex-1' : 'min-w-0 flex-1'}>
                     <CaseBoardCanvas 
                         id="droppable"
                         nodes={nodes}
@@ -300,7 +300,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
                         unsaved={unsaved}
                     />
                 </div>
-                    <div className={`w-full shrink-0 lg:w-72 ${fullscreen ? 'min-h-0 overflow-y-auto' : ''}`}>
+                    <div className={`w-full shrink-0 lg:w-130 ${fullscreen ? 'min-h-0 overflow-y-auto' : ''}`}>
                         <div className="vl-panel p-5">
                             <SliderBar
                                 filters={TABS}

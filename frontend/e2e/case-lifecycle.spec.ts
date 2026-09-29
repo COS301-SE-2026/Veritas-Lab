@@ -67,11 +67,12 @@ test('a case moves from draft to closed across three roles', async ({ browser })
         await expect(investigatorUi.status()).toHaveText('Closed');
         await expect(investigatorUi.closeCase()).toHaveCount(0);
         await expect(investigatorUi.editCase()).toHaveCount(0);
-        //the owner sees it closed and can still comment
+        //the owner sees it closed and can no longer comment
         await ownerUi.goto(caseId);
         await expect(ownerUi.status()).toHaveText('Closed');
         await ownerUi.goto(caseId, 'Comments');
-        await expect(ownerUi.commentComposer()).toBeVisible();
+        await expect(ownerUi.commentComposer()).toHaveCount(0);
+        await expect(ownerUi.readOnlyCommentNotice()).toBeVisible();
     } finally {
         await ownerContext.close();
         await investigatorContext.close();

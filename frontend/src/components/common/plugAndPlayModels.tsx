@@ -95,6 +95,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
     //runs the model on the current file
     const runCustomModel = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        setFullSuccess(false);
         try {
             if (!modelFile) {
                 throw new Error('No model file selected');

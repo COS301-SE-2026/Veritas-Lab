@@ -78,7 +78,7 @@ export function getCasePermissions({
         canViewTimeline: isAssigned || isViewer,
         canViewBoard: isAssigned || isViewer,
         canEditBoard: canWorkOnCase,
-        canComment: isOwner || (isStaff && !isOpen),
+        canComment: (isOwner && !isClosed) || (isStaff && !isOwner && !isOpen), //updated so that owner of case cannot comment once case is closed to prevent spamming
         canAnnotate: canWorkOnCase,
         canUsePlugAndPlay: (isAssigned && isPublished),
     };
