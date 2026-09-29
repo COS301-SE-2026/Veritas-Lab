@@ -69,6 +69,11 @@ Demo 3
 |[SAS NFR Testing](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/NFR-Testing-Demo-3)| NFR Testing|
 |[SAS NFR Traceability Matrix](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/NFR-Traceability-Matrix-Demo-3)| NFR Traceability Matrix|
 
+Demo 4
+
+| Resources | Description |
+|-----------|-------------|
+|[User Manual](Docs/Demo_4/User-Manual-Veritas-Lab.pdf)| The user manual|
 </div>
 </div>
 <br/>
