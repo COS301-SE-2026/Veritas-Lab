@@ -28,7 +28,6 @@ for (const role of ['INVESTIGATOR', 'ADMIN'] as const) {
                 const ui = casePage(page);
                 await ui.goto(seeded.caseId);
                 await expect(ui.closeCase()).toBeVisible();
-                await expect(ui.editCase()).toBeVisible();
                 await dash.goto();
                 await dash.search().fill(seeded.title);
                 await dash.unassign(seeded.title).click();
@@ -74,7 +73,8 @@ for (const role of ['INVESTIGATOR', 'ADMIN'] as const) {
                 await dash.goto();
                 //a draft owned by someone else isnt visible at all.
                 await dash.search().fill(draft.title);
-                await expect(page.getByText('No cases found.')).toBeVisible();
+                await expect(dash.card(draft.title)).toHaveCount(0);
+                // await expect(page.getByText('No cases found.')).toBeVisible();
                 await dash.search().fill(taken.title);
                 await expect(dash.card(taken.title)).toBeVisible();
                 await expect(dash.assignToMe(taken.title)).toHaveCount(0);

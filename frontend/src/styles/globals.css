@@ -126,6 +126,13 @@
     color: inherit;
     background: transparent;
   }
+  
+  .vl-btn-light-outline {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border-color: var(--color-line-strong);
+    box-shadow: var(--shadow-xs);
+  }
 
   .vl-card {
     background: var(--color-surface);
@@ -236,7 +243,7 @@
   .vl-float-toolbar-light .vl-float-divider { background: var(--color-line-strong); }
 
   .vl-btn-primary:not(:disabled):hover { background: var(--color-b-600); box-shadow: var(--shadow-md); transform: translateY(-1px); }
-  .vl-btn-primary:not(:disabled):hover { background: var(--color-b-600); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .vl-btn-light-outline:not(:disabled):hover { background: var(--color-surface-muted); border-color: var(--color-primary); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
   .vl-btn-outline:not(:disabled):hover { border-color: var(--color-primary); background: var(--color-surface-muted); }
   .vl-btn-light:not(:disabled):hover { background: var(--color-surface-muted); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
   .vl-btn-ghost:not(:disabled):hover { background: var(--color-surface-sunken); color: var(--color-primary); }

@@ -134,7 +134,7 @@ export type ButtonProps = {
     onClick?: () => void;
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack' | 'light';
+    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack' | 'light' | 'light-outline';
     size?: 'small' | 'medium' | 'large';
     className?: string;
 };

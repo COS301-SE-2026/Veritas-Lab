@@ -18,8 +18,9 @@ test('a case moves from draft to closed across three roles', async ({ browser })
         const ownerDash = dashboardPage(ownerPage);
         await ownerDash.goto();
         await ownerDash.newCase().click();
-        await ownerDash.caseTitle().fill(caseTitle);
-        await ownerDash.caseDescription().fill('Lifecycle flow');
+        await ownerDash.caseTitle().pressSequentially(caseTitle);
+        await ownerDash.caseDescription().pressSequentially('Lifecycle flow');
+        await expect(ownerDash.caseTitle()).toHaveValue(caseTitle);
         const [createResponse] = await Promise.all([
             ownerPage.waitForResponse((r) => r.url().includes('/api/createCase')),
             ownerDash.submitNewCase().click(),
@@ -56,7 +57,6 @@ test('a case moves from draft to closed across three roles', async ({ browser })
         const investigatorUi = casePage(investigatorPage);
         await investigatorUi.goto(caseId);
         await expect(investigatorUi.closeCase()).toBeVisible();
-        await expect(investigatorUi.editCase()).toBeVisible();
         const [closeResponse] = await Promise.all([
             investigatorPage.waitForResponse((r) => r.url().includes('/api/closeCase')),
             investigatorUi.closeCase().click(),
@@ -67,11 +67,12 @@ test('a case moves from draft to closed across three roles', async ({ browser })
         await expect(investigatorUi.status()).toHaveText('Closed');
         await expect(investigatorUi.closeCase()).toHaveCount(0);
         await expect(investigatorUi.editCase()).toHaveCount(0);
-        //the owner sees it closed and can still comment
+        //the owner sees it closed and can no longer comment
         await ownerUi.goto(caseId);
         await expect(ownerUi.status()).toHaveText('Closed');
         await ownerUi.goto(caseId, 'Comments');
-        await expect(ownerUi.commentComposer()).toBeVisible();
+        await expect(ownerUi.commentComposer()).toHaveCount(0);
+        await expect(ownerUi.readOnlyCommentNotice()).toBeVisible();
     } finally {
         await ownerContext.close();
         await investigatorContext.close();

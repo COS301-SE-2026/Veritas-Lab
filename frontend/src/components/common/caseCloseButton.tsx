@@ -27,7 +27,7 @@ export default function CaseCloseButton({ caseId, onClosed, className = '' }: Ca
     return (
         <div className={className}>
             <Button
-                variant="outline"
+                variant="primary"
                 onClick={handleClose}
                 disabled={isClosing}
                 className="w-full gap-2 py-3"

@@ -6,6 +6,10 @@ from app.core.env import Postgres_Settings,Other_Settings
 from app.core.media_relay import get_service
 from contextlib import asynccontextmanager
 import asyncpg
+import torch
+
+torch.set_num_threads(2)
+torch.set_num_interop_threads(1)
 
 other_settings = Other_Settings()
 postgres_settings = Postgres_Settings()

@@ -25,6 +25,8 @@ export default function Button({
         submit: 'vl-btn vl-btn-primary',
         sadSack: 'vl-btn vl-btn-ghost',
         light: 'vl-btn vl-btn-light',
+        //due to my dash have to have it in single qoutes
+        'light-outline': 'vl-btn vl-btn-light-outline',
     };
 
     return (

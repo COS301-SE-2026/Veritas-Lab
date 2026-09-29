@@ -32,6 +32,17 @@ from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_S
 from app.core.cases import get_object
 from app.core.database import get_connection
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+background_tasks: set[asyncio.Task] = set()
+analysis_semaphore = asyncio.Semaphore(1)
+
+def start_media_pipeline(relay) -> None:
+    task = asyncio.create_task(run_media_pipeline(relay))
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -49,6 +60,12 @@ CASE_UPDATED_SUCCESS = "Case updated successfully."
 UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 COMMENT_UPDATED_SUCCESS = "Comment edit successfully."
 
+async def run_media_pipeline(relay) -> None:
+    try:
+        async with analysis_semaphore:
+            await relay.relay_to_service()
+    except Exception:
+        logger.exception("Media pipeline failed")
 
 UPDATE_CASE_SQL = """
     UPDATE "Cases_DB"."Cases"
@@ -1311,7 +1328,7 @@ async def upload_evidence(
         media_id = UUID(result["MediaId"])
 
         relay = media_relay(media_id=media_id, extension=extension)
-        asyncio.create_task(relay.relay_to_service())
+        start_media_pipeline(relay)
 
         return {
             "status": "success",
@@ -2931,40 +2948,18 @@ async def get_case_audit_events(
     payload = await verify_jwt(request, connection)
 
     validated_case_id = Case(case_id=case_id).case_id
+    role = payload.get("role")
 
-    username = payload.get("username")
-    is_admin = payload.get("role") == "ADMIN"
+    if role not in ["ADMIN", "INVESTIGATOR"]:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": "error",
+                "message": AUDIT_NOT_ALLOWED
+            }
+        )
 
     try:
-        if not is_admin:
-            ownership = await connection.fetchrow(
-                """
-                SELECT
-                    COALESCE(cases.casecreator, audit.old_casecreator) AS casecreator,
-                    COALESCE(cases.caseassigned, audit.old_caseassigned) AS caseassigned
-                FROM (SELECT $1::uuid AS caseid) AS target
-                LEFT JOIN "Cases_DB"."Cases" AS cases
-                    ON cases.caseid = target.caseid
-                LEFT JOIN LATERAL (
-                    SELECT old_casecreator, old_caseassigned
-                    FROM "Cases_DB"."Audit_Cases"
-                    WHERE old_case_id = target.caseid
-                    ORDER BY audit_case_id DESC
-                    LIMIT 1
-                ) AS audit ON TRUE
-                """,
-                validated_case_id
-            )
-
-            if username not in (ownership["casecreator"], ownership["caseassigned"]):
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "status": "error",
-                        "message": AUDIT_NOT_ALLOWED
-                    }
-                )
-
         rows = await connection.fetch(
             """
             WITH case_audit AS (
@@ -2980,20 +2975,19 @@ async def get_case_audit_events(
                 FROM "Cases_DB"."Audit_Cases"
                 WHERE old_case_id = $1::uuid
 
+                UNION ALL
 
-            UNION ALL
-
-            SELECT
-                2147483647,
-                NULL::timestamptz,
-                NULL::varchar,
-                NULL::text,
-                cases.casename,
-                cases.casedescription,
-                cases.casestate,
-                cases.caseassigned
-            FROM "Cases_DB"."Cases" AS cases
-            WHERE cases.caseid = $1::uuid
+                SELECT
+                    2147483647,
+                    NULL::timestamptz,
+                    NULL::varchar,
+                    NULL::text,
+                    cases.casename,
+                    cases.casedescription,
+                    cases.casestate,
+                    cases.caseassigned
+                FROM "Cases_DB"."Cases" AS cases
+                WHERE cases.caseid = $1::uuid
             ),
             case_transitions AS (
                 SELECT
@@ -3048,14 +3042,17 @@ async def get_case_audit_events(
                         WHEN 'INSERT' THEN 'Evidence Added'
                         ELSE 'Evidence Annotated'
                     END AS eventaction
-                    FROM "Cases_DB"."Audit_Media" AS audit_media
-                    INNER JOIN "Cases_DB"."Cases" AS cases
-                        ON cases.caseid = $1::uuid
-                    CROSS JOIN LATERAL unnest(
-                        COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
-                    ) AS elem
-                    WHERE elem.evidence_id = audit_media.old_media_id
-                        AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
+                FROM "Cases_DB"."Audit_Media" AS audit_media
+                INNER JOIN "Cases_DB"."Cases" AS cases
+                    ON cases.caseid = $1::uuid
+                CROSS JOIN LATERAL unnest(
+                    COALESCE(
+                        cases.evidence,
+                        ARRAY[]::"Cases_DB".evidence_type[]
+                    )
+                ) AS elem
+                WHERE elem.evidence_id = audit_media.old_media_id
+                    AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
             )
             SELECT
                 audit_events.eventtimestamp AS eventtimestamp,
