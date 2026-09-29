@@ -24,6 +24,8 @@ const caseAlpha: DashboardCase = {
     caseReviews: null,
     caseName: 'Alpha Fraud',
     caseCreator: 'investigator.one',
+    caseState: 'OPEN',
+    caseAssigned: null,
     caseClosed: false,
     caseCreationDate: '2026-05-01T09:00:00.000Z',
 };
@@ -32,6 +34,8 @@ const caseBeta: DashboardCase = {
     caseReviews: null,
     caseName: 'Beta Review',
     caseCreator: 'investigator.two',
+    caseState: 'CLOSED',
+    caseAssigned: null,
     caseClosed: true,
     caseCreationDate: '2026-04-01T09:00:00.000Z',
 };
@@ -40,11 +44,16 @@ const caseGamma: DashboardCase = {
     caseReviews: null,
     caseName: 'Gamma Report',
     caseCreator: 'investigator.one',
+    caseState: 'OPEN',
+    caseAssigned: null,
     caseClosed: false,
     caseCreationDate: '2026-03-01T09:00:00.000Z',
 };
 const baseCases = [caseAlpha, caseBeta, caseGamma];
-const getCardContainer = (title: string) => screen.getByText(title).closest('a')!.parentElement as HTMLElement;
+const getCaseTitle = (title: string) => screen.getByText(title, { selector: 'div' });
+const findCaseTitle = (title: string) => screen.findByText(title, { selector: 'div' });
+const queryCaseTitle = (title: string) => screen.queryByText(title, { selector: 'div' });
+const getCardContainer = (title: string) => getCaseTitle(title).closest('div.relative') as HTMLElement;
 //tests to come:
 describe('Dashboard (integration)', () => {
     const mockedFetchCases = fetchCases as jest.MockedFunction<typeof fetchCases>;
@@ -61,9 +70,9 @@ describe('Dashboard (integration)', () => {
     it('loads cases and shows summary cards and the case list for an investigator', async () => {
         render(<Dashboard />);
         expect(screen.getByText('Loading cases...')).toBeInTheDocument();
-        expect(await screen.findByText('Alpha Fraud')).toBeInTheDocument();
-        expect(screen.getByText('Beta Review')).toBeInTheDocument();
-        expect(screen.getByText('Gamma Report')).toBeInTheDocument();
+        expect(await findCaseTitle('Alpha Fraud')).toBeInTheDocument();
+        expect(getCaseTitle('Beta Review')).toBeInTheDocument();
+        expect(getCaseTitle('Gamma Report')).toBeInTheDocument();
         expect(screen.getByText('Total Cases')).toBeInTheDocument();
         expect(screen.getByText('3')).toBeInTheDocument();
         expect(screen.getByText('Open Cases')).toBeInTheDocument();
@@ -77,10 +86,10 @@ describe('Dashboard (integration)', () => {
     it('hides the summary cards for a normal user but still lists cases and lets them create one', async () => {
         mockUseUserRole.mockReturnValue('USER');
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         expect(screen.queryByText('Total Cases')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'New Case' })).toBeInTheDocument();
-        expect(screen.getByText('Beta Review')).toBeInTheDocument();
+        expect(getCaseTitle('Beta Review')).toBeInTheDocument();
     });
     //error tests
     it('shows an error message when cases fail to load', async () => {
@@ -96,27 +105,27 @@ describe('Dashboard (integration)', () => {
     //filter and sort tests
     it('filters the case list by search query', async () => {
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         fireEvent.change(screen.getByPlaceholderText('Search cases...'), { target: { value: 'gamma' } });
-        expect(screen.getByText('Gamma Report')).toBeInTheDocument();
-        expect(screen.queryByText('Alpha Fraud')).not.toBeInTheDocument();
-        expect(screen.queryByText('Beta Review')).not.toBeInTheDocument();
+        expect(getCaseTitle('Gamma Report')).toBeInTheDocument();
+        expect(queryCaseTitle('Alpha Fraud')).not.toBeInTheDocument();
+        expect(queryCaseTitle('Beta Review')).not.toBeInTheDocument();
     });
     it('filters the case list by status', async () => {
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'Closed' }));
-        expect(screen.getByText('Beta Review')).toBeInTheDocument();
-        expect(screen.queryByText('Alpha Fraud')).not.toBeInTheDocument();
-        expect(screen.queryByText('Gamma Report')).not.toBeInTheDocument();
+        expect(getCaseTitle('Beta Review')).toBeInTheDocument();
+        expect(queryCaseTitle('Alpha Fraud')).not.toBeInTheDocument();
+        expect(queryCaseTitle('Gamma Report')).not.toBeInTheDocument();
     });
     it('sorts the case list by case name', async () => {
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         fireEvent.change(screen.getByRole('combobox'), { target: { value: 'caseName' } });
-        const alphaEl = screen.getByText('Alpha Fraud');
-        const betaEl = screen.getByText('Beta Review');
-        const gammaEl = screen.getByText('Gamma Report');
+        const alphaEl = getCaseTitle('Alpha Fraud');
+        const betaEl = getCaseTitle('Beta Review');
+        const gammaEl = getCaseTitle('Gamma Report');
         const allElements = Array.from(document.querySelectorAll('body *'));
         const positionOf = (el: HTMLElement) => allElements.indexOf(el);
         expect(positionOf(alphaEl)).toBeLessThan(positionOf(betaEl));
@@ -124,16 +133,16 @@ describe('Dashboard (integration)', () => {
     });
     it('lets an investigator delete any case, not just the ones they created', async () => {
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         expect(within(getCardContainer('Alpha Fraud')).getByRole('button')).toBeInTheDocument();
         expect(within(getCardContainer('Gamma Report')).getByRole('button')).toBeInTheDocument();
-        expect(within(getCardContainer('Beta Review')).getByRole('button')).toBeInTheDocument();
+        expect(within(getCardContainer('Beta Review')).queryByRole('button')).not.toBeInTheDocument();
     });
     it('does not let a normal user delete any case', async () => {
         mockUseUserRole.mockReturnValue('USER');
         mockUseCurrentUser.mockReturnValue({ username: 'plain.user' });
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         expect(within(getCardContainer('Alpha Fraud')).queryByRole('button')).not.toBeInTheDocument();
         expect(within(getCardContainer('Beta Review')).queryByRole('button')).not.toBeInTheDocument();
     });
@@ -157,25 +166,27 @@ describe('Dashboard (integration)', () => {
                 caseReviews: null,
                 caseName: 'Delta Investigation',
                 caseCreator: 'investigator.one',
+                caseState: 'OPEN',
+                caseAssigned: null,
                 caseClosed: false,
                 caseCreationDate: '2026-06-01T09:00:00.000Z',
             },
         ]);
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'New Case' }));
         fireEvent.change(screen.getByPlaceholderText('Enter case title'), { target: { value: 'Delta Investigation' } });
         fireEvent.change(screen.getByPlaceholderText('Enter case description'), { target: { value: 'New lead' } });
         fireEvent.click(screen.getByRole('button', { name: 'Create Case' }));
         await waitFor(() => expect(mockedCreateCase).toHaveBeenCalledWith('Delta Investigation', 'New lead'));
-        expect(await screen.findByText('Delta Investigation')).toBeInTheDocument();
+        expect(await findCaseTitle('Delta Investigation')).toBeInTheDocument();
         expect(mockedFetchCases).toHaveBeenCalledTimes(2);
     });
     //error test for creation
     it('shows an error in the create case modal when creation fails without closing it', async () => {
         mockedCreateCase.mockRejectedValue(new Error('Failed to create case'));
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         fireEvent.click(screen.getByRole('button', { name: 'New Case' }));
         fireEvent.change(screen.getByPlaceholderText('Enter case title'), { target: { value: 'Delta Investigation' } });
         fireEvent.change(screen.getByPlaceholderText('Enter case description'), { target: { value: 'New lead' } });
@@ -189,12 +200,12 @@ describe('Dashboard (integration)', () => {
         mockedFetchCases.mockResolvedValueOnce(baseCases);
         mockedFetchCases.mockResolvedValueOnce([caseBeta, caseGamma]);
         render(<Dashboard />);
-        await screen.findByText('Alpha Fraud');
+        await findCaseTitle('Alpha Fraud');
         fireEvent.click(within(getCardContainer('Alpha Fraud')).getByRole('button'));
         fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
         await waitFor(() => expect(mockedDeleteCase).toHaveBeenCalledWith('case-1'));
-        await waitFor(() => expect(screen.queryByText('Alpha Fraud')).not.toBeInTheDocument());
-        expect(screen.getByText('Beta Review')).toBeInTheDocument();
+        await waitFor(() => expect(queryCaseTitle('Alpha Fraud')).not.toBeInTheDocument());
+        expect(getCaseTitle('Beta Review')).toBeInTheDocument();
         expect(mockedFetchCases).toHaveBeenCalledTimes(2);
     });
 });

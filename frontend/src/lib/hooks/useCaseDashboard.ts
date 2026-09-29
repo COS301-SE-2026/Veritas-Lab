@@ -25,6 +25,12 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
     const [error, setError] = useState<string | null>(null);
     const cases = options.initialCases ?? fetchedCases;
     const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     const loadCases = async () => {
         setIsLoading(true);
@@ -76,7 +82,6 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
         })();
 
         return () => {
-            isMounted.current = false;
             isActive = false;
         };
     }, [options.initialCases]);
@@ -85,7 +90,7 @@ export default function useCaseDashboard(options: UseCaseDashboardOptions = {}) 
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     const filtered = cases.filter((item) => {
-        const caseStatus: CaseStatus = item.caseClosed ? 'Closed' : 'Open';
+        const caseStatus: CaseStatus = item.caseState === 'CLOSED' ? 'Closed' : 'Open';
         const matchesStatus = statusFilter === 'All' || caseStatus === statusFilter;
 
         if (!matchesStatus) {

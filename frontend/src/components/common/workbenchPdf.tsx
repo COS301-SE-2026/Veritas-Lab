@@ -128,7 +128,7 @@ export default function WorkbenchPdf({ url, ...pageProps }: Readonly<WorkbenchPd
             <Document
                 file={url}
                 onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                loading={<p className="text-sm text-(--color-text-subtle)">Loading PDF…</p>}
+                loading={<p className="text-sm text-(--color-text-subtle)">Loading PDF...</p>}
                 error={<p className="text-sm text-[var(--color-danger)]">Couldn’t load PDF.</p>}
             >
                 {Array.from({ length: numPages }, (_, index) => index + 1).map((pageNumber) => (

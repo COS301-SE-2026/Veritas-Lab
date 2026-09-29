@@ -32,6 +32,8 @@ describe('useCase', () => {
 				caseId: 'case-1',
 				caseName: 'Example Case',
 				caseCreator: 'investigator.one',
+				caseState: 'OPEN',
+    			caseAssigned: null,
 				caseReviews: null,
 				caseDescription: null,
 				caseClosed: false,

@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import MagicMock, patch
  
-from app.core.video_service import VideoService
+from app.core.video_service import video_service
 
-with patch("app.core.video_service.AIVideoDetector") as mock_detector_class:
+with patch("app.core.video_service.ai_video_detector") as mock_detector_class:
     mock_detector_class.return_value = MagicMock()
-    CONSTANT_VIDEO_SERVICE = VideoService()
+    CONSTANT_VIDEO_SERVICE = video_service()
 
 @pytest.mark.asyncio
 async def test_analyse_metadata_no_issues_found():

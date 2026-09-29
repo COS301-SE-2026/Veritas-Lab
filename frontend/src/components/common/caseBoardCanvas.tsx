@@ -21,6 +21,7 @@ type CaseBoardCanvasProps = {
     fullscreen?: boolean
     onToggleFullscreen?: () => void;
     onSave?: () => void;
+    readOnly?: boolean;
     saveState?: 'idle' | 'saving' | 'saved' | 'error';
     unsaved?: boolean;
 };
@@ -35,7 +36,7 @@ const edgeTypes = {
 
 // A better toolbar than the defualt one 
 function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, onToggleFullscreen, onSave, saveState, unsaved } : Readonly<{ 
-    onAddNote: () => void; 
+    onAddNote?: () => void; 
     edgesOnTop: boolean; 
     onToggleEdges: () => void; 
     fullscreen?: boolean; 
@@ -49,10 +50,12 @@ function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, 
 
     return (
         <div role="toolbar" className='vl-float-toolbar'>
-            <button type='button' onClick={onAddNote} className='vl-float-btn bg-(--color-secondary) font-semibold text-(--color-primary) hover:!bg-(--color-b-600)'>
-                <StickyNote size={16}/>
-                Note
-            </button>
+            {onAddNote && (
+                <button type='button' onClick={onAddNote} className='vl-float-btn bg-(--color-secondary) font-semibold text-(--color-primary) hover:!bg-(--color-b-600)'>
+                    <StickyNote size={16}/>
+                    Note
+                </button>
+            )}
 
             <button 
                 type='button' 
@@ -147,7 +150,8 @@ export default function CaseBoardCanvas({
     onToggleFullscreen,
     onSave,
     saveState,
-    unsaved
+    unsaved,
+    readOnly = false
 }: CaseBoardCanvasProps) {
     const {ref, isDropTarget} = useDroppable({id});
     const boxRef = useRef<HTMLDivElement | null>(null);
@@ -178,7 +182,12 @@ export default function CaseBoardCanvas({
             edgeTypes={edgeTypes} 
 			onNodesChange={onNodesChange}
 			onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
+            onConnect={readOnly ? undefined : onConnect}
+            nodesDraggable={!readOnly}
+            nodesConnectable={!readOnly}
+            elementsSelectable={!readOnly}
+            deleteKeyCode={readOnly ? null : 'Backspace'}
+            className={readOnly ? '[&_.react-flow__node]:pointer-events-none [&_.react-flow__edge]:pointer-events-none' : undefined}
             connectionMode={ConnectionMode.Loose}
             connectionLineType={ConnectionLineType.Straight}
             connectionLineStyle={{ stroke: '#b3261e', strokeWidth: 2, strokeDasharray: '4 3' }}
@@ -187,7 +196,7 @@ export default function CaseBoardCanvas({
         <Background />
         <Panel position='bottom-center' className='!mb-10'>
             <CustomBoardToolbar 
-                onAddNote={addNoteAtCenter}
+                onAddNote={readOnly ? undefined : addNoteAtCenter}
                 edgesOnTop={edgesOnTop}
                 onToggleEdges={() => setEdgesOnTop((event) => !event)}
                 fullscreen={fullscreen}
@@ -201,18 +210,26 @@ export default function CaseBoardCanvas({
 
         {nodes.length === 0 &&(
             <div className='pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 p-6 text-center'>
-                <p className='max-w-sm text-sm text-(--color-text-muted)'>
-                    Drag evidence onto the board, or generate a timeline from the existing evidence.    
-                </p>
-                <Button 
-                    variant='secondary'
-                    className="pointer-events-auto"
-                    text='Generate Case Board'
-                    onClick={onGenerate}
-                    disabled={!canGenerate}
-                />
-                {!canGenerate && (
-                    <p className='text-xs text-(--color-text-subtle)'>No evidence in this case has a captured timestamp</p>
+                {readOnly ? (
+                    <p className='max-w-sm text-sm text-(--color-text-muted)'>
+                        No board has been built for this case yet.
+                    </p>
+                ) : (
+                    <>
+                        <p className='max-w-sm text-sm text-(--color-text-muted)'>
+                            Drag evidence onto the board, or generate a timeline from the existing evidence.    
+                        </p>
+                        <Button 
+                            variant='secondary'
+                            className="pointer-events-auto"
+                            text='Generate Case Board'
+                            onClick={onGenerate}
+                            disabled={!canGenerate}
+                        />
+                        {!canGenerate && (
+                            <p className='text-xs text-(--color-text-subtle)'>No evidence in this case has a captured timestamp</p>
+                        )}
+                    </>
                 )}
             </div>
         )}

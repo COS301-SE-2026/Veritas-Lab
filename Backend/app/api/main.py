@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth import router as auth_router
 from app.api.routers.cases_router import router as cases_router
 from app.core.env import Postgres_Settings,Other_Settings
-
+from app.core.media_relay import get_service
 from contextlib import asynccontextmanager
 import asyncpg
 
@@ -23,9 +23,19 @@ async def lifespan(app: FastAPI):
         max_size=30
     )
 
-    yield
+    try:
+        print("Loading AI services...")
 
-    await app.state.pool.close()
+        get_service("image")
+        get_service("pdf")
+        get_service("video")
+
+        print("AI services loaded.")
+
+        yield
+
+    finally:
+        await app.state.pool.close()
 
 app = FastAPI(
     title="Veritas Lab API",

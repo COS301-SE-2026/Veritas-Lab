@@ -18,6 +18,7 @@ import { getCaseBoard, saveCaseBoard } from '@/lib/api/caseBoard';
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
+    readOnly?: boolean;
 };
 
 const TABS = ['Evidence', 'Report'] as const;
@@ -98,14 +99,14 @@ function extractBoard(board: CaseBoard | null | undefined, evidenceList: CaseEvi
     return { nodes, edges };
 }
 
-export default function CaseBoard({ caseId, evidenceList }: CaseBoardProps) {
+export default function CaseBoard({ caseId, evidenceList, readOnly = false }: CaseBoardProps) {
     return (
         <ReactFlowProvider>
-            <CaseBoardInner caseId={caseId} evidenceList={evidenceList} />
+            <CaseBoardInner caseId={caseId} evidenceList={evidenceList} readOnly={readOnly} />
         </ReactFlowProvider>
     )
 }
-export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
+export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseBoardProps) {
 
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -143,6 +144,9 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
     const unsaved = currentCaseBoard !== savedCaseBoard;
 
     const save = async (options?: { keepalive?: boolean }) => {
+        if (readOnly) {
+            return;
+        }
         const snapshot = currentCaseBoard;
         const board: CaseBoard = JSON.parse(snapshot);
 
@@ -255,7 +259,7 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
             onDragEnd={(event) => {
                 const { source, target, position } = event.operation;
 
-                if (event.canceled || !source || target?.id !== 'droppable') {
+                if (readOnly || event.canceled || !source || target?.id !== 'droppable') {
                     return;
                 }
 
@@ -290,7 +294,8 @@ export function CaseBoardInner({ caseId, evidenceList }: CaseBoardProps) {
                         canGenerate={capturedAt.some((time) => time != null)}
                         fullscreen={fullscreen}
                         onToggleFullscreen={() => setFullscreen((val) => !val)}
-                        onSave={() => void save()}
+                        onSave={readOnly ? undefined : () => void save()}
+                        readOnly={readOnly}
                         saveState={saveState}
                         unsaved={unsaved}
                     />

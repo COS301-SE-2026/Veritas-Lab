@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.media_service import AnalysisFindings
-from app.core.video_service import VideoService, FRAUD_MESSAGE
+from app.core.video_service import video_service, FRAUD_MESSAGE
 
 @pytest.fixture
 def service():
-    service = VideoService.__new__(VideoService)
+    service = video_service.__new__(video_service)
     service.ai_detector = MagicMock()
     return service
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 import librosa
-import asyncio
 from pathlib import Path
 import torch
 from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
@@ -182,7 +181,7 @@ class video_combined_analysis:
         self.visual_model.eval()
         self.audio_model = ai_audio_classifier()
 
-    async def analyse(
+    def analyse(
         self,
         video_path: str | Path,
         threshold: float = 0.5
@@ -198,30 +197,22 @@ class video_combined_analysis:
 
         audio_path = extract_audio_from_video(video_path)
 
-        visual_task = asyncio.to_thread(
-            predict_probability,
-            self.visual_model,
-            video
-        )
+        try:
+            # Everything here is synchronous because the entire
+            # analyse() function will run in a worker thread.
+            visual_probability = predict_probability(
+                self.visual_model,
+                video
+            )
 
-        if audio_path is not None:
-            try:
-                audio_task = asyncio.to_thread(
-                    self.analyse_audio_safe,
-                    audio_path
-                )
+            if audio_path is not None:
+                audio_result = self.analyse_audio_safe(audio_path)
+            else:
+                audio_result = None
 
-                visual_probability, audio_result = await asyncio.gather(
-                    visual_task,
-                    audio_task
-                )
-
-            finally:
+        finally:
+            if audio_path is not None:
                 Path(audio_path).unlink(missing_ok=True)
-
-        else:
-            visual_probability = await visual_task
-            audio_result = None
 
         visual_prediction = (
             "AI-generated"

@@ -3,6 +3,8 @@
 // The overlay never touches the underlying media, it only stores shapes/notes
 // positioned relative to it, see AnnotationPoint below.
 
+import { ActivationType, ClassificationResult, ModelConfig } from "@/lib/ai";
+import type { ReportFindings } from "@/types/api";
 /**
  * A point expressed as a percentage (0-100) of the media's rendered width/height.
  * Using percentages instead of raw pixels keeps annotations aligned with the media
@@ -69,11 +71,11 @@ export type AnnotationListProps = {
     annotations: Annotation[];
     selectedId: string | null;
     onSelect: (id: string) => void;
-    onRemove: (id: string) => void;
+    onRemove?: (id: string) => void;
 };
 
-// Workbench tools which now has both annotations and metadata compar.
-export type WorkbenchTool = 'Annotations' | 'Metadata';
+// Workbench tools which now has both annotations and metadata compar and plug and play models or PAPModels.
+export type WorkbenchTool = 'Plug-and-Play Models' | 'Annotations' | 'Metadata' | 'AI Report';
 
 export type WorkbenchPanelProps = {
     mediaKind: MediaKind;
@@ -81,6 +83,7 @@ export type WorkbenchPanelProps = {
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];
     selectedId: string | null;
+    readOnly?: boolean;
     onSelectAnnotation: (id: string) => void;
     onRemoveAnnotation: (id: string) => void;
     onClearAll: () => void;
@@ -109,7 +112,8 @@ export type ReportModalProps = {
     mediaKind?: MediaKind;
     mediaName: string;
     certainty: number | null;
-    findings: string | null;
+    findings: ReportFindings | null;
+    heatmapUrl?: string | null;
 };
 
 export type ReportPanelProps = {
@@ -117,8 +121,36 @@ export type ReportPanelProps = {
     mediaKind?: MediaKind;
     mediaName: string;
     certainty: number | null;
-    findings: string | null;
+    findings: ReportFindings | null;
     onClose?: () => void;
+    heatmapUrl?: string | null;
+};
+
+export type advancedModelConfigOptions = {
+    activation: ActivationType;
+    inputWidth: number;
+    inputHeight: number;
+    pageCount?: number;
+    frameCount?: number;
+}
+
+export type visualConfig = {
+    mean: [number, number, number];
+    std: [number, number, number];
+}
+
+export type PAPData = {
+    modelName: string;
+    fileName: string;
+    results: ClassificationResult;
+    config: ModelConfig;
+    date: string;
+}
+
+export type PAPModelResultsPayload = {
+    caseId: string;
+    mediaId: string;
+    data: PAPData;
 };
 export type AnnotationSource = 'USER' | 'AI';
 

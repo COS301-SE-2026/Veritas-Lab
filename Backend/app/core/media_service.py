@@ -64,7 +64,7 @@ class AnalysisFindings(BaseModel):
     Certainty: int
     Findings: str
 
-class MediaService(ABC):
+class media_service(ABC):
 
     def __init__(self):
         self.executor_id = SYSTEM_INIT_UUID

@@ -7,7 +7,8 @@ const mockUsePathname = jest.fn();
 const mockLogOut = jest.fn();
 
 jest.mock('next/navigation', () => ({
-	usePathname: () => mockUsePathname()
+	usePathname: () => mockUsePathname(),
+	useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('next/link', () => ({

@@ -247,7 +247,7 @@ function buildInsights( kind: string, entries: [string, string][], signals: Reco
             detail: `Fields naming a generative tool or declaring synthetic origin: ${aiKeys
                 .slice(0, 4)
                 .map(([key]) => key)
-                .join(', ')}${aiKeys.length > 4 ? '…' : ''}`,
+                .join(', ')}${aiKeys.length > 4 ? '...' : ''}`,
         });
     }
 

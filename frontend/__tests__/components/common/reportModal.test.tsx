@@ -31,7 +31,7 @@ const baseProps = {
     mediaKind: 'image' as const,
     mediaName: 'EvidenceA',
     certainty: 1,
-    findings: 'Some findings text',
+    findings: { risk_level: 1, findings: 'Some findings text' },
 };
 //alot of these tests are similar to existing workbench tests but need to be repeated for this component
 describe('ReportModal', () => {
@@ -56,26 +56,19 @@ describe('ReportModal', () => {
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('renders an image preview when mediaKind is image', () => {
-        render(<ReportModal {...baseProps} mediaKind="image" mediaUrl="/evidence-a.png" />);
-        const image = screen.getByAltText('EvidenceA');
-        expect(image).toHaveAttribute('src', '/evidence-a.png');
-    });
+    it('renders reasons for images', () => {
+        render(<ReportModal {...baseProps} mediaKind="image" />);
+        expect(screen.getByText('REASONS')).toBeInTheDocument();
+    })
 
-    it('renders a pdf preview when mediaKind is pdf', () => {
+    it('renders reasons for pdfs', () => {
         render(<ReportModal {...baseProps} mediaKind="pdf" mediaUrl="/evidence-a.pdf" />);
-        const iframe = screen.getByTitle('EvidenceA');
-        expect(iframe).toHaveAttribute('src', '/evidence-a.pdf');
-    });
+        expect(screen.getByText('REASONS')).toBeInTheDocument();
+    })
 
-    it('renders fallback message when mediaKind is unsupported', () => {
-        render(<ReportModal {...baseProps} mediaKind="unsupported" mediaUrl="/evidence-a.zip" />);
-        expect(screen.getByText('Preview unavailable for this evidence.')).toBeInTheDocument();
-    });
-
-    it('renders fallback message when there is no mediaUrl', () => {
-        render(<ReportModal {...baseProps} mediaUrl={undefined} />);
-        expect(screen.getByText('Preview unavailable for this evidence.')).toBeInTheDocument();
+    it('renders reasons for unsupported media types', () => {
+        render(<ReportModal {...baseProps} mediaKind="unsupported" mediaUrl="/evidence-a.txt" />);
+        expect(screen.queryByText('REASONS')).not.toBeInTheDocument();
     });
 
     it('renders the certainty label and description from getCertaintyMeta', () => {
@@ -105,12 +98,12 @@ describe('ReportModal', () => {
     });
 
     it('renders findings text when provided', () => {
-        render(<ReportModal {...baseProps} findings="Detected manipulation in metadata" />);
+        render(<ReportModal {...baseProps} findings={{ risk_level: 2, findings: 'Detected manipulation in metadata' }} />);
         expect(screen.getByText('Detected manipulation in metadata')).toBeInTheDocument();
     });
 
     it('renders fallback message when findings is null', () => {
         render(<ReportModal {...baseProps} findings={null} />);
-        expect(screen.getByText('No findings available yet for this evidence.')).toBeInTheDocument();
+        expect(screen.getByText('No reasons available yet for this evidence.')).toBeInTheDocument();
     });
 });

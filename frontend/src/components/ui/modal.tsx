@@ -1,8 +1,15 @@
 'use client';
 import type { ModalProps } from '@/types/components';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function Modal({ children, isOpen, onClose }: ModalProps) {
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (ke: KeyboardEvent) => {
@@ -14,10 +21,9 @@ export default function Modal({ children, isOpen, onClose }: ModalProps) {
         }
     }, [isOpen, onClose]);
 
-    if (!isOpen) return null;
+    if (!isOpen || !isMounted) return null;
 
-    return (
-        <>
+    return createPortal(
         <div 
             className="vl-animation-fade fixed inset-0 bg-black/50 flex justify-center items-center z-50 backdrop-blur-sm" 
             onClick={onClose}
@@ -27,7 +33,7 @@ export default function Modal({ children, isOpen, onClose }: ModalProps) {
             <div className="vl-animation-pop bg-white rounded-2xl p-8 w-full max-w-md shadow-lg" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
-        </div>
-        </>
+        </div>,
+        document.body
     );
-}   
+}

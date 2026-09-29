@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { getAllAudit } from '@/lib/api/audit';
 import useAuditLog from '@/lib/hooks/useAuditLog';
+import { AuditLogResponse } from '@/types/api';
 jest.mock('@/lib/api/audit', () => ({
     getAllAudit: jest.fn(),
 }));
@@ -12,22 +13,46 @@ describe('useAuditLog', () => {
 
     it('fetches and returns audit log info', async () => {
         const mockedGetAllAudit = getAllAudit as jest.MockedFunction<typeof getAllAudit>;
-        const mockedResponse = {
+        const mockedResponse: AuditLogResponse  = {
             status: 'success',
             cases: [
                 {
                     caseId: 'case-1',
-                    caseName: 'Alpha Fraud',
+                    caseName: 'Case 1',
                     eventCount: 2,
-                    lastEventTimestamp: '2026-05-02T10:30:00.000Z',
+                    lastEventTimestamp: '2026-09-11T11:30:00.000Z',
                     caseExists: true,
+                    events: [
+                        {
+                            timestamp: '2026-09-11T11:30:00.000Z',
+                            user: 'user1',
+                            action: 'Created case',
+                        },
+                        {
+                            timestamp: '2026-09-11T11:30:00.000Z',
+                            user: 'user1',
+                            action: 'Created case',
+                        }
+                    ]
                 },
                 {
                     caseId: 'case-2',
-                    caseName: 'Beta Theft',
-                    eventCount: 1,
-                    lastEventTimestamp: '2026-05-03T14:15:00.000Z',
-                    caseExists: true,
+                    caseName: 'Case 2',
+                    eventCount: 2,
+                    lastEventTimestamp: '2026-09-11T12:30:00.000Z',
+                    caseExists: false,
+                    events: [
+                        {
+                            timestamp: '2026-09-11T11:30:00.000Z',
+                            user: 'user2',
+                            action: 'Created case',
+                        },
+                        {
+                            timestamp: '2026-09-11T11:30:00.000Z',
+                            user: 'user1',
+                            action: 'Created case',
+                        }
+                    ]
                 },
             ],
         };

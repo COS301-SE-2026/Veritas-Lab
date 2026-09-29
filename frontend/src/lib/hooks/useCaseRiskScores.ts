@@ -26,7 +26,7 @@ export default function useCaseRiskScores(cases: CaseSummary[]) {
                         const apiData = await fetchCase(caseId);
                         const  riskScores = (apiData.evidence || [])
                         .map((evidence) => evidence.reportCertainty)
-                        .filter((score) => score !== null) as number[];
+                        .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
 
                         let average: number | null;
                         if(riskScores.length > 0) {

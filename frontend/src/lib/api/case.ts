@@ -1,4 +1,4 @@
-import type { ApiError, CaseResponse } from '@/types/api';
+import type { ApiError, CaseComment, CaseResponse } from '@/types/api';
 import { apiFetch } from './client';
 
 function normalizeComment(comment: Record<string, unknown>) {
@@ -70,7 +70,7 @@ export async function addComment(caseId: string, comment: string) {
 
 export async function closeCase(caseId: string): Promise<{ status: string; message?: string }> {
     const res = await apiFetch(`/api/closeCase`, {
-        method: 'POST',
+    method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -156,4 +156,16 @@ export async function publishCase(caseId: string): Promise<{ status: string; mes
         throw new Error(error?.detail?.message || 'Failed to publish case');
     }
     return data;
+}
+
+export async function fetchComments(caseId: string): Promise<CaseComment[]> {
+    const res = await apiFetch(`/api/getComments/${encodeURIComponent(caseId)}`, {
+        method: 'POST',
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        const error = data as ApiError | null;
+        throw new Error(error?.detail?.message || 'Failed to load comments');
+    }
+    return Array.isArray(data?.comments) ? data.comments.map(normalizeComment) : [];
 }
