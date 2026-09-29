@@ -109,7 +109,7 @@ export default function EvidenceCard({
                     mediaUrl={mediaUrl}
                     mediaName={mediaName}
                     mediaExtension={mediaExtension}
-                    width={228}
+                    width={298}
                 />
             </div>
             <div className={`mt-3 flex items-center justify-between gap-2 ${viewReport ? 'pr-7' : ''}`}>
