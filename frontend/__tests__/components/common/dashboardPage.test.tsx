@@ -47,7 +47,7 @@ describe('Dashboard page', () => {
         render(<Dashboard />);
         expect(screen.getByText('Dashboard')).toBeInTheDocument();
         expect(screen.getByPlaceholderText('Search cases...')).toBeInTheDocument();
-        expect(screen.getByText('Alpha Fraud')).toBeInTheDocument();
+        expect(screen.getByText('Alpha Fraud', { selector: 'div' })).toBeInTheDocument();
         expect(screen.getByText('Created by investigator.adams')).toBeInTheDocument();
         expect(screen.queryByText('Total Cases')).not.toBeInTheDocument();
         expect(screen.getByText('New Case')).toBeInTheDocument();

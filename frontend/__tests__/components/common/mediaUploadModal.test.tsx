@@ -28,14 +28,8 @@ describe('MediaUploadModal', () => {
     });
 
     it('calls onClose when clicking overlay', () => {
-        const { container } = render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
-        const overlay = container.querySelector('div.fixed.inset-0');
-
-        if (!overlay) {
-            throw new Error('Overlay not found');
-        }
-
-        fireEvent.click(overlay);
+        render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
+        fireEvent.click(screen.getByRole('dialog'));
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 });
