@@ -1,3 +1,4 @@
+import type { Annotation, PAPData } from '@/types/workbench';
 export type ApiError = {
     detail: {
         status?: 'error';
@@ -21,11 +22,15 @@ export type ChangePasswordResponse = {
     message: string;
 };
 
+export type CaseState = 'OPEN' | 'PUBLISHED' | 'CLOSED';
+
 export type DashboardCase = {
     caseId: string;
     caseReviews: Record<string, unknown> | null;
     caseName: string;
     caseCreator: string;
+    caseState: CaseState;
+    caseAssigned: string | null;
     caseClosed: boolean;
     caseCreationDate: string;
 };
@@ -41,19 +46,22 @@ export type AdminUser = {
 };
 
 export type CaseEvidence = {
-    reportId: string;
     mediaId: string;
+    casePerspective: string;
     mediaName: string;
     mediaBucket: string;
     mediaExtension: string;
     mediaTypeId: string;
     mediaUrl: string;
-    annotations: [] | null;
+    annotations: Annotation[] | null;
+    automatedAnnotations?: Annotation[] | null;
     reportArtifacts: Record<string, unknown> | null;
-    reportFindings: string | null;
+    reportFindings: ReportFindings | null;
     reportCertainty: number | null;
     reportComments: string | null;
     reportDateCreation: string | null;
+    heatmapUrl?: string | null;
+    plugAndPlay?: PAPReport[] | []
 };
 
 export type CaseComment = {
@@ -72,6 +80,8 @@ export type CaseResponse = {
         caseCreator: string;
         caseReviews: Record<string, unknown> | null;
         caseDescription: string | null;
+        caseState: CaseState;
+        caseAssigned: string | null;
         caseClosed: boolean;
         caseCreationDate: string | null;
     };
@@ -80,8 +90,8 @@ export type CaseResponse = {
 };
 
 export type AuditTimelineResponse = {
-    caseID: string,
-    events: AuditEvents[],
+    caseID: string;
+    events: AuditEvents[];
 }
 
 export type AuditEvents = {
@@ -89,10 +99,6 @@ export type AuditEvents = {
     user: string;
     action: string;
 }
-
-// export type AuditLogResponse = {
-//     auditLogs: AuditTimelineResponse[];
-// }
 
 export type AuditLogResponse = {
     status: string;
@@ -105,4 +111,56 @@ export type AuditLogCase = {
     eventCount: number;
     lastEventTimestamp: string;
     caseExists: boolean;
+    events: AuditEvents[];
+}
+
+export type ReportReason = string | { 
+    message: string; 
+    supports?: 'AI' | 'AUTHENTIC' | 'INCONCLUSIVE' 
+    importance?: 'low' | 'medium' | 'high'
+};
+
+export type susChunk = {
+    text: string;
+    ai_probability: number;
+};
+
+export type ReportFindings = {
+    //img and other stuff
+    risk_level: number;
+    findings?: string;
+    ai_probability?: number;
+    classification?: string;
+    prediction?: string;
+    summary?: string;
+    reasons?: ReportReason[];
+    warning?: string;
+    
+    //pdf
+    lexical_ai_probability?: number;
+    suspicious_chunks?: susChunk[];
+    branch_contributions?: Record<string, number>;
+
+    //vid
+    visual?: {
+        ai_probability?: number;
+        explanation?: string;
+        frame_importance?: { timestamp: number; importance: number }[];
+    };
+    audio?: { 
+        available?: boolean; 
+        ai_probability?: number 
+    };
+    fusion?: { 
+        visual_weight?: number; 
+        audio_weight?: number 
+    };
+};
+
+export type PAPReport = {
+    PNPModelId: number;
+    mediaId: string;
+    modelName: string;
+    modelResult: PAPData;
+    uploadDate: string;
 }

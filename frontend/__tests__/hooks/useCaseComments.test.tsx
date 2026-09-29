@@ -1,10 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import useCaseComments from '@/lib/hooks/useCaseComments';
-import { addComment, editComment } from '@/lib/api/case';
+import { addComment, editComment, fetchComments } from '@/lib/api/case';
 import type { CaseComment } from '@/types/api';
 jest.mock('@/lib/api/case', () => ({
     addComment: jest.fn(),
     editComment: jest.fn(),
+    fetchComments: jest.fn(),
 }));
 //hook tests - now reviewed and updated!
 describe('useCaseComments', () => {
@@ -19,6 +20,7 @@ describe('useCaseComments', () => {
     ];
     beforeEach(() => {
         jest.clearAllMocks();
+        (fetchComments as jest.MockedFunction<typeof fetchComments>).mockResolvedValue(initialComments);
     });
 
     it('renders existing comments and draft state', () => {
@@ -77,7 +79,10 @@ describe('useCaseComments', () => {
         });
 
         mockedAddComment.mockReturnValueOnce(pendingComment as Promise<Awaited<ReturnType<typeof addComment>>>);
-        const firstSubmit = result.current.submitComment();
+        let firstSubmit: ReturnType<typeof result.current.submitComment>;
+        await act(async () => {
+            firstSubmit = result.current.submitComment();
+        });
         await waitFor(() => {
             expect(result.current.isSubmitting).toBe(true);
         });
@@ -142,6 +147,9 @@ describe('useCaseComments', () => {
                 initialComments,
             })
         );
+        await waitFor(() => {
+            expect(result.current.isLoading).toBe(false);
+        });
         await act(async () => {
             result.current.removeComment(1);
         });

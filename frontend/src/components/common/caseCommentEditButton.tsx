@@ -62,36 +62,35 @@ export default function CommentEditButton({ caseId, commentId, initialComment, o
     return (
         <>
             <Button
-                variant="sadSack"
-                size="small"
+                type="button"
                 onClick={openModal}
-                className="flex h-6 items-center gap-1 !p-0 px-2 text-xs rounded-full hover:bg-[var(--color-light)] cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-current/80 transition-colors hover:bg-black/10 hover:text-current"
             >
                 <Pencil size={12} />
                 Edit
             </Button>
             <Modal isOpen={isModalOpen} onClose={closeModal}>
-                <div className="p-2">
+                <div>
                     {mode === 'edit' ? (
                         <>
-                            <h2 className="text-lg font-bold text-[var(--color-text)]">Edit comment</h2>
+                            <h2 className="text-lg font-bold text-(--color-text-strong)">Edit comment</h2>
                             <textarea
                                 value={draft}
                                 onChange={(event) => setDraft(event.target.value)}
                                 rows={3}
-                                className="mt-3 w-full resize-none rounded-2xl border border-[var(--color-light)]/30 bg-[var(--color-background)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-primary)]"
+                                className="vl-textarea mt-3 text-sm"
                             />
-                            {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
-                            <div className="mt-4 flex items-center justify-between gap-3">
+                            {error ? <div className="mt-3"><Label text={error} htmlFor="error" variant="error" /></div> : null}
+                            <div className="mt-5 flex items-center justify-between gap-3">
                                 <Button
                                     variant="sadSack"
                                     text="Delete comment"
                                     onClick={() => { setMode('confirmDelete'); setError(null); }}
                                     disabled={isSaving}
-                                    className="text-red-500 hover:text-red-700"
+                                    className="!text-[var(--color-danger)] hover:!bg-[var(--danger-soft)]"
                                 />
                                 <div className="flex gap-3">
-                                    <Button variant="sadSack" text="Cancel" onClick={closeModal} disabled={isSaving} />
+                                    <Button variant="outline" text="Cancel" onClick={closeModal} disabled={isSaving} />
                                     <Button
                                         variant="submit"
                                         text={isSaving ? 'Saving' : 'Save changes'}
@@ -103,18 +102,19 @@ export default function CommentEditButton({ caseId, commentId, initialComment, o
                         </>
                     ) : (
                         <>
-                            <h2 className="text-lg font-bold text-[var(--color-text)]">Delete comment?</h2>
-                            <p className="mt-2 text-sm text-(--color-light)">
+                            <h2 className="text-lg font-bold text-(--color-text-strong)">Delete comment?</h2>
+                            <p className="mt-2 text-sm text-(--color-text-muted)">
                                 This will permanently remove this comment. This action cannot be undone.
                             </p>
-                            {error ? <Label text={error} htmlFor="error" variant="error" /> : null}
+                            {error ? <div className="mt-3"><Label text={error} htmlFor="error" variant="error" /></div> : null}
                             <div className="mt-6 flex justify-end gap-3">
-                                <Button variant="sadSack" text="Back" onClick={() => setMode('edit')} disabled={isDeleting} />
+                                <Button variant="outline" text="Back" onClick={() => setMode('edit')} disabled={isDeleting} />
                                 <Button
                                     variant="submit"
                                     text={isDeleting ? 'Deleting' : 'Delete'}
                                     onClick={handleConfirmDelete}
                                     disabled={isDeleting}
+                                    className={'bg-[var(--color-danger)] text-white border-transparent hover:bg-(--color-danger)'}
                                 />
                             </div>
                         </>

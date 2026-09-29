@@ -11,6 +11,8 @@ describe('DashboardCards', () => {
                         caseReviews: { stage: 'intake' },
                         caseName: 'Alpha Fraud',
                         caseCreator: 'investigator.one',
+                        caseState: 'OPEN',
+                        caseAssigned: null,
                         caseClosed: false,
                         caseCreationDate: '2026-05-01T09:00:00.000Z',
                     },
@@ -19,6 +21,8 @@ describe('DashboardCards', () => {
                         caseReviews: { stage: 'resolved' },
                         caseName: 'Beta Review',
                         caseCreator: 'investigator.two',
+                        caseState: 'CLOSED',
+                        caseAssigned: null,
                         caseClosed: true,
                         caseCreationDate: '2026-04-01T09:00:00.000Z',
                     },
@@ -27,6 +31,8 @@ describe('DashboardCards', () => {
                         caseReviews: { stage: 'intake' },
                         caseName: 'Gamma Report',
                         caseCreator: 'investigator.three',
+                        caseState: 'OPEN',
+                        caseAssigned: null,
                         caseClosed: false,
                         caseCreationDate: '2026-03-01T09:00:00.000Z',
                     },
@@ -36,14 +42,14 @@ describe('DashboardCards', () => {
 
         expect(screen.getByText('Total Cases')).toBeInTheDocument();
         expect(screen.getByText('3')).toBeInTheDocument();
-        expect(screen.getByText('All time')).toBeInTheDocument();
-
+        
         expect(screen.getByText('Open Cases')).toBeInTheDocument();
         expect(screen.getByText('2')).toBeInTheDocument();
-        expect(screen.getByText('Open')).toBeInTheDocument();
-
+        expect(screen.getByText('Currently active')).toBeInTheDocument();
+        
         expect(screen.getByText('Cases Closed')).toBeInTheDocument();
         expect(screen.getByText('1')).toBeInTheDocument();
-        expect(screen.getByText('Closed (all time)')).toBeInTheDocument();
+
+        expect(screen.getAllByText('All time')).toHaveLength(2);
     });
 });

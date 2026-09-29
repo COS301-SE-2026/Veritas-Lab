@@ -54,7 +54,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
 }
 
-const protectedPrefixes = ['/dashboard', '/case-page'];
+const protectedPrefixes = ['/dashboard', '/case-page', '/admin', '/audit-log', '/help'];
 const authRoutes = ['/login', '/register', '/landing'];
 
 function isProtectedPath(pathname: string): boolean {
@@ -66,5 +66,13 @@ function isAuthRoute(pathname: string): boolean {
 }
 
 export const config = {
-    matcher: ['/', '/dashboard/:path*', '/case-page/:path*', '/login', '/register', '/landing'],
+    matcher: [
+        '/', 
+        '/dashboard/:path*', 
+        '/case-page/:path*', 
+        '/admin/:path*',
+        '/audit-log/:path*',
+        '/help/:path*',
+        '/login', '/register', '/landing'
+    ],
 };

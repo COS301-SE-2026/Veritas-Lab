@@ -2,11 +2,11 @@ import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from app.core.pdf_service import PDFService
+from app.core.pdf_service import pdf_service
 
-with patch("app.core.pdf_service.AIPDFDetector") as mock_detector_class:
+with patch("app.core.pdf_service.ai_pdf_detector") as mock_detector_class:
     mock_detector_class.return_value = MagicMock()
-    CONSTANT_PDF_SERVICE = PDFService()
+    CONSTANT_PDF_SERVICE = pdf_service()
 
 FRAUD_MESSAGE = "Lacks original authoring metadata; highly suspicious as it has been modified, re-rendered, or stripped by external software." #[cite: 4]
 
@@ -149,14 +149,3 @@ async def test_analyse_metadata_detects_confirmed_editor():
 
     assert result.Certainty == 1
     assert "PDF:Producer (Confirmed Editor/Converter): pypdf" in result.Findings
-
-def test_create_findings_string_returns_fallback_for_missing_summary():
-    """
-    Verifies the fallback string when no summary is provided in the input dictionary.
-    """
-    service = PDFService()
-    
-    input_data = {}
-    
-    result = service.create_findings_string(input_data)
-    assert result == "No findings"

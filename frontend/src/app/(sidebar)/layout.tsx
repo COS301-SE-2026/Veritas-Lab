@@ -2,6 +2,9 @@ import Sidebar from '@/components/common/sidebar';
 import { SidebarWrapper } from '@/context/SidebarContext';
 import { getCookie } from '@/auth/cookie';
 import { UserRoleProvider } from '@/context/UserRoleContext';
+import { redirect } from 'next/dist/client/components/navigation';
+import { CaseNavProvider } from '@/context/caseNavContext';
+import SessionKeepAlive from '@/components/common/sessionKeepAlive';
 type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 type CurrentUser = { //added to ensure admin cant delete itself or role change
     id: string;
@@ -11,6 +14,11 @@ type CurrentUser = { //added to ensure admin cant delete itself or role change
 function decodeJwtPayload(segment: string): Record<string, unknown> {
     return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
 }
+
+function isExpired(payload: Record<string, unknown>): boolean {
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
+}
+
 function getUserFromToken(token: string): CurrentUser {
     if (!token) {
         return { id: '', username: '', role: 'USER' };
@@ -30,19 +38,29 @@ function getUserFromToken(token: string): CurrentUser {
 
 export default async function SidebarLayout({ children }: { children: React.ReactNode }) {
     const token = await getCookie();
+    if(!token) redirect('/login');
+    try {
+        const payload = decodeJwtPayload(token.split('.')[1]);
+        if (isExpired(payload)) redirect('/login');
+    } catch {
+        redirect('/login');
+    }
     const currentUser = getUserFromToken(token);
 
     return (
         <SidebarWrapper>
+            <SessionKeepAlive />
             <UserRoleProvider user={currentUser}>
-                <div className="flex min-h-screen bg-[var(--color-primary)]">
-                    <Sidebar />
-                    <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden
-                                    bg-[var(--color-lightest)] rounded-l-3xl
-                                    shadow-[-8px_0_24px_var(--color-dark)]/50">
-                        {children}
-                    </main>
-                </div>
+                <CaseNavProvider>
+                    <div className="flex min-h-screen bg-[var(--color-primary)]">
+                        <Sidebar />
+                        <main className="relative z-10 min-w-0 flex-1 overflow-x-hidden
+                                        bg-(--color-canvas) rounded-l-[28px]
+                                        shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.45)]">
+                            {children}
+                        </main>
+                    </div>
+                </CaseNavProvider>
             </UserRoleProvider>
         </SidebarWrapper>
     );

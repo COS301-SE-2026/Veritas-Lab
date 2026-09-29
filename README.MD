@@ -15,6 +15,7 @@
 [![Codecov](https://img.shields.io/codecov/c/gh/COS301-SE-2026/Veritas-Lab/main?style=for-the-badge&logo=codecov&label=Coverage&color=F01F7A)](https://codecov.io/gh/COS301-SE-2026/Veritas-Lab)
 [![Open Issues](https://img.shields.io/github/issues/COS301-SE-2026/Veritas-Lab?style=for-the-badge&color=F0883E&label=Open%20Issues)](https://github.com/COS301-SE-2026/Veritas-Lab/issues)
 [![Closed Issues](https://img.shields.io/github/issues-closed/COS301-SE-2026/Veritas-Lab?style=for-the-badge&color=A371F7&label=Closed%20Issues)](https://github.com/COS301-SE-2026/Veritas-Lab/issues?q=is%3Aissue+is%3Aclosed)
+![Uptime Robot ratio (30 days)](https://img.shields.io/uptimerobot/ratio/m803931074-e5ec07b7d06780aa83293f0b?style=for-the-badge)
 
 
 
@@ -68,6 +69,11 @@ Demo 3
 |[SAS NFR Testing](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/NFR-Testing-Demo-3)| NFR Testing|
 |[SAS NFR Traceability Matrix](https://github.com/COS301-SE-2026/Veritas-Lab/wiki/NFR-Traceability-Matrix-Demo-3)| NFR Traceability Matrix|
 
+Demo 4
+
+| Resources | Description |
+|-----------|-------------|
+|[User Manual](Docs/Demo_4/User-Manual-Veritas-Lab.pdf)| The user manual|
 </div>
 </div>
 <br/>

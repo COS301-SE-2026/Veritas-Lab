@@ -1,16 +1,39 @@
 'use client';
 import type { ModalProps } from '@/types/components';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function Modal({ children, isOpen, onClose }: ModalProps) {
-    if (!isOpen) return null;
+    const [isMounted, setIsMounted] = useState(false);
 
-    return (
-        <>
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50" onClick={onClose}>
-            <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-lg" onClick={(e) => e.stopPropagation()}>
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (ke: KeyboardEvent) => {
+            if(ke.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('keydown', onKey);
+        }
+    }, [isOpen, onClose]);
+
+    if (!isOpen || !isMounted) return null;
+
+    return createPortal(
+        <div 
+            className="vl-animation-fade fixed inset-0 bg-black/50 flex justify-center items-center z-50 backdrop-blur-sm" 
+            onClick={onClose}
+            role='dialog'
+            aria-modal='true'    
+        >
+            <div className="vl-animation-pop bg-white rounded-2xl p-8 w-full max-w-md shadow-lg" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
-        </div>
-        </>
+        </div>,
+        document.body
     );
-}   
+}

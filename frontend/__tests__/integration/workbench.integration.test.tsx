@@ -3,14 +3,28 @@ import WorkbenchPage from '@/app/(sidebar)/case-page/[id]/workbench/[evidenceId]
 import { fetchCase } from '@/lib/api/case';
 import { saveAnnotations } from '@/lib/api/workbench';
 import type { CaseEvidence, CaseResponse } from '@/types/api';
+
+let mockSearchParams = new URLSearchParams();
 jest.mock('@/lib/api/case', () => ({
     fetchCase: jest.fn(),
 }));
 jest.mock('@/lib/api/workbench', () => ({
     saveAnnotations: jest.fn(),
 }));
+
+const mockUseUserRole = jest.fn();
+const mockUseCurrentUser = jest.fn();
+
+jest.mock('@/context/UserRoleContext', () => ({
+    useUserRole: () => mockUseUserRole(),
+    useCurrentUser: () => mockUseCurrentUser(),
+}));
+
 jest.mock('next/navigation', () => ({
-    useParams: () => ({ id: 'case-1', evidenceId: 'report-1' }),
+    useParams: () => ({ id: 'case-1', evidenceId: 'media-1' }),
+    useSearchParams: () => mockSearchParams,
+    useRouter: () => ({ push: jest.fn() , replace: jest.fn(), back: jest.fn() }),
+    usePathname: () => '/case-page/case-1/workbench/media-1',
 }));
 jest.mock('next/link', () => ({
     __esModule: true,
@@ -22,6 +36,11 @@ jest.mock('@/lib/media', () => ({
     getMediaKind: (extension?: string) => {
         if (extension === 'pdf') return 'pdf';
         if (extension && ['png', 'jpg', 'jpeg'].includes(extension)) return 'image';
+        return 'unsupported';
+    },
+    resolveMediaKind: ({ mediaExtension }: { mediaExtension?: string | null }) => {
+        if (mediaExtension === 'pdf') return 'pdf';
+        if (mediaExtension && ['png', 'jpg', 'jpeg'].includes(mediaExtension)) return 'image';
         return 'unsupported';
     },
 }));
@@ -42,8 +61,8 @@ jest.mock('next/dynamic', () => () => {
     return DynamicComponent;
 });
 const evidenceFixture: CaseEvidence = {
-    reportId: 'report-1',
     mediaId: 'media-1',
+    casePerspective: 'Suspicious Screenshot.png',
     mediaName: 'Suspicious Screenshot.png',
     mediaBucket: 'bucket-1',
     mediaExtension: 'png',
@@ -58,7 +77,7 @@ const evidenceFixture: CaseEvidence = {
             'File:FileSize': '204800',
         },
     },
-    reportFindings: 'Signs of AI generation detected.',
+    reportFindings: { risk_level: 2, findings: 'Signs of AI generation detected.' },
     reportCertainty: 2,
     reportComments: null,
     reportDateCreation: '2026-05-01T09:00:00.000Z',
@@ -69,6 +88,10 @@ const caseFixture: CaseResponse = {
         caseId: 'case-1',
         caseName: 'Alpha Fraud',
         caseCreator: 'investigator.one',
+
+        caseState: 'PUBLISHED',
+        caseAssigned: 'investigator.one',
+
         caseReviews: null,
         caseDescription: null,
         caseClosed: false,
@@ -83,22 +106,37 @@ describe('WorkbenchPage (integration)', () => {
     const mockedSaveAnnotations = saveAnnotations as jest.MockedFunction<typeof saveAnnotations>;
     beforeEach(() => {
         jest.resetAllMocks();
+
+        mockUseUserRole.mockReturnValue('INVESTIGATOR');
+        mockUseCurrentUser.mockReturnValue({
+            username: 'investigator.one',
+        });
+
         mockedFetchCase.mockResolvedValue(caseFixture);
+
+        mockSearchParams = new URLSearchParams();
     });
+
     const openAnnotationsTool = async () => {
         await screen.findByAltText('Suspicious Screenshot.png');
         fireEvent.click(screen.getByRole('button', { name: 'Annotations' }));
     };
     //annotation etsts
-    it('loads the matching evidence and shows the media with no annotation controls until a tool is picked', async () => {
+    it('loads the matching evidence and shows the media with the AI Report tab active by default', async () => {
         render(<WorkbenchPage />);
-        expect(await screen.findByRole('heading', { name: 'Suspicious Screenshot.png' })).toBeInTheDocument();
+
+        expect(
+            await screen.findByRole('heading', {
+                name: 'Suspicious Screenshot.png',
+            })).toBeInTheDocument();
+
         expect(screen.getByAltText('Suspicious Screenshot.png')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Back to case/i })).toHaveAttribute('href', '/case-page/case-1');
-        expect(screen.getByRole('button', { name: 'Annotations' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'View Metadata Comparison' })).toBeInTheDocument();
-        expect(screen.queryByText('Click an annotation to view its details.')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'AI Report' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'Annotations' })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: 'Metadata' })).toHaveAttribute('aria-pressed', 'false');
     });
+
     it('shows pre loaded annotations from the fetched evidence once the Annotations tool is active', async () => {
         render(<WorkbenchPage />);
         await openAnnotationsTool();
@@ -147,8 +185,17 @@ describe('WorkbenchPage (integration)', () => {
         fireEvent.click(screen.getByRole('button', { name: /^Save$/ }));
         await waitFor(() =>
             expect(mockedSaveAnnotations).toHaveBeenCalledWith({
-                evidenceId: 'report-1',
-                annotations: evidenceFixture.annotations,
+                caseId: 'case-1',
+                mediaId: 'media-1',
+                annotations: [
+                    expect.objectContaining({
+                        id: 'ann-1',
+                        kind: 'note',
+                        page: 1,
+                        text: 'Pre-existing note',
+                        source: 'USER',
+                    }),
+                ],
             })
         );
         expect(await screen.findByText('Annotations saved successfully!')).toBeInTheDocument();
@@ -173,7 +220,7 @@ describe('WorkbenchPage (integration)', () => {
     it('shows the metadata comparison', async () => {
         render(<WorkbenchPage />);
         await screen.findByAltText('Suspicious Screenshot.png');
-        fireEvent.click(screen.getByRole('button', { name: 'View Metadata Comparison' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Metadata' }));
         expect(screen.getByText('Metadata comparison')).toBeInTheDocument();
         expect(screen.getByText('EXIF:CameraModel')).toBeInTheDocument();
         expect(screen.getByText('Canon EOS 90D')).toBeInTheDocument();
@@ -182,28 +229,35 @@ describe('WorkbenchPage (integration)', () => {
         expect(screen.getByText('gpt-image')).toBeInTheDocument();
     });
     //report
-    it('opens and closes the report modal with the evidence details', async () => {
+    it('shows the AI report with the evidence details', async () => {
         render(<WorkbenchPage />);
         await screen.findByAltText('Suspicious Screenshot.png');
-        fireEvent.click(screen.getByRole('button', { name: /Show Report/i }));
+
+        expect(screen.getByRole('button', { name: 'AI Report' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('heading', { name: 'Report' })).toBeInTheDocument();
         expect(screen.getByText('Suspicious')).toBeInTheDocument();
         expect(screen.getByText('Some indicators of possible manipulation.')).toBeInTheDocument();
         expect(screen.getByText('Signs of AI generation detected.')).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Close report' }));
-        expect(screen.queryByRole('heading', { name: 'Report' })).not.toBeInTheDocument();
     });
     //error loading
     it('falls back to a generic title and empty preview when the case fails to load', async () => {
         mockedFetchCase.mockRejectedValue(new Error('Failed to load evidence media'));
         render(<WorkbenchPage />);
-        expect(await screen.findByRole('heading', { name: 'Evidence report-1' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'Evidence media-1' })).toBeInTheDocument();
         expect(screen.getByText('No media preview available yet')).toBeInTheDocument();
     });
     it('falls back to a generic title when the case loads but has no matching evidence', async () => {
         mockedFetchCase.mockResolvedValue({ ...caseFixture, evidence: [] });
         render(<WorkbenchPage />);
-        expect(await screen.findByRole('heading', { name: 'Evidence report-1' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'Evidence media-1' })).toBeInTheDocument();
         expect(screen.getByText('No media preview available yet')).toBeInTheDocument();
     });
+
+    //back button testing
+    it('navigates back to the case board when arriving from the board', async () => {
+        mockSearchParams = new URLSearchParams({ from: 'board' });
+        render(<WorkbenchPage />);
+        const backLink = await screen.findByRole('link', { name: /Back to case/i });
+        expect(backLink).toHaveAttribute('href', '/case-page/case-1?tab=Case%20Board');
+    })
 });

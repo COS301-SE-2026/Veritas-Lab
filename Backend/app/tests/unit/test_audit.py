@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 from fastapi import HTTPException
 import asyncpg
+import json
 
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
@@ -24,7 +25,7 @@ def override_database_dependency():
 CASE_ID = "12345678-abcd-ef01-2345-6789abcdef01"
 
 def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="mock_investigator", role="INVESTIGATOR"):
-    def mock_verify_jwt(request):
+    async def mock_verify_jwt(request, connection):
         return {"sub": sub, "username": username, "role": role}
 
     monkeypatch.setattr(
@@ -33,14 +34,20 @@ def _mock_jwt_success(monkeypatch, *, sub="mock-investigator-id", username="mock
         mock_verify_jwt
     )
 
-def _mock_db_connect(monkeypatch, *, fetch_return=None):
+def _mock_db_connect(monkeypatch, *, fetch_return=None, ownership_return=None):
     mock_connection = AsyncMock()
     mock_connection.fetch = AsyncMock(return_value=fetch_return)
+    # The audit endpoint reads ownership with fetchrow before fetching the timeline.
+    mock_connection.fetchrow = AsyncMock(
+        return_value=ownership_return
+        if ownership_return is not None
+        else {"casecreator": None, "caseassigned": None}
+    )
     mock_connection.close = AsyncMock(return_value=None)
     mock_connect = AsyncMock(return_value=mock_connection)
     monkeypatch.setattr(
         cases_router.asyncpg,
-        "connect", 
+        "connect",
         mock_connect
     )
     return mock_connection, mock_connect
@@ -65,7 +72,8 @@ def test_get_case_audit_events_success(monkeypatch):
 
     mock_connection, mock_connect = _mock_db_connect(
         monkeypatch,
-        fetch_return=fake_rows
+        fetch_return=fake_rows,
+        ownership_return={"casecreator": "mock_investigator", "caseassigned": None}
     )
 
     response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
@@ -88,7 +96,7 @@ def test_get_case_audit_events_success(monkeypatch):
     mock_connection.fetch.assert_called_once()
     mock_connection.close.assert_called_once()
 
-def test_get_case_audit_events_user_unauthorized(monkeypatch):
+def test_get_case_audit_events_non_owner_forbidden(monkeypatch):
     client.cookies.clear()
     _mock_jwt_success(monkeypatch,
     sub="mock-user-id",
@@ -99,10 +107,10 @@ def test_get_case_audit_events_user_unauthorized(monkeypatch):
     response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 403
-    data = response.json() == {
+    assert response.json() == {
         "detail": {
             "status": "error",
-            "message": cases_router.USER_UNAUTHORIZED
+            "message": cases_router.AUDIT_NOT_ALLOWED
         }
     }
 
@@ -122,7 +130,7 @@ def test_get_case_audit_events_db_error(monkeypatch):
     response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 500
-    data = response.json() == {
+    assert response.json() == {
         "detail": {
             "status": "error",
             "message": cases_router.DATABASE_ERROR_MESSAGE
@@ -146,14 +154,19 @@ def test_get_audited_cases_success(monkeypatch):
             "casename": "Flood in Westville",
             "eventcount": 5,
             "lasteventtimestamp": datetime(2024, 6, 2, 15, 30, tzinfo=timezone.utc),
-            "caseexists": True
+            "caseexists": True,
+            "events": json.dumps([
+                {"timestamp": "2024-06-01T12:00:00+00:00", "user": "investigator_user", "action": "Case Created"},
+                {"timestamp": "2024-06-02T15:30:00+00:00", "user": "admin_user", "action": "Evidence Added"}
+            ])
         },
         {
             "caseid": "87654321-dcba-10fe-5432-1098fedcba98",
             "casename": None,
             "eventcount": 3,
             "lasteventtimestamp": None,
-            "caseexists": False
+            "caseexists": False,
+            "events": "[]",
         }
     ]
 
@@ -176,12 +189,17 @@ def test_get_audited_cases_success(monkeypatch):
         "caseName": "Flood in Westville",
         "eventCount": 5,
         "lastEventTimestamp": "2024-06-02T15:30:00+00:00",
-        "caseExists": True
+        "caseExists": True,
+        "events": [
+            {"timestamp": "2024-06-01T12:00:00+00:00", "user": "investigator_user", "action": "Case Created"},
+            {"timestamp": "2024-06-02T15:30:00+00:00", "user": "admin_user", "action": "Evidence Added"}
+        ],
     }
 
     assert data["cases"][1]["caseName"] is None
     assert data["cases"][1]["lastEventTimestamp"] is None
     assert data["cases"][1]["caseExists"] is False
+    assert data["cases"][1]["events"] == []
 
     mock_connect.assert_called_once()
     mock_connection.fetch.assert_called_once()
@@ -231,7 +249,8 @@ def test_get_case_audit_events_empty_log(monkeypatch):
 
     mock_connection, mock_connect = _mock_db_connect(
         monkeypatch,
-        fetch_return=[]
+        fetch_return=[],
+        ownership_return={"casecreator": "mock_investigator", "caseassigned": None}
     )
 
     response = client.get(f"/api/getAudit/caseID/{CASE_ID}")

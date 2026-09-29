@@ -10,12 +10,15 @@ from app.auth.auth import create_token, COOKIE_NAME
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
-# The JWT username must match Cases.CaseCreator exactly, the endpoint updates on it.
-OWNER_USERNAME = "TestUpdateOwner"
-OTHER_USERNAME = "TestUpdateOther"
-
 OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
 OTHER_USER_ID = "00000000-0000-0000-0000-000000000002"
+USER_USER_ID = "00000000-0000-0000-0000-000000000003"
+
+# The JWT username must match Cases.CaseCreator exactly, the endpoint updates on it.
+# verify_jwt also checks it against the stored user, and ensure_user_exists stores f"{name}_{user_id[:8]}".
+OWNER_USERNAME = f"TestUpdateOwner_{OWNER_USER_ID[:8]}"
+OTHER_USERNAME = f"TestUpdateOther_{OTHER_USER_ID[:8]}"
+USER_USERNAME = f"TestUpdateUser_{USER_USER_ID[:8]}"
 
 ORIGINAL_NAME = "Integration Test - update case"
 ORIGINAL_DESCRIPTION = "The original description"
@@ -38,8 +41,8 @@ def other_investigator_cookie():
 
 def user_cookie():
     return create_token({
-        "id": str(uuid.uuid4()),
-        "username": OWNER_USERNAME,
+        "id": USER_USER_ID,
+        "username": USER_USERNAME,
         "role": "USER"
     })
 
@@ -61,29 +64,30 @@ async def fake_update_case_context(ensure_user_exists):
     created_ids = {"connection": conn}
 
     try:
-        await ensure_user_exists(conn, OWNER_USER_ID, OWNER_USERNAME, "INVESTIGATOR")
-        await ensure_user_exists(conn, OTHER_USER_ID, OTHER_USERNAME, "INVESTIGATOR")
+        assert await ensure_user_exists(conn, OWNER_USER_ID, "TestUpdateOwner", "INVESTIGATOR") == OWNER_USERNAME
+        assert await ensure_user_exists(conn, OTHER_USER_ID, "TestUpdateOther", "INVESTIGATOR") == OTHER_USERNAME
+        assert await ensure_user_exists(conn, USER_USER_ID, "TestUpdateUser", "USER") == USER_USERNAME
 
-        for label, creator in (("owned", OWNER_USERNAME), ("foreign", OTHER_USERNAME)):
+        for label, creator in (("owned", OWNER_USERNAME), ("foreign", OTHER_USERNAME), ("user_owned", USER_USERNAME)):
             case_id = str(uuid.uuid4())
             await conn.execute("SELECT set_config('app.current_user_id', $1, false)", OWNER_USER_ID)
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases"
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
                 uuid.UUID(case_id),
                 f"{ORIGINAL_NAME} - {label}",
                 creator,
                 ORIGINAL_DESCRIPTION,
-                False,
+                "OPEN",
             )
             created_ids[f"{label}_case_id"] = case_id
         yield created_ids
     finally:
         await conn.execute("SELECT set_config('app.current_user_id', $1, false)", OWNER_USER_ID)
-        for case_id in (created_ids.get("owned_case_id"), created_ids.get("foreign_case_id")):
+        for case_id in (created_ids.get("owned_case_id"), created_ids.get("foreign_case_id"), created_ids.get("user_owned_case_id")):
             if case_id:
                 await conn.execute('DELETE FROM "Cases_DB"."Cases" WHERE caseid = $1', uuid.UUID(case_id))
         await conn.execute("SELECT set_config('app.current_user_id', '', false)")
@@ -159,24 +163,44 @@ async def test_integration_update_case_both_fields(client, fake_update_case_cont
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_user_role_forbidden(client, fake_update_case_context):
+async def test_integration_update_case_user_role_can_update_own_case(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, user_cookie())
-    case_id = fake_update_case_context["owned_case_id"]
+    case_id = fake_update_case_context["user_owned_case_id"]
 
     response = client.post(
         "/api/updateCase",
         json={
             "CaseID": case_id,
-            "CaseName": "USER should not be able to do this"
+            "CaseName": "Renamed by the owning user"
         }
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"]["message"] == "User unauthorized"
+    assert response.status_code == 200
 
     row = await fetch_case(fake_update_case_context["connection"], case_id)
 
-    assert row["casename"] == f"{ORIGINAL_NAME} - owned"
+    assert row["casename"] == "Renamed by the owning user"
+    assert row["casedescription"] == ORIGINAL_DESCRIPTION
+
+@pytest.mark.asyncio
+async def test_integration_update_case_user_role_can_update_foreign_case(client, fake_update_case_context):
+    client.cookies.set(COOKIE_NAME, user_cookie())
+    case_id = fake_update_case_context["foreign_case_id"]
+
+    response = client.post(
+        "/api/updateCase",
+        json={
+            "CaseID": case_id,
+            "CaseName": "Stolen by a USER"
+        }
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["message"] == "Case not found or user unauthorized."
+
+    row = await fetch_case(fake_update_case_context["connection"], case_id)
+
+    assert row["casename"] == f"{ORIGINAL_NAME} - foreign"
 
 
 @pytest.mark.asyncio
@@ -201,7 +225,7 @@ async def test_integration_update_case_not_the_creator(client, fake_update_case_
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_unknown_case(client):
+async def test_integration_update_case_unknown_case(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, owner_cookie())
 
     response = client.post(
@@ -217,7 +241,7 @@ async def test_integration_update_case_unknown_case(client):
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_malformed_case_id(client):
+async def test_integration_update_case_malformed_case_id(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, owner_cookie())
 
     response = client.post(
@@ -233,7 +257,7 @@ async def test_integration_update_case_malformed_case_id(client):
 
 
 @pytest.mark.asyncio
-async def test_integration_update_case_missing_case_id(client):
+async def test_integration_update_case_missing_case_id(client, fake_update_case_context):
     client.cookies.set(COOKIE_NAME, owner_cookie())
 
     response = client.post(

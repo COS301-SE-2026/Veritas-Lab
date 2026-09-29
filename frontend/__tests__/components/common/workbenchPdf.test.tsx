@@ -72,6 +72,8 @@ const workbenchPdfProps = {
     onSelectAnnotation: jest.fn(),
     onAddShape: jest.fn() as (points: AnnotationPoint[], page: number) => void,
     onAddNote: jest.fn() as (position: AnnotationPoint, text: string, page: number) => void,
+    onAddHighlight: jest.fn(),
+    onResolveHighlight: jest.fn(),
 };
 
 function renderPdf(overrides: Partial<typeof workbenchPdfProps> = {}) {

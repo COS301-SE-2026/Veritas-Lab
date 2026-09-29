@@ -38,16 +38,16 @@ export default function HelpPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
+    <div className="mx-auto w-full max-w-5xl px-6 py-10">
       {/* Header which housees the search */}
       <header className="mb-8">
         <div className="flex items-center gap-3">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-(--color-lightest)">
-            <HelpCircle className="size-7 text-(--color-secondary)" />
+          <span className="flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-(--color-b-50) ring-1 ring-[color-mix(in_srgb,var(--b-500)_22%,transparent)]">
+            <HelpCircle className="size-7 text-(--color-b-600)" />
           </span>
           <div>
-            <h1 className="text-3xl font-bold text-(--color-text)">Help Menu</h1>
-            <p className="text-(--color-light)">
+            <h1 className="text-[30px] font-bold tracking-tight text-(--color-text-strong)">Help Menu</h1>
+            <p className="text-(--color-text-muted)">
               Tutorials, guides and answers for working in Veritas Lab.
             </p>
           </div>
@@ -57,7 +57,7 @@ export default function HelpPage() {
         <div className="relative mt-6">
           <Search
             size={18}
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-(--color-light)"
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-(--color-text-subtle)"
           />
           <input
             type="search"
@@ -65,7 +65,7 @@ export default function HelpPage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search help articles, guides and FAQs..."
             aria-label="Search help"
-            className="w-full rounded-full py-3 pl-12 pr-4 text-(--color-text) shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] focus:outline-none focus:ring-2 focus:ring-(--color-secondary)"
+            className="vl-input pl-12"
           />
         </div>
       </header>
@@ -82,14 +82,14 @@ export default function HelpPage() {
               aria-current={active ? 'page' : undefined}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 active
-                  ? 'bg-(--color-secondary) text-(--color-text)'
-                  : 'text-(--color-text) hover:bg-(--color-lightest)'
+                  ? 'bg-(--color-secondary) text-(--color-text) shadow-[0_4px_12px_-6px_color-mix(in_srgb,var(--b-600)_70%,transparent)]'
+                  : 'border border-(--color-line) bg-(--color-surface) text-(--color-text-strong) hover:bg-(--color-surface-muted)'
               }`}
             >
               <Icon size={16} />
               {label}
               {q && (
-                <span className="rounded-full bg-black/10 px-1.5 text-xs">{counts[id]}</span>
+                <span className={`rounded-full px-1.5 text-xs ${active ? 'bg-black/10' : 'bg-(--color-surface-sunken)'}`}>{counts[id]}</span>
               )}
             </button>
           );
@@ -116,37 +116,30 @@ export default function HelpPage() {
       <footer className="mt-10 flex flex-col items-start gap-4 rounded-2xl bg-(--color-primary) p-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-bold">Still need help?</h2>
-          <p className="text-sm text-white/70">
+          <p className="text-sm text-white/65">
             Reach the Delta Tech team and we&apos;ll get back to you.
           </p>
         </div>
         <a
           href={`mailto:${SUPPORT_EMAIL}`}
-          className="flex items-center gap-2 rounded-full bg-(--color-secondary) px-5 py-2.5 font-semibold text-(--color-text) transition-colors hover:bg-[#2E9E66]"
+          className="flex items-center gap-2 rounded-full bg-(--color-secondary) px-5 py-2.5 font-semibold text-(--color-text) transition-colors hover:bg-(--color-b-600)"
         >
           <Mail size={18} />
           Contact support
         </a>
       </footer>
-
-      <p className="mt-6 text-center text-sm text-(--color-light)">
-        Looking for your cases?{' '}
-        <Link href="/dashboard" className="font-medium text-(--color-text) underline">
-          Back to Dashboard
-        </Link>
-      </p>
     </div>
   );
 }
 // The empty search result
 function Empty({ query }: Readonly<{ query: string }>) {
   return (
-    <div className="rounded-2xl border border-dashed border-(--color-light) p-10 text-center">
-      <Search className="mx-auto size-8 text-(--color-light)" />
-      <p className="mt-3 font-medium text-(--color-text)">
+    <div className="rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center">
+      <Search className="mx-auto size-8 text-(--color-text-subtle)" />
+      <p className="mt-3 font-medium text-(--color-text-strong)">
         No results for &ldquo;{query}&rdquo;
       </p>
-      <p className="text-sm text-(--color-light)">
+      <p className="text-sm text-(--color-text-muted)">
         Try a different term, or check another section.
       </p>
     </div>

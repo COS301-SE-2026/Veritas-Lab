@@ -26,7 +26,7 @@ jest.mock('@/components/common/annotationLayer', () => ({
 }));
 
 const workbenchCanvasProps: WorkbenchCanvasProps = {
-    mediaUrl: null,
+    mediaUrl: undefined,
     mediaKind: 'unsupported',
     mediaName: 'evidence.file',
     active: true,
@@ -36,6 +36,8 @@ const workbenchCanvasProps: WorkbenchCanvasProps = {
     onSelectAnnotation: jest.fn(),
     onAddShape: jest.fn(),
     onAddNote: jest.fn(),
+    onAddHighlight: jest.fn(),
+    onResolveHighlight: jest.fn(),
 };
 
 function renderCanvas(overrides: Partial<WorkbenchCanvasProps> = {}) {

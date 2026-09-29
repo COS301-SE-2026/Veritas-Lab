@@ -11,20 +11,26 @@ export default function SliderBar<T extends string>({ filters, defaultFilter, on
     };
 
     return (
-        <div className={`flex items-center shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-full w-full p-1 ${className ?? ''}`}>
-            {filters.map((filter) => (
-                <button
-                    key={filter}
-                    onClick={() => handleClick(filter)}
-                    className={`flex-1 py-3 rounded-full text-sm font-semibold transition-colors duration-200
-                        ${active === filter
-                            ? 'text-[var(--color-text)] bg-[var(--color-secondary)]'
-                            : 'text-[var(--color-text)] hover:bg-gray-100'
-                        }`}
-                >
-                    {filter}
-                </button>
-            ))}
+        <div
+            className={`flex items-center gap-1 rounded-full border border-(--color-line) bg-(--color-surface-sunken) p-1 w-full ${className ?? ''}`}
+        >
+            {filters.map((filter) => {
+                const isActive = active === filter;
+                return (
+                    <button
+                        key={filter}
+                        onClick={() => handleClick(filter)}
+                        aria-pressed={isActive}
+                        className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--b-500)_45%,transparent)]
+                            ${isActive
+                                ? 'bg-(--color-secondary) text-(--color-text) shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--b-600)_60%,transparent)]'
+                                : 'text-(--color-text-muted) hover:bg-(--color-surface) hover:text-(--color-text-strong)'
+                            }`}
+                    >
+                        {filter}
+                    </button>
+                );
+            })}
         </div>
     );
 }

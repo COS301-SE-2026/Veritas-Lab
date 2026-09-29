@@ -13,7 +13,25 @@ export type CaseCardProps = {
     onDeleted?: () => void | Promise<void>;
     riskScore?: number | null;
     evidenceCount?: number;
+    assignMode?: 'assign' | 'unassign' | null;
+    onAssignmentChanged?: () => void | Promise<void>;
 };
+
+export type CasePublishButtonProps = {
+    caseId: string;
+    caseTitle: string;
+    onPublished?: () => void | Promise<void>;
+    className?: string;
+};
+
+export type CaseAssignButtonProps = {
+    caseId: string;
+    caseTitle: string;
+    mode: 'assign' | 'unassign';
+    onChanged?: () => void | Promise<void>;
+    className?: string;
+};
+
 export type CaseEditButtonProps = {
     caseId: string;
     initialName: string;
@@ -47,6 +65,13 @@ export type EvidenceCardProps = {
     caseId?: string;
     canDelete?: boolean;
     onDeleted?: () => void | Promise<void>;
+    variant?: 'default' | 'case-board';
+    capturedAt?: string | null;
+    reportCertainty?: number | null;
+    annotationCount?: number;
+    placed?: boolean;
+    selected?: boolean;
+    viewReport?: () => void;
 };
 //case evidence delete
 export type EvidenceDeleteButtonProps = {
@@ -89,15 +114,6 @@ export type CaseCloseButtonProps = {
     className?: string;
 };
 
-export type CheckBoxProps = {
-    label: string;
-    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-    checked?: boolean;
-    defaultChecked?: boolean;
-    disabled?: boolean;
-    className?: string;
-};
-
 export type DropdownOption = {
     label: string;
     value: string;
@@ -112,18 +128,13 @@ export type DropdownProps = {
     optionClassName?: string;
 };
 
-export type ContainerProps = {
-    children: ReactNode;
-    className?: string;
-};
-
 export type ButtonProps = {
     children?: ReactNode;
     text?: string;
     onClick?: () => void;
     disabled?: boolean;
     type?: 'button' | 'submit' | 'reset';
-    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack' | 'light';
+    variant?: 'primary' | 'secondary' | 'outline' | 'sidebar' | 'submit' | 'sadSack' | 'light' | 'light-outline';
     size?: 'small' | 'medium' | 'large';
     className?: string;
 };
@@ -142,10 +153,6 @@ export type CardProps = {
 export type CardSectionProps = {
     children: ReactNode;
     className?: string;
-};
-
-export type HeadingProps = {
-    text: string;
 };
 
 export type InputProps = {
@@ -179,11 +186,6 @@ export type SliderBarProps<T extends string = string> = {
     className?: string;
 };
 
-export type TextProps = {
-    text: string;
-    className?: string;
-};
-
 export interface Highlight {
     title: string;
     description: string;
@@ -202,3 +204,37 @@ export type Audience = {
     description: string;
     icon: LucideIcon;
 };
+
+export type BoardPosition = {
+    x: number;
+    y: number;
+}
+
+export type SavedEvidenceNode = {
+    mediaId: string;
+    position: BoardPosition;
+}
+
+export type SavedNoteNode = {
+    id: string;
+    position: BoardPosition;
+    text: string;
+}
+
+export type SavedEdge = {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    variant?: 'timeline';
+}
+
+export type CaseBoard = {
+    nodes: {
+        evidenceNodes: SavedEvidenceNode[];
+        noteNodes: SavedNoteNode[];
+    };
+    edges: SavedEdge[];
+}

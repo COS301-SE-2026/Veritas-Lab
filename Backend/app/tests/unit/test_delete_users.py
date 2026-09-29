@@ -1,3 +1,4 @@
+from unittest.mock import AsyncMock
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -27,7 +28,7 @@ async def test_admin_deletes_user_successfully(client, monkeypatch):
     monkeypatch.setattr(
         auth , 
         "verify_jwt", 
-        lambda request: admin_payload()
+        AsyncMock(return_value=admin_payload())
     )
 
     async def fake_delete(user_id, connection):
@@ -52,11 +53,11 @@ async def test_non_admin_is_forbidden(client, monkeypatch):
     monkeypatch.setattr(
         auth ,
         "verify_jwt", 
-        lambda request: {
+        AsyncMock(return_value={
             "sub": ADMIN_USER_ID, 
             "username": "Alex", 
             "role": "USER"
-        }
+        })
     )
         
     response = client.delete(f"/api/users/{TARGET_USER_ID}")
@@ -68,7 +69,7 @@ async def test_non_admin_is_forbidden(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_missing_token_is_unauthorized(client, monkeypatch):
-    def raise_http_exception(request):
+    async def raise_http_exception(request, connection):
         raise HTTPException(
             status_code=401,
             detail={
@@ -95,7 +96,7 @@ async def test_malformed_uuid_is_rejected(client, monkeypatch):
     monkeypatch.setattr(
         auth , 
         "verify_jwt", 
-        lambda request: admin_payload()
+        AsyncMock(return_value=admin_payload())
     )
 
     malformed_uuid = "not-a-valid-uuid"
@@ -112,7 +113,7 @@ async def test_admin_cannot_delete_themself(client, monkeypatch):
     monkeypatch.setattr(
         auth,
         "verify_jwt", 
-        lambda request: admin_payload()
+        AsyncMock(return_value=admin_payload())
     )
 
     #The target is the same as the admin's ID
@@ -122,13 +123,28 @@ async def test_admin_cannot_delete_themself(client, monkeypatch):
     assert response.json()["detail"]["message"] == "Admins cannot delete themselves."
     assert auth.COOKIE_NAME not in response.cookies
 
+@pytest.mark.asyncio
+async def test_system_init_cannot_be_deleted(client, monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "verify_jwt",
+        AsyncMock(return_value=admin_payload())
+    )
+
+    response = client.delete(
+        "/api/users/00000000-0000-0000-0000-000000000000"
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["message"] == "Invalid User ID format."
+
 #Testing nonexistent user with error code 404
 @pytest.mark.asyncio
 async def test_nonexistent_user_delete_404(client, monkeypatch):
     monkeypatch.setattr(
         auth, 
         "verify_jwt", 
-        lambda request: admin_payload()
+        AsyncMock(return_value=admin_payload())
     )
 
     async def fake_delete(user_id, connection):
@@ -152,7 +168,7 @@ async def test_nonexistent_user_delete_404(client, monkeypatch):
 #invalid jwt is rejected
 @pytest.mark.asyncio
 async def test_invalid_jwt_rejected(client, monkeypatch):
-    def fake_verify_raises(request):
+    async def fake_verify_raises(request, connection):
         raise HTTPException(
             status_code=401,
             detail={

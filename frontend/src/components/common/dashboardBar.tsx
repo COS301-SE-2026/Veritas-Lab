@@ -1,4 +1,5 @@
 'use client';
+import { Search } from 'lucide-react';
 import Input from '../ui/input';
 import Dropdown from '../ui/dropdown';
 import SliderBar from '../ui/sliderBar';
@@ -16,38 +17,31 @@ export default function DashboardBar({
     const statusFilters = ['All', 'Open', 'Closed'] as const;
 
     return (
-        <>
-        <div className='grid grid-cols-3 gap-4 rounded-full font-semibold text-[var(--color-text)] p-4 mt-4'>
-            <div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="relative">
+                <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-(--color-text-subtle)" />
                 <Input
                     placeholder="Search cases..."
-                    className='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] pl-5 w-full py-2.5 rounded-full'
+                    className="vl-input pl-11"
                     value={searchValue}
                     onChange={onSearchChange}
                 />
             </div>
-            <div>
-                <SliderBar
-                    filters={statusFilters}
-                    className='w-full'
-                    defaultFilter={statusFilter}
-                    onChange={onStatusChange}
-                />
-            </div>
-            <div>
-                <Dropdown
-                    options={[
-                        { label: 'Case Creation Date', value: 'caseCreationDate' },
-                        { label: 'Case Name', value: 'caseName' },
-                        { label: 'Case Creator', value: 'caseCreator' },
-                    ]}
-                    className='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] pl-5 ml-3 w-full py-3.5 rounded-full'
-                    optionClassName='shadow-[inset_0_0_8px_rgba(0,0,0,0.1)] rounded-full'
-                    defaultValue={sortValue}
-                    onChange={(event) => onSortChange?.(event.target.value as SortKey)}
-                />
-            </div>
+            <SliderBar
+                filters={statusFilters}
+                className="w-full"
+                defaultFilter={statusFilter}
+                onChange={onStatusChange}
+            />
+            <Dropdown
+                options={[
+                    { label: 'Case Creation Date', value: 'caseCreationDate' },
+                    { label: 'Case Name', value: 'caseName' },
+                    { label: 'Case Creator', value: 'caseCreator' },
+                ]}
+                defaultValue={sortValue}
+                onChange={(event) => onSortChange?.(event.target.value as SortKey)}
+            />
         </div>
-        </>
     );
 }

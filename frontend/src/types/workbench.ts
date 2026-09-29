@@ -3,6 +3,8 @@
 // The overlay never touches the underlying media, it only stores shapes/notes
 // positioned relative to it, see AnnotationPoint below.
 
+import { ActivationType, ClassificationResult, ModelConfig } from "@/lib/ai";
+import type { ReportFindings } from "@/types/api";
 /**
  * A point expressed as a percentage (0-100) of the media's rendered width/height.
  * Using percentages instead of raw pixels keeps annotations aligned with the media
@@ -14,7 +16,7 @@ export type AnnotationPoint = {
 };
 
 /** The tools currently planned for the workbench. More may be added later. */
-export type AnnotationTool = 'Select' | 'Draw' | 'Comment';
+export type AnnotationTool = 'Select' | 'Draw' | 'Comment' | 'Highlight';
 
 /** A freehand shape drawn on the overlay, e.g. circling a suspicious region. */
 export type ShapeAnnotation = {
@@ -23,6 +25,7 @@ export type ShapeAnnotation = {
     page: number;
     points: AnnotationPoint[];
     timeStamp?: number;
+    source?: AnnotationSource;
 };
 
 /** A text note pinned to a specific point on the media. */
@@ -33,9 +36,10 @@ export type NoteAnnotation = {
     position: AnnotationPoint;
     text: string;
     timeStamp?: number;
+    source?: AnnotationSource;
 };
 
-export type Annotation = ShapeAnnotation | NoteAnnotation;
+export type Annotation = ShapeAnnotation | NoteAnnotation | HighlightAnnotation;
 
 export type WorkbenchCanvasProps = {
     mediaUrl?: string;
@@ -48,6 +52,8 @@ export type WorkbenchCanvasProps = {
     onSelectAnnotation: (id: string | null) => void;
     onAddShape: (points: AnnotationPoint[], page: number, timeStamp?: number) => void;
     onAddNote: (position: AnnotationPoint, text: string, page: number, timeStamp?: number) => void;
+    onAddHighlight: (text: string, rects: HighlightRect[], page: number) => void;
+    onResolveHighlight: (id: string, rects: HighlightRect[]) => void;
     video?: React.RefObject<HTMLVideoElement | null>;
 };
 
@@ -65,19 +71,19 @@ export type AnnotationListProps = {
     annotations: Annotation[];
     selectedId: string | null;
     onSelect: (id: string) => void;
-    onRemove: (id: string) => void;
+    onRemove?: (id: string) => void;
 };
 
-// Workbench tools which now has both annotations and metadata compar.
-export type WorkbenchTool = 'Annotations' | 'Compare';
+// Workbench tools which now has both annotations and metadata compar and plug and play models or PAPModels.
+export type WorkbenchTool = 'Plug-and-Play Models' | 'Annotations' | 'Metadata' | 'AI Report';
 
 export type WorkbenchPanelProps = {
-    activeWorkbenchTool: WorkbenchTool | null;
-    onSelectWorkbenchTool: (tool: WorkbenchTool | null) => void;
+    mediaKind: MediaKind;
     activeTool: AnnotationTool;
     onToolChange: (tool: AnnotationTool) => void;
     annotations: Annotation[];
     selectedId: string | null;
+    readOnly?: boolean;
     onSelectAnnotation: (id: string) => void;
     onRemoveAnnotation: (id: string) => void;
     onClearAll: () => void;
@@ -85,7 +91,8 @@ export type WorkbenchPanelProps = {
 };
 
 export type SaveAnnotationsPayload = {
-    evidenceId: string;
+    caseId: string
+    mediaId: string;
     annotations: Annotation[];
 };
 
@@ -105,5 +112,61 @@ export type ReportModalProps = {
     mediaKind?: MediaKind;
     mediaName: string;
     certainty: number | null;
-    findings: string | null;
+    findings: ReportFindings | null;
+    heatmapUrl?: string | null;
+};
+
+export type ReportPanelProps = {
+    mediaUrl?: string;
+    mediaKind?: MediaKind;
+    mediaName: string;
+    certainty: number | null;
+    findings: ReportFindings | null;
+    onClose?: () => void;
+    heatmapUrl?: string | null;
+};
+
+export type advancedModelConfigOptions = {
+    activation: ActivationType;
+    inputWidth: number;
+    inputHeight: number;
+    pageCount?: number;
+    frameCount?: number;
+}
+
+export type visualConfig = {
+    mean: [number, number, number];
+    std: [number, number, number];
+}
+
+export type PAPData = {
+    modelName: string;
+    fileName: string;
+    results: ClassificationResult;
+    config: ModelConfig;
+    date: string;
+}
+
+export type PAPModelResultsPayload = {
+    caseId: string;
+    mediaId: string;
+    data: PAPData;
+};
+export type AnnotationSource = 'USER' | 'AI';
+
+export type HighlightRect = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+};
+
+export type HighlightAnnotation = {
+    id: string;
+    kind: 'highlight';
+    page: number;
+    text: string;
+    rects?: HighlightRect[];
+    source?: AnnotationSource;
+    timeStamp?: number;
 };

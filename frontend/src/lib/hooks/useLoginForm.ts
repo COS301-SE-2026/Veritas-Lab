@@ -61,6 +61,7 @@ export default function useLoginForm() {
             });
             setFormState(initialFormState);
             router.push('/dashboard');
+            router.refresh();
         }
         catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to reach the server. Please try again later.';

@@ -20,8 +20,12 @@ describe('CaseEvidenceDeleteButton', () => {
             fetchCase: jest.fn(),
             fetchCases: jest.fn(),
             addEvidence: jest.fn(),
+            publishCase: jest.fn(),
             closeCase: jest.fn(),
             deleteEvidence,
+            editComment: jest.fn(),
+            deleteComment: jest.fn(),
+            updateCase: jest.fn(),
         });
     });
     //test rendering of modal and its behaviour
@@ -73,9 +77,9 @@ describe('CaseEvidenceDeleteButton', () => {
         render(<CaseEvidenceDeleteButton caseId="case-1" mediaId="media-1" mediaName="EvidenceA" />);
         fireEvent.click(screen.getByRole('button'));
         fireEvent.click(screen.getByText('Delete'));
-        expect(screen.getByText('Deleting…')).toBeInTheDocument();
+        expect(screen.getByText('Deleting...')).toBeInTheDocument();
         expect(screen.getByText('Cancel')).toBeDisabled();
-        expect(screen.getByText('Deleting…')).toBeDisabled();
+        expect(screen.getByText('Deleting...')).toBeDisabled();
         resolveDelete({ status: 'success' });
         await waitFor(() => expect(screen.queryByText('Delete evidence?')).not.toBeInTheDocument());
     });

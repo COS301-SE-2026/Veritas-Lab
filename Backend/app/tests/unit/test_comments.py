@@ -41,7 +41,7 @@ INVESTIGATOR_JWT = {"userId": "user-1", "username": "investigator_one", "role": 
 
 
 def _jwt_mock(role="INVESTIGATOR", username="investigator_user"):
-    return lambda req: {"sub": "id", "username": username, "role": role}
+    return AsyncMock(return_value={"sub": "id", "username": username, "role": role})
 
 
 def _mock_connection():
@@ -304,7 +304,7 @@ def test_update_comment_success(monkeypatch):
 
 
 def test_update_comment_invalid_token_returns_401(monkeypatch):
-    def mock_verify_jwt(_):
+    async def mock_verify_jwt(_, connection):
         raise HTTPException(
             status_code=401, 
             detail={
@@ -337,7 +337,7 @@ def test_update_comment_invalid_case_id_returns_400(monkeypatch):
     monkeypatch.setattr(
         cases_router, 
         "verify_jwt", 
-        lambda _: INVESTIGATOR_JWT
+        AsyncMock(return_value=INVESTIGATOR_JWT)
     )
 
     response = client.post(

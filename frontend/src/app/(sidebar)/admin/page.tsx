@@ -44,15 +44,13 @@ export default function AdminPage() {
         { label: 'Role', value: 'role' },
     ];
     if (userRole !== 'ADMIN') {
-        return <div className='mt-8 ml-8 text-sm text-[var(--color-light)]'>Redirecting...</div>;
+        return <div className='mx-auto max-w-7xl px-6 sm:px-8 pt-10 text-sm text-(--color-text-muted)'>Redirecting...</div>;
     }
     return (
-        <div className='mt-8 ml-8 mr-8'>
-            <div className='flex items-start justify-between gap-4'>
-                <div>
-                    <div className='text-[32px] font-bold text-[var(--color-text)]'>Admin</div>
-                    <div className='text-[16px] text-[var(--color-light)]'>Manage users, roles, and account access</div>
-                </div>
+        <div className='mx-auto max-w-7xl px-6 sm:px-8 pt-10 pb-16'>
+            <div>
+                <h1 className='text-[30px] sm:text-[34px] font-bold tracking-tight text-(--color-text-strong)'>Admin</h1>
+                <p className='mt-1 text-[15px] text-(--color-text-muted)'>Manage users, roles, and account access</p>
             </div>
             <div className='mt-8'>
                 <AdminUserSearchBar
@@ -67,11 +65,11 @@ export default function AdminPage() {
                     onSortChange={(value) => setSortKey(value as 'id' | 'displayName' | 'username' | 'role')}
                 />
             </div>
-            <div className='mt-4 space-y-3'>
+            <div className='mt-6 space-y-3'>
                 {isLoading ? (
-                    <div className='text-sm text-[var(--color-light)]'>Loading users...</div>
+                    <div className='rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) py-16 text-center text-sm text-(--color-text-muted)'>Loading users...</div>
                 ) : error ? <Label text={error} htmlFor="error" variant="error" /> : visibleUsers.length === 0 ? (
-                    <div className='text-sm text-[var(--color-light)]'>No users found.</div>
+                    <div className='rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) py-16 text-center text-sm text-(--color-text-muted)'>No users found.</div>
                 ) : (
                     <AdminUsersPanel
                         users={visibleUsers}
@@ -93,7 +91,7 @@ export default function AdminPage() {
                 )}
             </div>
             {actionError ? (
-                <div className='mt-4 text-sm text-[var(--color-error)]'>{actionError}</div>
+                <div className='mt-4 text-sm text-[var(--color-danger)]'>{actionError}</div>
             ) : null}
 
             <AdminDeleteModal
@@ -117,5 +115,5 @@ export default function AdminPage() {
                 }}
             />
         </div>
-    ); //i hate html :( this was hell.
+    );
 }

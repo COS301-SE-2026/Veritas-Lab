@@ -1,26 +1,34 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import WorkbenchCanvas from '@/components/common/workbenchCanvas';
 import WorkbenchPanel from '@/components/common/workbenchPanel';
 import MetadataComparison from '@/components/common/workbenchMetadataComp';
-import ReportModal from '@/components/common/reportModal';
-import Button from '@/components/ui/button';
+import SliderBar from '@/components/ui/sliderBar';
 import useAnnotations from '@/lib/hooks/useAnnotations';
-import useReportModal from '@/lib/hooks/useEvidenceReport';
 import { saveAnnotations } from '@/lib/api/workbench';
 import { fetchCase } from '@/lib/api/case';
-import { getMediaKind } from '@/lib/media';
-import type { CaseEvidence } from '@/types/api';
+import { resolveMediaKind } from '@/lib/media';
+import { getCasePermissions, getVisibleCaseTabs } from '@/lib/casePermissions';
+import { useCurrentUser, useUserRole } from '@/context/UserRoleContext';
+import type { CaseEvidence, CaseResponse } from '@/types/api';
 import type { MediaKindMetadataComp, WorkbenchTool } from '@/types/workbench';
+import { mergeEvidenceAnnotations } from '@/lib/workbenchAnnotations';
+import PlugAndPlayModels from '@/components/common/plugAndPlayModels';
+import ReportPanel from '@/components/common/reportPanel';
+import { usePublishCaseNav } from '@/context/caseNavContext';
+
+const WORKBENCH_TABS: readonly WorkbenchTool[] = [ 'AI Report', 'Annotations', 'Metadata', 'Plug-and-Play Models'];
 
 export default function WorkbenchPage() {
     const params = useParams<{ id: string; evidenceId: string }>();
     const [error, setError] = useState<string | null>(null);
     const caseId = params.id;
     const evidenceId = params.evidenceId;
+    const userRole = useUserRole();
+    const currentUser = useCurrentUser();
 
     const {
         annotations,
@@ -30,25 +38,33 @@ export default function WorkbenchPage() {
         setSelectedId,
         addShape,
         addNote,
+        addHighlight,
+        resolveHighlight,
         removeAnnotation,
         clearAll,
         loadAnnotations,
     } = useAnnotations();
-    const { isReportOpen, openReport, closeReport } = useReportModal();
 
-    // Which workbench tool is open. By default none are open
-    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool | null>(null);
+    const [activeWorkbenchTool, setActiveWorkbenchTool] = useState<WorkbenchTool>('AI Report');
 
     const [seededForm, setSeededForm] = useState<CaseEvidence | null>(null);
     const [evidence, setEvidence] = useState<CaseEvidence | null>(null);
+    const [caseDetails, setCaseDetails] = useState<CaseResponse['case'] | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
-
+    const searchParams = useSearchParams();
+    const from = searchParams.get('from');
+    let backHref;
+    if (from === 'board') {
+        backHref = `/case-page/${caseId}?tab=${encodeURIComponent('Case Board')}`;
+    } else {
+        backHref = `/case-page/${caseId}`;
+    }
     const pickSelectedAnnotation = (id: string | null) => {
         setSelectedId(id);
         if (id === null) return;
 
         const chosen = annotations.find((annotation) => annotation.id === id);
-        if(video.current && (chosen?.timeStamp !== undefined)) {
+        if (video.current && (chosen?.timeStamp !== undefined)) {
             video.current.pause();
             video.current.currentTime = chosen.timeStamp;
         }
@@ -56,11 +72,12 @@ export default function WorkbenchPage() {
 
     useEffect(() => {
         let cancelled = false;
-        
+
         fetchCase(caseId)
             .then((data) => {
                 if (cancelled) return;
-                const match = data.evidence.find((item) => item.reportId === evidenceId) ?? null;
+                setCaseDetails(data.case);
+                const match = data.evidence.find((item) => item.mediaId === evidenceId) ?? null;
                 setEvidence(match);
             })
             .catch((error) => {
@@ -72,90 +89,170 @@ export default function WorkbenchPage() {
         };
     }, [caseId, evidenceId]);
 
-    if(evidence !== seededForm) {
+    if (evidence !== seededForm) {
         setSeededForm(evidence);
-        loadAnnotations(evidence?.annotations ?? []);
+        loadAnnotations(mergeEvidenceAnnotations(evidence?.annotations, evidence?.automatedAnnotations));
     }
-    const mediaName = evidence?.mediaName ?? `Evidence ${evidenceId}`;
+
+    const permissions = getCasePermissions({
+        role: userRole,
+        username: currentUser?.username,
+        caseCreator: caseDetails?.caseCreator,
+        caseState: caseDetails?.caseState,
+        caseAssigned: caseDetails?.caseAssigned,
+    });
+    usePublishCaseNav(caseId, caseDetails ? getVisibleCaseTabs(permissions) : null);
+    const canAnnotate = permissions.canAnnotate;
+    const workbenchTabs = WORKBENCH_TABS.filter(
+        (tab) => tab !== 'Plug-and-Play Models' || permissions.canUsePlugAndPlay,
+    );
+    const currentTab: WorkbenchTool = workbenchTabs.includes(activeWorkbenchTool) ? activeWorkbenchTool : 'AI Report';
+    const mediaName = evidence?.casePerspective ?? `Evidence ${evidenceId}`;
     const mediaUrl = evidence?.mediaUrl;
-    const mediaKind = getMediaKind(evidence?.mediaExtension);
-    const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind === 'video' ? 'unsupported' : mediaKind;
-    const annotationsActive = activeWorkbenchTool === 'Annotations';
-    const comparisonActive = activeWorkbenchTool === 'Compare';
+    const mediaKind = resolveMediaKind({
+        mediaExtension: evidence?.mediaExtension,
+        mediaName: evidence?.mediaName,
+        mediaUrl: evidence?.mediaUrl,
+    });
+    //changed video metadata to be supported, used to be unsupported which is why it wasnt rendering (sorry i forgot to change that)
+    const mediaKindMetadataComp: MediaKindMetadataComp = mediaKind;
+    const annotationsActive = currentTab === 'Annotations';
+    const metadataActive = currentTab === 'Metadata';
+    const PAPModelsActive = currentTab === 'Plug-and-Play Models';
+    const reportActive = currentTab === 'AI Report';
+    const effectiveTool = canAnnotate ? activeTool : 'Select';
+    //the AI annotations have their own table so only the users work is saved.
+    const handleSave = () => saveAnnotations({
+        caseId,
+        mediaId: evidenceId,
+        annotations: annotations.filter((annotation) => annotation.source !== 'AI'),
+    });
 
-    const handleSave = () => saveAnnotations({ evidenceId, annotations });
-
-    return (
-        <div className="mt-8 ml-16 mr-16">
-            <Link
-                href={`/case-page/${caseId}`}
-                className="inline-flex items-center gap-2 text-sm text-(--color-light) transition-colors hover:text-(--color-text)"
-            >
-                <ArrowLeft size={16} />
-                Back to case
-            </Link>
-
-            <div className="mt-4 flex items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-(--color-text)">{mediaName}</h1>
-                    <p className="mt-1 text-sm text-(--color-light)">
-                        Use the tools on the right to work on this evidence.
-                    </p>
+    const backLink = (
+        <Link
+            href={backHref}
+            className="inline-flex items-center gap-2 text-sm font-medium text-(--color-text-muted) transition-colors hover:text-(--color-text-strong)"
+        >
+            <ArrowLeft size={16} />
+            Back to case
+        </Link>
+    );
+    if (caseDetails && !permissions.canOpenWorkbench) {
+        return (
+            <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">
+                {backLink}
+                <div className="mt-6 rounded-[var(--radius-xl)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">
+                    You don&apos;t have access to the workbench for this case.
                 </div>
-                <Button variant="submit" onClick={openReport} className="flex items-center gap-2">
-                    <FileText size={16} />
-                    <span className="text-sm">Show Report</span>
-                </Button>
+            </div>
+        );
+    }
+    let subtitle = 'Use the annotation controls on the right to work on this evidence.';
+    if (metadataActive) {
+        subtitle = 'Showing extracted metadata in place of the preview. Switch to Annotations to return to the media.';
+    } else if (!canAnnotate) {
+        subtitle = 'You can view this evidence and its annotations. Assign yourself to the case to make changes.';
+    }
+    return (
+        <div className={`mx-auto ${annotationsActive || reportActive ? 'max-w-[100rem]' : 'max-w-7xl'} px-6 sm:px-10 pt-8 pb-16`}>
+            {backLink}
+
+            <div className="mt-4">
+                <h1 className="text-2xl font-bold text-(--color-text-strong)">{mediaName}</h1>
+                <p className="mt-1 text-sm text-(--color-text-muted)">{subtitle}</p>
+                {error ? <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p> : null}
+            </div>
+
+            <div className="mt-6">
+                <SliderBar<WorkbenchTool>
+                    key={workbenchTabs.join('|')}
+                    filters={workbenchTabs}
+                    defaultFilter={currentTab}
+                    onChange={(tab) => setActiveWorkbenchTool(tab)}
+                    className="w-full max-w-xl"
+                />
             </div>
 
             <div className="mt-6 flex gap-6">
-                <div className="flex-1">
-                    <WorkbenchCanvas
-                        video={video}
-                        mediaUrl={mediaUrl}
-                        mediaKind={mediaKind}
-                        mediaName={mediaName}
-                        active={annotationsActive}
-                        activeTool={activeTool}
-                        annotations={annotations}
-                        selectedId={selectedId}
-                        onSelectAnnotation={pickSelectedAnnotation}
-                        onAddShape={addShape}
-                        onAddNote={addNote}
-                    />
+                <div className="min-w-0 flex-1">
+                    <div className={(metadataActive || PAPModelsActive || (reportActive && evidence?.heatmapUrl)) ? 'hidden' : 'block'} aria-hidden={metadataActive}>
+                        <WorkbenchCanvas
+                            video={video}
+                            mediaUrl={mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            active={annotationsActive}
+                            activeTool={effectiveTool}
+                            annotations={annotations}
+                            selectedId={selectedId}
+                            onSelectAnnotation={pickSelectedAnnotation}
+                            onAddShape={addShape}
+                            onAddNote={addNote}
+                            onAddHighlight={addHighlight}
+                            onResolveHighlight={resolveHighlight}
+                        />
+                    </div>
 
-                    {comparisonActive ? (
+                    {metadataActive && (
                         <MetadataComparison
                             mediaKind={mediaKindMetadataComp}
                             mediaName={mediaName}
                             reportArtifacts={evidence?.reportArtifacts}
+                            className="h-[calc(100dvh-14rem)] min-h-[32rem]"
                         />
-                    ) : null}
+                    )}
+
+                    {PAPModelsActive && (
+                        <PlugAndPlayModels mediaUrl={mediaUrl} mediaName={mediaName} mediaKind={mediaKind} caseId={caseId} mediaId={evidenceId} plugAndPlayReport={evidence?.plugAndPlay ?? []}/>
+                    )}
+
+                    {reportActive && evidence?.heatmapUrl && (
+                        <WorkbenchCanvas
+                            video={video}
+                            mediaUrl={evidence?.heatmapUrl ?? mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            active={annotationsActive}
+                            activeTool={effectiveTool}
+                            annotations={annotations}
+                            selectedId={selectedId}
+                            onSelectAnnotation={pickSelectedAnnotation}
+                            onAddShape={addShape}
+                            onAddNote={addNote}
+                            onAddHighlight={addHighlight}
+                            onResolveHighlight={resolveHighlight}
+                        />
+                    )}
                 </div>
 
-                <WorkbenchPanel
-                    activeWorkbenchTool={activeWorkbenchTool}
-                    onSelectWorkbenchTool={setActiveWorkbenchTool}
-                    activeTool={activeTool}
-                    onToolChange={setActiveTool}
-                    annotations={annotations}
-                    selectedId={selectedId}
-                    onSelectAnnotation={pickSelectedAnnotation}
-                    onRemoveAnnotation={removeAnnotation}
-                    onClearAll={clearAll}
-                    onSave={handleSave}
-                />
-            </div>
+                {annotationsActive && (
+                    <WorkbenchPanel
+                        mediaKind={mediaKind}
+                        activeTool={effectiveTool}
+                        onToolChange={setActiveTool}
+                        annotations={annotations}
+                        selectedId={selectedId}
+                        onSelectAnnotation={pickSelectedAnnotation}
+                        onRemoveAnnotation={removeAnnotation}
+                        onClearAll={clearAll}
+                        onSave={handleSave}
+                        readOnly={!canAnnotate}
+                    />
+                )}
 
-            <ReportModal
-                isOpen={isReportOpen}
-                onClose={closeReport}
-                mediaUrl={mediaUrl}
-                mediaKind={mediaKind}
-                mediaName={mediaName}
-                certainty={evidence?.reportCertainty ?? null}
-                findings={evidence?.reportFindings ?? null}
-            />
+                {reportActive && (
+                    <div className="w-130 shrink-0 self-start">
+                        <ReportPanel
+                            mediaUrl={mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            certainty={evidence?.reportCertainty ?? null}
+                            findings={evidence?.reportFindings ?? null}
+                            heatmapUrl={evidence?.heatmapUrl ?? null}
+                        />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

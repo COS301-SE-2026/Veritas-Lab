@@ -2,14 +2,13 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch 
 
 import pytest
-import torch
-from app.ai.detector import AIImageDetector
-from app.ai.detector import AIVideoDetector
+from app.ai.detector import ai_image_detector
+from app.ai.detector import ai_video_detector
 
 @pytest.fixture
 def mock_video_detector_dependencies():
     mock_analysis_model = MagicMock()
-    mock_analysis_model.analyse = AsyncMock()
+    mock_analysis_model.analyse = MagicMock()
 
     with patch(
         "app.ai.detector.video_combined_analysis",
@@ -47,7 +46,7 @@ def mock_detector_dependencies():
         }
 
 def test_detector_initialises_model(mock_detector_dependencies) -> None:
-    detector = AIImageDetector()
+    detector = ai_image_detector()
 
     mock_detector_dependencies["model_class"].assert_called_once_with(
         freeze_features=False,
@@ -65,7 +64,7 @@ def test_detector_initialises_model(mock_detector_dependencies) -> None:
     mock_detector_dependencies["model"].eval.assert_called_once()
 
 def test_detector_loads_checkpoint(mock_detector_dependencies) -> None:
-    detector = AIImageDetector()
+    detector = ai_image_detector()
 
     mock_detector_dependencies["torch_load"].assert_called_once_with(
         Path("app/ai/best_model.pth"),
@@ -82,7 +81,7 @@ def test_detector_loads_checkpoint(mock_detector_dependencies) -> None:
     ]
 )
 def test_analyse_image_maps_risk_level(mock_detector_dependencies, risk_level: str, expected: int):
-    detector = AIImageDetector()
+    detector = ai_image_detector()
 
     prediction_result = {
         "risk_level": risk_level,
@@ -107,7 +106,7 @@ def test_analyse_image_maps_risk_level(mock_detector_dependencies, risk_level: s
         )
 
 def test_analyse_image_preserves_other_result_fields(mock_detector_dependencies) -> None:
-    detector = AIImageDetector()
+    detector = ai_image_detector()
 
     prediction_result = {
         "risk_level": "HIGH",
@@ -140,7 +139,7 @@ def test_analyse_image_preserves_other_result_fields(mock_detector_dependencies)
     ]
 
 def test_analyse_image_raises_key_error_for_unknown_risk(mock_detector_dependencies) -> None:
-    detector = AIImageDetector()
+    detector = ai_image_detector()
 
     prediction_result = {
         "risk_level": "UNKNOWN"
@@ -156,14 +155,14 @@ def test_analyse_image_raises_key_error_for_unknown_risk(mock_detector_dependenc
             detector.analyse_image(image_path)
 
 def test_video_detector_initialises_model(mock_video_detector_dependencies) -> None:
-    detector = AIVideoDetector()
+    detector = ai_video_detector()
 
     mock_video_detector_dependencies["model_class"].assert_called_once_with()
     assert detector.model is mock_video_detector_dependencies["model"]
 
 @pytest.mark.asyncio
 async def test_analyze_video_converts_to_path_object(mock_video_detector_dependencies) -> None:
-    detector = AIVideoDetector()
+    detector = ai_video_detector()
 
     mock_video_detector_dependencies["model"].analyse.return_value = {
         "prediction": "AI-generated",
@@ -196,7 +195,7 @@ async def test_analyse_video_maps_risk_level(
     authentic_probability: float,
     expected_risk_level: int
 ) -> None:
-    detector = AIVideoDetector()
+    detector = ai_video_detector()
 
     mock_video_detector_dependencies["model"].analyse.return_value = {
         "prediction": prediction,
@@ -210,7 +209,7 @@ async def test_analyse_video_maps_risk_level(
 
 @pytest.mark.asyncio
 async def test_analyse_video_preserves_other_result_fields(mock_video_detector_dependencies) -> None:
-    detector = AIVideoDetector()
+    detector = ai_video_detector()
 
     mock_video_detector_dependencies["model"].analyse.return_value = {
         "prediction": "AI-generated",

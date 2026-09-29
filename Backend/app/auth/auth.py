@@ -14,11 +14,14 @@ from app.core.database import get_connection
 from fastapi.security import APIKeyCookie
 
 COOKIE_NAME = "JWT_token"
+SYSTEM_INIT_UUID = uuidlib.UUID("00000000-0000-0000-0000-000000000000")
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
 NOT_AUTH = "Not authenticated"
 DATABASE_ERROR="Database error"
 EXPIRED_TOKEN = "Token has expired"
+TOKEN_ISSUE_LEEWAY = timedelta(seconds=5)
+TOKEN_REVOCATION_GRACE = timedelta(seconds=30)
 
 INVALID_TOKEN_401 = {
             "description": "Authentication failed",
@@ -71,6 +74,7 @@ auth_settings = Auth_Settings()
 
 SECRET_KEY = auth_settings.JWT_SECRET
 ALGORITHM = auth_settings.HASH
+COOKIE_MAX_AGE = auth_settings.TOKEN_EXPIRE * 60
 
 router = APIRouter(
     prefix="/api",
@@ -84,7 +88,10 @@ class error_response(BaseModel):
     status: str = Field(..., examples=["error"])
     message: str = Field(..., examples=["Invalid token or database failure"])
 
-def verify_jwt(request: Request) -> dict:
+# Decodes the JWT cookie and verifies its claims against the Users table.
+# The username and role inside the token are not trusted on their own: they must match the stored user,
+# and the token must not be older than the last token issued to that user
+async def verify_jwt(request: Request, connection: asyncpg.Connection) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise HTTPException(
@@ -101,8 +108,6 @@ def verify_jwt(request: Request) -> dict:
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-
-        return payload
 
     except ExpiredSignatureError:
         raise HTTPException(
@@ -121,6 +126,80 @@ def verify_jwt(request: Request) -> dict:
                 "message": INVALID_TOKEN
             }
         )
+
+    user_id = payload.get("sub")
+    username = payload.get("username")
+    role = payload.get("role")
+    expiry = payload.get("exp")
+
+    if not validate_uuid(user_id) or not username or not role or expiry is None:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT userid, username, userrole, userjwtissued
+            FROM "Users_DB"."Users"
+            WHERE userid = $1::uuid
+            """,
+            user_id
+        )
+
+    except asyncpg.PostgresError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": DATABASE_ERROR
+            }
+        )
+
+    # The user must still exist and the token's claims must match what is stored for them
+    if row is None or row["username"] != username or row["userrole"] != role:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    if is_token_revoked(expiry, row["userjwtissued"]):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    return {
+        "sub": str(row["userid"]),
+        "username": row["username"],
+        "role": row["userrole"],
+        "exp": expiry
+    }
+
+# Tokens only carry exp, so the issue time is the expiry minus the configured token lifetime.
+# A token issued before the user's latest login/refresh (userjwtissued) is revoked, but only once
+# TOKEN_REVOCATION_GRACE has passed since that newer token, so requests already in flight during a refresh still succeed.
+# TOKEN_ISSUE_LEEWAY covers exp being truncated to whole seconds and userjwtissued being set just after the token is made.
+def is_token_revoked(expiry: int | float, last_issued: datetime | None) -> bool:
+    if last_issued is None:
+        return False
+
+    token_issued = datetime.fromtimestamp(expiry, tz=timezone.utc) - timedelta(minutes=auth_settings.TOKEN_EXPIRE)
+
+    if token_issued >= last_issued - TOKEN_ISSUE_LEEWAY:
+        return False
+
+    return datetime.now(timezone.utc) - last_issued > TOKEN_REVOCATION_GRACE
 
 # Validates an email. 
 # Regex: One or more valid pre-@ characters (0-9, a-z, A-z,.,_,+,-), 
@@ -149,6 +228,13 @@ def validate_uuid(value: str) -> bool:
         return True
     except ValueError:
         return False
+
+def is_system_init_user(user_id) -> bool:
+    try:
+        is_system_init = uuidlib.UUID(str(user_id)) == SYSTEM_INIT_UUID
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return is_system_init
 
 # Validates a password. 
 # Password must contain a special character, number, lower case char, upper case char and be longer than 12 characters in length.
@@ -425,7 +511,7 @@ async def login(
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=1800
+        max_age=COOKIE_MAX_AGE
     )
 
     return {
@@ -601,7 +687,7 @@ async def register(
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=1800
+        max_age=COOKIE_MAX_AGE
     )
 
     return {
@@ -676,7 +762,7 @@ async def fetch_users(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     try:
-        payload = verify_jwt(request)
+        payload = await verify_jwt(request, connection)
 
         if payload.get("role") != "ADMIN":
             raise HTTPException(
@@ -697,6 +783,8 @@ async def fetch_users(
         users = []
 
         for row in rows:
+            if is_system_init_user(row["userid"]):
+                continue
             users.append(
                 {
                     "id":str(row["userid"]),
@@ -887,7 +975,7 @@ async def change_user_role(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
 
     if payload.get("role") != "ADMIN":
         raise HTTPException(
@@ -927,6 +1015,15 @@ async def change_user_role(
             detail={
                 "status":"error",
                 "message":"Invalid userId format."
+            }
+        )
+
+    if is_system_init_user(user_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Invalid userId format."
             }
         )
 
@@ -1112,7 +1209,7 @@ async def delete_user(
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
     #Verify the JWT for security
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
     user_id = user_id.strip()
 
     #Authorization. Only Admins can delete
@@ -1130,6 +1227,15 @@ async def delete_user(
         raise HTTPException(
             status_code = 400,
             detail= {
+                "status": "error",
+                "message": "Invalid User ID format."
+            }
+        )
+
+    if is_system_init_user(user_id):
+        raise HTTPException(
+            status_code=400,
+            detail={
                 "status": "error",
                 "message": "Invalid User ID format."
             }
@@ -1280,7 +1386,15 @@ async def change_password(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    payload = verify_jwt(request)
+    payload = await verify_jwt(request, connection)
+    if is_system_init_user(payload.get("sub")):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": "Invalid or missing new password. Password must be atleast 12 characters, have an upper and lower case char and a special character"
+            }
+        )
     current_password = change_password_request.currentPassword
     new_password = change_password_request.newPassword
     if not current_password or not new_password:
@@ -1552,7 +1666,9 @@ async def refresh_token(
     current_time = datetime.now(timezone.utc).timestamp()
     seconds_until_expiry = expiry - current_time
 
-    if seconds_until_expiry > 60:
+    refresh_window = (auth_settings.TOKEN_EXPIRE * 60) / 2 # Refresh if less than half the token's lifespan remains. We could shorten it if needed
+    
+    if seconds_until_expiry > refresh_window:
         return {
             "status": "success",
             "message": "Token does not need refreshing"
@@ -1593,7 +1709,7 @@ async def refresh_token(
         httponly=True,
         secure=True,
         samesite="none",
-        max_age=1800
+        max_age=COOKIE_MAX_AGE
     )
 
     return {

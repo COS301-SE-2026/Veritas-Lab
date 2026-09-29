@@ -3,9 +3,8 @@ from uuid import UUID
 import asyncpg
 import exiftool
 from app.core.env import Minio_Settings, R2_Settings, Other_Settings, Postgres_Settings
-from minio import Minio
 import json
-from urllib.parse import urlparse
+from typing import Any
 from pathlib import Path
 import aiofiles.tempfile
 from starlette.concurrency import run_in_threadpool
@@ -13,11 +12,13 @@ from pydantic import BaseModel
 import boto3
 from botocore.client import Config
 from mypy_boto3_s3 import S3Client
+import io
 
 minio_settings = Minio_Settings()
 r2_settings = R2_Settings()
 other_settings = Other_Settings()
 postgres_settings = Postgres_Settings()
+SYSTEM_INIT_UUID = UUID("00000000-0000-0000-0000-000000000000")
 
 def get_object() -> S3Client:
     if other_settings.ENVIRONMENT == "development":
@@ -63,7 +64,16 @@ class AnalysisFindings(BaseModel):
     Certainty: int
     Findings: str
 
-class MediaService(ABC):
+class media_service(ABC):
+
+    def __init__(self):
+        self.executor_id = SYSTEM_INIT_UUID
+
+    async def set_audit_executor(self, connection):
+        await connection.execute(
+            "SELECT set_config('app.current_user_id', $1, false)",
+            str(self.executor_id),
+        )
 
     async def extract(self, file_path: str, media_record: dict):
         def run_exiftool():
@@ -96,6 +106,7 @@ class MediaService(ABC):
         )
 
         try:
+            await self.set_audit_executor(connection)
             row = await connection.fetchrow(
                 """
                 SELECT
@@ -136,10 +147,6 @@ class MediaService(ABC):
 
         await run_in_threadpool(_download_from_s3)
 
-
-    
-    
-
     async def get_existing_metadata(self, media_id: UUID):
         connection = await asyncpg.connect(
             user=postgres_settings.DB_USER,
@@ -154,7 +161,7 @@ class MediaService(ABC):
             row = await connection.fetchrow(
                 """
                 SELECT ReportArtifacts AS "reportartifacts"
-                FROM "Cases_DB"."Reports"
+                FROM "Cases_DB"."Media"
                 WHERE MediaId = $1
                 AND ReportArtifacts IS NOT NULL
                 LIMIT 1
@@ -181,15 +188,65 @@ class MediaService(ABC):
         )
 
         try:
+            await self.set_audit_executor(connection)
             await connection.execute(
                 """
-                UPDATE "Cases_DB"."Reports"
+                UPDATE "Cases_DB"."Media"
                 SET ReportArtifacts = $1::jsonb
                 WHERE MediaId = $2
                 AND ReportArtifacts IS NULL
                 """,
                 json.dumps(metadata),
                 media_id
+            )
+
+        finally:
+            await connection.close()
+
+    def save_heatmap(
+        self,
+        media_id: UUID,
+        heatmap_bytes: bytes
+    ) -> None:
+        storage_client = get_object()
+
+        object_name = f"{media_id}.png"
+
+        file_stream = io.BytesIO(heatmap_bytes)
+
+        storage_client.put_object(
+            Bucket="heatmaps",
+            Key=object_name,
+            Body=file_stream,
+            ContentType="image/png"
+        )
+
+    async def save_annotation(self, media_id: UUID, automated_annotations: list[dict]):
+        connection = await asyncpg.connect(
+            user=postgres_settings.DB_USER,
+            password=postgres_settings.DB_PASSWORD,
+            database=postgres_settings.DB_NAME,
+            host=postgres_settings.DB_HOST,
+            port=postgres_settings.DB_PORT,
+            ssl="require" if postgres_settings.DB_SSL else None,
+        )
+
+        try:
+            await self.set_audit_executor(connection)
+
+            await connection.execute(
+                """
+                INSERT INTO "Cases_DB"."AutomatedAnnotations"
+                    (MediaId, MediaAnnotations)
+                VALUES
+                    ($1, $2::jsonb)
+                ON CONFLICT (MediaId)
+                DO UPDATE SET
+                    MediaAnnotations = EXCLUDED.MediaAnnotations,
+                    CreatedAt = CURRENT_TIMESTAMP
+                """,
+                media_id,
+                json.dumps(automated_annotations)
             )
 
         finally:
@@ -206,12 +263,14 @@ class MediaService(ABC):
         )
 
         try:
+            await self.set_audit_executor(connection)
             await connection.execute(
                 """
-                UPDATE "Cases_DB"."Reports"
+                UPDATE "Cases_DB"."Media"
                 SET
                     ReportFindings = $1,
-                    ReportCertainty = $2
+                    ReportCertainty = $2,
+                    ReportDateCreation = CURRENT_TIMESTAMP
                 WHERE MediaId = $3
                 """,
                 analysis.Findings,
@@ -238,6 +297,19 @@ class MediaService(ABC):
                 )
 
                 ai_analysis = await self.ai_analysis(file_path)
+                heatmap_path = ai_analysis.get("heatmap_path")
+
+                if heatmap_path is not None:
+                    heatmap_bytes = Path(heatmap_path).read_bytes()
+                    await run_in_threadpool(
+                        self.save_heatmap,
+                        media_id,
+                        heatmap_bytes
+                    )
+
+                automated_annotations = await self.automated_annotations(ai_analysis=ai_analysis)
+                ai_analysis.pop("heatmap", None)
+                await self.save_annotation(media_id, automated_annotations)
                 
             #This is to remove information about the system that does not 
             #affect the analysis
@@ -265,7 +337,7 @@ class MediaService(ABC):
             print(json.dumps(combined_findings, indent=4))
 
             # use this when you want to upload to the database
-            final_findings = self.create_findings_string(combined_findings)
+            final_findings = json.dumps(combined_findings)
             final_analysis = AnalysisFindings(Certainty=final_risk_level, Findings=final_findings)
             await self.update_analysis(media_id=media_id, analysis=final_analysis)
 
@@ -283,5 +355,5 @@ class MediaService(ABC):
         pass
 
     @abstractmethod
-    def create_findings_string(self, input: dict) ->str:
+    async def automated_annotations(self, **kwargs: Any):
         pass

@@ -25,6 +25,15 @@ async def fake_evidence_context(ensure_user_exists):
             "TestInvest", 
             "INVESTIGATOR"
         )
+
+        # verify_jwt only accepts tokens matching a stored user, so every identity the tests use is seeded here
+        other_investigator_id = str(uuid.uuid4())
+        other_investigator_name = await ensure_user_exists(conn, other_investigator_id, "UnauthorizedUser", "INVESTIGATOR")
+        user_id = str(uuid.uuid4())
+        user_name = await ensure_user_exists(conn, user_id, "UnauthorizedUser", "USER")
+        admin_id = str(uuid.uuid4())
+        admin_name = await ensure_user_exists(conn, admin_id, "testerAdmin", "ADMIN")
+
         await conn.execute("SELECT set_config('app.current_user_id', $1, false)", executor_id)
         media_type_row = await conn.fetchrow(
             """
@@ -45,14 +54,14 @@ async def fake_evidence_context(ensure_user_exists):
         await conn.execute(
             """
             INSERT INTO "Cases_DB"."Cases" 
-            (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """,
             uuid.UUID(case_id),
             "Delete Evidence Integration Test",
             case_creator,
             "Temporary case for testing evidence deletion",
-            False
+            "OPEN"
         )
         created_ids["case_id"] = case_id
 
@@ -70,18 +79,18 @@ async def fake_evidence_context(ensure_user_exists):
         )
         created_ids["media_id"] = media_id
 
-        report_row = await conn.fetchrow(
+        await conn.execute(
             """
-            INSERT INTO "Cases_DB"."Reports" 
-            (CaseId, MediaId, ImageTitle)
-            VALUES ($1, $2, $3)
-            RETURNING ReportId
+            UPDATE "Cases_DB"."Cases"
+            SET evidence = ARRAY[
+                ROW($2, $3)::"Cases_DB".evidence_type
+            ]
+            WHERE CaseId = $1
             """,
             uuid.UUID(case_id),
             uuid.UUID(media_id),
-            "Fake Evidence Title"
+            "test evidence",
         )
-        created_ids["report_id"] = str(report_row["reportid"])
 
         file_key = f"{media_id}{media_extension}"
         s3_client.put_object(
@@ -99,6 +108,12 @@ async def fake_evidence_context(ensure_user_exists):
             "bucket": media_bucket,
             "file_key": file_key,
             "executor_id": executor_id,
+            "other_investigator_id": other_investigator_id,
+            "other_investigator_name": other_investigator_name,
+            "user_id": user_id,
+            "user_name": user_name,
+            "admin_id": admin_id,
+            "admin_name": admin_name,
         }
 
     finally:
@@ -150,12 +165,11 @@ async def assert_object_storage_not_deleted(
 
     conn = await get_connection()
     try:
-        report_row = await conn.fetchrow(
-            'SELECT * FROM "Cases_DB"."Reports" WHERE CaseId = $1 AND MediaId = $2',
+        evidence_row = await conn.fetchrow(
+            'SELECT evidence FROM "Cases_DB"."Cases" WHERE CaseId = $1',
             uuid.UUID(case_id),
-            uuid.UUID(media_id)
         )
-        assert report_row is not None
+        assert any(str(evidence[0]) == str(media_id) for evidence in evidence_row["evidence"])
     finally:
         await conn.close()
 
@@ -180,8 +194,8 @@ async def test_integration_delete_evidence_403_not_creator(client, fake_evidence
     media_id = fake_evidence_context["media_id"]
 
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": "UnauthorizedUser",
+        "id": fake_evidence_context["other_investigator_id"],
+        "username": fake_evidence_context["other_investigator_name"],
         "role": "INVESTIGATOR"
     }
     client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
@@ -190,7 +204,7 @@ async def test_integration_delete_evidence_403_not_creator(client, fake_evidence
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] =="Unauthorized to delete this evidence or record not found."
+    assert response.json()["detail"]["message"] == "Unauthorized to delete this evidence or record not found."
     await assert_object_storage_not_deleted(media_id,case_id,fake_evidence_context)
     
 #403: USER deleting
@@ -200,8 +214,8 @@ async def test_integration_delete_evidence_403_user(client, fake_evidence_contex
     media_id = fake_evidence_context["media_id"]
 
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": "UnauthorizedUser",
+        "id": fake_evidence_context["user_id"],
+        "username": fake_evidence_context["user_name"],
         "role": "USER"
     }
     client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
@@ -210,7 +224,7 @@ async def test_integration_delete_evidence_403_user(client, fake_evidence_contex
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] =="User unauthorized"
+    assert response.json()["detail"]["message"] == "Unauthorized to delete this evidence or record not found."
     await assert_object_storage_not_deleted(media_id,case_id,fake_evidence_context)
 
 
@@ -221,8 +235,8 @@ async def test_integration_delete_evidence_400_case_id(client, fake_evidence_con
     media_id = fake_evidence_context["media_id"]
 
     unauthorized_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": "UnauthorizedUser",
+        "id": fake_evidence_context["other_investigator_id"],
+        "username": fake_evidence_context["other_investigator_name"],
         "role": "INVESTIGATOR"
     }
     client.cookies.set(COOKIE_NAME, create_token(unauthorized_investigator))
@@ -279,7 +293,7 @@ async def test_integration_delete_evidence_admin_success(
     admin_id = str(uuid.uuid4())
     conn = await get_connection()
     try:
-        await ensure_user_exists(conn, admin_id, creator, "ADMIN")
+        creator = await ensure_user_exists(conn, admin_id, creator, "ADMIN")
     finally:
         await conn.close()
 
@@ -311,11 +325,9 @@ async def test_integration_delete_evidence_admin_success(
 async def test_integration_delete_evidence_404_no_media(client, fake_evidence_context):
     case_id = fake_evidence_context["case_id"]
     media_id = str(uuid.uuid4())
-    creator = fake_evidence_context["creator"]
-
     mock_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": creator,
+        "id": fake_evidence_context["admin_id"],
+        "username": fake_evidence_context["admin_name"],
         "role": "ADMIN"
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_investigator))
@@ -332,11 +344,9 @@ async def test_integration_delete_evidence_404_no_media(client, fake_evidence_co
 async def test_integration_delete_evidence_404_no_case(client, fake_evidence_context):
     case_id = str(uuid.uuid4())
     media_id = fake_evidence_context["media_id"]
-    creator = "testerAdmin"
-
     mock_investigator = {
-        "id": str(uuid.uuid4()),
-        "username": creator,
+        "id": fake_evidence_context["admin_id"],
+        "username": fake_evidence_context["admin_name"],
         "role": "ADMIN"
     }
     client.cookies.set(COOKIE_NAME, create_token(mock_investigator))

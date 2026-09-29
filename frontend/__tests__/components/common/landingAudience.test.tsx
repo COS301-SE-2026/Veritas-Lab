@@ -12,7 +12,7 @@ jest.mock('lucide-react', () => ({
 describe('LandingAudience', () => {
     it('renders the section heading', () => {
         render(<LandingAudience />);
-        expect(screen.getByText("WHO IT'S FOR")).toBeInTheDocument();
+        expect(screen.getByText("Who it's for")).toBeInTheDocument();
     });
 
     it('renders all four audience titles', () => {

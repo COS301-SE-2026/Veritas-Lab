@@ -12,14 +12,14 @@ describe('DashboardModal', () => {
         render(
             <DashboardModal isOpen={false} onClose={mockOnClose} />
         );
-        expect(screen.queryByText('Create New Case')).not.toBeInTheDocument();
+        expect(screen.queryByText('Create new case')).not.toBeInTheDocument();
     });
 
     it('render modal when isOpen true', () => {
         render(
             <DashboardModal isOpen={true} onClose={mockOnClose} />
         );
-        expect(screen.getByText('Create New Case')).toBeInTheDocument();
+        expect(screen.getByText('Create new case')).toBeInTheDocument();
     });
 
     it('renders the case title input', () => {

@@ -12,7 +12,7 @@ jest.mock('lucide-react', () => ({
 describe('LandingHowItWorks', () => {
     it('renders the section heading', () => {
         render(<LandingHowItWorks />);
-        expect(screen.getByText('HOW IT WORKS')).toBeInTheDocument();
+        expect(screen.getByText('How it works')).toBeInTheDocument();
     });
 
     it('renders all four step numbers', () => {

@@ -7,7 +7,8 @@ const mockUsePathname = jest.fn();
 const mockLogOut = jest.fn();
 
 jest.mock('next/navigation', () => ({
-	usePathname: () => mockUsePathname()
+	usePathname: () => mockUsePathname(),
+	useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('next/link', () => ({
@@ -64,8 +65,8 @@ describe('Sidebar', () => {
 		mockUsePathname.mockReturnValue('/dashboard');
 		renderWithWrapper();
 		const homeLink = screen.getByRole('link', { name: 'Dashboard' });
-		expect(homeLink.className).toContain('bg-[var(--color-secondary)]');
-		expect(homeLink.className).toContain('text-[var(--color-text)]');
+		expect(homeLink.className).toContain('bg-(--color-secondary)');
+		expect(homeLink.className).toContain('text-(--color-text)');
 	});
 
 	it('toggles collapsed state when the button is clicked', () => {

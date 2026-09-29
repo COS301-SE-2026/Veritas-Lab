@@ -32,12 +32,15 @@ describe('useCase', () => {
 				caseId: 'case-1',
 				caseName: 'Example Case',
 				caseCreator: 'investigator.one',
+				caseState: 'OPEN',
+    			caseAssigned: null,
 				caseReviews: null,
 				caseDescription: null,
 				caseClosed: false,
 				caseCreationDate: '2026-05-01T09:00:00.000Z',
 			},
 			evidence: [],
+			comments: [],
 		} as Awaited<ReturnType<typeof fetchCase>>);
 		mockedCloseCase.mockResolvedValue({ status: 'success' });
 		mockedDeleteEvidence.mockResolvedValue({ status: 'success' });

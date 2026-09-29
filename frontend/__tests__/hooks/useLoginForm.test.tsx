@@ -13,12 +13,14 @@ jest.mock('next/navigation', () => ({
 
 describe('useLoginForm', () => {
     const mockPush = jest.fn();
+    const mockRefresh = jest.fn();
 
     beforeEach(() => {
         jest.clearAllMocks();
 
         (useRouter as jest.Mock).mockReturnValue({
             push: mockPush,
+            refresh: mockRefresh,
         });
     });
 

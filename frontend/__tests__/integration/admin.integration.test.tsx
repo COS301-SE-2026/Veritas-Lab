@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import AdminPage from '@/app/(sidebar)/admin/page';
 import { fetchUsers, changeUserRole, deleteUser } from '@/lib/api/admin';
 import type { AdminUser } from '@/types/api';
@@ -56,12 +56,13 @@ describe('AdminPage (integration)', () => {
         mockedFetchUsers.mockResolvedValue(baseUsers);
     });
     //rendering
-    it('redirects non admins to the dashboard and renders nothing else', () => {
+    it('redirects non admins to the dashboard and renders nothing else', async () => {
         mockUseUserRole.mockReturnValue('USER');
         render(<AdminPage />);
         expect(screen.getByText('Redirecting...')).toBeInTheDocument();
         expect(mockReplace).toHaveBeenCalledWith('/dashboard');
         expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+        await act(async () => {});
     });
     it('loads and displays users for an admin hiding controls on the current admins own row', async () => {
         render(<AdminPage />);

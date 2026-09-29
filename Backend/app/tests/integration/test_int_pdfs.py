@@ -1,11 +1,13 @@
 from pathlib import Path
-from uuid import uuid4
+from uuid import uuid4, UUID
 import pytest
+import json
 
 from app.tests.integration.conftest import get_connection
 from app.core.env import Minio_Settings, Postgres_Settings, User_Settings
 from app.core.media_service import get_object
-from app.core.pdf_service import PDFService
+from app.core.pdf_service import pdf_service
+from app.tests.integration.conftest import get_automated_annotations
 
 TEST_PDF = Path(__file__).resolve().parent / "test.pdf"
 USER_SETTINGS = User_Settings()
@@ -70,18 +72,6 @@ async def create_test_media(executor_id: str, executor_username: str):
             media_type["mediatypeid"]
         )
 
-        await connection.execute(
-            """
-            INSERT INTO "Cases_DB"."Reports" (
-                MediaId,
-                CaseId
-            )
-            VALUES ($1, $2)
-            """,
-            media_id,
-            case_id
-        )
-
         return (
             media_id,
             case_id,
@@ -115,7 +105,7 @@ async def get_report(media_id):
                 ReportArtifacts,
                 ReportFindings,
                 ReportCertainty
-            FROM "Cases_DB"."Reports"
+            FROM "Cases_DB"."Media"
             WHERE MediaId = $1
             """,
             media_id
@@ -148,14 +138,6 @@ async def delete_test_data(
 
         await connection.execute(
             """
-            DELETE FROM "Cases_DB"."Reports"
-            WHERE MediaId = $1
-            """,
-            media_id
-        )
-
-        await connection.execute(
-            """
             DELETE FROM "Cases_DB"."Media"
             WHERE MediaId = $1
             """,
@@ -177,7 +159,7 @@ async def delete_test_data(
 async def test_pdf_full_integration(
     ensure_user_exists
 ):
-    service = PDFService()
+    service = pdf_service()
 
     executor_id = str(uuid4())
     base_username = "pdf_integration_user"
@@ -222,6 +204,8 @@ async def test_pdf_full_integration(
         result = await service.analyse(media_id)
 
         assert result is not None
+
+        
         assert "risk_level" in result
         assert "ai_probability" in result
         assert "classification" in result
@@ -236,8 +220,58 @@ async def test_pdf_full_integration(
         assert report["reportartifacts"] is not None
         assert report["reportfindings"] is not None
         assert report["reportcertainty"] is not None
-        assert "Metadata:" in report["reportfindings"]
-        assert "AI Classifier:" in report["reportfindings"]
+
+        findings = json.loads(report["reportfindings"])
+
+        assert isinstance(findings, dict)
+
+        assert findings["risk_level"] == result["risk_level"]
+        assert findings["ai_probability"] == result["ai_probability"]
+        assert findings["classification"] == result["classification"]
+
+        assert "findings" in findings
+        assert "reasons" in findings
+        assert "suspicious_chunks" in findings
+
+        assert isinstance(findings["suspicious_chunks"], list)
+
+        annotation_record = await get_automated_annotations(media_id)
+
+        assert annotation_record is not None
+        assert annotation_record["mediaid"] == media_id
+        assert annotation_record["mediaannotations"] is not None
+        assert annotation_record["createdat"] is not None
+
+        annotations = annotation_record["mediaannotations"]
+
+        if isinstance(annotations, str):
+            annotations = json.loads(annotations)
+
+        assert isinstance(annotations, list)
+
+        for annotation in annotations:
+            assert "id" in annotation
+            UUID(annotation["id"])
+
+            assert annotation["kind"] == "highlight"
+            assert annotation["source"] == "AI"
+
+            assert "text" in annotation
+            assert isinstance(annotation["text"], str)
+            assert annotation["text"].strip() != ""
+
+        expected_texts = {
+            chunk["text"].strip()
+            for chunk in findings["suspicious_chunks"]
+            if chunk.get("text", "").strip()
+        }
+
+        annotation_texts = {
+            annotation["text"].strip()
+            for annotation in annotations
+        }
+
+        assert annotation_texts == expected_texts
 
     finally:
         if media_id is not None and case_id is not None and bucket is not None and object_name is not None:

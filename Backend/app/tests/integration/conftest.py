@@ -5,6 +5,8 @@ import pytest_asyncio
 from app.core.env import Postgres_Settings
 from fastapi.testclient import TestClient
 from app.api.main import app
+from app.auth.auth import create_token
+import json
 
 POSTGRES_SETTINGS = Postgres_Settings()
 
@@ -48,6 +50,8 @@ async def ensure_user_exists():
         )
         created_users.append(user_id)
 
+        return unique_username
+
     yield _ensure_user
 
     if created_users:
@@ -82,3 +86,371 @@ async def ensure_user_exists():
 def client():
     with TestClient(app) as test_client:
         yield test_client
+
+@pytest_asyncio.fixture
+async def case_assignment_context(ensure_user_exists):
+    conn = await get_connection()
+
+    investigator_id = str(uuid.uuid4())
+    admin_id = str(uuid.uuid4())
+    other_investigator_id = str(uuid.uuid4())
+    creator_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
+
+    # verify_jwt checks token usernames against the database, so use the usernames that were actually stored
+    investigator = await ensure_user_exists(
+        conn,
+        investigator_id,
+        "Test_Investigator",
+        "INVESTIGATOR"
+    )
+
+    admin = await ensure_user_exists(
+        conn,
+        admin_id,
+        "Test_Admin",
+        "ADMIN"
+    )
+
+    other_investigator = await ensure_user_exists(
+        conn,
+        other_investigator_id,
+        "Other_Investigator",
+        "INVESTIGATOR"
+    )
+
+    creator = await ensure_user_exists(
+        conn,
+        creator_id,
+        "Test_Creator",
+        "USER"
+    )
+
+    user = await ensure_user_exists(
+        conn,
+        user_id,
+        "Test_User",
+        "USER"
+    )
+
+    created_case_ids = []
+
+    try:
+        yield {
+            "conn": conn,
+
+            "investigator_id": investigator_id,
+            "investigator_name": investigator,
+            "investigator_token": create_token(
+                {
+                    "id": investigator_id,
+                    "username": investigator,
+                    "role": "INVESTIGATOR"
+                }
+            ),
+
+            "admin_id": admin_id,
+            "admin_name": admin,
+            "admin_token": create_token(
+                {
+                    "id": admin_id,
+                    "username": admin,
+                    "role": "ADMIN"
+                }
+            ),
+
+            "other_investigator_id": other_investigator_id,
+            "other_investigator_name": other_investigator,
+
+            "creator_id": creator_id,
+            "creator_name": creator,
+
+            "user_id": user_id,
+            "user_name": user,
+            "user_token": create_token(
+                {
+                    "id": user_id,
+                    "username": user,
+                    "role": "USER"
+                }
+            ),
+
+            "cases": created_case_ids,
+        }
+
+    finally:
+        await conn.execute(
+            "SELECT set_config('app.current_user_id', $1, false)",
+            investigator_id
+        )
+
+        for case_id in created_case_ids:
+            await conn.execute(
+                """
+                DELETE FROM "Cases_DB"."Cases"
+                WHERE caseid = $1
+                """,
+                uuid.UUID(case_id)
+            )
+
+        await conn.close()
+
+async def get_automated_annotations(media_id):
+    connection = await get_connection()
+
+    try:
+        return await connection.fetchrow(
+            """
+            SELECT
+                AnnotationId,
+                MediaId,
+                MediaAnnotations,
+                CreatedAt
+            FROM "Cases_DB"."AutomatedAnnotations"
+            WHERE MediaId = $1
+            """,
+            media_id
+        )
+
+    finally:
+        await connection.close()
+
+async def create_pnp_row(
+    conn,
+    media_id,
+    model_name="TestModel",
+    file_name="test.onnx",
+    classification="AI",
+    confidence=0.91,
+    config=None,
+    date="2026-09-26T14:00:00Z"
+):
+    if config is None:
+        config = {}
+
+    model_result = {
+        "modelName": model_name,
+        "fileName": file_name,
+        "results": {
+            "classification": classification,
+            "confidence": confidence
+        },
+        "config": config,
+        "date": date
+    }
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."PNPModels"
+            (MediaId, ModelName, ModelResult)
+        VALUES
+            ($1, $2, $3::jsonb)
+        """,
+        media_id,
+        model_name,
+        json.dumps(model_result)
+    )
+
+    return model_result
+
+async def delete_pnp_row(
+    conn,
+    media_id,
+    model_name
+):
+    await conn.execute(
+        """
+        DELETE FROM "Cases_DB"."PNPModels"
+        WHERE MediaId = $1
+          AND ModelName = $2
+        """,
+        media_id,
+        model_name
+    )
+
+@pytest_asyncio.fixture
+async def pnp_case_context(case_assignment_context):
+    context = case_assignment_context
+    conn = context["conn"]
+
+    media_type_id = uuid.uuid4()
+    media_id = uuid.uuid4()
+    case_id = uuid.uuid4()
+
+    await conn.execute(
+        """
+        SELECT set_config('app.current_user_id', $1, false)
+        """,
+        context["investigator_id"]
+    )
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."MediaType"
+            (MediaTypeId, MediaName, MediaBucket, MediaExtension)
+        VALUES
+            ($1, $2, $3, $4)
+        """,
+        media_type_id,
+        f"PNP_Test_Type_{str(media_type_id)[:8]}",
+        "pnp-test-bucket",
+        f".{str(media_type_id)[:4]}"
+    )
+
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."Media"
+            (MediaId, MediaType, MediaHash, MediaAnnotations)
+        VALUES
+            ($1, $2, $3, $4::jsonb)
+        """,
+        media_id,
+        media_type_id,
+        f"pnp-test-hash-{media_id}",
+        "{}"
+    )
+
+    # CaseAssigned must be NULL when the case is first created.
+    await conn.execute(
+        """
+        INSERT INTO "Cases_DB"."Cases"
+            (
+                CaseId,
+                CaseName,
+                CaseCreator,
+                CaseDescription,
+                CaseState,
+                evidence
+            )
+        VALUES
+            (
+                $1,
+                $2,
+                $3,
+                $4,
+                'PUBLISHED',
+                ARRAY[
+                    ROW($5::uuid, $6::text)::"Cases_DB".evidence_type
+                ]
+            )
+        """,
+        case_id,
+        "PNP Integration Test Case",
+        context["creator_name"],
+        "Case used for PNP integration testing",
+        media_id,
+        "Test evidence"
+    )
+
+    # Assign the case only after creation.
+    await conn.execute(
+        """
+        UPDATE "Cases_DB"."Cases"
+        SET CaseAssigned = $1
+        WHERE CaseId = $2
+        """,
+        context["investigator_name"],
+        case_id
+    )
+
+    context["cases"].append(str(case_id))
+
+    try:
+        yield {
+            **context,
+            "case_id": case_id,
+            "media_id": media_id,
+            "media_type_id": media_type_id
+        }
+
+    finally:
+        await conn.execute(
+            """
+            SELECT set_config('app.current_user_id', $1, false)
+            """,
+            context["investigator_id"]
+        )
+
+        await conn.execute(
+            """
+            DELETE FROM "Cases_DB"."PNPModels"
+            WHERE MediaId = $1
+            """,
+            media_id
+        )
+
+        # The case contains this media in its evidence array, but there is no FK
+        # from evidence to Media, so deleting Media before the Case is acceptable.
+        await conn.execute(
+            """
+            DELETE FROM "Cases_DB"."Media"
+            WHERE MediaId = $1
+            """,
+            media_id
+        )
+
+        await conn.execute(
+            """
+            DELETE FROM "Cases_DB"."MediaType"
+            WHERE MediaTypeId = $1
+            """,
+            media_type_id
+        )
+
+@pytest_asyncio.fixture
+async def delete_pnp_context(pnp_case_context):
+    context = pnp_case_context
+    conn = context["conn"]
+
+    model_name = "TestModel"
+
+    await create_pnp_row(
+        conn,
+        context["media_id"],
+        model_name=model_name,
+        file_name="test.onnx",
+        classification="AI",
+        confidence=0.91
+    )
+
+    try:
+        yield {
+            **context,
+            "model_name": model_name
+        }
+
+    finally:
+        await delete_pnp_row(
+            conn,
+            context["media_id"],
+            model_name
+        )
+
+@pytest_asyncio.fixture
+async def update_pnp_context(pnp_case_context):
+    context = pnp_case_context
+    conn = context["conn"]
+
+    model_name = "TestModel"
+
+    await create_pnp_row(
+        conn,
+        context["media_id"],
+        model_name=model_name,
+        file_name="original.onnx",
+        classification="AI",
+        confidence=0.60
+    )
+
+    try:
+        yield {
+            **context,
+            "model_name": model_name
+        }
+
+    finally:
+        await delete_pnp_row(
+            conn,
+            context["media_id"],
+            model_name
+        )

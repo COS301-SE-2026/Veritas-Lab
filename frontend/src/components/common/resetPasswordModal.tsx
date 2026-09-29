@@ -23,11 +23,14 @@ export default function ResetPasswordModal({ isOpen, onClose }: ResetPasswordMod
 
     return createPortal( //had to use createportal so that the modal is shown from document body otherwise it would appear behind the current page in <main>
         <Modal isOpen={isOpen} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-sm p-6">
-                <h2 className="text-xl font-semibold text-[var(--color-text)]">Change Password</h2>
+            <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
+                <div>
+                    <h2 className="text-xl font-bold text-(--color-text-strong)">Change password</h2>
+                    <p className="mt-1 text-sm text-(--color-text-muted)">Keep your account secure with a fresh password.</p>
+                </div>
 
-                <div className="flex flex-col gap-1">
-                    <Label htmlFor="currentPassword" text="Current Password" className="font-medium text-[var(--color-text)]" />
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="currentPassword" text="Current Password" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="currentPassword"
                         type="password"
@@ -37,8 +40,8 @@ export default function ResetPasswordModal({ isOpen, onClose }: ResetPasswordMod
                     />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                    <Label htmlFor="newPassword" text="New Password" className="font-medium text-[var(--color-text)]" />
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="newPassword" text="New Password" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="newPassword"
                         type="password"
@@ -48,8 +51,8 @@ export default function ResetPasswordModal({ isOpen, onClose }: ResetPasswordMod
                     />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                    <Label htmlFor="confirmNewPassword" text="Confirm New Password" className="font-medium text-[var(--color-text)]" />
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="confirmNewPassword" text="Confirm New Password" className="font-medium text-(--color-text-strong)" />
                     <Input
                         id="confirmNewPassword"
                         type="password"
@@ -59,15 +62,16 @@ export default function ResetPasswordModal({ isOpen, onClose }: ResetPasswordMod
                     />
                 </div>
 
-                {status.error && <p role="alert" className="text-sm text-red-600">{status.error}</p>}
-                {status.success && <p role="status" className="text-sm text-green-600">{status.success}</p>}
-                <div className="flex justify-end gap-3 mt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={status.isSubmitting}>
-                        Cancel
-                    </Button>
-                    <Button type="submit" variant="submit" disabled={status.isSubmitting}>
-                        {status.isSubmitting ? 'Saving...' : 'Save Password'}
-                    </Button>
+                {status.error && (
+                    <p role="alert" className="rounded-xl border border-[color-mix(in_srgb,var(--color-danger)_25%,transparent)] bg-[var(--danger-soft)] px-3 py-2 text-sm font-medium text-[var(--color-danger)]">{status.error}</p>
+                )}
+                {status.success && (
+                    <p role="status" className="rounded-xl border border-[color-mix(in_srgb,var(--ok-fg)_25%,transparent)] bg-[var(--ok-soft)] px-3 py-2 text-sm font-medium text-[var(--ok-fg)]">{status.success}</p>
+                )}
+
+                <div className="mt-1 flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={onClose} disabled={status.isSubmitting} text="Cancel" />
+                    <Button type="submit" variant="submit" disabled={status.isSubmitting} text={status.isSubmitting ? 'Saving...' : 'Save Password'} />
                 </div>
             </form>
         </Modal>,

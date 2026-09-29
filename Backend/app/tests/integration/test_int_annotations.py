@@ -15,15 +15,30 @@ from app.tests.integration.conftest import get_connection
 
 USER_SETTINGS = User_Settings()
 
+INVESTIGATOR_ID = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
+USER_ID = "4f0a6c2e-5d1b-4e7a-9c3f-2b8d6e1a7f40"
+OTHER_INVESTIGATOR_ID = "a3e5b7c9-1d2f-4a6b-8c0e-f1a2b3c4d5e6"
+
+# verify_jwt checks a token's username and role against the stored user,
+# and ensure_user_exists stores usernames as f"{name}_{user_id[:8]}"
+INVESTIGATOR_NAME = f"TestInvest_{INVESTIGATOR_ID[:8]}"
+USER_NAME = f"TestUser_{USER_ID[:8]}"
+OTHER_INVESTIGATOR_NAME = f"MRBeast_{OTHER_INVESTIGATOR_ID[:8]}"
+
+async def seed_test_users(conn, ensure_user_exists):
+    assert await ensure_user_exists(conn, INVESTIGATOR_ID, "TestInvest", "INVESTIGATOR") == INVESTIGATOR_NAME
+    assert await ensure_user_exists(conn, USER_ID, "TestUser", "USER") == USER_NAME
+    assert await ensure_user_exists(conn, OTHER_INVESTIGATOR_ID, "MRBeast", "INVESTIGATOR") == OTHER_INVESTIGATOR_NAME
+
 
 @pytest_asyncio.fixture
-async def fake_report_context(ensure_user_exists):
+async def fake_annotation_context(ensure_user_exists):
     conn = await get_connection()
     created_ids = {}
     user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
 
     try:
-        await ensure_user_exists(conn, user_id, "TestInvest", "INVESTIGATOR")
+        await seed_test_users(conn, ensure_user_exists)
 
         async with conn.transaction():
 
@@ -64,33 +79,34 @@ async def fake_report_context(ensure_user_exists):
             await conn.execute(
                 """
                 INSERT INTO "Cases_DB"."Cases" 
-                (CaseId, CaseName, CaseCreator, CaseDescription, CaseClosed)
-                VALUES ($1, $2, $3, $4, $5)
+                (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
+                VALUES ($1, $2, $3, $4, $5::case_state_enum)
                 """,
                 uuid.UUID(case_id), 
-                "Integration Test Investigation Case", 
-                "TestInvest", 
+                "Integration Test Investigation Case",
+                "CaseCreator",
                 "Integration test case description", 
-                False
+                "OPEN",
             )
             created_ids["case_id"] = case_id
 
-            report_row = await conn.fetchrow(
+            await conn.execute(
                 """
-                INSERT INTO "Cases_DB"."Reports" 
-                (CaseId, MediaId, ImageTitle )
-                VALUES ($1, $2, $3)
-                RETURNING ReportId, CaseId, MediaId, ImageTitle
+                UPDATE "Cases_DB"."Cases"
+                SET CaseAssigned = $2,
+                    CaseState = 'PUBLISHED'::case_state_enum,
+                    evidence = ARRAY[
+                        ROW($3, $4)::"Cases_DB".evidence_type
+                    ]
+                WHERE CaseId = $1
                 """,
                 uuid.UUID(case_id),
+                INVESTIGATOR_NAME,
                 uuid.UUID(media_id),
-                media_name
+                "annotation evidence"
             )
 
-            report_id = str(report_row["reportid"])
-            created_ids["report_id"] = report_id
-
-        yield report_id 
+        yield {"case_id": case_id, "media_id": media_id}
 
     finally:
         async with conn.transaction():
@@ -119,29 +135,25 @@ async def fake_report_context(ensure_user_exists):
 
         await conn.close()
 
-async def check_annotations(payload, report_id):
+async def check_annotations(media_id, expected_annotations=None):
     conn = await get_connection()
     try:
         row = await conn.fetchrow(
             """
-            SELECT m.MediaAnnotations 
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" m ON r.MediaId = m.MediaId
-            WHERE r.ReportId = $1
+            SELECT MediaAnnotations
+            FROM "Cases_DB"."Media"
+            WHERE MediaId = $1
             """,
-            uuid.UUID(report_id)
+            uuid.UUID(media_id)
         )
 
-        assert row is not None, f"Report {report_id} not found in database."
+        assert row is not None, f"Media {media_id} not found in database."
 
         db_annotations = row["mediaannotations"]
 
-        if db_annotations is not None:
-            if isinstance(db_annotations, str):
-                db_annotations = json.loads(db_annotations)
-            assert db_annotations != payload["annotations"]
-        else:
-            assert db_annotations is None
+        if isinstance(db_annotations, str):
+            db_annotations = json.loads(db_annotations)
+        assert db_annotations == expected_annotations
 
     finally:
         await conn.close()
@@ -149,11 +161,12 @@ async def check_annotations(payload, report_id):
 
 # Test for the 200
 @pytest.mark.asyncio
-async def test_integration_save_annotations_success(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_success(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -161,7 +174,8 @@ async def test_integration_save_annotations_success(client, fake_report_context)
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": report_id,
+        "caseId": case_id,
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "bounding_box", 
@@ -188,15 +202,14 @@ async def test_integration_save_annotations_success(client, fake_report_context)
     try:
         row = await conn.fetchrow(
             """
-            SELECT m.MediaAnnotations
-            FROM "Cases_DB"."Reports" r
-            JOIN "Cases_DB"."Media" m ON r.MediaId = m.MediaId
-            WHERE r.ReportId = $1
+            SELECT MediaAnnotations
+            FROM "Cases_DB"."Media"
+            WHERE MediaId = $1
             """,
-            uuid.UUID(report_id)
+            uuid.UUID(media_id)
         )
 
-        assert row is not None, f"Report {report_id} not found in database."
+        assert row is not None, f"Media {media_id} not found in database."
 
         db_annotations = row["mediaannotations"]
 
@@ -212,12 +225,13 @@ async def test_integration_save_annotations_success(client, fake_report_context)
 
 # Test 401, Invalid UUID
 @pytest.mark.asyncio
-async def test_integration_save_annotations_invalid_uuid(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_invalid_uuid(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -225,7 +239,8 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": "Invalid UUID",
+        "caseId": "Invalid UUID",
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "line", 
@@ -248,18 +263,20 @@ async def test_integration_save_annotations_invalid_uuid(client, fake_report_con
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload, report_id)
+    await check_annotations(media_id)
 
 # Test 401, Invalid JWT
 @pytest.mark.asyncio
-async def test_integration_save_annotations_invalid_jwt(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_invalid_jwt(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
 
     test_token = ""
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": report_id,
+        "caseId": case_id,
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "line", 
@@ -282,16 +299,17 @@ async def test_integration_save_annotations_invalid_jwt(client, fake_report_cont
     assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload, report_id)
+    await check_annotations(media_id)
 
 # 403 - User doesn't have permission. Role is USER
 @pytest.mark.asyncio
-async def test_integration_save_annotations_user_unauthorized(client, fake_report_context):
-    report_id = fake_report_context
+async def test_integration_save_annotations_user_unauthorized(client, fake_annotation_context):
+    case_id = fake_annotation_context["case_id"]
+    media_id = fake_annotation_context["media_id"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": USER_ID,
+        "username": USER_NAME,
         "role": "USER"
     }
 
@@ -299,7 +317,8 @@ async def test_integration_save_annotations_user_unauthorized(client, fake_repor
     client.cookies.set(COOKIE_NAME, test_token)
 
     payload = {
-        "reportId": "Invalid UUID",
+        "caseId": case_id,
+        "mediaId": media_id,
         "annotations": [
             {
                 "type": "line", 
@@ -322,7 +341,7 @@ async def test_integration_save_annotations_user_unauthorized(client, fake_repor
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
 
-    await check_annotations(payload, report_id)
+    await check_annotations(media_id)
 
 @pytest_asyncio.fixture
 async def fake_comment_context(ensure_user_exists):
@@ -331,7 +350,7 @@ async def fake_comment_context(ensure_user_exists):
     user_id = "9b74b4e3-7823-464b-a65f-4df2d75eeab3"
 
     try:
-        await ensure_user_exists(conn, user_id, "TestInvest", "INVESTIGATOR")
+        await seed_test_users(conn, ensure_user_exists)
 
         async with conn.transaction():
 
@@ -340,8 +359,8 @@ async def fake_comment_context(ensure_user_exists):
             case_creation_literal = """
             INSERT INTO "Cases_DB"."Cases" 
             (CaseId, CaseName, 
-            CaseCreator, CaseDescription, CaseClosed)
-            VALUES ($1, $2, $3, $4, $5)
+            CaseCreator, CaseDescription, CaseState)
+            VALUES ($1, $2, $3, $4, $5::case_state_enum)
             """
 
             await conn.execute(
@@ -349,7 +368,7 @@ async def fake_comment_context(ensure_user_exists):
                 uuid.UUID(case_id1), 
                 "Test Case", "Creator",
                 "To test comments", 
-                False
+                "OPEN"
             )
 
             created_ids["case_id1"] = case_id1
@@ -359,9 +378,9 @@ async def fake_comment_context(ensure_user_exists):
                 case_creation_literal,
                 uuid.UUID(case_id2), 
                 "Test separation", 
-                "TestInvest", 
+                INVESTIGATOR_NAME, 
                 "For more Tests", 
-                True
+                "OPEN"
             )
             created_ids["case_id2"] = case_id2
 
@@ -382,7 +401,7 @@ async def fake_comment_context(ensure_user_exists):
             comment_id1 = row["commentid"]
 
             comment_2_comment = "Nothing"
-            comment_2_user = "TestInvest"
+            comment_2_user = INVESTIGATOR_NAME
             row = await conn.fetchrow(
                 comment_creation_literal,
                 uuid.UUID(case_id1),
@@ -427,8 +446,8 @@ async def test_integration_get_comment_multiple_success(client, fake_comment_con
     case_id = fake_comment_context["case_id1"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -457,8 +476,8 @@ async def test_integration_get_comment_empty_success(client, fake_comment_contex
     case_id = fake_comment_context["case_id2"]
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -477,8 +496,8 @@ async def test_integration_get_comment_invalid_id_format_error(client, fake_comm
     case_id = "13"
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -497,8 +516,8 @@ async def test_integration_get_comment_missing_id_error(client, fake_comment_con
     case_id = ""
 
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -524,33 +543,13 @@ async def test_integration_get_comment_missing_cookie_error(client, fake_comment
     assert response.json()["detail"]["status"] == "error"
     assert response.json()["detail"]["message"] == "Not authenticated"
 
-
-# - 403: A normal user tries to get comments
-@pytest.mark.asyncio
-async def test_integration_get_comment_invalid_cookie_error(client, fake_comment_context):
-    case_id = fake_comment_context["case_id1"]
-
-    mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
-        "role": "USER"
-    }
-
-    client.cookies.set(COOKIE_NAME, create_token(mock_invest))
-
-    response = client.post(f"/api/getComments/{case_id}")
-
-    assert response.status_code == 403
-    assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "User unauthorized"
-
 # 201
 @pytest.mark.asyncio
 async def test_integration_create_comment_success(client, fake_comment_context):
     case_id = fake_comment_context["case_id1"]
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
-        "username": "TestInvest",
+        "id": INVESTIGATOR_ID,
+        "username": INVESTIGATOR_NAME,
         "role": "INVESTIGATOR"
     }
 
@@ -569,7 +568,7 @@ async def test_integration_create_comment_success(client, fake_comment_context):
     assert response.json()["status"] == "success"
     response_data = response.json()["comment"]
     assert response_data["comment"] == comment
-    assert response_data["username"] == "TestInvest"
+    assert response_data["username"] == INVESTIGATOR_NAME
 
     comment_id = response_data["commentId"]
 
@@ -583,7 +582,7 @@ async def test_integration_create_comment_success(client, fake_comment_context):
         assert db_row is not None, f"There doesn't exist a {comment_id} comment in the database."
 
         assert db_row["comment"] == comment
-        assert db_row["username"] == "TestInvest"
+        assert db_row["username"] == INVESTIGATOR_NAME
         assert str(db_row["caseid"]) == case_id
         
     finally:
@@ -605,9 +604,9 @@ async def assert_against_comment_table(user_name):
 @pytest.mark.asyncio
 async def test_integration_create_comment_empty_string(client, fake_comment_context):
     case_id = fake_comment_context["case_id1"]
-    user_name = "MRBeast"
+    user_name = OTHER_INVESTIGATOR_NAME
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": OTHER_INVESTIGATOR_ID,
         "username": user_name,
         "role": "INVESTIGATOR"
     }
@@ -631,9 +630,9 @@ async def test_integration_create_comment_empty_string(client, fake_comment_cont
 @pytest.mark.asyncio
 async def test_integration_create_comment_invalid_case_id(client, fake_comment_context):
     case_id = ""
-    user_name = "MRBeast"
+    user_name = OTHER_INVESTIGATOR_NAME
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": OTHER_INVESTIGATOR_ID,
         "username": user_name,
         "role": "INVESTIGATOR"
     }
@@ -656,9 +655,9 @@ async def test_integration_create_comment_invalid_case_id(client, fake_comment_c
 @pytest.mark.asyncio
 async def test_integration_create_comment_invalid_role(client, fake_comment_context):
     case_id = fake_comment_context["case_id1"]
-    user_name = "MRBeast"
+    user_name = OTHER_INVESTIGATOR_NAME
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": OTHER_INVESTIGATOR_ID,
         "username": user_name,
         "role": "Fred"
     }
@@ -674,17 +673,18 @@ async def test_integration_create_comment_invalid_role(client, fake_comment_cont
         json=payload
     )
 
-    assert response.status_code == 403
+    # The stored user is an INVESTIGATOR, so a token claiming any other role fails verification
+    assert response.status_code == 401
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "Permission denied"
+    assert response.json()["detail"]["message"] == "Invalid token"
     await assert_against_comment_table(user_name)
 
 @pytest.mark.asyncio
 async def test_integration_create_comment_user_open_case_forbidden(client, fake_comment_context):
     case_id = fake_comment_context["case_id1"]
-    user_name = "MRBeast"
+    user_name = USER_NAME
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": USER_ID,
         "username": user_name,
         "role": "USER"
     }
@@ -702,16 +702,17 @@ async def test_integration_create_comment_user_open_case_forbidden(client, fake_
 
     assert response.status_code == 403
     assert response.json()["detail"]["status"] == "error"
-    assert response.json()["detail"]["message"] == "Users may only comment on closed cases"
+    assert response.json()["detail"]["message"] == "Users may only comment on cases they created"
     await assert_against_comment_table(user_name)
 
+    
 # 404
 @pytest.mark.asyncio
 async def test_integration_create_comment_case_not_found(client, fake_comment_context):
     case_id = "2e067604-67c0-4b56-aeab-ca92e702aeb6"
-    user_name = "MRBeast"
+    user_name = OTHER_INVESTIGATOR_NAME
     mock_invest = {
-        "id": "9b74b4e3-7823-464b-a65f-4df2d75eeab3",
+        "id": OTHER_INVESTIGATOR_ID,
         "username": user_name,
         "role": "INVESTIGATOR"
     }

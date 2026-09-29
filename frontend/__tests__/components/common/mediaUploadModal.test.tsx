@@ -15,7 +15,7 @@ describe('MediaUploadModal', () => {
 
     it('renders when open and handles file selection', () => {
         render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
-        const input = screen.getByLabelText('Upload Media') as HTMLInputElement;
+        const input = screen.getByLabelText('Upload media') as HTMLInputElement;
         const file = new File(['file-content'], 'report.pdf', { type: 'application/pdf' });
         fireEvent.change(input, { target: { files: [file] } });
         expect(screen.getByText('report.pdf')).toBeInTheDocument();
@@ -28,14 +28,8 @@ describe('MediaUploadModal', () => {
     });
 
     it('calls onClose when clicking overlay', () => {
-        const { container } = render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
-        const overlay = container.querySelector('div.fixed.inset-0');
-
-        if (!overlay) {
-            throw new Error('Overlay not found');
-        }
-
-        fireEvent.click(overlay);
+        render(<MediaUploadModal isOpen onClose={onClose} caseId="case-123" />);
+        fireEvent.click(screen.getByRole('dialog'));
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 });

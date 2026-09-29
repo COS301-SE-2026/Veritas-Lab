@@ -1,29 +1,25 @@
 import type { ApiError, DashboardCase } from '@/types/api';
+import { apiFetch } from '@/lib/api/client';
 
 export async function fetchCases(): Promise<DashboardCase[]> {
-	const res = await fetch(`/api/getCases`, {
-		method: 'POST',
-		credentials: 'include',
+	const res = await apiFetch(`/api/getCases`, {
+		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({})
+		}
 	});
-	
 	const data = await res.json().catch(() => null);
 	if (!res.ok) {
-		const error = data as ApiError | null
+		const error = data as ApiError | null;
 		throw new Error(error?.detail?.message || 'Failed to fetch dashboard cases');
 	}
-
 	const serverCases = Array.isArray(data) ? data : data.cases ?? [];
 	return serverCases as DashboardCase[];
 }
 
 export async function createCase(title: string, description?: string): Promise<{ CaseId: string }> {
-	const res = await fetch(`/api/createCase`, {
+	const res = await apiFetch(`/api/createCase`, {
 		method: 'POST',
-		credentials: 'include',
 		headers: {
 			'Content-Type': 'application/json',
 		},
@@ -40,9 +36,8 @@ export async function createCase(title: string, description?: string): Promise<{
 }
 
 export async function deleteCase(caseId: string): Promise<{ status: string; message?: string }> {
-	const res = await fetch(`/api/deleteCase`, {
+	const res = await apiFetch(`/api/deleteCase`, {
 		method: 'DELETE',
-		credentials: 'include',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ CaseID: caseId }),
 	});
@@ -50,6 +45,34 @@ export async function deleteCase(caseId: string): Promise<{ status: string; mess
 	if (!res.ok) {
 		const error = data as ApiError | null
 		throw new Error(error?.detail?.message || 'Failed to delete case');
+	}
+	return data;
+}
+
+export async function assignCase(caseId: string): Promise<{ status: string; message?: string }> {
+	const res = await apiFetch(`/api/assignCase`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ CaseID: caseId }),
+	});
+	const data = await res.json().catch(() => null);
+	if (!res.ok) {
+		const error = data as ApiError | null
+		throw new Error(error?.detail?.message || 'Failed to assign case');
+	}
+	return data;
+}
+
+export async function unassignCase(caseId: string): Promise<{ status: string; message?: string }> {
+	const res = await apiFetch(`/api/unassignCase`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ CaseID: caseId }),
+	});
+	const data = await res.json().catch(() => null);
+	if (!res.ok) {
+		const error = data as ApiError | null
+		throw new Error(error?.detail?.message || 'Failed to unassign case');
 	}
 	return data;
 }
