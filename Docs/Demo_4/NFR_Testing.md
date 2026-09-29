@@ -64,9 +64,9 @@ Backend/venv/Scripts/python.exe -m locust -f nfr/performance/locustfile.py --hea
 
 | Target | Actual |
 |---|---|
-| < 300 ms | ⏳ |
+| < 300 ms | 500ms |
 
-**Evidence** ⏳
+**Evidence** 
 
 ![QR-01 Locust statistics](imgs/QR-01-locust-stats.png)
 ![QR-01 Locust charts](imgs/QR-01-locust-charts.png)

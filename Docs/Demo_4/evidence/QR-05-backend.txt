@@ -1,0 +1,51 @@
+........................................................................ [  8%]
+........................................................................ [ 17%]
+........................................................................ [ 26%]
+........................................................................ [ 35%]
+........................................................................ [ 44%]
+........................................................................ [ 53%]
+........................................................................ [ 62%]
+........................................................................ [ 71%]
+........................................................................ [ 80%]
+........................................................................ [ 88%]
+........................................................................ [ 97%]
+..................                                                       [100%]
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.12.7-final-0 _______________
+
+Name                                       Stmts   Miss  Cover
+--------------------------------------------------------------
+app\ai\detector.py                            58     11    81%
+app\api\main.py                               31     10    68%
+app\api\routers\cases_router.py              542     69    87%
+app\auth\auth.py                             296     23    92%
+app\core\cases.py                            257     38    85%
+app\core\database.py                           8      3    62%
+app\core\image_service.py                     91     13    86%
+app\core\media_relay.py                       25      7    72%
+app\core\media_service.py                    140     26    81%
+app\core\pdf_service.py                       90      9    90%
+app\core\video_service.py                    114     23    80%
+app\training\audio\predict.py                 30      3    90%
+app\training\audio\train.py                   69      1    99%
+app\training\image\evaluate.py                34      1    97%
+app\training\image\explanation.py            157     14    91%
+app\training\image\paths.py                    7      1    86%
+app\training\image\predict.py                 28      1    96%
+app\training\image\predict_validation.py      39      1    97%
+app\training\image\prediction.py              59     16    73%
+app\training\image\train.py                   46      1    98%
+app\training\pdf\build_dataset.py             38      5    87%
+app\training\pdf\explain.py                  141      1    99%
+app\training\pdf\lexical.py                  217      1    99%
+app\training\pdf\predict.py                   52      1    98%
+app\training\pdf\train.py                    138      1    99%
+app\training\video\analyser.py               129     29    78%
+app\training\video\model.py                   90     10    89%
+app\training\video\train.py                   82      1    99%
+--------------------------------------------------------------
+TOTAL                                       3487    320    91%
+
+12 files skipped due to complete coverage.
+Required test coverage of 85% reached. Total coverage: 90.82%
+810 passed in 75.70s (0:01:15)

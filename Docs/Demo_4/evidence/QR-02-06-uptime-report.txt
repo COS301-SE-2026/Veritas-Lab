@@ -1,0 +1,12 @@
+Monitor        : veritaslab.app (https://veritaslab.app), HTTP(S) check every 300 s
+Window         : 2026-09-07 10:33:07 UTC -> 2026-09-29 20:30:49 UTC  (22.42 days monitored)
+UptimeRobot    : 7-day 99.738 %, 30-day 99.939 % (UptimeRobot counts the full 30 days)
+Downtime       : 0h 26m 23s in 1 incident(s)
+Uptime         : 99.918 % over the monitored window   -> QR-02 (>= 99.9 %): PASS
+MTTR / MTTF    : 0h 26m 23s / 537.52 h   (MTBF 537.96 h)
+Availability   : MTTF / (MTTF + MTTR) = 99.918 %
+Budget left    : 0h 5m 53s more downtime before uptime drops below 99.9 %
+Incidents      :
+  2026-09-26 19:54:18 UTC  down 0h 26m 23s  503 Service Unavailable  -> recovered within 5 min: MISS
+QR-06 detection within 5 min (check interval 300 s): PASS
+QR-06 every real incident recovered within 5 min: MISS

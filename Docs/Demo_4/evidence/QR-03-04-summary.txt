@@ -1,0 +1,19 @@
+page      | runs | accessibility | performance | lcp_s | QR-03 | QR-04 | final_url | median_run
+admin     | 3    | 86            | 98          | 1.12  | FAIL  | PASS  | ok        | admin-run1.report.json
+audit-log | 3    | 94            | 99          | 0.84  | PASS  | PASS  | ok        | audit-log-run2.report.json
+case-page | 3    | 85            | 77          | 4.75  | FAIL  | FAIL  | ok        | case-page-run3.report.json
+dashboard | 3    | 86            | 99          | 0.84  | FAIL  | PASS  | ok        | dashboard-run2.report.json
+help      | 3    | 94            | 100         | 0.60  | PASS  | PASS  | ok        | help-run2.report.json
+landing   | 3    | 93            | 99          | 0.93  | PASS  | PASS  | ok        | landing-run2.report.json
+login     | 3    | 96            | 100         | 0.56  | PASS  | PASS  | ok        | login-run1.report.json
+register  | 3    | 96            | 100         | 0.67  | PASS  | PASS  | ok        | register-run2.report.json
+workbench | 3    | 90            | 82          | 3.37  | PASS  | FAIL  | ok        | workbench-run2.report.json
+
+Lowest accessibility: 85  |  lowest performance: 77  |  slowest LCP: 4.75 s
+
+
+
+
+
+
+

@@ -9,3 +9,6 @@ test.txt
 .vscode/settings.json
 *.safetensors
 Backend/app/ai/best_video_model.pt
+nfr/web/node_modules/
+nfr/security/.pytest_cache/
+Docs/Demo_4/evidence/lighthouse/*
