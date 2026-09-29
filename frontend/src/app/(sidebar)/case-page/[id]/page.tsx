@@ -158,6 +158,7 @@ export default function CasePage() {
                                         onDeleted={reloadCaseData}
                                         variant="default"
                                         viewReport={permissions.canViewReport ? () => setReportEvidence(evidence) : undefined}
+                                        reportCertainty={evidence.reportCertainty}
                                     />
                                 )) : (
                                     <div className="w-full rounded-[var(--radius-lg)] border border-dashed border-(--color-line-strong) bg-(--color-surface) p-10 text-center text-sm text-(--color-text-muted)">

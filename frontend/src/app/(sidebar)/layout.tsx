@@ -4,6 +4,7 @@ import { getCookie } from '@/auth/cookie';
 import { UserRoleProvider } from '@/context/UserRoleContext';
 import { redirect } from 'next/dist/client/components/navigation';
 import { CaseNavProvider } from '@/context/caseNavContext';
+import SessionKeepAlive from '@/components/common/sessionKeepAlive';
 type UserRole = 'ADMIN' | 'INVESTIGATOR' | 'USER';
 type CurrentUser = { //added to ensure admin cant delete itself or role change
     id: string;
@@ -48,6 +49,7 @@ export default async function SidebarLayout({ children }: { children: React.Reac
 
     return (
         <SidebarWrapper>
+            <SessionKeepAlive />
             <UserRoleProvider user={currentUser}>
                 <CaseNavProvider>
                     <div className="flex min-h-screen bg-[var(--color-primary)]">

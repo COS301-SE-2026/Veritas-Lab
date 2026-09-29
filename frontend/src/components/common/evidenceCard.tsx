@@ -100,7 +100,7 @@ export default function EvidenceCard({
             </div>
         );
     }
-
+    const certainty = getCertaintyMeta(reportCertainty);
     const card = (
         <div className={`vl-card ${href ? 'vl-card-interactive' : ''} flex h-[270px] w-[280px] flex-col p-4`}> 
             <div className="truncate text-[16px] font-semibold text-(--color-text-strong)">{mediaName}</div>
@@ -112,8 +112,12 @@ export default function EvidenceCard({
                     width={228}
                 />
             </div>
-            <div className="mt-3 flex items-center justify-between">
-                <span className="vl-badge vl-badge-neutral uppercase">{mediaExtension}</span>
+            <div className={`mt-3 flex items-center justify-between gap-2 ${viewReport ? 'pr-7' : ''}`}>
+                <div className="flex min-w-0 items-center gap-1.5">
+                        <div className="vl-dot shrink-0" style={{ color: certainty.colorVar }} />
+                        <div className="truncate">{certainty.label}</div>
+                </div>
+                <span className="vl-badge vl-badge-neutral uppercase shrink-0">{mediaExtension}</span>
             </div>
         </div>
     );
@@ -130,7 +134,7 @@ export default function EvidenceCard({
             onClick={viewReport}
             aria-label={`View report for ${mediaName}`}
             title="View report"
-            className="absolute right-4 bottom-4 z-10 rounded-full text-(--color-text-muted) hover:text-(--color-text-strong)"
+            className="absolute right-4.5 bottom-5.5 z-10 rounded-full text-(--color-text-muted) hover:text-(--color-text-strong)"
         >
             <FileText size={16} />
         </button>
