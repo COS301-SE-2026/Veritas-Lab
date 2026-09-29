@@ -36,7 +36,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+background_tasks: set[asyncio.Task] = set()
 analysis_semaphore = asyncio.Semaphore(1)
+
+def start_media_pipeline(relay) -> None:
+    task = asyncio.create_task(run_media_pipeline(relay))
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -1322,7 +1328,7 @@ async def upload_evidence(
         media_id = UUID(result["MediaId"])
 
         relay = media_relay(media_id=media_id, extension=extension)
-        asyncio.create_task(run_media_pipeline(relay))
+        start_media_pipeline(relay)
 
         return {
             "status": "success",
