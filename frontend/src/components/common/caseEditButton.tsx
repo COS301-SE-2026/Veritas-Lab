@@ -41,7 +41,7 @@ export default function CaseEditButton({ caseId, initialName, initialDescription
 
     return (
         <>
-            <Button variant="outline" text="Edit Case" onClick={openModal} className={className} />
+            <Button variant="light-outline" text="Edit Case" onClick={openModal} className={className} />
             <Modal isOpen={isModalOpen} onClose={closeModal}>
                 <div>
                     <div className="text-[22px] font-bold text-(--color-text-strong)">Edit case</div>

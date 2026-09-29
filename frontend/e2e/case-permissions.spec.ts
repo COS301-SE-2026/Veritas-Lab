@@ -52,7 +52,7 @@ const scenarios: Scenario[] = [
         viewer: 'USER', owner: 'USER', state: 'CLOSED', assignTo: 'INVESTIGATOR',
         expected: {
             editCase: false, uploadEvidence: false, publishCase: false, closeCase: false,
-            deleteEvidence: false, viewReport: true, workbenchLink: false, canComment: true,
+            deleteEvidence: false, viewReport: true, workbenchLink: false, canComment: false,
             sections: OWNER_SECTIONS,
         },
     },

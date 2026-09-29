@@ -21,15 +21,10 @@ async function postComment(page: import('@playwright/test').Page, body: string) 
 //test all comment as case owner
 test.describe('comments as the case owner', () => {
     test.use({ storageState: storageStateFor('USER') });
-    //the owner keeps commenting rights at every stage of the case
-    for (const state of ['OPEN', 'PUBLISHED', 'CLOSED'] as CaseState[]) {
+    //the owner keeps commenting rights while the case is open or published
+    for (const state of ['OPEN', 'PUBLISHED'] as CaseState[]) {
         test(`can comment on their own ${state.toLowerCase()} case`, async ({ page }) => {
-            const seeded = await seedCase({
-                owner: 'USER',
-                state,
-                withEvidence: false,
-                assignTo: state === 'CLOSED' ? 'INVESTIGATOR' : undefined,
-            });
+            const seeded = await seedCase({ owner: 'USER', state, withEvidence: false });
             const body = `owner note ${randomUUID().slice(0, 8)}`;
             try {
                 await casePage(page).goto(seeded.caseId, 'Comments');
@@ -58,6 +53,23 @@ test.describe('comments as the case owner', () => {
             await expect(page.getByText(body)).toBeVisible();
             await page.reload();
             await expect(page.getByText(body)).toBeVisible();
+        } finally {
+            await seeded.cleanup();
+        }
+    });
+
+    test('cannot comment on their own closed case', async ({ page }) => {
+        const seeded = await seedCase({
+            owner: 'USER',
+            state: 'CLOSED',
+            withEvidence: false,
+            assignTo: 'INVESTIGATOR',
+        });
+        try {
+            const ui = casePage(page);
+            await ui.goto(seeded.caseId, 'Comments');
+            await expect(ui.commentComposer()).toHaveCount(0);
+            await expect(ui.readOnlyCommentNotice()).toBeVisible();
         } finally {
             await seeded.cleanup();
         }
