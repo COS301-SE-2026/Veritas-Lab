@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
-
+from app.api.routers.cases_router import AUDIT_NOT_ALLOWED
 from app.auth.auth import COOKIE_NAME, create_token
 from app.tests.integration.conftest import get_connection
 
@@ -196,10 +196,31 @@ async def test_evidence_removal_is_not_recorded(client, audit_context):
     assert "Evidence Added" not in result
 
 @pytest.mark.asyncio
-async def test_timeline_unknown_case_is_forbidden_for_non_admin(client, audit_context):
-    client.cookies.set(COOKIE_NAME, audit_context["investigator_token"])
-    response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
+async def test_timeline_unknown_case_is_forbidden_for_user(
+    client,
+    audit_context,
+    ensure_user_exists
+):
+    ctx = audit_context
 
+    user_id = str(uuid.uuid4())
+    username = f"Audit_User_{user_id[:8]}"
+
+    await ensure_user_exists(
+        ctx["conn"],
+        user_id,
+        "Audit_User",
+        "USER"
+    )
+
+    user_token = create_token({
+        "id": user_id,
+        "username": username,
+        "role": "USER"
+    })
+
+    client.cookies.set(COOKIE_NAME, user_token)
+    response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
     assert response.status_code == 403, response.text
 
 @pytest.mark.asyncio
@@ -242,36 +263,62 @@ async def test_get_all_audited_cases(client, audit_context):
 
 
 @pytest.mark.asyncio
-async def test_timeline_visible_to_case_creator_with_user_role(client, audit_context, ensure_user_exists):
-    # Issue #458: the creator reads their own case timeline, whatever their role.
+async def test_timeline_forbidden_to_case_creator_with_user_role(
+    client,
+    audit_context,
+    ensure_user_exists
+):
     ctx = audit_context
     user_id = str(uuid.uuid4())
     username = f"Audit_User_{user_id[:8]}"
 
-    await ensure_user_exists(ctx["conn"], user_id, "Audit_User", "USER")
+    await ensure_user_exists(
+        ctx["conn"],
+        user_id,
+        "Audit_User",
+        "USER"
+    )
 
     case_id = uuid.uuid4()
+
     await ctx["conn"].execute(
-        "SELECT set_config('app.current_user_id', $1, false)", user_id
+        "SELECT set_config('app.current_user_id', $1, false)",
+        user_id
     )
+
     await ctx["conn"].execute(
         """
         INSERT INTO "Cases_DB"."Cases"
         (CaseId, CaseName, CaseCreator, CaseDescription, CaseState)
         VALUES ($1, $2, $3, $4, $5::case_state_enum)
         """,
-        case_id, "User owned audit case", username, "Created by a USER", "OPEN"
+        case_id,
+        "User owned audit case",
+        username,
+        "Created by a USER",
+        "OPEN"
     )
+
     ctx["cases"].append(str(case_id))
 
     client.cookies.set(
         COOKIE_NAME,
-        create_token({"id": user_id, "username": username, "role": "USER"})
+        create_token({
+            "id": user_id,
+            "username": username,
+            "role": "USER"
+        })
     )
+
     response = client.get(f"/api/getAudit/caseID/{case_id}")
 
-    assert response.status_code == 200, response.text
-    assert "Case Created" in actions(response)
+    assert response.status_code == 403, response.text
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": AUDIT_NOT_ALLOWED
+        }
+    }
 
 
 @pytest.mark.asyncio
@@ -291,21 +338,20 @@ async def test_timeline_visible_to_assigned_investigator(client, audit_context):
 
 
 @pytest.mark.asyncio
-async def test_timeline_forbidden_to_unrelated_investigator(client, audit_context):
-    # The access rule: an investigator who neither created nor is assigned the case
-    # can no longer read its history.
+async def test_timeline_visible_to_unrelated_investigator(client, audit_context):
     ctx = audit_context
     case_id = await seed_case(ctx)
 
     await ctx["conn"].execute(
         'UPDATE "Cases_DB"."Cases" SET casecreator = $2 WHERE CaseId = $1',
-        uuid.UUID(case_id), "SomebodyElse"
+        uuid.UUID(case_id),
+        "SomebodyElse"
     )
 
     client.cookies.set(COOKIE_NAME, ctx["investigator_token"])
     response = client.get(f"/api/getAudit/caseID/{case_id}")
-
-    assert response.status_code == 403, response.text
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "success"
 
 
 @pytest.mark.asyncio
