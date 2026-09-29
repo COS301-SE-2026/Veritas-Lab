@@ -154,7 +154,7 @@ export default function WorkbenchPage() {
         subtitle = 'You can view this evidence and its annotations. Assign yourself to the case to make changes.';
     }
     return (
-        <div className="mx-auto max-w-7xl px-6 sm:px-10 pt-8 pb-16">
+        <div className={`mx-auto ${annotationsActive || reportActive ? 'max-w-[100rem]' : 'max-w-7xl'} px-6 sm:px-10 pt-8 pb-16`}>
             {backLink}
 
             <div className="mt-4">
@@ -173,7 +173,7 @@ export default function WorkbenchPage() {
                 />
             </div>
 
-            <div className="mt-6 flex flex-col items-start gap-6 lg:flex-row">
+            <div className="mt-6 flex gap-6">
                 <div className="min-w-0 flex-1">
                     <div className={(metadataActive || PAPModelsActive || (reportActive && evidence?.heatmapUrl)) ? 'hidden' : 'block'} aria-hidden={metadataActive}>
                         <WorkbenchCanvas
@@ -241,14 +241,16 @@ export default function WorkbenchPage() {
                 )}
 
                 {reportActive && (
-                    <ReportPanel
-                        mediaUrl={mediaUrl}
-                        mediaKind={mediaKind}
-                        mediaName={mediaName}
-                        certainty={evidence?.reportCertainty ?? null}
-                        findings={evidence?.reportFindings ?? null}
-                        heatmapUrl={evidence?.heatmapUrl ?? null}
-                    />
+                    <div className="w-130 shrink-0 self-start">
+                        <ReportPanel
+                            mediaUrl={mediaUrl}
+                            mediaKind={mediaKind}
+                            mediaName={mediaName}
+                            certainty={evidence?.reportCertainty ?? null}
+                            findings={evidence?.reportFindings ?? null}
+                            heatmapUrl={evidence?.heatmapUrl ?? null}
+                        />
+                    </div>
                 )}
             </div>
         </div>

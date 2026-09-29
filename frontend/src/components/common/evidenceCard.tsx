@@ -1,9 +1,7 @@
 'use client';
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { useDraggable } from '@dnd-kit/react';
-import { GripVertical, PenLine, Clock, ClockAlert, FileText } from "lucide-react";
-import { getMediaKind } from "@/lib/media";
+import { PenLine, Clock, ClockAlert, FileText } from "lucide-react";
 import { getCertaintyMeta } from "@/lib/report";
 import type { EvidenceCardProps } from "@/types/components";
 import DeleteEvidence from "./caseEvidenceDeleteButton";
@@ -25,7 +23,7 @@ export default function EvidenceCard({
     const isBoard = variant === 'case-board';
     const formattedTime = capturedAt ? formatCapturedAt(capturedAt) : null;
 
-    const { ref, handleRef, isDragging } = useDraggable({
+    const { ref, isDragging } = useDraggable({
         id: `evidence-${mediaId ?? mediaName}`,
         data: { mediaId, caseId, mediaName },
         disabled: !isBoard,
@@ -43,18 +41,11 @@ export default function EvidenceCard({
         return (
             <div
                 ref={ref}
+                tabIndex={0}
                 data-testid="case-board-evidence-card"
-                className={`group relative w-full min-w-0 overflow-hidden rounded-[var(--radius-md)] border bg-(--color-surface) transition-[box-shadow,border-color,opacity,transform] duration-200 ${stateClasses} ${placed && !isDragging ? "opacity-55" : ""}`}
+                className={`group relative cursor-grab w-full min-w-0 select-none overflow-hidden rounded-[var(--radius-md)] border bg-(--color-surface) transition-[box-shadow,border-color,opacity,transform] duration-200 active:cursor-grabbing focus-visible:outline-none focus-visible:shadow-(--shadow-focus) ${stateClasses} ${placed && !isDragging ? "opacity-55" : ""}`}
             >
-                <div className="flex items-center gap-2.5 py-2.5 pr-3 pl-2">
-                    <button
-                        ref={handleRef}
-                        type="button"
-                        aria-label={`Drag ${mediaName} onto the board`}
-                        className="flex h-8 w-5 shrink-0 cursor-grab items-center justify-center rounded-md text-(--color-text-subtle) transition-colors hover:bg-(--color-surface-sunken) hover:text-(--color-text-muted) active:cursor-grabbing focus-visible:outline-none focus-visible:shadow-(--shadow-focus)"
-                    >
-                        <GripVertical size={14} />
-                    </button>
+                <div className="flex items-center gap-3 p-3">
 
                     <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-(--color-line) bg-(--color-surface-sunken)">
                         <EvidenceThumbnail
@@ -111,7 +102,7 @@ export default function EvidenceCard({
     }
 
     const card = (
-        <div className={`vl-card ${href ? 'vl-card-interactive' : ''} flex h-[204px] w-[230px] flex-col p-4`}> 
+        <div className={`vl-card ${href ? 'vl-card-interactive' : ''} flex h-[270px] w-[280px] flex-col p-4`}> 
             <div className="truncate text-[16px] font-semibold text-(--color-text-strong)">{mediaName}</div>
             <div className="mt-3 flex flex-1 items-center justify-center overflow-hidden rounded-[14px] border border-(--color-line) bg-(--color-surface-sunken)">
                 <EvidenceThumbnail
