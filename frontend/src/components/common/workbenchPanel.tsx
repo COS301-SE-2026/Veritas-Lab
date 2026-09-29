@@ -40,7 +40,7 @@ export default function WorkbenchPanel({
     };
 
     return (
-        <div className="vl-panel flex w-full shrink-0 flex-col gap-4 p-5 lg:w-72">
+        <div className="vl-panel flex max-h-[calc(100dvh-128px)] w-130 shrink-0 flex-col gap-4 self-start p-5">
             <div>
                 <h2 className="text-lg font-bold text-(--color-text-strong)">Annotation tools</h2>
                 <p className="mt-1 text-xs text-(--color-text-muted)">
@@ -50,7 +50,7 @@ export default function WorkbenchPanel({
                 </p>
             </div>
 
-            <div className="flex flex-col gap-4 border-t border-(--color-line) pt-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 border-t border-(--color-line) pt-4">
                 {readOnly ? null : (
                     <SliderBar<AnnotationTool>
                         filters={toolsFor(mediaKind)}
@@ -59,7 +59,7 @@ export default function WorkbenchPanel({
                         className="w-full"
                     />
                 )}
-
+                
                 <AnnotationList
                     annotations={annotations}
                     selectedId={selectedId}

@@ -1,9 +1,11 @@
 'use client';
 import { Highlighter, MessageSquare, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import type { AnnotationListProps } from '@/types/workbench';
-
+import SliderBar from '@/components/ui/sliderBar';
+import { useState } from 'react';
 export default function AnnotationList({ annotations, selectedId, onSelect, onRemove }: Readonly<AnnotationListProps>) {
-
+    const [tab, setTab] = useState<'Manual' | 'AI'>('Manual');
+    const visible = annotations.filter((annotation) => (annotation.source === 'AI') === (tab === 'AI'));
     const formatTimestamp = (seconds: number): string => {
         const min = Math.floor(seconds / 60);
         const remainder = seconds - (min * 60);
@@ -13,14 +15,19 @@ export default function AnnotationList({ annotations, selectedId, onSelect, onRe
     return (
         <div className="vl-sunken p-4">
             <h2 className="text-base font-bold text-(--color-text-strong)">Annotations</h2>
-
-            {annotations.length === 0 ? (
+            <SliderBar<'Manual' | 'AI'>
+                filters={['Manual', 'AI']}
+                defaultFilter={tab}
+                onChange={setTab}
+                className="mt-3"
+            />
+            {visible.length === 0 ? (
                 <p className="mt-2 text-sm text-(--color-text-muted)">
                     No annotations yet. Use the Draw or Comment tool on the media.
                 </p>
             ) : (
-                <ul className="mt-4 flex flex-col gap-1.5">
-                    {annotations.map((annotation, index) => {
+                <ul className="mt-4 flex max-h-96 flex-col gap-2 overflow-y-auto pr-1">
+                    {visible.map((annotation, index) => {
                         const isSelected = annotation.id === selectedId;
                         const isAi = annotation.source === 'AI';
                         const isUnlocated = annotation.kind === 'highlight' && annotation.rects?.length === 0;
