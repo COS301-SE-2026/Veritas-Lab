@@ -67,7 +67,7 @@ export function getCasePermissions({
         isOwner,
         isAssigned,
         isViewer,
-        canEditCase: (isOwner && isOpen) || canWorkOnCase,
+        canEditCase: (isOwner && isOpen),
         canUploadEvidence: isOwner && isOpen,
         canPublishCase: isOwner && isOpen,
         canCloseCase: canWorkOnCase,

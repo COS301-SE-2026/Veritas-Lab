@@ -18,8 +18,9 @@ test('a case moves from draft to closed across three roles', async ({ browser })
         const ownerDash = dashboardPage(ownerPage);
         await ownerDash.goto();
         await ownerDash.newCase().click();
-        await ownerDash.caseTitle().fill(caseTitle);
-        await ownerDash.caseDescription().fill('Lifecycle flow');
+        await ownerDash.caseTitle().pressSequentially(caseTitle);
+        await ownerDash.caseDescription().pressSequentially('Lifecycle flow');
+        await expect(ownerDash.caseTitle()).toHaveValue(caseTitle);
         const [createResponse] = await Promise.all([
             ownerPage.waitForResponse((r) => r.url().includes('/api/createCase')),
             ownerDash.submitNewCase().click(),
@@ -56,7 +57,6 @@ test('a case moves from draft to closed across three roles', async ({ browser })
         const investigatorUi = casePage(investigatorPage);
         await investigatorUi.goto(caseId);
         await expect(investigatorUi.closeCase()).toBeVisible();
-        await expect(investigatorUi.editCase()).toBeVisible();
         const [closeResponse] = await Promise.all([
             investigatorPage.waitForResponse((r) => r.url().includes('/api/closeCase')),
             investigatorUi.closeCase().click(),
