@@ -23,7 +23,7 @@ from uuid import UUID
 from datetime import datetime, timedelta, timezone
 import uuid
 from uuid import uuid4
-from app.core.media_relay import MediaRelay
+from app.core.media_relay import media_relay
 from pathlib import Path
 import boto3
 from botocore.client import Config
@@ -31,6 +31,7 @@ from mypy_boto3_s3 import S3Client
 from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_Settings
 from app.core.cases import get_object
 from app.core.database import get_connection
+import asyncio
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -98,6 +99,11 @@ class audited_case(BaseModel):
     eventCount: int | None = Field(..., examples=[5])
     lastEventTimestamp: str | None = Field(..., examples=["2026-05-20T19:43:02+00:00"])
     caseExists: bool | None = Field(..., examples=[True])
+    events: List[audit_event] = Field(..., examples=[{
+        "timestamp": "2026-05-20T19:43:02+00:00",
+        "user": "investigator_user",
+        "action": "Case Created"
+    }])
 
 class audited_cases_response(BaseModel):
     status: str = Field(..., examples=["success"])
@@ -328,12 +334,19 @@ def row_to_audit_event(row: dict) -> dict:
     }
 
 def _row_to_audited_case(row: dict) -> dict:
+    raw_events = row["events"]
+    events = json.loads(raw_events) if isinstance(raw_events, str) else (raw_events or [])
+
     return {
         "caseId": str(row["caseid"]),
         "caseName": row["casename"],
         "eventCount": row["eventcount"],
         "lastEventTimestamp": row["lasteventtimestamp"].isoformat() if row["lasteventtimestamp"] else None,
-        "caseExists": row["caseexists"]
+        "caseExists": row["caseexists"],
+        "events": [
+            {"timestamp": event["timestamp"], "user": event["user"], "action": event["action"]}
+            for event in events
+        ]
     }
 
 @router.post(
@@ -522,7 +535,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         if role == "USER":
             rows = await connection.fetch(
                 """
-                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
                 FROM "Cases_DB"."Cases"
                 WHERE casecreator = $1
                 ORDER BY casecreationdate DESC
@@ -533,7 +546,7 @@ async def get_cases(request: Request, connection: Annotated[asyncpg.Connection, 
         elif role in ["ADMIN", "INVESTIGATOR"]:
             rows = await connection.fetch(
                 """
-                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate
+                SELECT caseid, casecreator, casename, casedescription, casestate, casecreationdate, caseassigned
                 FROM "Cases_DB"."Cases"
                 WHERE 
                     casecreator = $1
@@ -1297,8 +1310,8 @@ async def upload_evidence(
         extension = Path(result["Filename"]).suffix.lower()
         media_id = UUID(result["MediaId"])
 
-        media_relay = MediaRelay(media_id=media_id, extension=extension)
-        background_task.add_task(media_relay.relay_to_service)
+        relay = media_relay(media_id=media_id, extension=extension)
+        asyncio.create_task(relay.relay_to_service())
 
         return {
             "status": "success",
@@ -1906,19 +1919,6 @@ async def delete_comment(
             }
         },
         401: INVALID_TOKEN_401,
-        403: {
-            "description": "Forbidden - User lacks sufficient permissions",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail":{
-                            "status": "error",
-                            "message": USER_UNAUTHORIZED
-                        }
-                    }
-                }
-            }
-        },
         500: {
             "description": "Internal Server Error - Database connection or unexpected server failure",
             "content": {
@@ -1950,10 +1950,7 @@ async def retreive_comments(
     request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-
-    payload = await verify_jwt(request, connection)
-    user_role=payload.get("role")
-    verify_not_user(user_role) 
+    await verify_jwt(request, connection)
 
     try:
         case = Case(case_id=case_id)
@@ -2987,7 +2984,7 @@ async def get_case_audit_events(
             UNION ALL
 
             SELECT
-                214783647,
+                2147483647,
                 NULL::timestamptz,
                 NULL::varchar,
                 NULL::text,
@@ -3092,8 +3089,9 @@ async def get_case_audit_events(
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Get all cases with audit logs",
     description=(
-        "Returns the different cases that have at least one audit entry, with the number of recorded events"
-        " and when the most recent one happened. Amdin only."
+        "Returns every case that has at least one audit entry, with the number of recorded events, "
+        "when the most recent one happened, and the case's full audit timeline (the same events "
+        "returned by `/getAudit/caseID/{case_id}`, newest first). Admin only."
     ),
     responses={
         200: {
@@ -3109,14 +3107,43 @@ async def get_case_audit_events(
                                 "caseName": "Reciepts sus",
                                 "eventCount": 5,
                                 "lastEventTimnestamp": "2026-08-12T11:01:30",
-                                "caseExists": True
+                                "caseExists": True,
+                                "events": [
+                                    {
+                                        "timestamp": "2026-08-12T11:01:30+00:00",
+                                        "user": "investigator_user",
+                                        "action": "Case Closed"
+                                    },
+                                    {
+                                        "timestamp": "2026-08-12T10:45:15+00:00",
+                                        "user": "normal_user",
+                                        "action": "Case Published"
+                                    },
+                                    {
+                                        "timestamp": "2026-08-12T10:30:00+00:00",
+                                        "user": "normal_user",
+                                        "action": "Case Created"
+                                    }
+                                ]
                             },
                             {
                                 "caseId": "987e6543-e21b-12d3-a456-426614174000",
                                 "caseName": "Idk ig",
                                 "eventCount": 2,
                                 "lastEventTimnestamp": None,
-                                "caseExists": False
+                                "caseExists": False,
+                                "events": [
+                                    {
+                                        "timestamp": "2026-08-11T09:15:00+00:00",
+                                        "user": "admin_user",
+                                        "action": "Case Deleted"
+                                    },
+                                    {
+                                        "timestamp": "2026-08-11T09:00:00+00:00",
+                                        "user": "normal_user",
+                                        "action": "Case Created"
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -3186,7 +3213,117 @@ async def get_audited_cases(
                     MAX(audit_events.eventtimestamp) AS lasteventtimestamp
                 FROM audit_events
                 GROUP BY audit_events.caseid
-            )
+            ),
+
+            timeline_case_audit AS (
+                SELECT
+                    old_case_id AS caseid,
+                    audit_case_id AS ordinal,
+                    audittimestamp,
+                    query_executor_name,
+                    query_type::text AS query_type,
+                    old_casename,
+                    old_casedescription,
+                    old_casestate,
+                    old_caseassigned
+                FROM "Cases_DB"."Audit_Cases"
+                WHERE old_case_id IS NOT NULL
+
+                UNION ALL
+
+                SELECT
+                    cases.caseid AS caseid,
+                    2147483647,
+                    NULL::timestamptz,
+                    NULL::varchar,
+                    NULL::text,
+                    cases.casename,
+                    cases.casedescription,
+                    cases.casestate,
+                    cases.caseassigned
+                FROM "Cases_DB"."Cases" AS cases
+            ),
+            timeline_transitions AS (
+            SELECT
+                caseid,
+                audittimestamp,
+                query_executor_name,
+                query_type,
+                old_casename,
+                old_casedescription,
+                old_casestate,
+                old_caseassigned,
+                LEAD(old_casename) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_casename,
+                LEAD(old_casedescription) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_casedescription,
+                LEAD(old_casestate) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_casestate,
+                LEAD(old_caseassigned) OVER (PARTITION BY caseid ORDER BY ordinal) AS next_caseassigned
+            FROM timeline_case_audit
+            ),
+            timeline_state_events AS (
+                SELECT
+                    caseid,
+                    audittimestamp AS eventtimestamp,
+                    query_executor_name AS eventuser,
+                    CASE
+                        WHEN query_type = 'INSERT' THEN 'Case Created'
+                        WHEN query_type = 'DELETE' THEN 'Case Deleted'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'PUBLISHED' THEN 'Case Published'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'CLOSED' THEN 'Case Closed'
+                        WHEN next_casestate IS DISTINCT FROM old_casestate
+                            AND next_casestate = 'OPEN' THEN 'Case Reopened'
+                        WHEN old_caseassigned IS NULL
+                            AND next_caseassigned IS NOT NULL THEN 'Case Assigned'
+                        WHEN old_caseassigned IS NOT NULL
+                            AND next_caseassigned IS NULL THEN 'Case Unassigned'
+                        WHEN old_casename IS DISTINCT FROM next_casename
+                            AND old_casedescription IS DISTINCT FROM next_casedescription
+                            THEN 'Case Renamed and Description Updated'
+                        WHEN old_casename IS DISTINCT FROM next_casename
+                            THEN 'Case Renamed'
+                        WHEN old_casedescription IS DISTINCT FROM next_casedescription
+                            THEN 'Case Description Updated'
+                        ELSE 'Case Updated'
+                END AS eventaction
+                FROM timeline_transitions
+                WHERE query_type IS NOT NULL
+            ),
+            timeline_evidence_events AS (
+                SELECT
+                    cases.caseid AS caseid,
+                    audit_media.audittimestamp AS eventtimestamp,
+                    audit_media.query_executor_name AS eventuser,
+                    CASE audit_media.query_type::text
+                        WHEN 'INSERT' THEN 'Evidence Added'
+                        ELSE 'Evidence Annotated'
+                    END AS eventaction
+                FROM "Cases_DB"."Cases" AS cases
+                CROSS JOIN LATERAL unnest(
+                    COALESCE(cases.evidence, ARRAY[]::"Cases_DB".evidence_type[])
+                ) AS elm
+                INNER JOIN "Cases_DB"."Audit_Media" AS audit_media
+                    ON audit_media.old_media_id = elm.evidence_id
+                    AND audit_media.query_type::text IN ('INSERT', 'UPDATE')
+                ),
+                case_timelines AS (
+                    SELECT
+                        caseid,
+                        jsonb_agg(
+                            jsonb_build_object(
+                                'timestamp', eventtimestamp,
+                                'user', eventuser,
+                                'action', eventaction
+                            )
+                            ORDER BY eventtimestamp DESC NULLS LAST
+                        ) AS events
+                    FROM (
+                        SELECT caseid, eventtimestamp, eventuser, eventaction FROM timeline_state_events
+                        UNION ALL
+                        SELECT caseid, eventtimestamp, eventuser, eventaction FROM timeline_evidence_events
+                    ) AS combined_timeline_events
+                    GROUP BY caseid
+                )
             SELECT
                 audit_summary.caseid AS caseid,
                 COALESCE(cases.casename,
@@ -3199,10 +3336,13 @@ async def get_audited_cases(
             ) AS casename,
             audit_summary.eventcount AS eventcount,
             audit_summary.lasteventtimestamp AS lasteventtimestamp,
-            (cases.caseid IS NOT NULL) AS caseexists
+            (cases.caseid IS NOT NULL) AS caseexists,
+            COALESCE(case_timelines.events, '[]'::jsonb) AS events
             FROM audit_summary
             LEFT JOIN "Cases_DB"."Cases" AS cases
                 ON cases.caseid = audit_summary.caseid
+            LEFT JOIN case_timelines
+                ON case_timelines.caseid = audit_summary.caseid
             ORDER BY audit_summary.lasteventtimestamp DESC NULLS LAST
             """
         )

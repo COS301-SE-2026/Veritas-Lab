@@ -101,7 +101,7 @@ export default function AnnotationLayer({
             onPointerUp={handlePointerUp}
             onClick={handleOverlayClick}
             onKeyDown={handleOverlayKeyDown}
-            className={`absolute inset-0 select-none ${active && !isOn && activeTool !== 'Highlight' ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
+            className={`absolute inset-0 z-10 select-none ${active && !isOn && activeTool !== 'Highlight' ? CURSOR_BY_TOOL[activeTool] : 'pointer-events-none'}`}
         >
             {active ? (
                 <>

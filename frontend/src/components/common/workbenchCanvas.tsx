@@ -6,7 +6,7 @@ import type { AnnotationTool, WorkbenchCanvasProps } from '@/types/workbench';
 
 const WorkbenchPdf = dynamic(() => import('@/components/common/workbenchPdf'), {
     ssr: false,
-    loading: () => <p className="text-sm text-(--color-text-subtle)">Loading viewer…</p>,
+    loading: () => <p className="text-sm text-(--color-text-subtle)">Loading viewer...</p>,
 });
 
 const WorkbenchVideo = dynamic(() => import('@/components/common/workbenchVideo'), {

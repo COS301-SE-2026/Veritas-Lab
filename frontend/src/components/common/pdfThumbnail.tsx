@@ -12,7 +12,7 @@ export default function PdfThumbnail({ url, width = 96 }: Readonly<PdfThumbnailP
     return (
         <Document
             file={url}
-            loading={<span className="text-xs text-(--color-text-subtle)">Loading…</span>}
+            loading={<span className="text-xs text-(--color-text-subtle)">Loading...</span>}
             error={<span className="text-xs text-[var(--color-danger)]">No preview</span>}
         >
             <Page

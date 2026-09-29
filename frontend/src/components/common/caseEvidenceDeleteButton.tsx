@@ -58,7 +58,7 @@ export default function EvidenceDeleteButton({ caseId, mediaId, mediaName, onDel
                         <Button variant="outline" text="Cancel" onClick={closeModal} disabled={isDeleting} />
                         <Button
                             variant="submit"
-                            text={isDeleting ? 'Deleting…' : 'Delete'}
+                            text={isDeleting ? 'Deleting...' : 'Delete'}
                             onClick={handleConfirmDelete}
                             disabled={isDeleting}
                             className={'bg-[var(--color-danger)] text-white border-transparent hover:bg-(--color-danger)'}

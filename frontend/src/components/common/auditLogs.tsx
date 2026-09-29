@@ -23,7 +23,9 @@ export default function AuditLogs() {
     return (
         <div className="space-y-3">
             {auditLogs.cases.map((log, index) => (
-                <AuditLogCaseCard key={index} cases={log} />
+                <div key={index}>
+                    <AuditLogCaseCard key={index} caseLog={log} />
+                </div>
             ))}
         </div>
     );

@@ -13,7 +13,7 @@ import boto3
 from botocore.client import Config
 from app.core.env import Other_Settings, Minio_Settings, R2_Settings
 from mypy_boto3_s3 import S3Client
-from app.core.media_relay import MediaRelay
+from app.core.media_relay import media_relay
 
 CASE_NOT_FOUND = "Case not found"
 MISSING_CASE_ID = "Case id is missing"
@@ -459,7 +459,9 @@ class Case:
                     await media.seek(0)
                     
                     file_stream = io.BytesIO(file_bytes)
-                    storage_client.put_object(
+
+                    await asyncio.to_thread(
+                        storage_client.put_object,
                         Bucket=bucket_name,
                         Key=target_filename,
                         Body=file_stream,
@@ -725,22 +727,21 @@ class Case:
             )
         
         await set_audit_executor(connection, executor_id)
-
+ 
         row = await connection.fetchrow(
             """
             WITH case_check AS (
-                SELECT caseid, casestate
+                SELECT caseid, casecreator
                 FROM "Cases_DB"."Cases"
-                WHERE caseid = $1
+                WHERE caseid = $1::uuid
             ),
             inserted AS (
                 INSERT INTO "Cases_DB"."Comments" (caseid, username, comment)
-                SELECT $1, $2, $3
+                SELECT $1::uuid, $2::varchar(100), $3::text
                 FROM case_check
                 WHERE (
-                    $4 = 'ADMIN'
-                    OR ($4 = 'USER' AND casestate = 'CLOSED')
-                    OR ($4 = 'INVESTIGATOR')
+                    ($4::text = 'USER' AND casecreator = $2::varchar(100))
+                    OR ($4::text <> 'USER')
                 )
                 RETURNING commentid, caseid, username, comment, commenttimestamp
             )
@@ -750,7 +751,6 @@ class Case:
                 i.username,
                 i.comment,
                 i.commenttimestamp,
-                c.casestate,
                 (c.caseid IS NOT NULL) AS case_exists,
                 (i.commentid IS NOT NULL) AS comment_inserted
             FROM case_check c
@@ -761,33 +761,33 @@ class Case:
             comment.strip(),
             role,
         )
-
+ 
         if row is None or not row["case_exists"]:
             raise HTTPException(
                 status_code=404, 
                 detail={
-                    "status":"error",
-                    "message":CASE_NOT_FOUND
+                    "status": "error",
+                    "message": CASE_NOT_FOUND
                 }
             )
-
+ 
         if not row["comment_inserted"]:
             if role == "USER":
                 raise HTTPException(
                     status_code=403, 
                     detail={
-                        "status":"error",
-                        "message":"Users may only comment on closed cases"
+                        "status": "error",
+                        "message": "Users may only comment on cases they created"
                     }
                 )
             raise HTTPException(
                 status_code=403, 
                 detail={
-                    "status":"error",
-                    "message":"Permission denied"
+                    "status": "error",
+                    "message": "Permission denied"
                 }
             )
-
+ 
         return {
             "commentId": row["commentid"],
             "caseId": str(row["caseid"]),

@@ -1,8 +1,8 @@
 import json
 import pytest
 from unittest.mock import MagicMock, AsyncMock, ANY
-from app.core.image_service import ImageService
-from app.core.pdf_service import PDFService
+from app.core.image_service import image_service
+from app.core.pdf_service import pdf_service
 from app.core.media_service import AnalysisFindings
 import numpy as np
 
@@ -30,7 +30,7 @@ async def test_pdf_extract_success(monkeypatch):
 
     mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
-    service = PDFService()
+    service = pdf_service()
 
     media_record = {
         "media_id": "12345678-abcd-ef01-2345-6789abcdef01",
@@ -63,7 +63,7 @@ async def test_png_extract_success(monkeypatch):
 
     mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
-    service = ImageService()
+    service = image_service()
 
     media_record = {
         "media_id": "12345678-abcd-ef01-2345-6789abcdef02",
@@ -97,7 +97,7 @@ async def test_jpg_extract_success(monkeypatch):
 
     mock_context = mock_exiftool(monkeypatch, [fake_metadata])
 
-    service = ImageService()
+    service = image_service()
     
     media_record = {
         "media_id": "12345678-abcd-ef01-2345-6789abcdef03",
@@ -121,7 +121,7 @@ async def test_jpg_extract_success(monkeypatch):
 async def test_pdf_extract_empty_metadata(monkeypatch):
     mock_context = mock_exiftool(monkeypatch, [])
 
-    service = PDFService()
+    service = pdf_service()
 
     media_record = {
         "media_id": "12345678-abcd-ef01-2345-6789abcdef01",
@@ -162,7 +162,7 @@ async def test_get_media_record_success(monkeypatch):
 
     connection = mock_connection(monkeypatch, fetchrow_result=row)
 
-    service = ImageService()
+    service = image_service()
 
     result = await service.get_media_record("12345678-abcd-ef01-2345-6789abcdef01")
 
@@ -177,7 +177,7 @@ async def test_get_media_record_success(monkeypatch):
 async def test_get_media_record_not_found(monkeypatch):
     connection = mock_connection(monkeypatch, fetchrow_result=None)
 
-    service = ImageService()
+    service = image_service()
 
     with pytest.raises(ValueError, match="Media not found"):
         await service.get_media_record("12345678-abcd-ef01-2345-6789abcdef01")
@@ -187,7 +187,7 @@ async def test_get_media_record_not_found(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_download_media(monkeypatch, tmp_path):
-    service = ImageService()
+    service = image_service()
 
     fake_s3_client = MagicMock()
     monkeypatch.setattr("app.core.media_service.get_object", lambda: fake_s3_client)
@@ -216,7 +216,7 @@ async def test_get_existing_metadata_found(monkeypatch):
     row = {"reportartifacts": {"File:FileType": "JPEG"}}
     connection = mock_connection(monkeypatch, fetchrow_result=row)
 
-    service = ImageService()
+    service = image_service()
     result = await service.get_existing_metadata("12345678-abcd-ef01-2345-6789abcdef01")
 
     assert result == {"File:FileType": "JPEG"}
@@ -230,7 +230,7 @@ async def test_get_existing_metadata_found(monkeypatch):
 async def test_get_existing_metadata_not_found(monkeypatch):
     connection = mock_connection(monkeypatch, fetchrow_result=None)
 
-    service = ImageService()
+    service = image_service()
     result = await service.get_existing_metadata("12345678-abcd-ef01-2345-6789abcdef01")
 
     assert result is None
@@ -241,7 +241,7 @@ async def test_get_existing_metadata_not_found(monkeypatch):
 async def test_save_metadata(monkeypatch):
     connection = mock_connection(monkeypatch)
 
-    service = ImageService()
+    service = image_service()
     metadata = {"File:FileType": "JPEG"}
 
     await service.save_metadata("12345678-abcd-ef01-2345-6789abcdef01", metadata)
@@ -264,7 +264,7 @@ async def test_save_metadata(monkeypatch):
 async def test_update_analysis(monkeypatch):
     connection = mock_connection(monkeypatch)
 
-    service = ImageService()
+    service = image_service()
     analysis = AnalysisFindings(Certainty=2, Findings="Metadata indicates editing")
 
     await service.update_analysis(
@@ -292,7 +292,7 @@ async def test_update_analysis(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_analyse_uses_cached_metadata(monkeypatch):
-    service = ImageService()
+    service = image_service()
 
     cached_metadata = {"File:FileType": "JPEG"}
     monkeypatch.setattr(
@@ -329,7 +329,7 @@ async def test_analyse_uses_cached_metadata(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_analyse_full_path_strips_noise_keys(monkeypatch):
-    service = ImageService()
+    service = image_service()
 
     media_id = "12345678-abcd-ef01-2345-6789abcdef01"
     media_record = {
@@ -457,7 +457,7 @@ async def test_analyse_full_path_strips_noise_keys(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pdf_service_ai_analysis(monkeypatch):
-    service = PDFService()
+    service = pdf_service()
 
     monkeypatch.setattr(
         service.ai_detector,

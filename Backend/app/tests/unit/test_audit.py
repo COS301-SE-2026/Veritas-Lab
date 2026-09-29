@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 from fastapi import HTTPException
 import asyncpg
+import json
 
 from app.api.main import app
 import app.api.routers.cases_router as cases_router
@@ -129,7 +130,7 @@ def test_get_case_audit_events_db_error(monkeypatch):
     response = client.get(f"/api/getAudit/caseID/{CASE_ID}")
 
     assert response.status_code == 500
-    data = response.json() == {
+    assert response.json() == {
         "detail": {
             "status": "error",
             "message": cases_router.DATABASE_ERROR_MESSAGE
@@ -153,14 +154,19 @@ def test_get_audited_cases_success(monkeypatch):
             "casename": "Flood in Westville",
             "eventcount": 5,
             "lasteventtimestamp": datetime(2024, 6, 2, 15, 30, tzinfo=timezone.utc),
-            "caseexists": True
+            "caseexists": True,
+            "events": json.dumps([
+                {"timestamp": "2024-06-01T12:00:00+00:00", "user": "investigator_user", "action": "Case Created"},
+                {"timestamp": "2024-06-02T15:30:00+00:00", "user": "admin_user", "action": "Evidence Added"}
+            ])
         },
         {
             "caseid": "87654321-dcba-10fe-5432-1098fedcba98",
             "casename": None,
             "eventcount": 3,
             "lasteventtimestamp": None,
-            "caseexists": False
+            "caseexists": False,
+            "events": "[]",
         }
     ]
 
@@ -183,12 +189,17 @@ def test_get_audited_cases_success(monkeypatch):
         "caseName": "Flood in Westville",
         "eventCount": 5,
         "lastEventTimestamp": "2024-06-02T15:30:00+00:00",
-        "caseExists": True
+        "caseExists": True,
+        "events": [
+            {"timestamp": "2024-06-01T12:00:00+00:00", "user": "investigator_user", "action": "Case Created"},
+            {"timestamp": "2024-06-02T15:30:00+00:00", "user": "admin_user", "action": "Evidence Added"}
+        ],
     }
 
     assert data["cases"][1]["caseName"] is None
     assert data["cases"][1]["lastEventTimestamp"] is None
     assert data["cases"][1]["caseExists"] is False
+    assert data["cases"][1]["events"] == []
 
     mock_connect.assert_called_once()
     mock_connection.fetch.assert_called_once()

@@ -4,7 +4,7 @@ import pytest
 
 from app.core.media_service import AnalysisFindings
 from app.core.pdf_service import (
-    PDFService,
+    pdf_service,
     FRAUD_MESSAGE,
     PDF_METADATA_CREATOR,
     PDF_METADATA_CREATORTOOL,
@@ -13,7 +13,7 @@ from app.core.pdf_service import (
 
 @pytest.fixture
 def service():
-    service = PDFService.__new__(PDFService)
+    service = pdf_service.__new__(pdf_service)
     service.ai_detector = MagicMock()
     return service
 

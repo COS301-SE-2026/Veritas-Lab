@@ -36,6 +36,8 @@ const workbenchCanvasProps: WorkbenchCanvasProps = {
     onSelectAnnotation: jest.fn(),
     onAddShape: jest.fn(),
     onAddNote: jest.fn(),
+    onAddHighlight: jest.fn(),
+    onResolveHighlight: jest.fn(),
 };
 
 function renderCanvas(overrides: Partial<WorkbenchCanvasProps> = {}) {
