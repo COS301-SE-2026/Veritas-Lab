@@ -1,0 +1,33 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- C:\School\3rd year\COS 301\CapStone\Veritas-Lab\Backend\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\School\3rd year\COS 301\CapStone\Veritas-Lab
+plugins: anyio-4.13.0, locust-2.46.4, asyncio-1.3.0, base-url-2.1.0, cov-7.1.0, playwright-0.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+nfr/security/test_qr07_passwords.py::test_a_every_stored_password_is_bcrypt_cost_12_or_more 
+[QR-07a] 4/4 stored passwords are bcrypt with cost >= 12
+PASSED
+nfr/security/test_qr07_passwords.py::test_b_no_response_exposes_a_password_or_hash 
+[QR-07b] 0 of 5 responses expose a password or hash: POST /register, POST /login, POST /fetchUsers (admin), POST /refreshToken, POST /changePassword
+PASSED
+nfr/security/test_qr07_passwords.py::test_c_no_credentials_or_tokens_in_urls 
+[QR-07c] 31 routes checked, URL parameters found: ['case_id', 'comment_id', 'media_id', 'user_id']
+PASSED
+nfr/security/test_qr07_passwords.py::test_d_jwt_cookie_is_httponly_and_secure 
+[QR-07d] register: JWT_token=<redacted>; HttpOnly; Max-Age=1800; Path=/; SameSite=none; Secure
+
+[QR-07d] login: JWT_token=<redacted>; HttpOnly; Max-Age=1800; Path=/; SameSite=none; Secure
+
+[QR-07d] refresh: JWT_token=<redacted>; HttpOnly; Max-Age=1800; Path=/; SameSite=none; Secure
+PASSED
+
+=================================== PASSES ====================================
+- generated xml file: C:\School\3rd year\COS 301\CapStone\Veritas-Lab\Docs\Demo_4\evidence\QR-07-junit.xml -
+=========================== short test summary info ===========================
+PASSED nfr/security/test_qr07_passwords.py::test_a_every_stored_password_is_bcrypt_cost_12_or_more
+PASSED nfr/security/test_qr07_passwords.py::test_b_no_response_exposes_a_password_or_hash
+PASSED nfr/security/test_qr07_passwords.py::test_c_no_credentials_or_tokens_in_urls
+PASSED nfr/security/test_qr07_passwords.py::test_d_jwt_cookie_is_httponly_and_secure
+============================== 4 passed in 3.22s ==============================

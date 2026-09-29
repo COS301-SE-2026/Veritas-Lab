@@ -1,0 +1,42 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- C:\School\3rd year\COS 301\CapStone\Veritas-Lab\Backend\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\School\3rd year\COS 301\CapStone\Veritas-Lab\Backend
+configfile: pytest.ini
+plugins: anyio-4.13.0, locust-2.46.4, asyncio-1.3.0, base-url-2.1.0, cov-7.1.0, playwright-0.8.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 55 items / 24 deselected / 31 selected
+
+app/tests/unit/test_bcrypt_helpers.py::test_hash_password_returns_string PASSED [  3%]
+app/tests/unit/test_bcrypt_helpers.py::test_hash_password_does_not_return_plain_password PASSED [  6%]
+app/tests/unit/test_bcrypt_helpers.py::test_hash_password_produces_different_hashes PASSED [  9%]
+app/tests/unit/test_bcrypt_helpers.py::test_verify_password_returns_true_for_correct_password PASSED [ 12%]
+app/tests/unit/test_bcrypt_helpers.py::test_verify_password_returns_false_for_incorrect_pssword PASSED [ 16%]
+app/tests/unit/test_login.py::test_successful_login PASSED               [ 19%]
+app/tests/unit/test_login.py::test_login_incorrect_password PASSED       [ 22%]
+app/tests/unit/test_login.py::test_login_user_does_not_exist PASSED      [ 25%]
+app/tests/unit/test_login.py::test_login_missing_password PASSED         [ 29%]
+app/tests/unit/test_login.py::test_login_incorrect_email PASSED          [ 32%]
+app/tests/unit/test_login.py::test_login_missing_email PASSED            [ 35%]
+app/tests/integration/test_int_auth.py::test_integration_user_login_success PASSED [ 38%]
+app/tests/integration/test_int_auth.py::test_integration_login_invalid_password_failure PASSED [ 41%]
+app/tests/integration/test_int_auth.py::test_integration_login_wrong_password_failure PASSED [ 45%]
+app/tests/integration/test_int_auth.py::test_integration_login_no_email_failure PASSED [ 48%]
+app/tests/integration/test_int_auth.py::test_integration_login_invalid_email_failure PASSED [ 51%]
+app/tests/integration/test_int_auth.py::test_integration_login_wrong_email_failure PASSED [ 54%]
+app/tests/integration/test_int_auth.py::test_integration_register_success PASSED [ 58%]
+app/tests/integration/test_int_auth.py::test_integration_register_sets_jwt_cookie PASSED [ 61%]
+app/tests/integration/test_int_auth.py::test_integration_register_invalid_email PASSED [ 64%]
+app/tests/integration/test_int_auth.py::test_integration_register_invalid_password PASSED [ 67%]
+app/tests/integration/test_int_auth.py::test_integration_register_blank_username PASSED [ 70%]
+app/tests/integration/test_int_auth.py::test_integration_register_duplicate_email PASSED [ 74%]
+app/tests/integration/test_int_auth.py::test_integration_register_duplicate_username PASSED [ 77%]
+app/tests/integration/test_int_auth.py::test_integration_register_persists_user PASSED [ 80%]
+app/tests/integration/test_int_auth.py::test_integration_change_password_success PASSED [ 83%]
+app/tests/integration/test_int_auth.py::test_integration_change_password_incorrect_current_password PASSED [ 87%]
+app/tests/integration/test_int_auth.py::test_integration_change_password_same_as_current PASSED [ 90%]
+app/tests/integration/test_int_auth.py::test_integration_change_password_invalid_new_password PASSED [ 93%]
+app/tests/integration/test_int_auth.py::test_integration_change_password_missing_fields PASSED [ 96%]
+app/tests/integration/test_int_auth.py::test_integration_change_password_no_auth PASSED [100%]
+
+===================== 31 passed, 24 deselected in 15.52s ======================
