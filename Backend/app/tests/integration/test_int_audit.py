@@ -196,10 +196,31 @@ async def test_evidence_removal_is_not_recorded(client, audit_context):
     assert "Evidence Added" not in result
 
 @pytest.mark.asyncio
-async def test_timeline_unknown_case_is_forbidden_for_non_admin(client, audit_context):
-    client.cookies.set(COOKIE_NAME, audit_context["investigator_token"])
-    response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
+async def test_timeline_unknown_case_is_forbidden_for_user(
+    client,
+    audit_context,
+    ensure_user_exists
+):
+    ctx = audit_context
 
+    user_id = str(uuid.uuid4())
+    username = f"Audit_User_{user_id[:8]}"
+
+    await ensure_user_exists(
+        ctx["conn"],
+        user_id,
+        "Audit_User",
+        "USER"
+    )
+
+    user_token = create_token({
+        "id": user_id,
+        "username": username,
+        "role": "USER"
+    })
+
+    client.cookies.set(COOKIE_NAME, user_token)
+    response = client.get(f"/api/getAudit/caseID/{uuid.uuid4()}")
     assert response.status_code == 403, response.text
 
 @pytest.mark.asyncio

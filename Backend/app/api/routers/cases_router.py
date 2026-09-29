@@ -32,6 +32,11 @@ from app.core.env import Postgres_Settings, Minio_Settings, Other_Settings, R2_S
 from app.core.cases import get_object
 from app.core.database import get_connection
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+analysis_semaphore = asyncio.Semaphore(1)
 
 postgres_settings = Postgres_Settings()
 other_settings = Other_Settings()
@@ -49,6 +54,12 @@ CASE_UPDATED_SUCCESS = "Case updated successfully."
 UPDATE_FIELDS_REQUIRED = "At least one of CaseName or CaseDescription must be provided"
 COMMENT_UPDATED_SUCCESS = "Comment edit successfully."
 
+async def run_media_pipeline(relay) -> None:
+    try:
+        async with analysis_semaphore:
+            await relay.relay_to_service()
+    except Exception:
+        logger.exception("Media pipeline failed")
 
 UPDATE_CASE_SQL = """
     UPDATE "Cases_DB"."Cases"
@@ -1311,7 +1322,7 @@ async def upload_evidence(
         media_id = UUID(result["MediaId"])
 
         relay = media_relay(media_id=media_id, extension=extension)
-        asyncio.create_task(relay.relay_to_service())
+        asyncio.create_task(run_media_pipeline(relay))
 
         return {
             "status": "success",
@@ -2931,12 +2942,11 @@ async def get_case_audit_events(
     payload = await verify_jwt(request, connection)
 
     validated_case_id = Case(case_id=case_id).case_id
-
+    role = payload.get("role")
     username = payload.get("username")
-    is_admin = payload.get("role") == "ADMIN"
 
     try:
-        if not is_admin:
+        if role not in ["ADMIN", "INVESTIGATOR"]:
             ownership = await connection.fetchrow(
                 """
                 SELECT
@@ -2956,7 +2966,7 @@ async def get_case_audit_events(
                 validated_case_id
             )
 
-            if username not in (ownership["casecreator"], ownership["caseassigned"]):
+            if ownership is None or username != ownership["casecreator"]:
                 raise HTTPException(
                     status_code=403,
                     detail={
@@ -2964,6 +2974,23 @@ async def get_case_audit_events(
                         "message": AUDIT_NOT_ALLOWED
                     }
                 )
+
+            if username != ownership["casecreator"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "status": "error",
+                        "message": AUDIT_NOT_ALLOWED
+                    }
+                )
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": AUDIT_NOT_ALLOWED
+                }
+            )
 
         rows = await connection.fetch(
             """
