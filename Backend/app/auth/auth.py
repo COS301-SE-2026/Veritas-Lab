@@ -340,6 +340,20 @@ async def search_users_via_username(username: str, connection: asyncpg.Connectio
         "password": row["userpassword"]
     }
 
+# Checks in a single query if an email or username is already registered.
+async def user_exists_via_email_or_username(email: str, username: str, connection: asyncpg.Connection) -> bool:
+    row = await connection.fetchrow(
+            """
+            SELECT 1
+            FROM "Users_DB"."Users"
+            WHERE useremail = $1 OR username = $2
+            LIMIT 1
+            """,
+            email, username
+        )
+
+    return row is not None
+
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
 async def delete_user_by_id(user_id: str, connection: asyncpg.Connection) -> bool:
@@ -483,16 +497,15 @@ async def login(
 
     user = await search_users_via_email(request.email.strip(), connection)
 
+    # Always do one bcrypt operation, whether or not the account exists, so the response time
+    # does not reveal if the email is registered. hash_password costs the same as verify_password.
     if user is None:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "status": "error",
-                "message": AMBIGUOUS_ERROR
-            }
-        )
-    
-    if not verify_password(request.password, user["password"]):
+        hash_password(request.password)
+        password_valid = False
+    else:
+        password_valid = verify_password(request.password, user["password"])
+
+    if not password_valid:
         raise HTTPException(
             status_code=401,
             detail={
@@ -646,29 +659,23 @@ async def register(
             }
         )
 
-    existing_user = await search_users_via_email(request.email.strip(), connection)
-
-    if existing_user is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "status": "error",
-                "message": AMBIGUOUS_ERROR
-            }
-        )
-    
-    existing_username = await search_users_via_username(request.username.strip(), connection)
-    
-    if existing_username is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "status": "error",
-                "message": AMBIGUOUS_ERROR
-            }
-        )
-
+    # Removed the time difference and made the search one request.
     hashed_password = hash_password(request.password)
+    user_exists = await user_exists_via_email_or_username(
+        request.email.strip(),
+        request.username.strip(),
+        connection
+    )
+
+    if user_exists:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "status": "error",
+                "message": AMBIGUOUS_ERROR
+            }
+        )
+
     new_user = await insert_user(
         request.email.strip(), 
         request.username.strip(), 
