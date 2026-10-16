@@ -63,7 +63,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
         if (!mediaUrl) {
             throw new Error('Media URL is undefined');
         }
-        const res = await fetch(mediaUrl);
+        const res = await fetch(mediaUrl, { cache: 'no-store' , mode: 'cors' });
 
         if (!res.ok) {
             throw new Error(`Failed to load evidence file: ${res.status}`);
