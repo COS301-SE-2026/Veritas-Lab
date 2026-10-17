@@ -127,6 +127,11 @@ async def verify_jwt(request: Request, connection: asyncpg.Connection) -> dict:
             }
         )
 
+    return await verify_claims_against_db(payload, connection)
+
+# Checks a decoded token's claims against the Users table. Shared by verify_jwt and the refresh endpoint,
+# so a refresh can never mint a new token for a user that was deleted, renamed, had its role changed, or whose token was revoked
+async def verify_claims_against_db(payload: dict, connection: asyncpg.Connection) -> dict:
     user_id = payload.get("sub")
     username = payload.get("username")
     role = payload.get("role")
@@ -1486,7 +1491,7 @@ async def change_password(
     }
 
 @router.post(
-    "/refreshToken",
+    "/refresh",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Refresh JWT Token",
@@ -1576,6 +1581,17 @@ async def change_password(
                                 "detail": {
                                     "status": "error",
                                     "message": "Token missing required fields"
+                                }
+                            }
+                        },
+
+                        "ClaimsMismatch": {
+                            "summary": "Token claims do not match the database",
+                            "description": "Triggered when the user no longer exists, the username or role in the JWT differs from the stored user, or the token was revoked by a newer login or refresh.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
                                 }
                             }
                         }
@@ -1670,18 +1686,6 @@ async def refresh_token(
             }
         )
 
-    current_time = datetime.now(timezone.utc).timestamp()
-    seconds_until_expiry = expiry - current_time
-
-    refresh_window = (auth_settings.TOKEN_EXPIRE * 60) / 2 # Refresh if less than half the token's lifespan remains. We could shorten it if needed
-    
-    if seconds_until_expiry > refresh_window:
-        return {
-            "status": "success",
-            "message": "Token does not need refreshing"
-        }
-        
-    
     if "sub" not in payload or "username" not in payload or "role" not in payload:
         raise HTTPException(
             status_code=401,
@@ -1690,11 +1694,26 @@ async def refresh_token(
                 "message": "Token missing required fields"
             }
         )
-    
+
+    # The claims must match the stored user before anything else, so a revoked or stale token never gets a 200
+    claims = await verify_claims_against_db(payload, connection)
+
+    current_time = datetime.now(timezone.utc).timestamp()
+    seconds_until_expiry = expiry - current_time
+
+    refresh_window = (auth_settings.TOKEN_EXPIRE * 60) / 2 # Refresh if less than half the token's lifespan remains. We could shorten it if needed
+
+    if seconds_until_expiry > refresh_window:
+        return {
+            "status": "success",
+            "message": "Token does not need refreshing"
+        }
+
+    # Build the new token from the DB-verified values, not the incoming payload
     user = {
-        "id":payload["sub"],
-        "username": payload["username"],
-        "role": payload["role"]
+        "id": claims["sub"],
+        "username": claims["username"],
+        "role": claims["role"]
     }
 
     new_token = create_token(user)
