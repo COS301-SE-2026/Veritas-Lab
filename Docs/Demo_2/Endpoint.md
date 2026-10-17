@@ -242,7 +242,7 @@ status code: 403
 
 ----
 ### EP6: Refresh token
-Endpoint: /api/refreshToken
+Endpoint: /api/refresh
 
 #### Request Headers
 	 No paramters
@@ -278,6 +278,7 @@ status code: 401
 #### Possible Error Response Codes
 
 - 401- When the user is not authenticated
+- 401 - "Invalid token" when the token's claims no longer match the stored user (user deleted, username or role changed) or the token was revoked by a newer login or refresh
 - 500 - Returned when an Unknown server error occurs or database error
 
 ---
