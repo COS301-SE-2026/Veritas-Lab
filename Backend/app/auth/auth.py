@@ -195,9 +195,11 @@ async def verify_claims_against_db(payload: dict, connection: asyncpg.Connection
 # A token issued before the user's latest login/refresh (userjwtissued) is revoked, but only once
 # TOKEN_REVOCATION_GRACE has passed since that newer token, so requests already in flight during a refresh still succeed.
 # TOKEN_ISSUE_LEEWAY covers exp being truncated to whole seconds and userjwtissued being set just after the token is made.
+# A NULL userjwtissued means the user has no active session (logout blanks it; login, register and refresh set it),
+# so every token is revoked, immediately and without the grace period.
 def is_token_revoked(expiry: int | float, last_issued: datetime | None) -> bool:
     if last_issued is None:
-        return False
+        return True
 
     token_issued = datetime.fromtimestamp(expiry, tz=timezone.utc) - timedelta(minutes=auth_settings.TOKEN_EXPIRE)
 
@@ -300,6 +302,17 @@ async def update_user_jwt_issued_via_user(user: dict, connection: asyncpg.Connec
             WHERE userid = $1
             """,
             user["id"]
+        )
+
+# Blanks userjwtissued so verify_jwt and refresh reject every token the user holds (used by logout)
+async def clear_user_jwt_issued(user_id: str, connection: asyncpg.Connection):
+    await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userjwtissued = NULL
+            WHERE userid = $1::uuid
+            """,
+            user_id
         )
 
 # Once the envs are setup this will need to be updated
@@ -1741,4 +1754,131 @@ async def refresh_token(
     return {
         "status":"success",
         "message": "Token refreshed"
+    }
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Log out",
+    description="Blanks the user's token issue time so every JWT the user holds, including expired ones, can no longer be used or refreshed, and clears the authentication cookie. Expired tokens are accepted so an expired session can still be ended.",
+    responses={
+        200: {
+            "description": "User logged out",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Logged out successfully"
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Token authentication or validation failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "NotAuthenticated": {
+                            "summary": "Not authenticated",
+                            "description": "Triggered when the authentication cookie is missing or empty.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when the JWT cannot be decoded, its claims do not match the database, or it was already revoked (for example by a previous logout).",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Failed to log out",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Failed to log out"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def logout(
+    request: Request,
+    response: Response,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    token = request.cookies.get(COOKIE_NAME)
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": NOT_AUTH
+            }
+        )
+
+    # An expired token can still log out, because refresh would otherwise keep renewing it
+    try:
+        payload = jwt.decode(
+            token,
+            auth_settings.JWT_SECRET,
+            algorithms=[auth_settings.HASH],
+            options={"verify_exp": False}
+        )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    # Only a token that still matches the database may log the user out, so an old or stale
+    # token cannot be used to sign someone out of their current session
+    claims = await verify_claims_against_db(payload, connection)
+
+    try:
+        await clear_user_jwt_issued(claims["sub"], connection)
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": "Failed to log out"
+            }
+        )
+
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        httponly=True,
+        secure=True,
+        samesite="none"
+    )
+
+    return {
+        "status": "success",
+        "message": "Logged out successfully"
     }
