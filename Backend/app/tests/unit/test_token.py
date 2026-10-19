@@ -40,7 +40,7 @@ def stored_user(**overrides) -> dict:
         "userid": uuid.UUID(USER_ID),
         "username": "test_user",
         "userrole": "INVESTIGATOR",
-        "userjwtissued": None
+        "userjwtissued": datetime.now(timezone.utc)
     }
     return {**row, **overrides}
 
@@ -312,3 +312,64 @@ def test_refresh_token_revoked_even_when_no_refresh_needed(monkeypatch):
     response = make_client("revoked-fresh-token").post(REFRESH_URL)
 
     assert_invalid_token(response)
+
+def test_logout_missing_cookie():
+    response = make_client().post("/api/logout")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Not authenticated"
+        }
+    }
+
+def test_logout_invalid_jwt(monkeypatch):
+    monkeypatch.setattr(
+        auth.jwt,
+        "decode",
+        lambda *args, **kwargs: (_ for _ in ()).throw(auth.JWTError())
+    )
+
+    response = make_client("invalid-token").post("/api/logout")
+
+    assert_invalid_token(response)
+
+def test_logout_success(monkeypatch):
+    payload = token_payload(timedelta(minutes=5))
+    mock_decode_returning(monkeypatch, payload)
+    use_stored_user(monkeypatch, stored_user())
+    clear_session = AsyncMock()
+    monkeypatch.setattr(auth, "clear_user_jwt_issued", clear_session)
+
+    response = make_client("valid-token").post("/api/logout")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Logged out successfully"
+    }
+    delete_cookie = response.headers["set-cookie"]
+    assert delete_cookie.startswith(f"{COOKIE_NAME}=")
+    assert "Max-Age=0" in delete_cookie
+    clear_session.assert_awaited_once()
+    assert clear_session.await_args.args[0] == USER_ID
+
+def test_logout_clear_session_failure(monkeypatch):
+    mock_decode_returning(monkeypatch, token_payload(timedelta(minutes=5)))
+    use_stored_user(monkeypatch, stored_user())
+    monkeypatch.setattr(
+        auth,
+        "clear_user_jwt_issued",
+        AsyncMock(side_effect=Exception("Database error"))
+    )
+
+    response = make_client("valid-token").post("/api/logout")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": {
+            "status": "error",
+            "message": "Failed to log out"
+        }
+    }

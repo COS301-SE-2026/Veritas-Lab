@@ -48,7 +48,7 @@ def stored_user(**overrides) -> dict:
         "userid": uuid.UUID(USER_ID),
         "username": "byron",
         "userrole": "ADMIN",
-        "userjwtissued": None
+        "userjwtissued": datetime.now(timezone.utc)
     }
     return {**row, **overrides}
 
