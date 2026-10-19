@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.auth.auth import router as auth_router
+from app.auth.auth import limiter, router as auth_router
 from app.api.routers.cases_router import router as cases_router
 from app.core.env import Postgres_Settings,Other_Settings
 from app.core.media_relay import get_service
 from contextlib import asynccontextmanager
 import asyncpg
 import torch
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 torch.set_num_threads(2)
 torch.set_num_interop_threads(1)
@@ -49,6 +51,8 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 allowed_origins = [
@@ -78,6 +82,4 @@ def root():
         "status":"success",
         "message":"The API is running..."
     }
-
-
 

@@ -2,13 +2,14 @@ import uuid
 import asyncpg
 import pytest
 import pytest_asyncio
-from app.core.env import Postgres_Settings
+from app.core.env import Postgres_Settings, User_Settings
 from fastapi.testclient import TestClient
 from app.api.main import app
 from app.auth.auth import create_token
 import json
 
 POSTGRES_SETTINGS = Postgres_Settings()
+USER_SETTINGS = User_Settings()
 
 async def get_connection() -> asyncpg.Connection:
     conn = await asyncpg.connect(
@@ -20,6 +21,26 @@ async def get_connection() -> asyncpg.Connection:
         ssl="require" if POSTGRES_SETTINGS.DB_SSL else None,
     )
     return conn
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def activate_baseline_test_users():
+    connection = await get_connection()
+    try:
+        await connection.execute(
+            '''
+            UPDATE "Users_DB"."Users"
+            SET UserJWTIssued = NOW()
+            WHERE UserEmail = ANY($1::text[])
+            ''',
+            [
+                USER_SETTINGS.ADMIN_EMAIL,
+                USER_SETTINGS.E2E_USER_EMAIL,
+                USER_SETTINGS.E2E_INVESTIGATOR_EMAIL,
+            ]
+        )
+    finally:
+        await connection.close()
 
 @pytest_asyncio.fixture
 async def ensure_user_exists():
@@ -47,6 +68,14 @@ async def ensure_user_exists():
             unique_username,
             role,
             "audit-test-password"
+        )
+        await conn.execute(
+            '''
+            UPDATE "Users_DB"."Users"
+            SET UserJWTIssued = NOW()
+            WHERE UserId = $1
+            ''',
+            uuid.UUID(user_id)
         )
         created_users.append(user_id)
 

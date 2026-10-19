@@ -1373,6 +1373,43 @@ async def test_integration_refresh_token_no_auth(client):
     }
 
 @pytest.mark.asyncio
+async def test_integration_logout_clears_session_and_cookie(client):
+    user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+    token = create_token(user)
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE_NAME, token)
+
+    response = client.post("/api/logout")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Logged out successfully"
+    }
+    delete_cookie = response.headers["set-cookie"]
+    assert delete_cookie.startswith(f"{COOKIE_NAME}=")
+    assert "Max-Age=0" in delete_cookie
+
+    connection = await get_connection()
+    try:
+        issued_at = await connection.fetchval(
+            '''
+            SELECT userjwtissued
+            FROM "Users_DB"."Users"
+            WHERE userid = $1
+            ''',
+            ADMIN_USER["userid"]
+        )
+        assert issued_at is None
+    finally:
+        await connection.close()
+
+@pytest.mark.asyncio
 async def test_integration_refresh_token_invalid_token(client):
     client.cookies.clear()
     client.cookies.set(

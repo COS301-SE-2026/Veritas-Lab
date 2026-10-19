@@ -12,6 +12,8 @@ from typing import Annotated
 from app.core.env import Auth_Settings
 from app.core.database import get_connection
 from fastapi.security import APIKeyCookie
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 COOKIE_NAME = "JWT_token"
 SYSTEM_INIT_UUID = uuidlib.UUID("00000000-0000-0000-0000-000000000000")
@@ -22,6 +24,7 @@ DATABASE_ERROR="Database error"
 EXPIRED_TOKEN = "Token has expired"
 TOKEN_ISSUE_LEEWAY = timedelta(seconds=5)
 TOKEN_REVOCATION_GRACE = timedelta(seconds=30)
+limiter = Limiter(key_func=get_remote_address)
 
 INVALID_TOKEN_401 = {
             "description": "Authentication failed",
@@ -490,12 +493,14 @@ def create_token(user: dict) ->str:
     }
 
 )
+@limiter.limit("10/minute")
 async def login(
-    request: login_request,
+    payload: login_request,
     response: Response,
+    request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    if not validate_email(request.email):
+    if not validate_email(payload.email):
         raise HTTPException(
             status_code=400,
             detail={
@@ -504,7 +509,7 @@ async def login(
             }
         )
 
-    if not validate_password(request.password):
+    if not validate_password(payload.password):
         raise HTTPException(
             status_code=400,
             detail={
@@ -513,15 +518,15 @@ async def login(
             }
         )
 
-    user = await search_users_via_email(request.email.strip(), connection)
+    user = await search_users_via_email(payload.email.strip(), connection)
 
     # Always do one bcrypt operation, whether or not the account exists, so the response time
     # does not reveal if the email is registered. hash_password costs the same as verify_password.
     if user is None:
-        hash_password(request.password)
+        hash_password(payload.password)
         password_valid = False
     else:
-        password_valid = verify_password(request.password, user["password"])
+        password_valid = verify_password(payload.password, user["password"])
 
     if not password_valid:
         raise HTTPException(
@@ -645,12 +650,14 @@ async def login(
         }
     }
 )
+@limiter.limit("10/hour")
 async def register(
-    request: register_request,
+    payload: register_request,
     response: Response,
+    request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    if not validate_email(request.email):
+    if not validate_email(payload.email):
         raise HTTPException(
             status_code=400,
             detail={
@@ -659,7 +666,7 @@ async def register(
             }
         )
 
-    if not validate_password(request.password):
+    if not validate_password(payload.password):
         raise HTTPException(
             status_code=400,
             detail={
@@ -668,7 +675,7 @@ async def register(
             }
         )
 
-    if not request.username or not request.username.strip():
+    if not payload.username or not payload.username.strip():
         raise HTTPException(
             status_code=400,
             detail={
@@ -678,10 +685,10 @@ async def register(
         )
 
     # Removed the time difference and made the search one request.
-    hashed_password = hash_password(request.password)
+    hashed_password = hash_password(payload.password)
     user_exists = await user_exists_via_email_or_username(
-        request.email.strip(),
-        request.username.strip(),
+        payload.email.strip(),
+        payload.username.strip(),
         connection
     )
 
@@ -695,9 +702,9 @@ async def register(
         )
 
     new_user = await insert_user(
-        request.email.strip(), 
-        request.username.strip(), 
-        "USER", 
+        payload.email.strip(),
+        payload.username.strip(),
+        "USER",
         hashed_password,
         connection
     )
@@ -1628,6 +1635,7 @@ async def change_password(
         }
     }
 )
+@limiter.limit("30/minute")
 async def refresh_token(
     request: Request,
     response: Response,
@@ -1822,6 +1830,7 @@ async def refresh_token(
         }
     }
 )
+@limiter.limit("10/minute")
 async def logout(
     request: Request,
     response: Response,
