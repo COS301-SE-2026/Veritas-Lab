@@ -31,6 +31,7 @@ CASE_DELETE_NOT_ALLOWED = "Only the creator of an open case or an admin can dele
 STORAGE_DELETE_FAILED_PREFIX = "Failed to delete stored object "
 
 FILE_TOO_LARGE = "File exceeds the maximum allowed size of 50MB"
+FILE_TYPE_MISMATCH = "File content does not match its extension"
  
 MAX_UPLOAD_SIZE_BYTES = 50 * 1048576  # 50MB this is later going to be a env
 # 1MB = 1024 times 1024
@@ -143,7 +144,55 @@ async def read_upload_with_size_limit(media: UploadFile) -> bytes:
         chunks.append(chunk)
  
     return b"".join(chunks)
- 
+
+EXTENSION_CONTENT_TYPES = {
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".pdf": {"application/pdf"},
+    ".mp4": {"video/mp4"},
+}
+
+# Works out the real content type of a file from its first bytes. Returns None if it is not a known type.
+def detect_content_type(file_bytes: bytes) -> str | None:
+    head = file_bytes[:16]
+
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"%PDF-"):
+        return "application/pdf"
+    if head[4:8] == b"ftyp":
+        return "video/mp4"
+
+    return None
+
+def validate_upload_content(extension: str, file_bytes: bytes) -> str:
+    allowed_types = EXTENSION_CONTENT_TYPES.get(extension)
+
+    if allowed_types is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{extension}"
+            }
+        )
+
+    detected_type = detect_content_type(file_bytes)
+
+    if detected_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": FILE_TYPE_MISMATCH
+            }
+        )
+
+    return detected_type
+
 
 # pdf script detection helper
 def pdf_script_helper(file_bytes):
@@ -197,6 +246,11 @@ def pdf_script_helper(file_bytes):
             }
         )
                    
+
+# Runs the script check for uploads that need one. Only PDFs are checked for now.
+def check_upload_for_scripts(extension: str, file_bytes: bytes):
+    if extension == ".pdf":
+        pdf_script_helper(file_bytes)
 
 async def collect_orphan_media(connection: asyncpg.Connection, evidence) -> list[dict]:
     """
@@ -374,9 +428,10 @@ class Case:
         #Cannot trust the supplied extension ever
         file_bytes = await read_upload_with_size_limit(media) # Cannot trust supplied file size.
         await media.seek(0)
+        # The type comes from the file's own bytes, never from the extension or the client's Content-Type header
+        content_type = validate_upload_content(local_extension, file_bytes)
         #script detection
-        if local_extension == ".pdf":
-            pdf_script_helper(file_bytes)
+        check_upload_for_scripts(local_extension, file_bytes)
             
         # It is impossible for case id to be an invalid uuid since it is typed to UUID
 
@@ -465,7 +520,8 @@ class Case:
                         Bucket=bucket_name,
                         Key=target_filename,
                         Body=file_stream,
-                        ContentType=media.content_type
+                        ContentType=content_type,
+                        ContentDisposition="attachment"
                     )
 
                     await connection.execute(
@@ -489,7 +545,9 @@ class Case:
                 'get_object',
                 Params={
                     'Bucket': bucket_name,
-                    'Key': target_filename
+                    'Key': target_filename,
+                    'ResponseContentType': content_type,
+                    'ResponseContentDisposition': 'attachment'
                 },
                 ExpiresIn=3600 
             )
@@ -861,5 +919,3 @@ class Case:
                     "message": DATABASE_ERROR_MESSAGE
                 }
             )
-
-
