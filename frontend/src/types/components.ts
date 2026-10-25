@@ -222,6 +222,8 @@ export type SavedNoteNode = {
     author?: string;
 }
 
+export type CaseEdgeVariant = 'timeline' | 'conflict' | 'device';
+
 export type SavedEdge = {
     id: string;
     source: string;
@@ -229,7 +231,7 @@ export type SavedEdge = {
     label?: string;
     sourceHandle?: string | null;
     targetHandle?: string | null;
-    variant?: 'timeline';
+    variant?: CaseEdgeVariant;
 }
 
 export type CaseBoard = {

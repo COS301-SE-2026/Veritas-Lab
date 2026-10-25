@@ -10,7 +10,7 @@ import ReportPanel from '@/components/common/reportPanel';
 import { resolveMediaKind } from '@/lib/media';
 import SliderBar from '@/components/ui/sliderBar'
 import { NoteNodeData } from '@/components/common/noteNode';
-import { getCapturedAt } from '@/lib/data/captureTime';
+import { getEvidenceFacts, hasBoardFacts } from '@/lib/data/evidenceMetadata';
 import { generateBoard, toEvidenceNode, evidenceNodeId  } from '@/lib/data/boardGenerator';
 import type { CaseBoard, SavedEdge } from '@/types/components';
 import { CaseEdgeData } from "./customEdge";
@@ -220,11 +220,12 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
         ]);    
     }
 
-    // Gets the timestamp for each evidance
-    const capturedAt = useMemo(() => 
-        evidenceList.map((e) => 
-            getCapturedAt(e.reportArtifacts)
-    ), [evidenceList]);
+    // Reads time, location, device and editing info from each evidence's metadata
+    const evidenceFacts = useMemo(() =>
+        evidenceList.map((e) => getEvidenceFacts(e.reportArtifacts)),
+    [evidenceList]);
+
+    const capturedAt = useMemo(() => evidenceFacts.map((facts) => facts.capturedAt), [evidenceFacts]);
 
     const groupedEvidence = useMemo(() => {
         const placedIds = new Set (nodes.filter((node) => node.type === 'evidence').map((node) => node.id))
@@ -245,7 +246,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
 
     // Generates the case board automatically
     const generate = () => {
-        const board = generateBoard(evidenceList, capturedAt);
+        const board = generateBoard(evidenceList, evidenceFacts);
         setNodes(board.nodes);
         setEdges(board.edges);
         setTimeout(() => fitView({ padding: 0.1, duration: 500 }), 50);
@@ -297,7 +298,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
                         onConnect={onConnect}
                         onAddNote={onAddNote}
                         onGenerate={generate}
-                        canGenerate={capturedAt.some((time) => time != null)}
+                        canGenerate={evidenceFacts.some(hasBoardFacts)}
                         fullscreen={fullscreen}
                         onToggleFullscreen={() => setFullscreen((val) => !val)}
                         onSave={readOnly ? undefined : () => void save()}
