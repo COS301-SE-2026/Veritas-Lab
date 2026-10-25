@@ -71,6 +71,7 @@ def test_successful_login(monkeypatch):
 
     assert auth.COOKIE_NAME in response.cookies
     assert response.cookies.get(auth.COOKIE_NAME) == "mockedJWTToken"
+    assert "SameSite=Lax" in response.headers["set-cookie"]
 
 def test_login_incorrect_password(monkeypatch):
     client.cookies.clear()

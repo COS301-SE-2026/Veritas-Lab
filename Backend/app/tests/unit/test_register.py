@@ -68,6 +68,7 @@ def test_successful_registration(monkeypatch):
 
     assert auth.COOKIE_NAME in response.cookies
     assert response.cookies.get(auth.COOKIE_NAME) == "mockedJWTToken"
+    assert "SameSite=Lax" in response.headers["set-cookie"]
 
 
 def test_invalid_email_returns_400():
