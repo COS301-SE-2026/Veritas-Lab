@@ -87,13 +87,9 @@ Demo 4
 |-----------|-------------|------|
 | Frontend | Next.js with React | <img src="https://skillicons.dev/icons?i=next,react"/> |
 | Backend | Python, FastAPI | <img src="https://skillicons.dev/icons?i=py,fastapi"/> |
-| Search | OpenSearch |  |
 | Database | PostgreSQL | <img src="https://skillicons.dev/icons?i=postgresql"/> |
-| Storage | AWS S3 | <img src="https://skillicons.dev/icons?i=aws"/> |
+| Storage | Cloudflare R2 | |
 | Machine Learning & Computer Vision | Pytorch, OpenCV, Hugging Face | <img src="https://skillicons.dev/icons?i=pytorch,opencv"/> |
-| Caching | Redis | <img src="https://skillicons.dev/icons?i=redis"/> |
-| Queue | Celery | |
-| Authentication | Json Web Token |  |
 | Deployment | AWS,Docker,GitHubActions | <img src="https://skillicons.dev/icons?i=aws,docker,githubactions"/> |
 | Testing and Version Control | PyTest, Jest, Playwright, Github | <img src="https://skillicons.dev/icons?i=jest,github,git"/> |
 
