@@ -10,11 +10,12 @@ import ReportPanel from '@/components/common/reportPanel';
 import { resolveMediaKind } from '@/lib/media';
 import SliderBar from '@/components/ui/sliderBar'
 import { NoteNodeData } from '@/components/common/noteNode';
-import { getCapturedAt } from '@/lib/data/captureTime';
+import { getEvidenceFacts, hasBoardFacts } from '@/lib/data/evidenceMetadata';
 import { generateBoard, toEvidenceNode, evidenceNodeId  } from '@/lib/data/boardGenerator';
 import type { CaseBoard, SavedEdge } from '@/types/components';
 import { CaseEdgeData } from "./customEdge";
 import { getCaseBoard, saveCaseBoard } from '@/lib/api/caseBoard';
+import { useCurrentUser } from '@/context/UserRoleContext';
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
@@ -31,13 +32,17 @@ function formatBoard(nodes: Node[], edges: Edge[]): CaseBoard {
             position: { x: node.position.x, y: node.position.y }
         }));
 
-    const noteNodes = nodes
+        const noteNodes = nodes
         .filter((node) => node.type === 'note')
-        .map((node) => ({
-            id: node.id,
-            position: { x: node.position.x, y: node.position.y },
-            text: (node.data as NoteNodeData).text ?? ''
-        }));
+        .map((node) => {
+            const data = node.data as NoteNodeData;
+            return {
+                id: node.id,
+                position: { x: node.position.x, y: node.position.y },
+                text: data.text ?? '',
+                ...(data.author ? { author: data.author } : {})
+            };
+        });
     
     const savedEdges: SavedEdge[] = edges.map((edge) => {
         const data = edge.data as CaseEdgeData | undefined;
@@ -77,7 +82,7 @@ function extractBoard(board: CaseBoard | null | undefined, evidenceList: CaseEvi
         id: saved.id,
         type: 'note',
         position: saved.position,
-        data: { text: saved.text }
+        data: { text: saved.text, author: saved.author }
     }));
 
     const nodes = [...evidenceNodes, ...noteNodes];
@@ -113,6 +118,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
     const { screenToFlowPosition, fitView } = useReactFlow();
     const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
     const noteCount = useRef(0);
+    const currentUser = useCurrentUser();
     const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
     const [fullscreen, setFullscreen] = useState(false);
     const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -206,7 +212,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
             id: `note-${Date.now()}-${noteCount.current++}`,
             type: 'note',
             position: { x: position.x - 112, y: position.y - 112 },
-            data: { text: '' }
+            data: { text: '', ...(currentUser?.username ? { author: currentUser.username } : {}) }
         }
         setNodes((prevNodes) => [
             ...prevNodes,
@@ -214,11 +220,12 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
         ]);    
     }
 
-    // Gets the timestamp for each evidance
-    const capturedAt = useMemo(() => 
-        evidenceList.map((e) => 
-            getCapturedAt(e.reportArtifacts)
-    ), [evidenceList]);
+    // Reads time, location, device and editing info from each evidence's metadata
+    const evidenceFacts = useMemo(() =>
+        evidenceList.map((e) => getEvidenceFacts(e.reportArtifacts)),
+    [evidenceList]);
+
+    const capturedAt = useMemo(() => evidenceFacts.map((facts) => facts.capturedAt), [evidenceFacts]);
 
     const groupedEvidence = useMemo(() => {
         const placedIds = new Set (nodes.filter((node) => node.type === 'evidence').map((node) => node.id))
@@ -239,7 +246,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
 
     // Generates the case board automatically
     const generate = () => {
-        const board = generateBoard(evidenceList, capturedAt);
+        const board = generateBoard(evidenceList, evidenceFacts);
         setNodes(board.nodes);
         setEdges(board.edges);
         setTimeout(() => fitView({ padding: 0.1, duration: 500 }), 50);
@@ -291,7 +298,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
                         onConnect={onConnect}
                         onAddNote={onAddNote}
                         onGenerate={generate}
-                        canGenerate={capturedAt.some((time) => time != null)}
+                        canGenerate={evidenceFacts.some(hasBoardFacts)}
                         fullscreen={fullscreen}
                         onToggleFullscreen={() => setFullscreen((val) => !val)}
                         onSave={readOnly ? undefined : () => void save()}

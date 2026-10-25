@@ -19,3 +19,14 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
     return data as LoginResponse;
 }
+
+export async function logout(): Promise<void> {
+    const res = await fetch(`/api/logout`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+
+    if (!res.ok) {
+        throw new Error('Unexpected error, logout failed');
+    }
+}

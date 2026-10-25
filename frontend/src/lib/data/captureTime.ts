@@ -22,7 +22,7 @@ function pick(meta: Record<string, unknown>, keys: string[]): [string, string] |
     return undefined;
 }
 
-const dates = ['subsecdatetimeoriginal', 'datetimeoriginal', 'createdate', 'mediacreatedate', 'creationdate'];
+const dates = ['subsecdatetimeoriginal', 'datetimeoriginal', 'createdate', 'mediacreatedate', 'creationdate', 'gpsdatetime'];
 const offsets = ['offsettimeoriginal', 'offsettime'];
 const zone = /(Z|[+-]\d{2}:?\d{2})$/i;
 

@@ -3,8 +3,9 @@ import { getCertaintyMeta } from '@/lib/report';
 import { useRouter, useParams } from 'next/navigation';
 import EvidenceThumbnail from '@/components/common/evidenceThumbnail';
 import { getMediaKind } from '@/lib/media';
-import { PenLine, X } from 'lucide-react';
+import { PenLine, X, Clock, MapPin, Smartphone, TriangleAlert } from 'lucide-react';
 import Pin from '@/components/common/boardPin'
+import { format } from 'date-fns';
 
 export type EvidenceNodeData = {
     mediaId: string;
@@ -13,6 +14,11 @@ export type EvidenceNodeData = {
     mediaExtension: string;
     reportCertainty: number | null;
     annotationCount: number;
+    capturedAt?: number | null;
+    device?: string | null;
+    location?: string | null;
+    locationTitle?: string | null;
+    editNote?: string | null;
 }
 
 
@@ -50,6 +56,34 @@ export default function EvidenceNode({ id, data, selected }: NodeProps<Node<Evid
                         width={294}
                     />
                 </div>
+                {(data.capturedAt != null || data.location || data.device || data.editNote) && (
+                    <div className="mt-2 flex flex-col gap-1 text-[11px] text-(--color-text-muted)">
+                        {data.capturedAt != null && (
+                            <div className="flex min-w-0 items-center gap-1.5" title={new Date(data.capturedAt).toISOString()}>
+                                <Clock size={11} className="shrink-0" />
+                                <span className="truncate">{format(data.capturedAt, 'd MMM yyyy, HH:mm:ss')}</span>
+                            </div>
+                        )}
+                        {data.location && (
+                            <div className="flex min-w-0 items-center gap-1.5" title={data.locationTitle ?? data.location}>
+                                <MapPin size={11} className="shrink-0" />
+                                <span className="truncate">{data.location}</span>
+                            </div>
+                        )}
+                        {data.device && (
+                            <div className="flex min-w-0 items-center gap-1.5" title={data.device}>
+                                <Smartphone size={11} className="shrink-0" />
+                                <span className="truncate">{data.device}</span>
+                            </div>
+                        )}
+                        {data.editNote && (
+                            <div className="flex min-w-0 items-center gap-1.5 text-[#b45309]" title={data.editNote}>
+                                <TriangleAlert size={11} className="shrink-0" />
+                                <span className="truncate">{data.editNote}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
                 <div className="flex items-center gap-3 py-1.5 text-[11px] text-(--color-text-muted)">
                     <div className="flex min-w-0 items-center gap-1.5">
                         <div className="vl-dot shrink-0" style={{ color: certainty.colorVar }} />

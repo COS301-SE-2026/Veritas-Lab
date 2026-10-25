@@ -1282,7 +1282,7 @@ async def test_integration_refresh_token_not_needed(client):
         token
     )
 
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -1311,7 +1311,7 @@ async def test_integration_refresh_token_near_expiry(client):
         old_token
     )
 
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
     assert response.status_code == 200
     assert response.json() == {
         "status": "success",
@@ -1345,7 +1345,7 @@ async def test_integration_refresh_expired_token(client):
         expired_token
     )
 
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -1363,7 +1363,7 @@ async def test_integration_refresh_expired_token(client):
 @pytest.mark.asyncio
 async def test_integration_refresh_token_no_auth(client):
     client.cookies.clear()
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
     assert response.status_code == 401
     assert response.json() == {
         "detail": {
@@ -1373,6 +1373,43 @@ async def test_integration_refresh_token_no_auth(client):
     }
 
 @pytest.mark.asyncio
+async def test_integration_logout_clears_session_and_cookie(client):
+    user = {
+        "id": str(ADMIN_USER["userid"]),
+        "username": ADMIN_USER["username"],
+        "role": "ADMIN"
+    }
+    token = create_token(user)
+
+    client.cookies.clear()
+    client.cookies.set(COOKIE_NAME, token)
+
+    response = client.post("/api/logout")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "Logged out successfully"
+    }
+    delete_cookie = response.headers["set-cookie"]
+    assert delete_cookie.startswith(f"{COOKIE_NAME}=")
+    assert "Max-Age=0" in delete_cookie
+
+    connection = await get_connection()
+    try:
+        issued_at = await connection.fetchval(
+            '''
+            SELECT userjwtissued
+            FROM "Users_DB"."Users"
+            WHERE userid = $1
+            ''',
+            ADMIN_USER["userid"]
+        )
+        assert issued_at is None
+    finally:
+        await connection.close()
+
+@pytest.mark.asyncio
 async def test_integration_refresh_token_invalid_token(client):
     client.cookies.clear()
     client.cookies.set(
@@ -1380,7 +1417,7 @@ async def test_integration_refresh_token_invalid_token(client):
         "this-is-not-a-valid-jwt"
     )
 
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
     assert response.status_code == 401
     assert response.json() == {
         "detail": {
@@ -1409,7 +1446,7 @@ async def test_integration_refresh_token_missing_expiry(client):
         token
     )
 
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
 
     assert response.status_code == 401
     assert response.json() == {
@@ -1439,7 +1476,7 @@ async def test_integration_refresh_token_missing_required_fields(client):
         token
     )
 
-    response = client.post("/api/refreshToken")
+    response = client.post("/api/refresh")
 
     assert response.status_code == 401
     assert response.json() == {
@@ -1448,6 +1485,92 @@ async def test_integration_refresh_token_missing_required_fields(client):
             "message": "Token missing required fields"
         }
     }
+
+# The refresh endpoint checks the token's claims against the stored user before issuing a new token
+def near_expiry_token(user_id: str, username: str, role: str) -> str:
+    return jwt.encode(
+        {
+            "sub": user_id,
+            "username": username,
+            "role": role,
+            "exp": datetime.now(timezone.utc) + timedelta(seconds=30)
+        },
+        AUTH_SETTINGS.JWT_SECRET,
+        algorithm=AUTH_SETTINGS.HASH
+    )
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_rejects_after_role_change(client, ensure_user_exists):
+    user_id = str(uuidlib.uuid4())
+    connection = await get_connection()
+
+    try:
+        username = await ensure_user_exists(connection, user_id, "RefreshDemoted", "ADMIN")
+
+        await connection.execute(
+            'UPDATE "Users_DB"."Users" SET userrole = $2 WHERE userid = $1',
+            uuidlib.UUID(user_id),
+            "USER"
+        )
+
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, near_expiry_token(user_id, username, "ADMIN"))
+        response = client.post("/api/refresh")
+    finally:
+        await connection.close()
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["message"] == INVALID_TOKEN
+    assert COOKIE_NAME not in response.cookies
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_rejects_deleted_user(client, ensure_user_exists):
+    user_id = str(uuidlib.uuid4())
+    connection = await get_connection()
+
+    try:
+        username = await ensure_user_exists(connection, user_id, "RefreshDeleted", "INVESTIGATOR")
+
+        await connection.execute(
+            'DELETE FROM "Users_DB"."Users" WHERE userid = $1',
+            uuidlib.UUID(user_id)
+        )
+
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, near_expiry_token(user_id, username, "INVESTIGATOR"))
+        response = client.post("/api/refresh")
+    finally:
+        await connection.close()
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["message"] == INVALID_TOKEN
+    assert COOKIE_NAME not in response.cookies
+
+@pytest.mark.asyncio
+async def test_integration_refresh_token_rejects_revoked_token(client, ensure_user_exists):
+    user_id = str(uuidlib.uuid4())
+    connection = await get_connection()
+
+    try:
+        username = await ensure_user_exists(connection, user_id, "RefreshRevoked", "INVESTIGATOR")
+
+        # A newer token was issued a minute ago (e.g. a later login), which is past the grace period
+        await connection.execute(
+            'UPDATE "Users_DB"."Users" SET userjwtissued = $2 WHERE userid = $1',
+            uuidlib.UUID(user_id),
+            datetime.now(timezone.utc) - timedelta(minutes=1)
+        )
+
+        # Expires in 30s, so it was issued well before that newer token
+        client.cookies.clear()
+        client.cookies.set(COOKIE_NAME, near_expiry_token(user_id, username, "INVESTIGATOR"))
+        response = client.post("/api/refresh")
+    finally:
+        await connection.close()
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["message"] == INVALID_TOKEN
+    assert COOKIE_NAME not in response.cookies
 
 
 # verify_jwt checks every token against the stored user, so a token that was valid stops working once the user changes

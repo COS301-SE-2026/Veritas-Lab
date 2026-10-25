@@ -9,6 +9,7 @@ import { sendPAPModelResults } from '@/lib/api/workbench';
 import PlugAndPlayReport from '@/components/common/plugAndPlayReport';
 import { PAPReport } from '@/types/api';
 import { useEffect } from 'react';
+import PlugAndPlayInfo from '@/components/common/plugAndPlayInfo';
 type PlugAndPlayModelsProps = {
     mediaUrl: string | undefined;
     mediaName: string;
@@ -63,7 +64,7 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
         if (!mediaUrl) {
             throw new Error('Media URL is undefined');
         }
-        const res = await fetch(mediaUrl);
+        const res = await fetch(mediaUrl, { cache: 'no-store' , mode: 'cors' });
 
         if (!res.ok) {
             throw new Error(`Failed to load evidence file: ${res.status}`);
@@ -166,9 +167,16 @@ export default function PlugAndPlayModels({ mediaUrl, mediaName, mediaKind, case
             <div className="min-w-[600px]">
                 <div className="vl-panel flex flex-col gap-4 p-6">
                     <div className="flex items-center gap-2">
-                        <BrainCircuit size={24} />
-                        <h2 className="text-lg font-semibold">Plug and Play Models</h2>
-                    </div>
+                    <BrainCircuit size={24} />
+                    <h2 className="text-lg font-semibold">Plug and Play Models</h2>
+                    <PlugAndPlayInfo
+                        mediaKind={mediaKind}
+                        mean={defaultVisualConfig.mean}
+                        std={defaultVisualConfig.std}
+                        threshold={defaultBaseModelConfig.threshold}
+                        classLabels={defaultBaseModelConfig.classLabels}
+                    />
+                </div>
 
                     <p className="text-sm text-(--color-text-muted)">
                         Load up your own capable ONNX models and run them on evidence files.

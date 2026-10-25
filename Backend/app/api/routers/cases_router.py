@@ -10,6 +10,13 @@ from app.core.cases import (
     CASE_NOT_FOUND,
     MISSING_CASE_ID,
     PDF_SCRIPTS_NOT_ALLOWED,
+    PDF_EMBEDDED_NOT_ALLOWED,
+    PDF_VERIFICATION_FAILED,
+    INVALID_PDF_PREFIX,
+    FILE_TOO_LARGE,
+    FILE_TYPE_MISMATCH,
+    IMAGE_DECODE_FAILED,
+    IMAGE_DIMENSIONS_TOO_LARGE,
     UNSUPPORTED_EXTENSION_PREFIX,
     MEDIA_ALREADY_ON_CASE,
     CASE_DELETE_NOT_ALLOWED,
@@ -1176,7 +1183,10 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
         },
         400: {
             "model": error_response,
-            "description": "Bad Request - malformed case id, unsupported file, or unsafe PDF.",
+            "description": (
+                "Bad Request - malformed case id, unsupported file, invalid file "
+                "content, invalid image, or unsafe PDF."
+            ),
             "content": {
                 "application/json": {
                     "examples": {
@@ -1206,6 +1216,77 @@ async def get_single_case(case_id: str, request: Request, connection: Annotated[
                                     "message": PDF_SCRIPTS_NOT_ALLOWED
                                 }
                             }
+                        },
+                        "Embedded content in PDF": {
+                            "summary": "PDF contains embedded files or media",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": PDF_EMBEDDED_NOT_ALLOWED
+                                }
+                            }
+                        },
+                        "PDF verification failure": {
+                            "summary": "PDF security could not be verified",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": PDF_VERIFICATION_FAILED
+                                }
+                            }
+                        },
+                        "Invalid PDF": {
+                            "summary": "PDF is malformed or corrupted",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": f"{INVALID_PDF_PREFIX}..."
+                                }
+                            }
+                        },
+                        "Content type mismatch": {
+                            "summary": "File bytes do not match the extension",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": FILE_TYPE_MISMATCH
+                                }
+                            }
+                        },
+                        "Invalid image": {
+                            "summary": "Image cannot be decoded or exceeds the pixel limit",
+                            "examples": {
+                                "Decode failure": {
+                                    "value": {
+                                        "detail": {
+                                            "status": "error",
+                                            "message": IMAGE_DECODE_FAILED
+                                        }
+                                    }
+                                },
+                                "Dimensions too large": {
+                                    "value": {
+                                        "detail": {
+                                            "status": "error",
+                                            "message": IMAGE_DIMENSIONS_TOO_LARGE
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        413: {
+            "model": error_response,
+            "description": "Payload Too Large - uploaded file exceeds the 50 MB limit.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": FILE_TOO_LARGE
                         }
                     }
                 }

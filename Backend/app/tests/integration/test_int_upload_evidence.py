@@ -1,4 +1,5 @@
 import uuid
+import base64
 
 import pytest
 import pytest_asyncio
@@ -39,7 +40,11 @@ def cookie_for(username: str, role: str, user_id: str | None = None) -> str:
 
 
 def png_bytes(marker: str) -> bytes:
-    return b"\x89PNG\r\n\x1a\n" + marker.encode()
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+        "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
+    return png + marker.encode()
 
 
 async def insert_case(conn, case_id, creator, closed, user_id):

@@ -12,8 +12,11 @@ from typing import Annotated
 from app.core.env import Auth_Settings
 from app.core.database import get_connection
 from fastapi.security import APIKeyCookie
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 COOKIE_NAME = "JWT_token"
+COOKIE_SAMESITE = "lax"
 SYSTEM_INIT_UUID = uuidlib.UUID("00000000-0000-0000-0000-000000000000")
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
@@ -22,6 +25,7 @@ DATABASE_ERROR="Database error"
 EXPIRED_TOKEN = "Token has expired"
 TOKEN_ISSUE_LEEWAY = timedelta(seconds=5)
 TOKEN_REVOCATION_GRACE = timedelta(seconds=30)
+limiter = Limiter(key_func=get_remote_address)
 
 INVALID_TOKEN_401 = {
             "description": "Authentication failed",
@@ -127,6 +131,11 @@ async def verify_jwt(request: Request, connection: asyncpg.Connection) -> dict:
             }
         )
 
+    return await verify_claims_against_db(payload, connection)
+
+# Checks a decoded token's claims against the Users table. Shared by verify_jwt and the refresh endpoint,
+# so a refresh can never mint a new token for a user that was deleted, renamed, had its role changed, or whose token was revoked
+async def verify_claims_against_db(payload: dict, connection: asyncpg.Connection) -> dict:
     user_id = payload.get("sub")
     username = payload.get("username")
     role = payload.get("role")
@@ -190,9 +199,11 @@ async def verify_jwt(request: Request, connection: asyncpg.Connection) -> dict:
 # A token issued before the user's latest login/refresh (userjwtissued) is revoked, but only once
 # TOKEN_REVOCATION_GRACE has passed since that newer token, so requests already in flight during a refresh still succeed.
 # TOKEN_ISSUE_LEEWAY covers exp being truncated to whole seconds and userjwtissued being set just after the token is made.
+# A NULL userjwtissued means the user has no active session (logout blanks it; login, register and refresh set it),
+# so every token is revoked, immediately and without the grace period.
 def is_token_revoked(expiry: int | float, last_issued: datetime | None) -> bool:
     if last_issued is None:
-        return False
+        return True
 
     token_issued = datetime.fromtimestamp(expiry, tz=timezone.utc) - timedelta(minutes=auth_settings.TOKEN_EXPIRE)
 
@@ -297,6 +308,17 @@ async def update_user_jwt_issued_via_user(user: dict, connection: asyncpg.Connec
             user["id"]
         )
 
+# Blanks userjwtissued so verify_jwt and refresh reject every token the user holds (used by logout)
+async def clear_user_jwt_issued(user_id: str, connection: asyncpg.Connection):
+    await connection.execute(
+            """
+            UPDATE "Users_DB"."Users"
+            SET userjwtissued = NULL
+            WHERE userid = $1::uuid
+            """,
+            user_id
+        )
+
 # Once the envs are setup this will need to be updated
 async def search_users_via_email(email: str, connection: asyncpg.Connection):
     row = await connection.fetchrow(
@@ -339,6 +361,20 @@ async def search_users_via_username(username: str, connection: asyncpg.Connectio
         "role": row["userrole"],
         "password": row["userpassword"]
     }
+
+# Checks in a single query if an email or username is already registered.
+async def user_exists_via_email_or_username(email: str, username: str, connection: asyncpg.Connection) -> bool:
+    row = await connection.fetchrow(
+            """
+            SELECT 1
+            FROM "Users_DB"."Users"
+            WHERE useremail = $1 OR username = $2
+            LIMIT 1
+            """,
+            email, username
+        )
+
+    return row is not None
 
 #Delete functionaslity hard deletes the user row by UUID in the db
 #Returns True if found and False if not found
@@ -458,12 +494,14 @@ def create_token(user: dict) ->str:
     }
 
 )
+@limiter.limit("10/minute")
 async def login(
-    request: login_request,
+    payload: login_request,
     response: Response,
+    request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    if not validate_email(request.email):
+    if not validate_email(payload.email):
         raise HTTPException(
             status_code=400,
             detail={
@@ -472,7 +510,7 @@ async def login(
             }
         )
 
-    if not validate_password(request.password):
+    if not validate_password(payload.password):
         raise HTTPException(
             status_code=400,
             detail={
@@ -481,18 +519,17 @@ async def login(
             }
         )
 
-    user = await search_users_via_email(request.email.strip(), connection)
+    user = await search_users_via_email(payload.email.strip(), connection)
 
+    # Always do one bcrypt operation, whether or not the account exists, so the response time
+    # does not reveal if the email is registered. hash_password costs the same as verify_password.
     if user is None:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "status": "error",
-                "message": AMBIGUOUS_ERROR
-            }
-        )
-    
-    if not verify_password(request.password, user["password"]):
+        hash_password(payload.password)
+        password_valid = False
+    else:
+        password_valid = verify_password(payload.password, user["password"])
+
+    if not password_valid:
         raise HTTPException(
             status_code=401,
             detail={
@@ -510,7 +547,7 @@ async def login(
         value=token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=COOKIE_SAMESITE,
         max_age=COOKIE_MAX_AGE
     )
 
@@ -614,12 +651,14 @@ async def login(
         }
     }
 )
+@limiter.limit("10/hour")
 async def register(
-    request: register_request,
+    payload: register_request,
     response: Response,
+    request: Request,
     connection: Annotated[asyncpg.Connection, Depends(get_connection)]
 ):
-    if not validate_email(request.email):
+    if not validate_email(payload.email):
         raise HTTPException(
             status_code=400,
             detail={
@@ -628,7 +667,7 @@ async def register(
             }
         )
 
-    if not validate_password(request.password):
+    if not validate_password(payload.password):
         raise HTTPException(
             status_code=400,
             detail={
@@ -637,7 +676,7 @@ async def register(
             }
         )
 
-    if not request.username or not request.username.strip():
+    if not payload.username or not payload.username.strip():
         raise HTTPException(
             status_code=400,
             detail={
@@ -646,20 +685,15 @@ async def register(
             }
         )
 
-    existing_user = await search_users_via_email(request.email.strip(), connection)
+    # Removed the time difference and made the search one request.
+    hashed_password = hash_password(payload.password)
+    user_exists = await user_exists_via_email_or_username(
+        payload.email.strip(),
+        payload.username.strip(),
+        connection
+    )
 
-    if existing_user is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "status": "error",
-                "message": AMBIGUOUS_ERROR
-            }
-        )
-    
-    existing_username = await search_users_via_username(request.username.strip(), connection)
-    
-    if existing_username is not None:
+    if user_exists:
         raise HTTPException(
             status_code=409,
             detail={
@@ -668,11 +702,10 @@ async def register(
             }
         )
 
-    hashed_password = hash_password(request.password)
     new_user = await insert_user(
-        request.email.strip(), 
-        request.username.strip(), 
-        "USER", 
+        payload.email.strip(),
+        payload.username.strip(),
+        "USER",
         hashed_password,
         connection
     )
@@ -686,7 +719,7 @@ async def register(
         value=token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=COOKIE_SAMESITE,
         max_age=COOKIE_MAX_AGE
     )
 
@@ -1479,7 +1512,7 @@ async def change_password(
     }
 
 @router.post(
-    "/refreshToken",
+    "/refresh",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(COOKIE_SCHEME)],
     summary="Refresh JWT Token",
@@ -1571,6 +1604,17 @@ async def change_password(
                                     "message": "Token missing required fields"
                                 }
                             }
+                        },
+
+                        "ClaimsMismatch": {
+                            "summary": "Token claims do not match the database",
+                            "description": "Triggered when the user no longer exists, the username or role in the JWT differs from the stored user, or the token was revoked by a newer login or refresh.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
                         }
                     }
                 }
@@ -1592,6 +1636,7 @@ async def change_password(
         }
     }
 )
+@limiter.limit("30/minute")
 async def refresh_token(
     request: Request,
     response: Response,
@@ -1663,18 +1708,6 @@ async def refresh_token(
             }
         )
 
-    current_time = datetime.now(timezone.utc).timestamp()
-    seconds_until_expiry = expiry - current_time
-
-    refresh_window = (auth_settings.TOKEN_EXPIRE * 60) / 2 # Refresh if less than half the token's lifespan remains. We could shorten it if needed
-    
-    if seconds_until_expiry > refresh_window:
-        return {
-            "status": "success",
-            "message": "Token does not need refreshing"
-        }
-        
-    
     if "sub" not in payload or "username" not in payload or "role" not in payload:
         raise HTTPException(
             status_code=401,
@@ -1683,11 +1716,26 @@ async def refresh_token(
                 "message": "Token missing required fields"
             }
         )
-    
+
+    # The claims must match the stored user before anything else, so a revoked or stale token never gets a 200
+    claims = await verify_claims_against_db(payload, connection)
+
+    current_time = datetime.now(timezone.utc).timestamp()
+    seconds_until_expiry = expiry - current_time
+
+    refresh_window = (auth_settings.TOKEN_EXPIRE * 60) / 2 # Refresh if less than half the token's lifespan remains. We could shorten it if needed
+
+    if seconds_until_expiry > refresh_window:
+        return {
+            "status": "success",
+            "message": "Token does not need refreshing"
+        }
+
+    # Build the new token from the DB-verified values, not the incoming payload
     user = {
-        "id":payload["sub"],
-        "username": payload["username"],
-        "role": payload["role"]
+        "id": claims["sub"],
+        "username": claims["username"],
+        "role": claims["role"]
     }
 
     new_token = create_token(user)
@@ -1708,11 +1756,139 @@ async def refresh_token(
         value=new_token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=COOKIE_SAMESITE,
         max_age=COOKIE_MAX_AGE
     )
 
     return {
         "status":"success",
         "message": "Token refreshed"
+    }
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(COOKIE_SCHEME)],
+    summary="Log out",
+    description="Blanks the user's token issue time so every JWT the user holds, including expired ones, can no longer be used or refreshed, and clears the authentication cookie. Expired tokens are accepted so an expired session can still be ended.",
+    responses={
+        200: {
+            "description": "User logged out",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "message": "Logged out successfully"
+                    }
+                }
+            }
+        },
+
+        401: {
+            "description": "Token authentication or validation failed",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "NotAuthenticated": {
+                            "summary": "Not authenticated",
+                            "description": "Triggered when the authentication cookie is missing or empty.",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": NOT_AUTH
+                                }
+                            }
+                        },
+
+                        "InvalidToken": {
+                            "summary": "Invalid JWT",
+                            "description": "Triggered when the JWT cannot be decoded, its claims do not match the database, or it was already revoked (for example by a previous logout).",
+                            "value": {
+                                "detail": {
+                                    "status": "error",
+                                    "message": INVALID_TOKEN
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
+        500: {
+            "description": "Failed to log out",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": {
+                            "status": "error",
+                            "message": "Failed to log out"
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+@limiter.limit("10/minute")
+async def logout(
+    request: Request,
+    response: Response,
+    connection: Annotated[asyncpg.Connection, Depends(get_connection)]
+):
+    token = request.cookies.get(COOKIE_NAME)
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": NOT_AUTH
+            }
+        )
+
+    # An expired token can still log out, because refresh would otherwise keep renewing it
+    try:
+        payload = jwt.decode(
+            token,
+            auth_settings.JWT_SECRET,
+            algorithms=[auth_settings.HASH],
+            options={"verify_exp": False}
+        )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "status": "error",
+                "message": INVALID_TOKEN
+            }
+        )
+
+    # Only a token that still matches the database may log the user out, so an old or stale
+    # token cannot be used to sign someone out of their current session
+    claims = await verify_claims_against_db(payload, connection)
+
+    try:
+        await clear_user_jwt_issued(claims["sub"], connection)
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "message": "Failed to log out"
+            }
+        )
+
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        httponly=True,
+        secure=True,
+        samesite=COOKIE_SAMESITE
+    )
+
+    return {
+        "status": "success",
+        "message": "Logged out successfully"
     }
