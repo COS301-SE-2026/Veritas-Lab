@@ -143,6 +143,7 @@ def test_refresh_token_success_within_one_minute(monkeypatch):
 
     assert auth.COOKIE_NAME in response.cookies
     assert response.cookies.get(auth.COOKIE_NAME) == "new-mock-token"
+    assert "SameSite=lax" in response.headers["set-cookie"]
 
 def test_refresh_token_success_when_expired(monkeypatch):
     decode_call_count = {"count": 0}
@@ -352,6 +353,7 @@ def test_logout_success(monkeypatch):
     delete_cookie = response.headers["set-cookie"]
     assert delete_cookie.startswith(f"{COOKIE_NAME}=")
     assert "Max-Age=0" in delete_cookie
+    assert "SameSite=lax" in delete_cookie
     clear_session.assert_awaited_once()
     assert clear_session.await_args.args[0] == USER_ID
 

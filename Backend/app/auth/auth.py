@@ -16,6 +16,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 COOKIE_NAME = "JWT_token"
+COOKIE_SAMESITE = "lax"
 SYSTEM_INIT_UUID = uuidlib.UUID("00000000-0000-0000-0000-000000000000")
 AMBIGUOUS_ERROR= "The email and/or password are invalid"
 INVALID_TOKEN= "Invalid token"
@@ -546,7 +547,7 @@ async def login(
         value=token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=COOKIE_SAMESITE,
         max_age=COOKIE_MAX_AGE
     )
 
@@ -718,7 +719,7 @@ async def register(
         value=token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=COOKIE_SAMESITE,
         max_age=COOKIE_MAX_AGE
     )
 
@@ -1755,7 +1756,7 @@ async def refresh_token(
         value=new_token,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite=COOKIE_SAMESITE,
         max_age=COOKIE_MAX_AGE
     )
 
@@ -1884,7 +1885,7 @@ async def logout(
         key=COOKIE_NAME,
         httponly=True,
         secure=True,
-        samesite="none"
+        samesite=COOKIE_SAMESITE
     )
 
     return {
