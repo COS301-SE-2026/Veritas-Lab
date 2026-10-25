@@ -8,6 +8,8 @@ from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionEr
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 from pypdf import PdfReader
+from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject
+from PIL import Image
 from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.client import Config
@@ -21,6 +23,9 @@ CASE_ALREADY_EXISTS = "This case already exists"
 PDF_SCRIPTS_NOT_ALLOWED = "We don't allow scripts in pdfs. They are a security concern."
 PDF_VERIFICATION_FAILED = "Could not verify PDF security. File rejected."
 INVALID_PDF_PREFIX = "Invalid or corrupted PDF file: "
+PDF_EMBEDDED_NOT_ALLOWED = "We don't allow embedded files in pdfs. They are a security concern."
+IMAGE_DECODE_FAILED = "Image could not be decoded. File rejected."
+IMAGE_DIMENSIONS_TOO_LARGE = "Image dimensions exceed the maximum allowed size"
 INVALID_CASE_ID_UUID = "Invalid case_id UUID"
 UNSUPPORTED_EXTENSION_PREFIX = "Unsupported file extension: "
 MEDIA_ALREADY_ON_CASE = "Image already associated with this case"
@@ -31,9 +36,13 @@ CASE_DELETE_NOT_ALLOWED = "Only the creator of an open case or an admin can dele
 STORAGE_DELETE_FAILED_PREFIX = "Failed to delete stored object "
 
 FILE_TOO_LARGE = "File exceeds the maximum allowed size of 50MB"
+FILE_TYPE_MISMATCH = "File content does not match its extension"
  
 MAX_UPLOAD_SIZE_BYTES = 50 * 1048576  # 50MB this is later going to be a env
 # 1MB = 1024 times 1024
+
+MAX_UPLOAD_IMAGE_PIXELS = 80_000_000
+PDF_MAX_OBJECTS = 500_000
 
 minio_settings = Minio_Settings()
 other_settings = Other_Settings()
@@ -143,60 +152,221 @@ async def read_upload_with_size_limit(media: UploadFile) -> bytes:
         chunks.append(chunk)
  
     return b"".join(chunks)
- 
+
+EXTENSION_CONTENT_TYPES = {
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".pdf": {"application/pdf"},
+    ".mp4": {"video/mp4"},
+}
+
+# Works out the real content type of a file from its first bytes. Returns None if it is not a known type.
+def detect_content_type(file_bytes: bytes) -> str | None:
+    head = file_bytes[:16]
+
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"%PDF-"):
+        return "application/pdf"
+    if head[4:8] == b"ftyp":
+        return "video/mp4"
+
+    return None
+
+def validate_upload_content(extension: str, file_bytes: bytes) -> str:
+    allowed_types = EXTENSION_CONTENT_TYPES.get(extension)
+
+    if allowed_types is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": f"{UNSUPPORTED_EXTENSION_PREFIX}{extension}"
+            }
+        )
+
+    detected_type = detect_content_type(file_bytes)
+
+    if detected_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": FILE_TYPE_MISMATCH
+            }
+        )
+
+    return detected_type
+
+
+def find_blocked_pdf_content(reader: PdfReader) -> str | None:
+    active_keys = frozenset({"/OpenAction", "/AA", "/JS", "/JavaScript", "/XFA", "/Launch"})
+    embedded_keys = frozenset({"/EmbeddedFiles", "/EF", "/AF"})
+    blocked_actions = frozenset({
+        "/JavaScript",
+        "/Launch",
+        "/SubmitForm",
+        "/ImportData",
+        "/GoToR",
+        "/GoToE",
+        "/Rendition",
+        "/RichMediaExecute",
+    })
+    blocked_annotations = frozenset({"/FileAttachment", "/RichMedia", "/3D"})
+
+    stack = [reader.trailer]
+
+    # Inspect unreferenced objects listed in the cross-reference tables as well.
+    for generation, entries in getattr(reader, "xref", {}).items():
+        for object_number in entries:
+            stack.append(IndirectObject(object_number, generation, reader))
+    for object_number in getattr(reader, "xref_objStm", {}):
+        stack.append(IndirectObject(object_number, 0, reader))
+
+    seen: set[tuple[int, int]] = set()
+    visited = 0
+
+    while stack:
+        current = stack.pop()
+
+        if isinstance(current, IndirectObject):
+            reference = (current.idnum, current.generation)
+            if reference in seen:
+                continue
+            seen.add(reference)
+            current = current.get_object()
+
+        visited += 1
+        if visited > PDF_MAX_OBJECTS:
+            raise ValueError("Too many objects to verify")
+
+        if isinstance(current, ArrayObject):
+            for item in current:
+                if isinstance(item, (IndirectObject, ArrayObject, DictionaryObject)):
+                    stack.append(item)
+
+        elif isinstance(current, DictionaryObject):
+            for key, value in dict.items(current):
+                if key in active_keys:
+                    return PDF_SCRIPTS_NOT_ALLOWED
+                if key in embedded_keys:
+                    return PDF_EMBEDDED_NOT_ALLOWED
+
+                if key in ("/S", "/Subtype", "/Type"):
+                    name = value.get_object() if isinstance(value, IndirectObject) else value
+                    if key == "/S" and name in blocked_actions:
+                        return PDF_SCRIPTS_NOT_ALLOWED
+                    if key == "/Subtype" and name in blocked_annotations:
+                        return PDF_EMBEDDED_NOT_ALLOWED
+                    if key == "/Type" and name == "/EmbeddedFile":
+                        return PDF_EMBEDDED_NOT_ALLOWED
+
+                if isinstance(value, (IndirectObject, ArrayObject, DictionaryObject)):
+                    stack.append(value)
+
+    return None
 
 # pdf script detection helper
 def pdf_script_helper(file_bytes):
     try:
-        pdf_file = io.BytesIO(file_bytes)
-        reader = PdfReader(pdf_file)
+        reader = PdfReader(io.BytesIO(file_bytes))
 
-        try: 
-            root = reader.trailer.get("/Root", {}) #checking for automatic triggers
-            if root:
-                root = root.get_object()
-                if "/OpenAction" in root or "/AA" in root:
-                    raise HTTPException(
-                        status_code=400, 
-                        detail={
-                            "status": "error",
-                            "message": PDF_SCRIPTS_NOT_ALLOWED
-                        }
-                    )
+        try:
+            if reader.is_encrypted and not reader.decrypt(""):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": PDF_VERIFICATION_FAILED
+                    }
+                )
 
-                if "/Names" in root:
-                    names=root["/Names"].get_object()
-                    if "/JavaScript" in names:
-                        raise HTTPException(
-                            status_code=400,
-                            detail={
-                                "status": "error",
-                                "message": PDF_SCRIPTS_NOT_ALLOWED
-                            }
-                        )
+            blocked_message = find_blocked_pdf_content(reader)
+
+            if blocked_message is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": blocked_message
+                    }
+                )
+
         except HTTPException:
             raise
-        except KeyError :
-            pass
-        except Exception :
+        except Exception:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "status": "error",
                     "message": PDF_VERIFICATION_FAILED
                 }
-            ) 
+            )
     except HTTPException:
-        raise 
+        raise
     except Exception as e:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail={
                 "status": "error",
                 "message": f"{INVALID_PDF_PREFIX}{str(e)}"
             }
         )
-                   
+
+# Runs the script check for uploads that need one. Only PDFs are checked for now.
+def check_upload_for_scripts(extension: str, file_bytes: bytes):
+    if extension == ".pdf":
+        pdf_script_helper(file_bytes)
+
+IMAGE_FORMATS = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG"}
+
+def check_image_decodes(extension: str, file_bytes: bytes):
+    expected_format = IMAGE_FORMATS.get(extension)
+
+    if expected_format is None:
+        return
+
+    try:
+        with Image.open(io.BytesIO(file_bytes)) as image:
+            if image.format != expected_format:
+                raise ValueError("Image format does not match its extension")
+
+            width, height = image.size
+            if width * height > MAX_UPLOAD_IMAGE_PIXELS:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "error",
+                        "message": IMAGE_DIMENSIONS_TOO_LARGE
+                    }
+                )
+
+            image.verify()  # checks the file structure. The image has to be opened again before it can be decoded
+
+        with Image.open(io.BytesIO(file_bytes)) as image:
+            image.load()  # decodes every pixel
+
+    except HTTPException:
+        raise
+    except Image.DecompressionBombError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": IMAGE_DIMENSIONS_TOO_LARGE
+            }
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "message": IMAGE_DECODE_FAILED
+            }
+        )
 
 async def collect_orphan_media(connection: asyncpg.Connection, evidence) -> list[dict]:
     """
@@ -374,9 +544,11 @@ class Case:
         #Cannot trust the supplied extension ever
         file_bytes = await read_upload_with_size_limit(media) # Cannot trust supplied file size.
         await media.seek(0)
+        # The type comes from the file's own bytes, never from the extension or the client's Content-Type header
+        content_type = validate_upload_content(local_extension, file_bytes)
         #script detection
-        if local_extension == ".pdf":
-            pdf_script_helper(file_bytes)
+        await asyncio.to_thread(check_upload_for_scripts, local_extension, file_bytes)
+        await asyncio.to_thread(check_image_decodes, local_extension, file_bytes)
             
         # It is impossible for case id to be an invalid uuid since it is typed to UUID
 
@@ -465,7 +637,8 @@ class Case:
                         Bucket=bucket_name,
                         Key=target_filename,
                         Body=file_stream,
-                        ContentType=media.content_type
+                        ContentType=content_type,
+                        ContentDisposition="attachment"
                     )
 
                     await connection.execute(
@@ -489,7 +662,9 @@ class Case:
                 'get_object',
                 Params={
                     'Bucket': bucket_name,
-                    'Key': target_filename
+                    'Key': target_filename,
+                    'ResponseContentType': content_type,
+                    'ResponseContentDisposition': 'attachment'
                 },
                 ExpiresIn=3600 
             )
@@ -861,5 +1036,3 @@ class Case:
                     "message": DATABASE_ERROR_MESSAGE
                 }
             )
-
-

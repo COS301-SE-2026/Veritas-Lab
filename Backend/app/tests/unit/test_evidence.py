@@ -5,7 +5,9 @@ from fastapi.testclient import TestClient
 import io
 import uuid
 import asyncpg
+import base64
 from botocore.exceptions import EndpointConnectionError
+from pypdf.generic import DictionaryObject
 
 from app.api.main import app
 from app.core.cases import (
@@ -23,6 +25,12 @@ from app.tests.unit.database_override import unit_get_connection
 
 
 client = TestClient(app)
+
+VALID_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+VALID_PDF = b"%PDF-1.4\n%test pdf\n"
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +51,7 @@ async def test_images_upload_success(mockMediaRelay,mockUuid, mockget_object, mo
     """
     Test successful evidence processing and extension identification
     """
-    fileContent = b"A fake binary for a png"
+    fileContent = VALID_PNG
     testContent = io.BytesIO(fileContent)
     
     mockMedia = UploadFile(
@@ -139,7 +147,7 @@ async def test_same_image_different_name(mockUuid, mockget_object, mockDbConnect
     """
     Testing the image hash for dupe  prevention
     """
-    fileContent = b"A fake binary for a png"
+    fileContent = VALID_PNG
     
     # First upload: success.png
     testContent1 = io.BytesIO(fileContent)
@@ -231,7 +239,7 @@ async def test_duplicate_report_violates_constraint(mockUuid, mockget_object, mo
     """
     Test uniqueness error handling when dupes in same case appear
     """
-    fileContent = b"A fake binary for a png"
+    fileContent = VALID_PNG
     
     # First upload: success.png
     testContent1 = io.BytesIO(fileContent)
@@ -550,7 +558,7 @@ When an admin tries to delete a record that does not exist. (returns DELETE 0). 
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
 async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
-    fileContent = b"fake pdf bytes"
+    fileContent = VALID_PDF
     testContent = io.BytesIO(fileContent)
 
     mockMedia = UploadFile(
@@ -559,11 +567,13 @@ async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
         headers={"content-type": "application/pdf"}
     )
 
-    mockRootIndirect = MagicMock()
-    mockRootIndirect.get_object.return_value = {"/OpenAction": MagicMock()}
-
     mockReader = MagicMock()
-    mockReader.trailer = {"/Root": mockRootIndirect}
+    mockReader.trailer = DictionaryObject({
+        "/Root": DictionaryObject({"/OpenAction": DictionaryObject()})
+    })
+    mockReader.is_encrypted = False
+    mockReader.xref = {}
+    mockReader.xref_objStm = {}
     mockPdfReaderClass.return_value = mockReader
 
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
@@ -585,7 +595,7 @@ async def test_add_evidence_pdf_open_action_rejected(mockPdfReaderClass):
 @pytest.mark.asyncio
 @patch("app.core.cases.PdfReader")
 async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
-    fileContent = b"fake pdf bytes"
+    fileContent = VALID_PDF
     testContent = io.BytesIO(fileContent)
 
     mockMedia = UploadFile(
@@ -594,14 +604,15 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
         headers={"content-type": "application/pdf"}
     )
 
-    mockNamesIndirect = MagicMock()
-    mockNamesIndirect.get_object.return_value = {"/JavaScript": MagicMock()}
-
-    mockRootIndirect = MagicMock()
-    mockRootIndirect.get_object.return_value = {"/Names": mockNamesIndirect}
-
     mockReader = MagicMock()
-    mockReader.trailer = {"/Root": mockRootIndirect}
+    mockReader.trailer = DictionaryObject({
+        "/Root": DictionaryObject({
+            "/Names": DictionaryObject({"/JavaScript": DictionaryObject()})
+        })
+    })
+    mockReader.is_encrypted = False
+    mockReader.xref = {}
+    mockReader.xref_objStm = {}
     mockPdfReaderClass.return_value = mockReader
 
     case = Case(case_creator="New_Dev", case_name="The Reciepts exposed")
@@ -626,7 +637,7 @@ async def test_add_evidence_pdf_javascript_rejected(mockPdfReaderClass):
 @patch("app.core.cases.PdfReader")
 @patch("uuid.uuid4")
 async def test_add_evidence_pdf_being_uploaded_success(mockUuid,mockPdfReaderClass, mockget_object, mockDbConnect):
-    fileContent = b"fake pdf bytes"
+    fileContent = VALID_PDF
     testContent = io.BytesIO(fileContent)
 
     mockMedia = UploadFile(
@@ -636,10 +647,10 @@ async def test_add_evidence_pdf_being_uploaded_success(mockUuid,mockPdfReaderCla
     )
 
     mockRootIndirect = MagicMock()
-    mockRootIndirect.get_object.return_value = {}
+    mockRootIndirect.get_object.return_value = DictionaryObject()
 
     mockReader = MagicMock()
-    mockReader.trailer = {"/Root": mockRootIndirect}
+    mockReader.trailer = DictionaryObject({"/Root": mockRootIndirect})
     mockPdfReaderClass.return_value = mockReader
 
     fakeUuidString = "33333333-abcd-ef01-2345-6789abcdef01"
@@ -803,7 +814,7 @@ def test_delete_evidence_user_forbidden(monkeypatch):
 @patch("app.core.cases.get_object")
 @patch("asyncpg.connect")
 async def test_add_evidence_storage_failure_returns_500(mockDbConnect, mockget_object):
-    fileContent = b"A fake binary for a png"
+    fileContent = VALID_PNG
     testContent = io.BytesIO(fileContent)
 
     mockMedia = UploadFile(
