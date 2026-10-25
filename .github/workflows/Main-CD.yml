@@ -1,5 +1,5 @@
 name: Main CD
-#Only runs when codes gets on main so either a merged PR or a direct push.
+
 on:
     push:
         branches: ["main"]
@@ -12,12 +12,12 @@ permissions:
 
 jobs:
     deploy-azure:
-        environment: Prod
+        environment: Dev
         runs-on: ubuntu-latest
         timeout-minutes: 15
         steps:
             - uses: actions/checkout@v7
-              with:
+              with: 
                 lfs: false
 
             - name: Restore model cache
@@ -59,73 +59,33 @@ jobs:
                 registry: ghcr.io
                 username: ${{ github.actor }}
                 password: ${{ secrets.GITHUB_TOKEN }}
+
             - uses: docker/build-push-action@v7
               with:
                 context: ./Backend
                 push: true
-                tags: ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}
+                tags: ghcr.io/cos301-se-2026/veritas-lab-backend:dev-${{ github.sha }}
+
             - uses: docker/build-push-action@v7
               with:
                 context: ./frontend
                 push: true
-                tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}
+                tags: ghcr.io/cos301-se-2026/veritas-lab-frontend:dev-${{ github.sha }}
+
             - uses: azure/login@v3
               with:
-                client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
-                tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
-                subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_02B6A6C1098B4F408E9DEBBC5971A95D }}
+                client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_DEV }}
+                tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DEV }}
+                subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DEV }}
+                
             - uses: azure/webapps-deploy@v3
               with:
-                app-name: veritas-lab-api
+                app-name: veritas-lab-dev
                 sitecontainers-config: >-
                     [
                         {
                             "name": "main",
-                            "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ github.sha }}",
-                            "targetPort": 3000,
-                            "isMain": true,
-                            "authType": "UserCredentials",
-                            "userName": "${{ secrets.GHCR_USERNAME }}",
-                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
-                        },
-                        {
-                            "name": "backend",
-                            "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:${{ github.sha }}",
-                            "targetPort": 8000,
-                            "isMain": false,
-                            "authType": "UserCredentials",
-                            "userName": "${{ secrets.GHCR_USERNAME }}",
-                            "passwordSecret": "${{ secrets.GHCR_PAT}}"
-                        }
-                    ]
-    rollback:
-        name: rollback
-        needs: [deploy-azure]
-        if: failure()
-        environment: Prod
-        runs-on: ubuntu-latest
-        timeout-minutes: 20
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                fetch-depth: 2
-
-            - id: previous
-              run: echo "sha=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
-            - uses: azure/login@v3
-              with:
-                client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56CD338B385F4779A7BC4676B29FB956 }}
-                tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BED7D1D0A9DC411E9AE99306D126609E }}
-                subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_02B6A6C1098B4F408E9DEBBC5971A95D }}
-
-            - uses: azure/webapps-deploy@v3
-              with:
-                app-name: veritas-lab-api
-                sitecontainers-config: >-
-                    [
-                        {
-                            "name": "main",
-                            "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:${{ steps.previous.outputs.sha }}",
+                            "image": "ghcr.io/cos301-se-2026/veritas-lab-frontend:dev-${{ github.sha }}",
                             "targetPort": 3000,
                             "isMain": true,
                             "authType": "UserCredentials",
@@ -134,7 +94,7 @@ jobs:
                         },
                         {
                             "name": "backend",
-                            "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:${{ steps.previous.outputs.sha }}",
+                            "image": "ghcr.io/cos301-se-2026/veritas-lab-backend:dev-${{ github.sha }}",
                             "targetPort": 8000,
                             "isMain": false,
                             "authType": "UserCredentials",
