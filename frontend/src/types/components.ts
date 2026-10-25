@@ -219,6 +219,7 @@ export type SavedNoteNode = {
     id: string;
     position: BoardPosition;
     text: string;
+    author?: string;
 }
 
 export type SavedEdge = {

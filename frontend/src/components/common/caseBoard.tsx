@@ -15,6 +15,7 @@ import { generateBoard, toEvidenceNode, evidenceNodeId  } from '@/lib/data/board
 import type { CaseBoard, SavedEdge } from '@/types/components';
 import { CaseEdgeData } from "./customEdge";
 import { getCaseBoard, saveCaseBoard } from '@/lib/api/caseBoard';
+import { useCurrentUser } from '@/context/UserRoleContext';
 type CaseBoardProps = {
     caseId: string;
     evidenceList: CaseEvidence[];
@@ -31,13 +32,17 @@ function formatBoard(nodes: Node[], edges: Edge[]): CaseBoard {
             position: { x: node.position.x, y: node.position.y }
         }));
 
-    const noteNodes = nodes
+        const noteNodes = nodes
         .filter((node) => node.type === 'note')
-        .map((node) => ({
-            id: node.id,
-            position: { x: node.position.x, y: node.position.y },
-            text: (node.data as NoteNodeData).text ?? ''
-        }));
+        .map((node) => {
+            const data = node.data as NoteNodeData;
+            return {
+                id: node.id,
+                position: { x: node.position.x, y: node.position.y },
+                text: data.text ?? '',
+                ...(data.author ? { author: data.author } : {})
+            };
+        });
     
     const savedEdges: SavedEdge[] = edges.map((edge) => {
         const data = edge.data as CaseEdgeData | undefined;
@@ -77,7 +82,7 @@ function extractBoard(board: CaseBoard | null | undefined, evidenceList: CaseEvi
         id: saved.id,
         type: 'note',
         position: saved.position,
-        data: { text: saved.text }
+        data: { text: saved.text, author: saved.author }
     }));
 
     const nodes = [...evidenceNodes, ...noteNodes];
@@ -113,6 +118,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
     const { screenToFlowPosition, fitView } = useReactFlow();
     const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Evidence');
     const noteCount = useRef(0);
+    const currentUser = useCurrentUser();
     const onConnect = (connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'custom-edge' }, eds))
     const [fullscreen, setFullscreen] = useState(false);
     const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -206,7 +212,7 @@ export function CaseBoardInner({ caseId, evidenceList, readOnly = false }: CaseB
             id: `note-${Date.now()}-${noteCount.current++}`,
             type: 'note',
             position: { x: position.x - 112, y: position.y - 112 },
-            data: { text: '' }
+            data: { text: '', ...(currentUser?.username ? { author: currentUser.username } : {}) }
         }
         setNodes((prevNodes) => [
             ...prevNodes,

@@ -6,6 +6,7 @@ import Pin from '@/components/common/boardPin'
 
 export type NoteNodeData = {
     text: string
+    author?: string
 }
 
 export default function NoteNode({ id, data, selected }: NodeProps<Node<NoteNodeData>>) {
@@ -27,6 +28,10 @@ export default function NoteNode({ id, data, selected }: NodeProps<Node<NoteNode
                 onChange={(event) => updateNodeData(id, { text: event.target.value })}
                 onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); }}
             />
+
+            <div className="shrink-0 truncate px-3 pb-2 text-right text-[11px] italic text-[#3b3620aa]">
+                - {data.author || 'Unknown'}
+            </div>
 
             {selected && (
                 <button
