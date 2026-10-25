@@ -2,11 +2,20 @@ import { getStraightPath, BaseEdge, type EdgeProps, type Edge, useReactFlow, Edg
 import { X, Pencil } from 'lucide-react';
 import { PinSize } from '@/components/common/boardPin';
 import { useState } from 'react';
+import type { CaseEdgeVariant } from '@/types/components';
 
 export type CaseEdgeData = {
-    variant?: 'timeline';
+    variant?: CaseEdgeVariant;
     label?: string;
 }
+
+// Shared with the board legend so colours stay in sync
+export const EDGE_STYLES: Record<CaseEdgeVariant | 'manual', { stroke: string; dash?: string; legend: string }> = {
+    manual: { stroke: '#b3261e', legend: 'Your links' },
+    timeline: { stroke: '#2e9e66', legend: 'Timeline (time gap · distance)' },
+    conflict: { stroke: '#d97706', legend: 'Implausible travel between captures' },
+    device: { stroke: '#2563eb', dash: '6 4', legend: 'Same capture device' },
+};
 
 type CustomEdge = Edge<CaseEdgeData, 'custom'>;
 
@@ -44,7 +53,8 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sel
                 path={path}
                 interactionWidth={14}
                 style={{
-                    stroke: data?.variant === 'timeline' ? '#2e9e66' : '#b3261e',
+                    stroke: EDGE_STYLES[data?.variant ?? 'manual'].stroke,
+                    strokeDasharray: EDGE_STYLES[data?.variant ?? 'manual'].dash,
                     strokeWidth: selected ? 3 : 2,
                     strokeLinecap: 'round'
                 }}

@@ -4,7 +4,7 @@ import {useDroppable} from '@dnd-kit/react';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import '@xyflow/react/dist/style.css';
 import EvidenceNode from '@/components/common/evidenceNode';
-import CustomEdge from '@/components/common/customEdge'
+import CustomEdge, { EDGE_STYLES, type CaseEdgeData } from '@/components/common/customEdge'
 import { Layers, StickyNote, Minus, Maximize, Minimize2, Maximize2, Plus, Loader2, Check, Save } from 'lucide-react';
 import NoteNode from '@/components/common/noteNode'
 import Button from '@/components/ui/button'
@@ -34,7 +34,28 @@ const edgeTypes = {
 'custom-edge': CustomEdge,
 };
 
-// A better toolbar than the defualt one 
+// Explains the link colours, only listing the kinds that are on the board
+function EdgeLegend({ edges }: Readonly<{ edges: Edge[] }>) {
+    const present = new Set(edges.map((edge) => (edge.data as CaseEdgeData | undefined)?.variant ?? 'manual'));
+    const generated = (['timeline', 'conflict', 'device'] as const).filter((variant) => present.has(variant));
+    if (generated.length === 0) return null;
+
+    const rows = present.has('manual') ? [...generated, 'manual' as const] : generated;
+    return (
+        <div className='flex flex-col gap-1 rounded-[var(--radius-md)] border border-(--color-line) bg-(--color-surface) px-3 py-2 text-[11px] text-(--color-text-muted) shadow-(--shadow-xs)'>
+            {rows.map((variant) => (
+                <div key={variant} className='flex items-center gap-2'>
+                    <svg width='22' height='6' aria-hidden='true'>
+                        <line x1='0' y1='3' x2='22' y2='3' stroke={EDGE_STYLES[variant].stroke} strokeWidth='2' strokeDasharray={EDGE_STYLES[variant].dash} />
+                    </svg>
+                    {EDGE_STYLES[variant].legend}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// A better toolbar than the defualt one
 function CustomBoardToolbar({ onAddNote, edgesOnTop, onToggleEdges, fullscreen, onToggleFullscreen, onSave, saveState, unsaved } : Readonly<{ 
     onAddNote?: () => void; 
     edgesOnTop: boolean; 
@@ -194,6 +215,9 @@ export default function CaseBoardCanvas({
             minZoom={0.1}
     	>
         <Background />
+        <Panel position='top-left'>
+            <EdgeLegend edges={edges} />
+        </Panel>
         <Panel position='bottom-center' className='!mb-10'>
             <CustomBoardToolbar 
                 onAddNote={readOnly ? undefined : addNoteAtCenter}
@@ -217,7 +241,7 @@ export default function CaseBoardCanvas({
                 ) : (
                     <>
                         <p className='max-w-sm text-sm text-(--color-text-muted)'>
-                            Drag evidence onto the board, or generate a timeline from the existing evidence.    
+                            Drag evidence onto the board, or generate one from the evidence metadata (time, location and device).
                         </p>
                         <Button 
                             variant='secondary'
@@ -227,7 +251,7 @@ export default function CaseBoardCanvas({
                             disabled={!canGenerate}
                         />
                         {!canGenerate && (
-                            <p className='text-xs text-(--color-text-subtle)'>No evidence in this case has a captured timestamp</p>
+                            <p className='text-xs text-(--color-text-subtle)'>No evidence in this case has a timestamp, location or device in its metadata</p>
                         )}
                     </>
                 )}
